@@ -101,7 +101,7 @@ def envoy_cc_fuzz_test(
     envoy_cc_test_library(
         name = test_lib_name,
         deps = deps + envoy_stdlib_deps() + [
-            repository + "//test/fuzz:fuzz_init_lib",
+            repository + "//test/fuzz:fuzz_runner_lib",
             repository + "//test/test_common:test_version_linkstamp",
         ],
         repository = repository,

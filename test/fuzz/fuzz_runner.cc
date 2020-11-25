@@ -59,3 +59,14 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
 
 } // namespace Fuzz
 } // namespace Envoy
+
+// LLVMFuzzerInitialize() is called by LibFuzzer once before fuzzing starts.
+// NOLINTNEXTLINE(readability-identifier-naming)
+extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
+  // Before parsing gmock flags, set the default value of flag --gmock_verbose to "error".
+  // This suppresses logs from NiceMock objects, which can be noisy and provide little value.
+  testing::GMOCK_FLAG(verbose) = "error";
+  testing::InitGoogleMock(argc, *argv);
+  Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::critical);
+  return 0;
+}

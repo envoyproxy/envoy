@@ -55,15 +55,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "fuzz_init_lib",
-    srcs = ["fuzz_init.cc"],
-    hdrs = ["fuzz_init.h"],
-    deps = [
-        ":fuzz_runner_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     deps = [
