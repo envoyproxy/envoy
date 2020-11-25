@@ -75,7 +75,8 @@ message OAuth2Config {
   // Any request that matches any of the provided matchers will be passed through without OAuth validation.
   repeated config.route.v3.HeaderMatcher pass_through_matcher = 8;
 
-  // Space separated list of scopes to be claimed in the authorization request
+  // Space separated list of scopes to be claimed in the authorization request.
+  // Defaults to "user" if not provided.
   string auth_scopes = 9;
 }
 
