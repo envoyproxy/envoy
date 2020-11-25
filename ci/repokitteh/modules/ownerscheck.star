@@ -194,7 +194,8 @@ def _comment(config, results, assignees, force=False):
     if spec.auto_assign:
       api_assignee = None
       # Find owners via github.team_get_by_name, github.team_list_members
-      team = github.team_get_by_name(owner)
+      team_name = owner.split('/')[1]
+      team = github.team_get_by_name(team_name)
       members = [m['login'] for m in github.team_list_members(team['id'])]
       # Is a team member already assigned? The first assigned team member is picked. Bad O(n^2) as
       # Starlark doesn't have sets, n is small.
