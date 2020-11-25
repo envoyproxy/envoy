@@ -35,8 +35,10 @@ if [[ -n "$1" ]]; then
   BASE_DOCKER_IMAGE="ubuntu:20.04"
   # Copy the binary to deal with symlinks in Bazel cache and Docker daemon confusion.
   declare -r LOCAL_ENVOY="envoy-binary"
-  cp -f "$1" "${PWD}/${LOCAL_ENVOY}"
-  sed -i -e "s@# ADD %local envoy bin%@ADD ${LOCAL_ENVOY}@" "${DOCKER_BUILD_FILE}"
+  declare -r LOCAL_ENVOY_DIR="build_envoy"
+  mkdir -p "${LOCAL_ENVOY_DIR}"
+  cp -f "$1" "${LOCAL_ENVOY_DIR}/${LOCAL_ENVOY}"
+  sed -i -e "s@# ADD %local envoy bin%@ADD ${LOCAL_ENVOY_DIR}/${LOCAL_ENVOY}@" "${DOCKER_BUILD_FILE}"
 fi
 
 cat "${DOCKER_BUILD_FILE}"
@@ -44,6 +46,6 @@ cat "${DOCKER_BUILD_FILE}"
 docker build -t "envoy-google-vrp:local" --build-arg "ENVOY_VRP_BASE_IMAGE=${BASE_DOCKER_IMAGE}" -f "${DOCKER_BUILD_FILE}" .
 
 if [[ -n "$1" ]]; then
-  rm -f "${LOCAL_ENVOY}"
+  rm -rf "${LOCAL_ENVOY_DIR}"
 fi
 rm -r "${BUILD_DIR}"
