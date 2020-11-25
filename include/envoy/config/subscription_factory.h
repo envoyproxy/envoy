@@ -44,7 +44,7 @@ public:
    * @return SubscriptionPtr subscription object corresponding for collection_locator.
    */
   virtual SubscriptionPtr
-  collectionSubscriptionFromUrl(const udpa::core::v1::ResourceLocator& collection_locator,
+  collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,
                                 absl::string_view type_url, Stats::Scope& scope,
                                 SubscriptionCallbacks& callbacks,
