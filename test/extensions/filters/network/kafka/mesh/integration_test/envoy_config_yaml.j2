@@ -6,7 +6,11 @@ static_resources:
         port_value: {{ data['kafka_envoy_port'] }}
     filter_chains:
     - filters:
-      - name: envoy.filters.network.kafka_mesh
+      - name: requesttypes
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
+          stat_prefix: testfilter
+      - name: mesh
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh
           advertised_host: "127.0.0.1"

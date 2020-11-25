@@ -10,7 +10,7 @@ from threading import Thread, Semaphore
 import time
 import unittest
 
-from kafka import KafkaAdminClient, KafkaConsumer, KafkaProducer, TopicPartition
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import urllib.request
 
 
@@ -60,62 +60,137 @@ class IntegrationTest(unittest.TestCase):
   def envoy_stats_address(cls):
     return 'http://127.0.0.1:%s/stats' % IntegrationTest.services.envoy_monitoring_port
 
-  def test_producing_to_a_single_cluster(self):
+  def test_producing(self):
     """
     This test verifies that producer can send messages through mesh filter.
-    Consumers are going to read from Kafka clusters directly to make sure that nothing was lost.
+    We are going to send messages to two topics: 'apples' and 'bananas'.
+    The mesh filter is configured to forward records for topics starting with 'a' (like 'apples')
+    to the first cluster, and the ones starting with 'b' (so 'bananas') to the second one.
+
+    We are going to send messages one by one, so they will not be batched in Kafka producer,
+    so the filter is going to receive them one by one too.
+
+    After sending, the consumers are going to read from Kafka clusters directly to make sure that
+    nothing was lost.
     """
 
     messages_to_send = 100
-    partition_apples = TopicPartition('apples', 0)
-    partition_bananas = TopicPartition('bananas', 0)
+    partition1 = TopicPartition('apples', 0)
+    partition2 = TopicPartition('bananas', 0)
 
     producer = KafkaProducer(bootstrap_servers=IntegrationTest.kafka_envoy_address(),
                              api_version=(1, 0, 0))
     for _ in range(messages_to_send):
-      future_apples = producer.send(value=b'apples_data',
-                                    topic=partition_apples.topic,
-                                    partition=partition_apples.partition)
-      self.assertTrue(future_apples.get().offset >= 0)
-      future_bananas = producer.send(value=b'bananas_data',
-                                     topic=partition_bananas.topic,
-                                     partition=partition_bananas.partition)
-      self.assertTrue(future_bananas.get().offset >= 0)
+      future1 = producer.send(value=b'aaaa',
+                                    topic=partition1.topic,
+                                    partition=partition1.partition)
+      self.assertTrue(future1.get().offset >= 0)
+      future2 = producer.send(value=b'bbbb',
+                                     topic=partition2.topic,
+                                     partition=partition2.partition)
+      self.assertTrue(future2.get().offset >= 0)
+    producer.close()
 
-    # apples
-    consumer_for_apples = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_cluster1_address(),
+    # Check if 'apples' records were properly forwarded to the first cluster.
+    consumer1 = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_cluster1_address(),
                                         auto_offset_reset='earliest',
                                         fetch_max_bytes=100)
-    consumer_for_apples.assign([partition_apples])
+    consumer1.assign([partition1])
     received_messages = []
     while (len(received_messages) < messages_to_send):
-      poll_result = consumer_for_apples.poll(timeout_ms=1000)
-      received_messages += poll_result[partition_apples]
+      poll_result = consumer1.poll(timeout_ms=1000)
+      received_messages += poll_result[partition1]
     self.assertTrue(len(received_messages) == 100)
-    consumer_for_apples.close(False)
+    for record in received_messages:
+      self.assertTrue(record.value == b'aaaa')
 
-    # bananas
-    consumer_for_bananas = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_cluster2_address(),
+    # Check if 'bananas' records were properly forwarded to the second cluster.
+    consumer2 = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_cluster2_address(),
                                          auto_offset_reset='earliest',
                                          fetch_max_bytes=100)
-    consumer_for_bananas.assign([partition_bananas])
+    consumer2.assign([partition2])
     received_messages = []
     while (len(received_messages) < messages_to_send):
-      poll_result = consumer_for_bananas.poll(timeout_ms=1000)
-      received_messages += poll_result[partition_bananas]
+      poll_result = consumer2.poll(timeout_ms=1000)
+      received_messages += poll_result[partition2]
     self.assertTrue(len(received_messages) == 100)
-    consumer_for_bananas.close(False)
+    for record in received_messages:
+      self.assertTrue(record.value == b'bbbb')
 
-    # self.metrics.collect_final_metrics()
-    # self.metrics.assert_metric_increase('metadata', 2)
-    # self.metrics.assert_metric_increase('produce', 100)
-    # # 'fetch_max_bytes' was set to a very low value, so client will need to send a FetchRequest
-    # # multiple times to broker to get all 100 messages (otherwise all 100 records could have been
-    # # received in one go).
-    # self.metrics.assert_metric_increase('fetch', 20)
-    # # Both producer & consumer had to fetch cluster metadata.
-    # self.metrics.assert_metric_increase('metadata', 2)
+    # Check that no records were incorrectly routed (they would have created the topics).
+    self.assertTrue(partition2.topic not in consumer1.topics())
+    self.assertTrue(partition1.topic not in consumer2.topics())
+    consumer1.close(False)
+    consumer2.close(False)
 
+    # Check if requests have been received.
+    self.metrics.collect_final_metrics()
+    self.metrics.assert_metric_increase('produce', 200)
+
+  def test_producing_with_batched_records(self):
+    """
+    Compared to previous test, we are going to have batching in Kafka producers (this is caused by high 'linger.ms' value).
+    So a single request that reaches a Kafka broker might be carrying more than one record, for different partitions.
+    """
+
+    messages_to_send = 100
+    partition1 = TopicPartition('apricots', 0)
+    partition2 = TopicPartition('berries', 0)
+
+    producer = KafkaProducer(bootstrap_servers=IntegrationTest.kafka_envoy_address(),
+                             api_version=(1, 0, 0),
+                             linger_ms=1000,
+                             batch_size=100)
+    futures = []
+    for _ in range(messages_to_send):
+      future1 = producer.send(value=b'aaaa',
+                                    topic=partition1.topic,
+                                    partition=partition1.partition)
+      futures.append(future1)
+      future2 = producer.send(value=b'bbbb',
+                                     topic=partition2.topic,
+                                     partition=partition2.partition)
+      futures.append(future2)
+    # This ensures that all records have been sent to 'apricots' and 'berries' topics.
+    for future in futures:
+      self.assertTrue(future.get().offset >= 0)
+    producer.close()
+
+    # Check if 'apricots' records were properly forwarded to the first cluster.
+    consumer1 = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_cluster1_address(),
+                                        auto_offset_reset='earliest',
+                                        fetch_max_bytes=100)
+    consumer1.assign([partition1])
+    received_messages = []
+    while (len(received_messages) < messages_to_send):
+      poll_result = consumer1.poll(timeout_ms=1000)
+      received_messages += poll_result[partition1]
+    self.assertTrue(len(received_messages) == 100)
+    for record in received_messages:
+      self.assertTrue(record.value == b'aaaa')
+
+    # Check if 'berries' records were properly forwarded to the second cluster.
+    consumer2 = KafkaConsumer(bootstrap_servers=IntegrationTest.kafka_cluster2_address(),
+                                         auto_offset_reset='earliest',
+                                         fetch_max_bytes=100)
+    consumer2.assign([partition2])
+    received_messages = []
+    while (len(received_messages) < messages_to_send):
+      poll_result = consumer2.poll(timeout_ms=1000)
+      received_messages += poll_result[partition2]
+    self.assertTrue(len(received_messages) == 100)
+    for record in received_messages:
+      self.assertTrue(record.value == b'bbbb')
+
+    # Check that no records were incorrectly routed (they would have created the topics).
+    self.assertTrue(partition2.topic not in consumer1.topics())
+    self.assertTrue(partition1.topic not in consumer2.topics())
+    consumer1.close(False)
+    consumer2.close(False)
+
+    # Check if requests have been received.
+    self.metrics.collect_final_metrics()
+    self.metrics.assert_metric_increase('produce', 1)
 
 class MetricsHolder:
   """
