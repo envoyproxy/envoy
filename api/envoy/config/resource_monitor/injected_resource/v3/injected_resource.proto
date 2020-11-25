@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.resource_monitor.injected_resource.v3;
 
 import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.resource_monitor.injected_resource.v3";
@@ -18,5 +19,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the resource pressure and be updated atomically by a symbolic link swap.
 // This is intended primarily for integration tests to force Envoy into an overloaded state.
 message InjectedResourceConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig";
+
   string filename = 1 [(validate.rules).string = {min_len: 1}];
 }
