@@ -15,7 +15,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/collection_entry.proto";
+import "xds/core/v3/collection_entry.proto";
 
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -36,7 +36,7 @@ message ListenerCollection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.ListenerCollection";
 
-  repeated udpa.core.v1.CollectionEntry entries = 1;
+  repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
 // [#next-free-field: 26]

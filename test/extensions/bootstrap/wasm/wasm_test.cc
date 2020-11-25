@@ -3,6 +3,7 @@
 
 #include "extensions/common/wasm/wasm.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -73,34 +74,14 @@ public:
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
 };
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 class WasmTest : public WasmTestBase, public testing::TestWithParam<std::string> {
 public:
   void createWasm() { WasmTestBase::createWasm(GetParam()); }
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8"
-#endif
-#if defined(ENVOY_WASM_V8) && (defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME))
-    ,
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm"
-#endif
-#if (defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)) && defined(ENVOY_WASM_WASMTIME)
-    ,
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-    "wasmtime"
-#endif
-);
-
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest, testing_values);
-#endif
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest,
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTest);
 
 class WasmNullTest : public WasmTestBase, public testing::TestWithParam<std::string> {
 public:
@@ -116,22 +97,8 @@ public:
   }
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_null_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8",
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm",
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-    "wasmtime",
-#endif
-    "null");
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, testing_null_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, Envoy::Extensions::Common::Wasm::runtime_values);
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 class WasmTestMatrix : public WasmTestBase,
                        public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
@@ -151,24 +118,9 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
-                         testing::Combine(testing::Values(
-#if defined(ENVOY_WASM_V8)
-                                              "v8"
-#endif
-#if defined(ENVOY_WASM_V8) && (defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME))
-                                              ,
-#endif
-#if defined(ENVOY_WASM_WAVM)
-                                              "wavm"
-#endif
-#if (defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)) && defined(ENVOY_WASM_WASMTIME)
-                                              ,
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-                                              "wasmtime"
-#endif
-                                              ),
+                         testing::Combine(Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
                                           testing::Values("cpp", "rust")));
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
 TEST_P(WasmTestMatrix, Logging) {
   plugin_configuration_ = "configure-test";
@@ -202,9 +154,7 @@ TEST_P(WasmTestMatrix, Logging) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher_->clearDeferredDeleteList();
 }
-#endif
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 TEST_P(WasmTest, BadSignature) {
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -266,7 +216,6 @@ TEST_P(WasmTest, Asm2Wasm) {
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("out 0 0 0")));
   EXPECT_TRUE(wasm_->configure(context, plugin_));
 }
-#endif
 
 TEST_P(WasmNullTest, Stats) {
   createWasm();
