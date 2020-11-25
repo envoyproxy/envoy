@@ -74,8 +74,8 @@ if [[ "$OSTYPE" == "msys" ]]; then
     done
     SOCKET="127.0.0.1:${port}"
 else
-    if [[ -z "${TEST_UDSDIR}" ]]; then	
-        TEST_UDSDIR=$(mktemp -d /tmp/envoy_test_thrift.XXXXXX)	
+    if [[ -z "${TEST_UDSDIR}" ]]; then
+        TEST_UDSDIR=$(mktemp -d /tmp/envoy_test_thrift.XXXXXX)
     fi
     SOCKET="${TEST_UDSDIR}/fixture.sock"
     rm -f "${SOCKET}"
@@ -104,7 +104,7 @@ if [[ "$OSTYPE" == "msys" ]]; then
     "${DRIVER_DIR}/server.exe" "${SERVICE_FLAGS[@]}" &
     SERVER_PID="$!"
 else
-    SERVICE_FLAGS+=("--unix")	
+    SERVICE_FLAGS+=("--unix")
     "${DRIVER_DIR}/server" "${SERVICE_FLAGS[@]}" &
     SERVER_PID="$!"
     while [[ ! -a "${SOCKET}" ]]; do
@@ -113,7 +113,7 @@ else
         if ! kill -0 "${SERVER_PID}"; then
             echo "server failed to start"
             exit 1
-        fi	
+        fi
     done
 fi
 
