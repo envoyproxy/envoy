@@ -71,8 +71,6 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
-    # kill_request filter is excluded from envoy_all_extensions() in all_extensions.bzl to make sure it will not be built into Envoy by default. To build Envoy with kill_request filter, please include it in envoy_all_extensions().
-    "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
     "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
     "envoy.filters.http.oauth2":                         "//source/extensions/filters/http/oauth2:config",
@@ -227,6 +225,11 @@ EXTENSIONS = {
     "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
     "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
     "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
+}
+
+DISABLED_BY_DEFAULT_EXTENSIONS = {
+    # kill_request filter is excluded from envoy_all_extensions() in all_extensions.bzl so that it will not be built into Envoy by default. To build Envoy with kill_request filter, please include it in envoy_all_extensions().
+    "envoy.filters.http.kill_request": "//third_party/envoy/src/source/extensions/filters/http/kill_request:kill_request_config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
