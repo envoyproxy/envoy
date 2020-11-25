@@ -179,6 +179,10 @@ def _comment(config, results, assignees, force=False):
 
     mode = spec.owner[-1] == '!' and 'approval' or 'fyi'
 
+    print('debug')
+    print(spec.owner)
+    print(mode)
+
     key = "ownerscheck/%s/%s" % (spec.owner, spec.path_match)
 
     if (not force) and (store_get(key) == mode):
@@ -214,7 +218,7 @@ def _comment(config, results, assignees, force=False):
       # Otherwise, pick at "random" (we just use timestamp).
       if not api_assignee:
         api_assignee = members[now().second % len(members)]
-      lines.append('API shepherd assignee is %s' % api_assignee)
+      lines.append('API shepherd assignee is @%s' % api_assignee)
       github.issue_assign(api_assignee)
 
   if lines:
