@@ -215,7 +215,7 @@ def _comment(config, results, assignees, force=False):
       if not api_assignee:
         api_assignee = members[now().second % len(members)]
       lines.append('API shepherd assignee is %s' % api_assignee)
-      github.issue_assign([api_assignee])
+      github.issue_assign(api_assignee)
 
   if lines:
     github.issue_create_comment('\n'.join(lines))
