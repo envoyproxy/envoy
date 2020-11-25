@@ -1422,8 +1422,8 @@ TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
 
   // Prior to the commit when this test was added, the code would return a
   // context where has_value() was true, producing an opt ref that has a value
-  // which is a reference pointing to null.  Doing anything on that reference
-  // would cause a crash.  The rest of this test is ensuring that case doesn't
+  // which is a reference pointing to null. Doing anything on that reference
+  // would cause a crash. The rest of this test is ensuring that case doesn't
   // occur again.
   if (context.has_value()) {
     // Compiler will not directly let us compare the rhs with null
