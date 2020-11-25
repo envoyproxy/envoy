@@ -138,16 +138,7 @@ public:
 
   /**
    * Calls the provided function with a string-view representation of the
-   * elaborated name. This is useful during the interim period when we
-   * are using FakeSymbolTableImpl, to avoid an extra allocation. Once
-   * we migrate to using SymbolTableImpl, this interface will no longer
-   * be helpful and can be removed. The reason it's useful now is that
-   * it makes up, in part, for some extra runtime overhead that is spent
-   * on the SymbolTable abstraction and API, without getting full benefit
-   * from the improved representation.
-   *
-   * TODO(#6307): Remove this when the transition from FakeSymbolTableImpl to
-   * SymbolTableImpl is complete.
+   * elaborated name.
    *
    * @param stat_name The stat name.
    * @param fn The function to call with the elaborated stat name as a string_view.

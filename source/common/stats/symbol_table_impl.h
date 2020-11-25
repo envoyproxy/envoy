@@ -585,7 +585,7 @@ private:
  * SymbolTable lock, but tokens are not shared across StatNames.
  *
  * The SymbolTable is required as a constructor argument to assist in encoding
- * the stat-names, which differs between FakeSymbolTableImpl and SymbolTableImpl.
+ * the stat-names.
  *
  * Example usage:
  *   StatNameDynamicPool pool(symbol_table);
@@ -652,7 +652,6 @@ public:
   void clear(SymbolTable& symbol_table);
 
 private:
-  friend class FakeSymbolTableImpl;
   friend class SymbolTableImpl;
 
   /**
@@ -666,10 +665,8 @@ private:
    * ...
    *
    *
-   * For FakeSymbolTableImpl, each symbol is a single char, casted into a
-   * uint8_t. For SymbolTableImpl, each symbol is 1 or more bytes, in a
-   * variable-length encoding. See SymbolTableImpl::Encoding::addSymbol for
-   * details.
+   * For SymbolTableImpl, each symbol is 1 or more bytes, in a variable-length
+   * encoding. See SymbolTableImpl::Encoding::addSymbol for details.
    */
   void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
 
@@ -841,7 +838,6 @@ public:
   }
 
 private:
-  friend class FakeSymbolTableImpl;
   friend class SymbolTableImpl;
 
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
