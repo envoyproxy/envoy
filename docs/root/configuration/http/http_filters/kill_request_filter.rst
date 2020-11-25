@@ -4,7 +4,7 @@ Kill Request
 ===============
 
 The KillRequest filter can be used to crash Envoy when receiving a Kill request.
-By default, KillRequest filter is not built into Envoy binary since it is removed from *envoy_all_extensions()* in *all_extensions.bzl*. If you want to use this extenstion, please add it in *envoy_all_extensions()*.
+By default, KillRequest filter is not built into Envoy binary since it is removed from *envoy_all_extensions()* in *all_extensions.bzl*. If you want to use this extension, please add it in *envoy_all_extensions()*.
 
 Configuration
 -------------

@@ -44,6 +44,5 @@ filegroup(
     name = "google_com_proxy_port_0",
     srcs = [
         "google_com_proxy_port_0.yaml",
-        "google_com_proxy_port_0_with_kill_request_filter.yaml",
     ],
 )
