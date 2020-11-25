@@ -45,15 +45,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //     - name: some_service
 //       connect_timeout: 5s
 //       typed_extension_protocol_options:
-//        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+//         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
 //           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-//            upstream_http_protocol_options:
-//              auto_sni: true
-//            common_http_protocol_options:
-//              idle_timeout: 1s
-//            explicit_http_config:
-//              http2_protocol_options:
-//                max_concurrent_streams: 100
+//           upstream_http_protocol_options:
+//             auto_sni: true
+//           common_http_protocol_options:
+//             idle_timeout: 1s
+//           explicit_http_config:
+//             http2_protocol_options:
+//               max_concurrent_streams: 100
 //        .... [further cluster config]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols (HTTP/1.1, HTTP/2).

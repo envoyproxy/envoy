@@ -768,7 +768,7 @@ message Cluster {
   // This has been deprecated in favor of
   // :ref:`upstream_http_protocol_options <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
   // in the :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
-  // http_protocol_options can be set via the cluster's
+  // upstream_http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
@@ -780,7 +780,7 @@ message Cluster {
   // This has been deprecated in favor of
   // :ref:`common_http_protocol_options <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>`
   // in the :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
-  // http_protocol_options can be set via the cluster's
+  // common_http_protocol_options can be set via the cluster's
   // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
   // See ref:`upstream_http_protocol_options
   // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
