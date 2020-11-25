@@ -843,7 +843,6 @@ private:
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
 
   const std::string name_;
-  Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;

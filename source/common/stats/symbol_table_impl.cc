@@ -615,7 +615,7 @@ void StatNameList::clear(SymbolTable& symbol_table) {
 }
 
 StatNameSet::StatNameSet(SymbolTable& symbol_table, absl::string_view name)
-    : name_(std::string(name)), symbol_table_(symbol_table), pool_(symbol_table) {
+    : name_(std::string(name)), pool_(symbol_table) {
   builtin_stat_names_[""] = StatName();
 }
 
