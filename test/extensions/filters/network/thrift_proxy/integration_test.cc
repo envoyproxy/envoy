@@ -106,6 +106,21 @@ public:
     initializeCommon();
   }
 
+  void tryInitializePassthrough() {
+    std::tie(std::ignore, std::ignore, std::ignore, payload_passthrough_) = GetParam();
+
+    if (payload_passthrough_) {
+      config_helper_.addFilterConfigModifier<
+          envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy>(
+          "thrift", [](Protobuf::Message& filter) {
+            auto& conn_manager =
+                dynamic_cast<envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy&>(
+                    filter);
+            conn_manager.set_payload_passthrough(true);
+          });
+    }
+  }
+
   // We allocate as many upstreams as there are clusters, with each upstream being allocated
   // to clusters in the order they're defined in the bootstrap config.
   void initializeCommon() {
@@ -119,41 +134,7 @@ public:
       }
     });
 
-    std::tie(std::ignore, std::ignore, std::ignore, payload_passthrough_) = GetParam();
-
-    if (payload_passthrough_) {
-      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        ASSERT_TRUE(bootstrap.mutable_static_resources()->listeners_size());
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        ASSERT_TRUE(listener);
-        ASSERT_TRUE(listener->filter_chains_size());
-
-        envoy::config::listener::v3::Filter* filter = nullptr;
-        auto* filter_chain = listener->mutable_filter_chains(0);
-        for (ssize_t i = 0; i < filter_chain->filters_size(); i++) {
-          if (filter_chain->mutable_filters(i)->name() == "thrift") {
-            filter = filter_chain->mutable_filters(i);
-            break;
-          }
-        }
-        ASSERT_TRUE(filter);
-
-        if (filter) {
-          envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy conn_manager;
-          conn_manager = MessageUtil::anyConvert<
-              envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy>(
-              *(filter->mutable_typed_config()));
-
-          conn_manager.set_payload_passthrough(true);
-
-          filter_chain->clear_filters();
-          filter = filter_chain->add_filters();
-          filter->mutable_typed_config()->PackFrom(conn_manager);
-          filter->set_name("envoy.filters.network.thrift_proxy");
-        }
-        ASSERT_TRUE(filter_chain->filters_size() == 1);
-      });
-    }
+    tryInitializePassthrough();
 
     BaseThriftIntegrationTest::initialize();
   }
@@ -184,7 +165,7 @@ protected:
 
   Buffer::OwnedImpl request_bytes_;
   Buffer::OwnedImpl response_bytes_;
-};
+}; // namespace ThriftProxy
 
 static std::string
 paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool, bool>>& params) {

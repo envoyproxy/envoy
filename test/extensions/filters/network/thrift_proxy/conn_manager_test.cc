@@ -348,7 +348,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
   initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -386,7 +386,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   EXPECT_EQ(&filter_callbacks_.connection_, callbacks->connection());
 
   // Resume processing.
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->continueDecoding();
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -461,7 +461,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
         EXPECT_EQ(write_buffer_.toString(), buffer.toString());
       }));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
@@ -561,7 +561,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
                     });
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
@@ -580,7 +580,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
                     });
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
@@ -596,7 +596,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
@@ -612,7 +612,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
 
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
@@ -655,7 +655,7 @@ route_config:
   EXPECT_NE(nullptr, route->routeEntry());
   EXPECT_EQ("cluster", route->routeEntry()->clusterName());
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->continueDecoding();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -679,7 +679,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -713,7 +713,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -755,7 +755,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
         EXPECT_EQ(response_buffer.toString(), buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -789,7 +789,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -824,7 +824,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -859,7 +859,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -901,7 +901,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   callbacks->startUpstreamResponse(transport, proto);
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, true));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -943,7 +943,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -979,7 +979,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -1249,7 +1249,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
         EXPECT_EQ(8, buffer.drainBEInt<int32_t>());
         EXPECT_EQ("response", buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1293,7 +1293,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
         EXPECT_EQ(8, buffer.drainBEInt<int32_t>());
         EXPECT_EQ("response", buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1328,7 +1328,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
         return FilterStatus::StopIteration;
       }));
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false)).Times(0);
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Remote closes the connection.
   filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
@@ -1430,7 +1430,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(1);
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, buffer_.length());
@@ -1454,9 +1454,9 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(1);
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -1480,7 +1480,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(1);
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1496,7 +1496,7 @@ payload_passthrough: true
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -1523,7 +1523,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(1);
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1539,7 +1539,7 @@ payload_passthrough: true
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -1566,7 +1566,7 @@ payload_passthrough: true
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(1);
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1583,7 +1583,7 @@ payload_passthrough: true
   BinaryProtocolImpl proto;
   callbacks->startUpstreamResponse(transport, proto);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -1618,7 +1618,7 @@ route_config:
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(1);
+  EXPECT_CALL(*decoder_filter_, passthroughData(_));
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -1635,7 +1635,7 @@ route_config:
   EXPECT_NE(nullptr, route->routeEntry());
   EXPECT_EQ("cluster", route->routeEntry()->clusterName());
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->continueDecoding();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();

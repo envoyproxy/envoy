@@ -412,17 +412,11 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
 }
 
 bool ConnectionManager::ActiveRpc::passthroughSupported() {
-  if (passthrough_supported_.has_value()) {
-    return passthrough_supported_.value();
-  }
-
   for (auto& entry : decoder_filters_) {
-    if (entry->handle_->passthroughSupported() == false) {
-      passthrough_supported_ = false;
+    if (!entry->handle_->passthroughSupported()) {
       return false;
     }
   }
-  passthrough_supported_ = true;
   return true;
 }
 

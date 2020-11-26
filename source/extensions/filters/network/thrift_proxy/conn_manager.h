@@ -251,7 +251,6 @@ private:
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
     absl::any filter_context_;
-    absl::optional<bool> passthrough_supported_{};
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
   };
