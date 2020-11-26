@@ -1,14 +1,14 @@
 Envoy 是什么？
 ------------
 
-Envoy 是专为大型现代服务架构而设计的通信总线和 L7 代理。该项目源于以下理念：
+Envoy 是为面向大型现代服务架构而设计的 L7 代理和通信总线。该项目源于以下理念：
 
   *对于应用来说网络应该是透明的。当网络和应用出现故障时，应该非常容易定位问题发生的根源。*
 
-事实上，实现上述的目标非常困难。为了做到这一点，Envoy 提供了以下高级特性：
+事实上，实现上述的目标非常困难。Envoy 试图通过提供以下高级功能来实现这一目标：
 
 **进程外架构：**Envoy 是一个独立进程，伴随每个应用服务运行。
-所有的 Envoy 形成一个透明的通信网格，每个应用于本地主机收发信息，对网络的拓扑结构无感知。
+所有的 Envoy 形成一个透明的通信网格，每个应用与 localhost 收发信息，对网络的拓扑结构无感知。
 在服务间通信的场景下，进程外架构对比传统软件库的方式有两大优势：
 
   * Envoy 适用于任何应用编程语言。
@@ -20,30 +20,29 @@ Envoy 是专为大型现代服务架构而设计的通信总线和 L7 代理。�
     Envoy 可以透明地在整个基础架构上快速部署和升级。
 
 **L3/L4 filter 架构：**Envoy 的核心是一个 L3/L4 网络代理。
-可插拔的 :ref:`filter <arch_overview_network_filters>` 链机制允许开发人员编写 filter 来执行不同 TCP/UDP 代理任务并将其插入到主服务中。
+可插拔的 :ref:`filter <arch_overview_network_filters>` 链机制允许开发 filter 来执行不同 TCP/UDP 代理任务并将其插入到主服务中。
 现已有多个支持各种任务的 filter，如原始的 :ref:`TCP 代理 <arch_overview_tcp_proxy>`、:ref:`UDP 代理 <arch_overview_udp_proxy>`、
 :ref:`HTTP 代理 <arch_overview_http_conn_man>`、:ref:`TLS 客户端证书认证 <arch_overview_ssl_auth_filter>`、
-:ref:`Redis <arch_overview_redis>`、:ref:`MongoDB <arch_overview_mongo>` 和 :ref:`Postgres <arch_overview_postgres>` 等等。
+:ref:`Redis <arch_overview_redis>`、:ref:`MongoDB <arch_overview_mongo>` 和 :ref:`Postgres <arch_overview_postgres>` 等。
 
 **HTTP L7 filter 架构：**HTTP 是现代应用架构中的关键组件，Envoy :ref:`支持 <arch_overview_http_filters>`额外的 HTTP L7 filter 层。
-可以将 HTTP filter 插入 HTTP 执行不同任务的连接管理子系统中，如 :ref:`buffering <config_http_filters_buffer>`、:ref:`rate limiting
-<arch_overview_global_rate_limit>`、:ref:`routing/forwarding <arch_overview_http_routing>`、
-嗅探 Amazon 的 :ref:`DynamoDB <arch_overview_dynamo>` 等等。
+可以将 HTTP filter 插入执行不同任务的 HTTP 连接管理子系统中，如 :ref:`缓存 <config_http_filters_buffer>`、:ref:`限速 <arch_overview_global_rate_limit>`、:ref:`路由/转发 <arch_overview_http_routing>`、
+嗅探 Amazon 的 :ref:`DynamoDB <arch_overview_dynamo>` 等。
 
 **顶级 HTTP/2 支持：**当以 HTTP 模式运行时，Envoy 同时:ref:`支持 <arch_overview_http_protocols>` HTTP/1.1 和 HTTP/2。
 Envoy 可以作为 HTTP/1.1 和 HTTP/2 之间的双向透明代理。
-这意味着它可以桥接 HTTP/1.1 和 HTTP/2 客户端以及目标服务器的任意组合。
-建议配置所有服务之间的 Envoy 使用 HTTP/2 来创建持久连接的网格，以便可以复用请求和响应。
+这意味着任意 HTTP/1.1 和 HTTP/2 客户端和目标服务器的组合都可以桥接在一起。
+建议配置所有服务之间的 Envoy 使用 HTTP/2 来创建持久连接的网格，以便可以实现请求和响应的多路复用。
 
-**HTTP L7 路由：**当以 HTTP 模式运行时，Envoy 支持一种:ref:`routing <arch_overview_http_routing>`子系统，能够根据路径、权限、内容类型、:ref:`运行时 <arch_overview_runtime>`参数值等对请求进行路由和重定向。
+**HTTP L7 路由：**当以 HTTP 模式运行时，Envoy 支持一种:ref:`路由 <arch_overview_http_routing>`子系统，能够根据路径、权限、内容类型、:ref:`运行时 <arch_overview_runtime>`参数值等对请求进行路由和重定向。
 这项功能在将 Envoy 用作前端/边缘代理时非常有用，同时，在构建服务网格时也会使用此功能。
 
 **gRPC 支持：**`gRPC <https://www.grpc.io/>`_ 是一个来自 Google 的 RPC 框架，它使用 HTTP/2 作为底层多路复用传输协议。
 Envoy:ref:`支持 <arch_overview_grpc>`被 gRPC 请求和响应的作为路由和负载均衡底层的所有 HTTP/2 功能。
 这两个系统是非常互补的。
 
-**服务发现和动态配置：**Envoy 可以选择使用:ref:`dynamic configuration APIs <arch_overview_dynamic_config>` 的分层集合实现集中管理。
-这些层为Envoy 提供了以下内容的动态更新：后端集群内的主机、后端集群本身、HTTP 路由、监听套接字和加密材料。
+**服务发现和动态配置：**Envoy 可以选择使用一组分层的:ref:`动态配置 API <arch_overview_dynamic_config>` 来实现集中化管理。
+这些层为 Envoy 提供了以下内容的动态更新：后端集群内的主机、后端集群本身、HTTP 路由、监听套接字和加密材料。
 对于更简单的部署，可以:ref:`通过 DNS 解析 <arch_overview_service_discovery_types_strict_dns>`（甚至:ref:`完全跳过 <arch_overview_service_discovery_types_static>`）发现后端主机，静态配置文件将替代更深的层。
 
 **健康检查：**:ref:`推荐 <arch_overview_service_discovery_eventually_consistent>`使用将服务发现视为最终一致的过程的方式来建立 Envoy 网格。
@@ -61,9 +60,9 @@ Envoy 还通过:ref:`异常检查 <arch_overview_outlier_detection>`子系统支
 **前端/边缘代理支持：**在边缘使用相同的软件大有好处（可观察性、管理、相同的服务发现和负载均衡算法等）。
 Envoy 包含足够多的功能，使其可作为大多数现代 Web 应用程序的边缘代理。
 包括 :ref:`TLS <arch_overview_ssl>` 终止、HTTP/1.1 和 HTTP/2 :ref:`支持 <arch_overview_http_protocols>`，
-以及 HTTP L7 :ref:`routing <arch_overview_http_routing>`。
+以及 HTTP L7 :ref:`路由 <arch_overview_http_routing>`。
 
-**绝佳的可观察性：**如上所述，Envoy 的主要目标是让网络透明化。
+**最佳的可观察性：**如上所述，Envoy 的主要目标是让网络透明化。
 然而，在网络层面和应用层面都有可能出现问题。
 Envoy 包含对所有子系统的强大:ref:`统计 <arch_overview_statistics>`支持。
 目前支持 `statsd <https://github.com/etsy/statsd>`_（和兼容程序）作为统计信息接收器，但是插入不同的接收器并不困难。
