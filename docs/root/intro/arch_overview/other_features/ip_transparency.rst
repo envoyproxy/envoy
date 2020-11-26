@@ -21,24 +21,24 @@ Envoy 支持多种方法把下游远程地址提供给上游主机。
 HTTP 头
 ------------
 
-HTTP 头可以把请求的原始 IP 地址携带到 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 头部字段。
+HTTP 头部可能在 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 头部字段中携带请求的原始 IP 地址。
 上游服务器可以使用该头部确定下游远程地址。Envoy 也可以使用这个头部来选择 :ref:` 原始来源 HTTP 过滤器 <arch_overview_ip_transparency_original_src_http>`
 使用的 IP 地址。
 
-HTTP  头方法有一些缺点：
+HTTP 头部方法有一些缺点：
 
 * 它只适用于 HTTP。
 * 它可能不被上游主机支持。
 * 它需要仔细配置。
 
-代理协议
+Proxy Protocol
 --------------
 
-`HAproxy 代理协议 <http://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_ 定义了一种协议，
-在主要 TCP 流之前，通讯 TCP 连接的元数据。该元数据包括来源 IP。Envoy 支持使用 :ref:` 代理协议过滤器 <config_listener_filters_proxy_protocol>`
+`HAproxy Proxy Protocol <http://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_ 定义了一种协议，
+在主要 TCP 流之前，通讯 TCP 连接的元数据。该元数据包括来源 IP。Envoy 支持使用 :ref:`Proxy Protocol 过滤器 <config_listener_filters_proxy_protocol>`
 消费该信息，这可以用于恢复下游远程地址传播到 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 头部字段。
 它也可以和 :ref:` 原始来源监听过滤器 <arch_overview_ip_transparency_original_src_listener>` 连接使用。最后，
-Enovy 支持使用 :ref:` 代理协议传输套接字 <extension_envoy.transport_sockets.upstream_proxy_protocol>` 生成该头部。
+Enovy 支持使用 :ref:`Proxy Protocol 传输套接字 <extension_envoy.transport_sockets.upstream_proxy_protocol>` 生成该头部。
 
 这里有一个创建套接字的样例配置：
 
@@ -61,7 +61,7 @@ Enovy 支持使用 :ref:` 代理协议传输套接字 <extension_envoy.transport
 
 注意：如果你正在封装 TLS 套接字，这个头部会在 TLS 握手发生前被发送。
 
-一些代理协议的缺点：
+一些 Proxy Protocol 的缺点：
 
 * 它只支持 TCP 协议。
 * 它需要上游主机支持。
