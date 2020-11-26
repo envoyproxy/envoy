@@ -1,4 +1,4 @@
-// test
+// test 2
 syntax = "proto3";
 
 package envoy.config.core.v3;
