@@ -165,7 +165,7 @@ protected:
 
   Buffer::OwnedImpl request_bytes_;
   Buffer::OwnedImpl response_bytes_;
-}; // namespace ThriftProxy
+};
 
 static std::string
 paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool, bool>>& params) {
