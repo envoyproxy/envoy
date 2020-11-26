@@ -236,11 +236,6 @@ std::string SymbolTableImpl::toString(const StatName& stat_name) const {
   return absl::StrJoin(decodeStrings(stat_name.data(), stat_name.dataSize()), ".");
 }
 
-void SymbolTableImpl::callWithStringView(StatName stat_name,
-                                         const std::function<void(absl::string_view)>& fn) const {
-  fn(toString(stat_name));
-}
-
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
   const SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());

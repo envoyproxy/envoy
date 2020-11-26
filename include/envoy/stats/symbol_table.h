@@ -136,16 +136,6 @@ public:
   virtual void debugPrint() const PURE;
 #endif
 
-  /**
-   * Calls the provided function with a string-view representation of the
-   * elaborated name.
-   *
-   * @param stat_name The stat name.
-   * @param fn The function to call with the elaborated stat name as a string_view.
-   */
-  virtual void callWithStringView(StatName stat_name,
-                                  const std::function<void(absl::string_view)>& fn) const PURE;
-
   using RecentLookupsFn = std::function<void(absl::string_view, uint64_t)>;
 
   /**

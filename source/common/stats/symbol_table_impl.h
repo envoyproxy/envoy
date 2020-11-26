@@ -186,8 +186,6 @@ public:
   void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
   StoragePtr makeDynamicStorage(absl::string_view name) override;
-  void callWithStringView(StatName stat_name,
-                          const std::function<void(absl::string_view)>& fn) const override;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
