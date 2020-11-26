@@ -1,10 +1,5 @@
 .. _arch_overview_load_balancing_overprovisioning_factor:
 
-Overprovisioning Factor
+超额供给因数
 -----------------------
-Priority levels and localities are considered overprovisioned with
-:ref:`this percentage <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>`.
-Envoy doesn't consider a priority level or locality unavailable until the
-fraction of available hosts multiplied by the overprovisioning factor drops
-below 100. The default value is 140 (in percentage, which means 140%), so a priority level or locality will not be
-considered unavailable until the percentage of available endpoints goes below 72%.
+超额供给因数是流量在优先级和区域纬度被 :ref:`超额供给的百分比值 <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.overprovisioning_factor>`。在可用主机数量和超额供给因数的乘积降至 100 以下之前，Envoy 不会认为某个优先级或区域不可用。默认值是 140（以百分比为单位，即 140%），因此在可用端点的百分比低于 72% 之前，优先级或区域不会被视为不可用。
