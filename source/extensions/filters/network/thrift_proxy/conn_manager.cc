@@ -411,7 +411,7 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   }
 }
 
-bool ConnectionManager::ActiveRpc::passthroughSupported() {
+bool ConnectionManager::ActiveRpc::passthroughSupported() const {
   for (auto& entry : decoder_filters_) {
     if (!entry->handle_->passthroughSupported()) {
       return false;

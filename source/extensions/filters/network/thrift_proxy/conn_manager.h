@@ -229,7 +229,7 @@ private:
       LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
 
-    bool passthroughSupported();
+    bool passthroughSupported() const;
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
     void finalizeRequest();
 
