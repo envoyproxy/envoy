@@ -79,9 +79,8 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
 template <class T> std::vector<std::string> authScopesList(const T& auth_scopes_protos) {
   std::vector<std::string> scopes;
 
-  // if 'auth_scopes_protos' is zero sized, it means the list is empty in the yaml,
-  // then it should default to a list of single value
-  if (auth_scopes_protos.size() == 0) {
+  // if 'auth_scopes' is empty it must return a list with the default value.
+  if (auth_scopes_protos.empty()) {
     scopes.reserve(1);
     scopes.emplace_back(DEFAULT_AUTH_SCOPE);
   } else {
