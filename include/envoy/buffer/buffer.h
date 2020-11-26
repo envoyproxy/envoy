@@ -393,9 +393,41 @@ public:
   template <typename T, size_t Size = sizeof(T)> void writeBEInt(T value) {
     writeInt<ByteOrder::BigEndian, T, Size>(value);
   }
+
+  /**
+   * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
+   * watermark. Setting the high watermark to 0 disables watermark functionality.
+   * @param watermark supplies the buffer high watermark size threshold, in bytes.
+   */
+  virtual void setWatermarks(uint32_t watermark) PURE;
+  /**
+   * Returns the configured high watermark.
+   */
+  virtual uint32_t highWatermark() const PURE;
+  /**
+   * Determine if the buffer watermark trigger condition is currently set. The watermark trigger is
+   * set when the buffer size exceeds the configured high watermark and is cleared once the buffer
+   * size drops to the low watermark.
+   * @return true if the buffer size once exceeded the high watermark and hasn't since dropped to
+   * the low watermark.
+   */
+  virtual bool highWatermarkTriggered() const PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
+
+// Informational enum that hints at the buffer's intended use.
+enum class BufferType {
+  // Per-connection input buffer used to read directly from an IoHandle.
+  Read,
+  // Per-connection output buffer used to write directly to an IoHandle.
+  Output,
+  // Per-stream HTTP output buffer. In the case of HTTP2 and HTTP3/QUIC, this buffer participates in
+  // per-stream flow control.
+  HttpStreamOutput,
+  // Internal buffers used for internally by filters or other components of the IO pipeline.
+  Internal,
+};
 
 /**
  * A factory for creating buffers which call callbacks when reaching high and low watermarks.
@@ -412,7 +444,7 @@ public:
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr create(std::function<void()> below_low_watermark,
+  virtual InstancePtr create(BufferType buffer_type, std::function<void()> below_low_watermark,
                              std::function<void()> above_high_watermark,
                              std::function<void()> above_overflow_watermark) PURE;
 };

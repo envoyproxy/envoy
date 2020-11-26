@@ -45,8 +45,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   void commonContinue();
   virtual bool canContinue() PURE;
-  virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
-  virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
+  virtual Buffer::InstancePtr createBuffer() PURE;
+  virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool complete() PURE;
   virtual bool has100Continueheaders() PURE;
   virtual void do100ContinueHeaders() PURE;
@@ -138,8 +138,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   // ActiveStreamFilterBase
   bool canContinue() override;
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override { return false; }
   void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
@@ -224,8 +224,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
 
   // ActiveStreamFilterBase
   bool canContinue() override { return true; }
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override;
   void do100ContinueHeaders() override;
@@ -776,8 +776,8 @@ private:
   // processing the next filter. The storage is created on demand. We need to store metadata
   // temporarily in the filter in case the filter has stopped all while processing headers.
   std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
-  Buffer::WatermarkBufferPtr buffered_response_data_;
-  Buffer::WatermarkBufferPtr buffered_request_data_;
+  Buffer::InstancePtr buffered_response_data_;
+  Buffer::InstancePtr buffered_request_data_;
   uint32_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;

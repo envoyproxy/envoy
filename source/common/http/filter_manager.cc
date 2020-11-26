@@ -250,16 +250,16 @@ bool ActiveStreamDecoderFilter::canContinue() {
   return !parent_.state_.local_complete_;
 }
 
-Buffer::WatermarkBufferPtr ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
-      [this]() -> void { this->requestDataDrained(); },
+Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
+  auto buffer = dispatcher().getWatermarkFactory().create(
+      Buffer::BufferType::Internal, [this]() -> void { this->requestDataDrained(); },
       [this]() -> void { this->requestDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
 
-Buffer::WatermarkBufferPtr& ActiveStreamDecoderFilter::bufferedData() {
+Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
@@ -1302,15 +1302,15 @@ absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeCon
   return parent_.filter_manager_callbacks_.routeConfig();
 }
 
-Buffer::WatermarkBufferPtr ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer(
-      [this]() -> void { this->responseDataDrained(); },
+Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
+  auto buffer = dispatcher().getWatermarkFactory().create(
+      Buffer::BufferType::Internal, [this]() -> void { this->responseDataDrained(); },
       [this]() -> void { this->responseDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
-  return Buffer::WatermarkBufferPtr{buffer};
+  return buffer;
 }
-Buffer::WatermarkBufferPtr& ActiveStreamEncoderFilter::bufferedData() {
+Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }

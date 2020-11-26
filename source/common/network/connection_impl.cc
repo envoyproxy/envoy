@@ -54,12 +54,13 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
-      read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
-                   [this]() -> void { this->onReadBufferHighWatermark(); },
-                   []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
       write_buffer_(dispatcher.getWatermarkFactory().create(
-          [this]() -> void { this->onWriteBufferLowWatermark(); },
+          Buffer::BufferType::Output, [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      read_buffer_(dispatcher.getWatermarkFactory().create(
+          Buffer::BufferType::Read, [this]() -> void { this->onReadBufferLowWatermark(); },
+          [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
@@ -196,7 +197,7 @@ void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent:
 
 bool ConnectionImpl::filterChainWantsData() {
   return read_disable_count_ == 0 ||
-         (read_disable_count_ == 1 && read_buffer_.highWatermarkTriggered());
+         (read_disable_count_ == 1 && read_buffer_->highWatermarkTriggered());
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
@@ -315,7 +316,7 @@ void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
 
   ENVOY_CONN_LOG(trace, "readDisable: disable={} disable_count={} state={} buffer_length={}", *this,
-                 disable, read_disable_count_, static_cast<int>(state()), read_buffer_.length());
+                 disable, read_disable_count_, static_cast<int>(state()), read_buffer_->length());
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // `EPOLLRDHUP` for an epoll backend). For backends that support it, this allows us to apply
@@ -357,7 +358,7 @@ void ConnectionImpl::readDisable(bool disable) {
       ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
     }
 
-    if (filterChainWantsData() && (read_buffer_.length() > 0 || transport_wants_read_)) {
+    if (filterChainWantsData() && (read_buffer_->length() > 0 || transport_wants_read_)) {
       // If the read_buffer_ is not empty or transport_wants_read_ is true, the connection may be
       // able to process additional bytes even if there is no data in the kernel to kick off the
       // filter chain. Alternately if the read buffer has data the fd could be read disabled. To
@@ -367,7 +368,7 @@ void ConnectionImpl::readDisable(bool disable) {
 
       // Sanity check: resumption with read_disable_count_ > 0 should only happen if the read
       // buffer's high watermark has triggered.
-      ASSERT(read_buffer_.length() > 0 || read_disable_count_ == 0);
+      ASSERT(read_buffer_->length() > 0 || read_disable_count_ == 0);
       dispatch_buffered_data_ = true;
       setReadBufferReady();
     }
@@ -473,8 +474,8 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
-    static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
-    read_buffer_.setWatermarks(limit + 1);
+    write_buffer_->setWatermarks(limit + 1);
+    read_buffer_->setWatermarks(limit + 1);
   }
 }
 
@@ -568,7 +569,7 @@ void ConnectionImpl::onReadReady() {
     // Do not clear transport_wants_read_ when returning early; the early return skips the transport
     // socket doRead call.
     if (latched_dispatch_buffered_data && filterChainWantsData()) {
-      onRead(read_buffer_.length());
+      onRead(read_buffer_->length());
     }
     return;
   }
@@ -578,8 +579,8 @@ void ConnectionImpl::onReadReady() {
   // reading from the transport if the read buffer is above high watermark at the start of the
   // method.
   transport_wants_read_ = false;
-  IoResult result = transport_socket_->doRead(read_buffer_);
-  uint64_t new_buffer_size = read_buffer_.length();
+  IoResult result = transport_socket_->doRead(*read_buffer_);
+  uint64_t new_buffer_size = read_buffer_->length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
   // If this connection doesn't have half-close semantics, translate end_stream into
@@ -591,7 +592,7 @@ void ConnectionImpl::onReadReady() {
 
   read_end_stream_ |= result.end_stream_read_;
   if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
-      (latched_dispatch_buffered_data && read_buffer_.length() > 0)) {
+      (latched_dispatch_buffered_data && read_buffer_->length() > 0)) {
     // Skip onRead if no bytes were processed unless we explicitly want to force onRead for
     // buffered data. For instance, skip onRead if the connection was closed without producing
     // more data.

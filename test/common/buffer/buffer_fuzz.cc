@@ -165,6 +165,15 @@ public:
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
 
+  void setWatermarks(uint32_t) override {
+    // Not implemented.
+    ASSERT(false);
+  }
+  uint32_t highWatermark() const override { return 0; }
+  // Returns true if the high watermark callbacks have been called more recently
+  // than the low watermark callbacks.
+  bool highWatermarkTriggered() const override { return false; }
+
   absl::string_view asStringView() const { return {start(), size_}; }
 
   char* mutableStart() { return data_.data() + start_; }
