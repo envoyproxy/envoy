@@ -159,7 +159,7 @@ def _reconcile(config, specs=None):
   return results
 
 
-def _comment(config, results, assignees, force=False):
+def _comment(config, results, assignees, sender, force=False):
   lines = []
 
   for spec, approved in results:
@@ -196,7 +196,8 @@ def _comment(config, results, assignees, force=False):
       # Find owners via github.team_get_by_name, github.team_list_members
       team_name = owner.split('/')[1]
       team = github.team_get_by_name(team_name)
-      members = [m['login'] for m in github.team_list_members(team['id'])]
+      # Exclude author from assignment.
+      members = [m['login'] for m in github.team_list_members(team['id']) if m['login'] != sender]
       # Is a team member already assigned? The first assigned team member is picked. Bad O(n^2) as
       # Starlark doesn't have sets, n is small.
       for assignee in assignees:
@@ -213,17 +214,17 @@ def _comment(config, results, assignees, force=False):
     github.issue_create_comment('\n'.join(lines))
 
 
-def _reconcile_and_comment(config, assignees):
-  _comment(config, _reconcile(config), assignees)
+def _reconcile_and_comment(config, assignees, sender):
+  _comment(config, _reconcile(config), assignees, sender)
 
 
-def _force_reconcile_and_comment(config, assignees):
-  _comment(config, _reconcile(config), assignees, force=True)
+def _force_reconcile_and_comment(config, assignees, sender):
+  _comment(config, _reconcile(config), assignees, sender, force=True)
 
 
-def _pr(action, config, assignees):
+def _pr(action, config, assignees, sender):
   if action in ['synchronize', 'opened']:
-    _reconcile_and_comment(config, assignees)
+    _reconcile_and_comment(config, assignees, sender)
 
 
 def _pr_review(action, review_state, config):
