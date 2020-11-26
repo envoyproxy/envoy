@@ -1,51 +1,28 @@
 .. _arch_overview_load_balancing_zone_aware_routing:
 
-Zone aware routing
+区域感知路由
 ------------------
 
-We use the following terminology:
+我们使用以下的术语：
 
-* **Originating/Upstream cluster**: Envoy routes requests from an originating cluster to an upstream
-  cluster.
-* **Local zone**: The same zone that contains a subset of hosts in both the originating and
-  upstream clusters.
-* **Zone aware routing**: Best effort routing of requests to an upstream cluster host in the local
-  zone.
+* **发起/上游集群**：Envoy 将请求从发起集群路由到上游集群。
+* **本地区域**：同一区域包含发起集群和上游集群中的主机子集。
+* **区域感知路由**：将请求尽最大努力路由到本地区域的上游集群主机。
 
-In deployments where hosts in originating and upstream clusters belong to different zones
-Envoy performs zone aware routing. There are several preconditions before zone aware routing can be
-performed:
+在部署中，如果发起集群和上游集群中的主机属于不同的区域，Envoy 会执行区域感知路由。在执行区域感知路由之前，有几个先决条件：
 
 .. _arch_overview_load_balancing_zone_aware_routing_preconditions:
 
-* Both originating and upstream cluster are not in
-  :ref:`panic mode <arch_overview_load_balancing_panic_threshold>`.
-* Zone aware :ref:`routing is enabled <config_cluster_manager_cluster_runtime_zone_routing>`.
-* The originating cluster has the same number of zones as the upstream cluster.
-* The upstream cluster has enough hosts. See
-  :ref:`here <config_cluster_manager_cluster_runtime_zone_routing>` for more information.
+* 发起集群和上游集群都不在 :ref:`紧急模式（Panic Mode） <arch_overview_load_balancing_panic_threshold>`。
+* 区域感知 :ref:`路由已开启 <config_cluster_manager_cluster_runtime_zone_routing>`。
+* 发起集群与上游集群拥有相同的区域数量。
+* 上游集群有足够的主机。参考 :ref:`这里 <config_cluster_manager_cluster_runtime_zone_routing>` 以了解更多信息。
 
-The purpose of zone aware routing is to send as much traffic to the local zone in the upstream
-cluster as possible while roughly maintaining the same number of requests per second across all
-upstream hosts (depending on load balancing policy).
+区域感知路由的目的是将尽可能多的流量发送到上游集群的本地区域，同时在所有上游主机上大致保持每秒相同的请求数量（取决于负载均衡策略）。
 
-Envoy tries to push as much traffic as possible to the local upstream zone as long as
-roughly the same number of requests per host in the upstream cluster are maintained. The decision of
-whether Envoy routes to the local zone or performs cross zone routing depends on the percentage of
-healthy hosts in the originating cluster and upstream cluster in the local zone. There are two cases
-with regard to percentage relations in the local zone between originating and upstream clusters:
+只要上游集群中每台主机的请求数量保持大致相同，Envoy 就会尽量将流量推送到本地上游区域。Envoy 是路由到本地区域还是执行跨区域路由，取决于发起集群和上游集群中健康主机在本地区域的百分比。关于发起集群和上游集群在本地区域的百分比关系，有两种情况：
 
-* The originating cluster local zone percentage is greater than the one in the upstream cluster.
-  In this case we cannot route all requests from the local zone of the originating cluster to the
-  local zone of the upstream cluster because that will lead to request imbalance across all upstream
-  hosts. Instead, Envoy calculates the percentage of requests that can be routed directly to the
-  local zone of the upstream cluster. The rest of the requests are routed cross zone. The specific
-  zone is selected based on the residual capacity of the zone (that zone will get some local zone
-  traffic and may have additional capacity Envoy can use for cross zone traffic).
-* The originating cluster local zone percentage is smaller than the one in upstream cluster.
-  In this case the local zone of the upstream cluster can get all of the requests from the
-  local zone of the originating cluster and also have some space to allow traffic from other zones
-  in the originating cluster (if needed).
+* 发起集群本地区域百分比大于上游集群的百分比。在这种情况下，我们不能将所有请求从发起集群的本地区域路由到上游集群的本地区域，因为这将导致所有上游主机的请求不平衡。相反，Envoy 会计算出可以直接路由到上游集群本地区域的请求的百分比。其余的请求则跨区域路由。具体的区域是根据区域的剩余容量来选择的（该区域会获得一些本地区域的流量，并且 Envoy 可能有额外的容量可以用于跨区域的流量）。
+* 发起集群本地区域百分比小于上游集群的百分比。在这种情况下，上游集群的本地区域可以从发起集群的本地区域获得所有的请求，同时（如果需要）也有一定的空间允许获得发起集群中其他区域的流量。
 
-Note that when using multiple priorities, zone aware routing is currently only supported for P=0.
-
+需要注意的是，当使用多个优先级时，目前只支持 P=0 的区域感知路由。
