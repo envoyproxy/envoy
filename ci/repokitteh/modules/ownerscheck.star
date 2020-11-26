@@ -181,10 +181,10 @@ def _comment(config, results, assignees, sender, force=False):
 
     key = "ownerscheck/%s/%s" % (spec.owner, spec.path_match)
 
-    #if (not force) and (store_get(key) == mode):
-    #  mode = 'skip'
-    #else:
-    #  store_put(key, mode)
+    if (not force) and (store_get(key) == mode):
+      mode = 'skip'
+    else:
+      store_put(key, mode)
 
     if mode == 'approval':
       lines.append('CC %s: Your approval is needed%s.' % (mention, match_description))
