@@ -24,29 +24,25 @@ static void throwOnUnsupportedRequest(const std::string& reason, const RequestHe
 
 void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
   switch (arg->request_header_.api_key_) {
-  case /* Produce */ 0: {
+  case /* Produce */ 0:
     const std::shared_ptr<Request<ProduceRequest>> cast =
         std::dynamic_pointer_cast<Request<ProduceRequest>>(arg);
     process(cast);
     break;
-  }
-  case /* Metadata */ 3: {
+  case /* Metadata */ 3:
     const std::shared_ptr<Request<MetadataRequest>> cast =
         std::dynamic_pointer_cast<Request<MetadataRequest>>(arg);
     process(cast);
     break;
-  }
-  case /* ApiVersions */ 18: {
+  case /* ApiVersions */ 18:
     const std::shared_ptr<Request<ApiVersionsRequest>> cast =
         std::dynamic_pointer_cast<Request<ApiVersionsRequest>>(arg);
     process(cast);
     break;
-  }
-  default: {
+  default:
     // We got something else than typical Produce request.
     throwOnUnsupportedRequest("unsupported (bad client API invoked?)", arg->request_header_);
     break;
-  }
   } // switch
 }
 
