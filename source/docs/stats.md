@@ -193,11 +193,6 @@ with a format-check, but we can determine whether symbol-table lookups are
 occurring during via an admin endpoint that shows 20 recent lookups by name, at
 `ENVOY_HOST:ADMIN_PORT/stats?recentlookups`.
 
-As of October 6, 2020, the "fake" symbol table implementation has been removed
-from the system, and the "--use-fake-symbol-table" option is now a no-op,
-triggering a warning if set to "1". The option will be removed in a later
-release.
-
 ### Symbol Table Class Overview
 
 Class | Superclass | Description
