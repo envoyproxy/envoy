@@ -7,8 +7,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/grpc_subscription_impl.h"
 #include "common/config/grpc_mux_impl.h"
+#include "common/config/grpc_subscription_impl.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
@@ -46,8 +46,8 @@ public:
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_, false);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        grpc_mux_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_, stats_,
-        dispatcher_.timeSource(), init_fetch_timeout, false);
+        grpc_mux_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_,
+        stats_, dispatcher_.timeSource(), init_fetch_timeout, false);
 
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
@@ -158,7 +158,8 @@ public:
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
     auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    static_cast<GrpcMuxDelta*>(shared_mux.get())
+        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 

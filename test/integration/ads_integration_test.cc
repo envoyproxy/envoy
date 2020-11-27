@@ -256,9 +256,9 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
   // Inconsistent SotW and delta behaviors for warming, see
   // https://github.com/envoyproxy/envoy/issues/11477#issuecomment-657855029.
   if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta) {
-// TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-//    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-//                                        {"cluster_0"}, {}, {}));
+    // TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+    //    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+    //                                        {"cluster_0"}, {}, {}));
   }
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildTlsClusterLoadAssignment("cluster_0")},
@@ -1207,13 +1207,13 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 
   // CDS is resumed and EDS response was acknowledged.
-// TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+  // TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
   //  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
-    // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
-    // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
-    // ACK goes out, they're both acknowledging version 3.
-    EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}));
-//  }
+  // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
+  // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
+  // ACK goes out, they're both acknowledging version 3.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}));
+  //  }
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "2", {"warming_cluster_2", "warming_cluster_1"},
                                       {}, {}));

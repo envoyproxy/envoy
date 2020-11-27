@@ -410,8 +410,8 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
                                        expect_node, expected_error_code, expected_error_substring);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, expect_node, 
-					expected_error_code, expected_error_substring);
+                                        expected_resource_names_removed, expect_node,
+                                        expected_error_code, expected_error_substring);
   }
 }
 
@@ -442,7 +442,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     EXPECT_TRUE(discovery_request.has_node());
     EXPECT_FALSE(discovery_request.node().id().empty());
     EXPECT_FALSE(discovery_request.node().cluster().empty());
-  } 
+  }
 
   if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
@@ -501,7 +501,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
-    bool expect_node, const Protobuf::int32 expected_error_code, 
+    bool expect_node, const Protobuf::int32 expected_error_code,
     const std::string& expected_error_substring) {
   API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
@@ -529,8 +529,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
   if (!sub_result) {
     return sub_result;
   }
-  auto unsub_result =
-      compareSets(expected_unsub, actual_unsub, "resource_names_unsubscribe");
+  auto unsub_result = compareSets(expected_unsub, actual_unsub, "resource_names_unsubscribe");
   if (!unsub_result) {
     return unsub_result;
   }

@@ -64,7 +64,9 @@ class MockSubscription : public Subscription {
 public:
   MOCK_METHOD(void, start,
               (const std::set<std::string>& resources, const bool use_prefix_matching));
-  MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names, const bool use_namespace_matching));
+  MOCK_METHOD(void, updateResourceInterest,
+              (const std::set<std::string>& update_to_these_names,
+               const bool use_namespace_matching));
   MOCK_METHOD(void, requestOnDemandUpdate, (const std::set<std::string>& add_these_names));
 };
 
@@ -96,10 +98,10 @@ public:
   MOCK_METHOD(Watch*, addWatch,
               (const std::string& type_url, const std::set<std::string>& resources,
                SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-	       std::chrono::milliseconds init_fetch_timeout,
-               const bool use_prefix_matching));
-  MOCK_METHOD(void, updateWatch, (const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources, const bool creating_namespace_watch));
+               std::chrono::milliseconds init_fetch_timeout, const bool use_prefix_matching));
+  MOCK_METHOD(void, updateWatch,
+              (const std::string& type_url, Watch* watch, const std::set<std::string>& resources,
+               const bool creating_namespace_watch));
   MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch));
 
   MOCK_METHOD(void, start, (), (override));

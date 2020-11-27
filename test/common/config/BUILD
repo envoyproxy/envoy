@@ -131,9 +131,10 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -189,8 +190,8 @@ envoy_cc_test_library(
     hdrs = ["delta_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
-        "//source/common/config:version_converter_lib",
         "//source/common/config:grpc_subscription_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",

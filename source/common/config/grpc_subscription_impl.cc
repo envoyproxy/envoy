@@ -5,14 +5,12 @@ namespace Config {
 
 GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, absl::string_view type_url,
                                            SubscriptionCallbacks& callbacks,
-					   OpaqueResourceDecoder& resource_decoder,
-                                           SubscriptionStats stats,
-					   TimeSource& time_source,
+                                           OpaqueResourceDecoder& resource_decoder,
+                                           SubscriptionStats stats, TimeSource& time_source,
                                            std::chrono::milliseconds init_fetch_timeout,
                                            bool is_aggregated)
-    : grpc_mux_(std::move(grpc_mux)), type_url_(type_url), callbacks_(callbacks), 
-      resource_decoder_(resource_decoder), stats_(stats),
-      time_source_(time_source),
+    : grpc_mux_(std::move(grpc_mux)), type_url_(type_url), callbacks_(callbacks),
+      resource_decoder_(resource_decoder), stats_(stats), time_source_(time_source),
       init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
 
 GrpcSubscriptionImpl::~GrpcSubscriptionImpl() {
@@ -24,13 +22,15 @@ GrpcSubscriptionImpl::~GrpcSubscriptionImpl() {
 ScopedResume GrpcSubscriptionImpl::pause() { return grpc_mux_->pause(type_url_); }
 
 // Config::Subscription
-void GrpcSubscriptionImpl::start(const std::set<std::string>& resources, const bool use_namespace_matching) {
+void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
+                                 const bool use_namespace_matching) {
   // ADS initial request batching relies on the users of the GrpcMux *not* calling start on it,
   // whereas non-ADS xDS users must call it themselves.
   if (!is_aggregated_) {
     grpc_mux_->start();
   }
-  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, init_fetch_timeout_, use_namespace_matching);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, init_fetch_timeout_,
+                               use_namespace_matching);
   stats_.update_attempt_.inc();
   ENVOY_LOG(debug, "{} subscription started", type_url_);
 }
@@ -47,9 +47,8 @@ void GrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::string>& fo
 }
 
 // Config::SubscriptionCallbacks
-void GrpcSubscriptionImpl::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& resources,
-    const std::string& version_info) {
+void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                          const std::string& version_info) {
   ENVOY_LOG(debug, "{} received SotW update", type_url_);
   stats_.update_attempt_.inc();
   grpc_mux_->disableInitFetchTimeoutTimer();
@@ -102,7 +101,6 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
 
   stats_.update_attempt_.inc();
 }
-
 
 } // namespace Config
 } // namespace Envoy

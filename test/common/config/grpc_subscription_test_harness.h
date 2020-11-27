@@ -54,10 +54,12 @@ public:
 
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         std::make_shared<GrpcMuxSotw>(std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
-                                      dispatcher_, *method_descriptor_, envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_,
-                                      rate_limit_settings_, local_info_,
+                                      dispatcher_, *method_descriptor_,
+                                      envoy::config::core::v3::ApiVersion::AUTO, random_,
+                                      stats_store_, rate_limit_settings_, local_info_,
                                       /*skip_subsequent_node=*/true),
-        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_, stats_, dispatcher_.timeSource(), init_fetch_timeout,
+        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_, stats_,
+        dispatcher_.timeSource(), init_fetch_timeout,
         /*is_aggregated=*/false);
   }
 
@@ -134,7 +136,8 @@ public:
                         Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
     auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxSotw*>(shared_mux.get())->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    static_cast<GrpcMuxSotw*>(shared_mux.get())
+        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
     EXPECT_EQ(control_plane_stats_.identifier_.value(), "ground_control_foo123");
     Mock::VerifyAndClearExpectations(&async_stream_);
   }

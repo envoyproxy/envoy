@@ -24,8 +24,8 @@ namespace Config {
 class SubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
-  SubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout,
-                                     Event::Dispatcher& dispatcher);
+  SubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
+                    std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher);
   virtual ~SubscriptionState() = default;
 
   // Update which resources we're interested in subscribing to.
@@ -71,7 +71,8 @@ public:
   virtual ~SubscriptionStateFactory() = default;
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   virtual std::unique_ptr<SubscriptionState>
-  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout) PURE;
+  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        std::chrono::milliseconds init_fetch_timeout) PURE;
 };
 
 } // namespace Config

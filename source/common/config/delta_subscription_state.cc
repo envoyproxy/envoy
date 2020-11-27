@@ -10,8 +10,8 @@ namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
-		                               UntypedConfigUpdateCallbacks& watch_map, 
-					       std::chrono::milliseconds init_fetch_timeout,
+                                               UntypedConfigUpdateCallbacks& watch_map,
+                                               std::chrono::milliseconds init_fetch_timeout,
                                                Event::Dispatcher& dispatcher)
     : SubscriptionState(std::move(type_url), watch_map, init_fetch_timeout, dispatcher) {}
 
@@ -24,8 +24,10 @@ DeltaSubscriptionStateFactory::~DeltaSubscriptionStateFactory() = default;
 
 std::unique_ptr<SubscriptionState>
 DeltaSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,
-                                                     UntypedConfigUpdateCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout) {
-  return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, init_fetch_timeout, dispatcher_);
+                                                     UntypedConfigUpdateCallbacks& callbacks,
+                                                     std::chrono::milliseconds init_fetch_timeout) {
+  return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, init_fetch_timeout,
+                                                  dispatcher_);
 }
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
@@ -57,7 +59,8 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
 }
 
 UpdateAck DeltaSubscriptionState::handleResponse(const void* response_proto_ptr) {
-  auto* response = static_cast<const envoy::service::discovery::v3::DeltaDiscoveryResponse*>(response_proto_ptr);
+  auto* response =
+      static_cast<const envoy::service::discovery::v3::DeltaDiscoveryResponse*>(response_proto_ptr);
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(response->nonce(), type_url());
@@ -95,7 +98,7 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
   callbacks().onConfigUpdate(message.resources(), message.removed_resources(),
-                            message.system_version_info());
+                             message.system_version_info());
   for (const auto& resource : message.resources()) {
     resource_versions_[resource.name()] = ResourceVersion(resource.version());
   }
@@ -126,7 +129,7 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
   callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                  nullptr);
+                                   nullptr);
 }
 
 envoy::service::discovery::v3::DeltaDiscoveryRequest*

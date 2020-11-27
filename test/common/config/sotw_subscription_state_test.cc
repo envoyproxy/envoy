@@ -1,7 +1,7 @@
+#include "common/config/resource_name.h"
 #include "common/config/sotw_subscription_state.h"
 #include "common/config/utility.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/config/resource_name.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -18,7 +18,8 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-const std::string TypeUrl = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(envoy::config::core::v3::ApiVersion::V3);
+const std::string TypeUrl = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+    envoy::config::core::v3::ApiVersion::V3);
 
 class SotwSubscriptionStateTest : public testing::Test {
 protected:
@@ -171,7 +172,7 @@ TEST_F(SotwSubscriptionStateTest, CheckUpdatePending) {
   EXPECT_TRUE(state_.subscriptionUpdatePending());
 }
 
-TEST_F(SotwSubscriptionStateTest, handleEstablishmentFailure) {
+TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailure) {
   // Although establishment failure is not supposed to cause an onConfigUpdateFailed() on the
   // ultimate actual subscription callbacks, the callbacks reference held is actually to
   // the WatchMap, which then calls GrpcSubscriptionImpl(s). It is the GrpcSubscriptionImpl

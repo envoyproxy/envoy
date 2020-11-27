@@ -79,7 +79,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message), control_plane_stats_);
+    static_cast<GrpcMuxDelta*>(shared_mux.get())
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
@@ -93,7 +94,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message), control_plane_stats_);
+    static_cast<GrpcMuxDelta*>(shared_mux.get())
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
@@ -107,7 +109,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message), control_plane_stats_);
+    static_cast<GrpcMuxDelta*>(shared_mux.get())
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
@@ -143,11 +146,12 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
   std::shared_ptr<GrpcMuxDelta> xds_context = std::make_shared<GrpcMuxDelta>(
-      std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor, envoy::config::core::v3::ApiVersion::AUTO, random,
-      stats_store, rate_limit_settings, local_info, true);
+      std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
+      envoy::config::core::v3::ApiVersion::AUTO, random, stats_store, rate_limit_settings,
+      local_info, true);
 
   auto subscription = std::make_unique<GrpcSubscriptionImpl>(
-      xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, resource_decoder, stats, 
+      xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, resource_decoder, stats,
       dispatcher.timeSource(), std::chrono::milliseconds(12345), false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));

@@ -2,9 +2,9 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/decoded_resource_impl.h"
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
+#include "common/config/decoded_resource_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/memory/utils.h"
@@ -15,9 +15,11 @@ namespace Envoy {
 namespace Config {
 
 GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
-                         bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info, envoy::config::core::v3::ApiVersion transport_api_version)
+                         bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info,
+                         envoy::config::core::v3::ApiVersion transport_api_version)
     : subscription_state_factory_(std::move(subscription_state_factory)),
-      skip_subsequent_node_(skip_subsequent_node), local_info_(local_info), transport_api_version_(transport_api_version),
+      skip_subsequent_node_(skip_subsequent_node), local_info_(local_info),
+      transport_api_version_(transport_api_version),
       enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {
   Config::Utility::checkLocalInfo("ads", local_info);
@@ -25,16 +27,17 @@ GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_
 
 Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
                              SubscriptionCallbacks& callbacks,
-			     OpaqueResourceDecoder& resource_decoder,
+                             OpaqueResourceDecoder& resource_decoder,
                              std::chrono::milliseconds init_fetch_timeout,
-			     const bool use_namespace_matching) {
+                             const bool use_namespace_matching) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     if (enable_type_url_downgrade_and_upgrade_) {
       registerVersionedTypeUrl(type_url);
     }
-    watch_map = watch_maps_.emplace(type_url, std::make_unique<WatchMap>(use_namespace_matching)).first;
+    watch_map =
+        watch_maps_.emplace(type_url, std::make_unique<WatchMap>(use_namespace_matching)).first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
                                          type_url, *watch_maps_[type_url], init_fetch_timeout));
     subscription_ordering_.emplace_back(type_url);
@@ -51,7 +54,7 @@ Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::st
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void GrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                               const std::set<std::string>& resources,
-			      const bool creating_namespace_watch) {
+                              const bool creating_namespace_watch) {
   ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch for {}", type_url);
   ASSERT(watch != nullptr);
   SubscriptionState& sub = subscriptionStateFor(type_url);
@@ -146,7 +149,7 @@ void GrpcMuxImpl::handleEstablishedStream() {
   }
   set_any_request_sent_yet_in_current_stream(false);
   maybeUpdateQueueSizeStat(0);
-  pausable_ack_queue_.clear();  
+  pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
 }
 
@@ -206,7 +209,7 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
     ENVOY_LOG(debug, "GrpcMuxImpl wants to send discovery request for {}", next_request_type_url);
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
-        break;
+      break;
     }
     void* request;
     // Get our subscription state to generate the appropriate discovery request, and send.
@@ -222,7 +225,7 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
       request = sub.getNextRequestAckless();
       ENVOY_LOG(debug, "GrpcMuxImpl sent non-ACK discovery request for {}", next_request_type_url);
     }
-      ENVOY_LOG(debug, "GrpcMuxImpl skip_subsequent_node: {}", skip_subsequent_node());
+    ENVOY_LOG(debug, "GrpcMuxImpl skip_subsequent_node: {}", skip_subsequent_node());
     sendGrpcMessage(request);
   }
   maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
@@ -273,7 +276,7 @@ absl::optional<std::string> GrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
 // Delta- and SotW-specific concrete subclasses:
 GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                            const Protobuf::MethodDescriptor& service_method,
-			   envoy::config::core::v3::ApiVersion transport_api_version,
+                           envoy::config::core::v3::ApiVersion transport_api_version,
                            Random::RandomGenerator& random, Stats::Scope& scope,
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
@@ -287,8 +290,9 @@ void GrpcMuxDelta::onStreamEstablished() { handleEstablishedStream(); }
 void GrpcMuxDelta::onEstablishmentFailure() { handleStreamEstablishmentFailure(); }
 void GrpcMuxDelta::onWriteable() { trySendDiscoveryRequests(); }
 void GrpcMuxDelta::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message, ControlPlaneStats&) {
-      	genericHandleResponse(message->type_url(), message.get());
+    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+    ControlPlaneStats&) {
+  genericHandleResponse(message->type_url(), message.get());
 }
 
 void GrpcMuxDelta::establishGrpcStream() { grpc_stream_.establishNewStream(); }
@@ -308,7 +312,8 @@ void GrpcMuxDelta::maybeUpdateQueueSizeStat(uint64_t size) {
 bool GrpcMuxDelta::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
 bool GrpcMuxDelta::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
-void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url, const std::set<std::string>& for_update) {
+void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
+                                         const std::set<std::string>& for_update) {
   SubscriptionState& sub = subscriptionStateFor(type_url);
   sub.updateSubscriptionInterest(for_update, {});
   // Tell the server about our change in interest, if any.
@@ -319,7 +324,7 @@ void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url, const std:
 
 GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-			 envoy::config::core::v3::ApiVersion transport_api_version,
+                         envoy::config::core::v3::ApiVersion transport_api_version,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
@@ -333,7 +338,8 @@ void GrpcMuxSotw::onStreamEstablished() { handleEstablishedStream(); }
 void GrpcMuxSotw::onEstablishmentFailure() { handleStreamEstablishmentFailure(); }
 void GrpcMuxSotw::onWriteable() { trySendDiscoveryRequests(); }
 void GrpcMuxSotw::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message, ControlPlaneStats& control_plane_stats) {
+    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+    ControlPlaneStats& control_plane_stats) {
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
   }

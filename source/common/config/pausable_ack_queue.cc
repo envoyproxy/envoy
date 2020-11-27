@@ -12,7 +12,7 @@ void PausableAckQueue::push(UpdateAck x) { storage_.push_back(std::move(x)); }
 size_t PausableAckQueue::size() const { return storage_.size(); }
 
 void PausableAckQueue::clear() {
-//  pauses_.clear();
+  //  pauses_.clear();
   storage_.clear();
 }
 

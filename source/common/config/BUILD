@@ -91,11 +91,11 @@ envoy_cc_library(
     hdrs = ["delta_subscription_state.h"],
     deps = [
         ":api_version_lib",
-	":utility_lib",
         ":subscription_state_lib",
+        ":utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-	"@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -105,10 +105,10 @@ envoy_cc_library(
     hdrs = ["sotw_subscription_state.h"],
     deps = [
         ":subscription_state_lib",
+        ":utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-	":utility_lib",
-	"@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -122,8 +122,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",
         "//source/common/common:minimal_logger_lib",
-	"@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -168,6 +167,8 @@ envoy_cc_library(
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
     deps = [
+        ":api_version_lib",
+        ":decoded_resource_lib",
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
@@ -175,11 +176,9 @@ envoy_cc_library(
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
-	"//source/common/memory:utils_lib",
+        "//source/common/memory:utils_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-	"@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-        ":api_version_lib",
-        ":decoded_resource_lib",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -204,7 +203,7 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-	"@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

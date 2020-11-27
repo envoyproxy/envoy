@@ -73,12 +73,10 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                   ->create(),
               dispatcher_, sotwGrpcMethod(type_url, api_config_source.transport_api_version()),
               api_config_source.transport_api_version(), api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source),
-	      local_info_,
+              Utility::parseRateLimitSettings(api_config_source), local_info_,
               api_config_source.set_node_on_first_message_only()),
-          type_url, callbacks, resource_decoder, stats,
-	  dispatcher_.timeSource(),
-	  Utility::configSourceInitialFetchTimeout(config),
+          type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
+          Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       return std::make_unique<GrpcSubscriptionImpl>(
@@ -88,10 +86,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                   ->create(),
               dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
               api_config_source.transport_api_version(), api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_, 
-	      api_config_source.set_node_on_first_message_only()),
-          type_url, callbacks, resource_decoder, stats,
-	  dispatcher_.timeSource(),
+              Utility::parseRateLimitSettings(api_config_source), local_info_,
+              api_config_source.set_node_on_first_message_only()),
+          type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
           Utility::configSourceInitialFetchTimeout(config), false);
     }
     default:
@@ -100,9 +97,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
-        cm_.adsMux(), type_url, callbacks, resource_decoder, stats,
-	dispatcher_.timeSource(),
-	Utility::configSourceInitialFetchTimeout(config), true);
+        cm_.adsMux(), type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
+        Utility::configSourceInitialFetchTimeout(config), true);
   }
   default:
     throw EnvoyException(

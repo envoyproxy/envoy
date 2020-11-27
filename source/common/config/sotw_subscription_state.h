@@ -17,8 +17,8 @@ class SotwSubscriptionState : public SubscriptionState {
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-                std::chrono::milliseconds init_fetch_timeout,
-                                             Event::Dispatcher& dispatcher);
+                        std::chrono::milliseconds init_fetch_timeout,
+                        Event::Dispatcher& dispatcher);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -72,7 +72,8 @@ public:
   SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher);
   ~SotwSubscriptionStateFactory() override;
   std::unique_ptr<SubscriptionState>
-  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout) override;
+  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        std::chrono::milliseconds init_fetch_timeout) override;
 
 private:
   Event::Dispatcher& dispatcher_;

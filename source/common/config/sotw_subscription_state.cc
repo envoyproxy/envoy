@@ -7,8 +7,9 @@
 namespace Envoy {
 namespace Config {
 
-SotwSubscriptionState::SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-		std::chrono::milliseconds init_fetch_timeout,
+SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
+                                             UntypedConfigUpdateCallbacks& callbacks,
+                                             std::chrono::milliseconds init_fetch_timeout,
                                              Event::Dispatcher& dispatcher)
     : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {}
 
@@ -22,8 +23,9 @@ SotwSubscriptionStateFactory::~SotwSubscriptionStateFactory() = default;
 std::unique_ptr<SubscriptionState>
 SotwSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,
                                                     UntypedConfigUpdateCallbacks& callbacks,
-						    std::chrono::milliseconds init_fetch_timeout) {
-  return std::make_unique<SotwSubscriptionState>(type_url, callbacks, init_fetch_timeout, dispatcher_);
+                                                    std::chrono::milliseconds init_fetch_timeout) {
+  return std::make_unique<SotwSubscriptionState>(type_url, callbacks, init_fetch_timeout,
+                                                 dispatcher_);
 }
 
 void SotwSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
@@ -50,7 +52,8 @@ void SotwSubscriptionState::markStreamFresh() {
 }
 
 UpdateAck SotwSubscriptionState::handleResponse(const void* response_proto_ptr) {
-  auto* response = static_cast<const envoy::service::discovery::v3::DiscoveryResponse*>(response_proto_ptr);
+  auto* response =
+      static_cast<const envoy::service::discovery::v3::DiscoveryResponse*>(response_proto_ptr);
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(response->nonce(), type_url());
@@ -63,12 +66,14 @@ UpdateAck SotwSubscriptionState::handleResponse(const void* response_proto_ptr) 
   return ack;
 }
 
-void SotwSubscriptionState::handleGoodResponse(const envoy::service::discovery::v3::DiscoveryResponse& message) {
+void SotwSubscriptionState::handleGoodResponse(
+    const envoy::service::discovery::v3::DiscoveryResponse& message) {
   for (const auto& resource : message.resources()) {
     if (resource.type_url() != message.type_url()) {
       throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
                                        "the message-wide type URL {} in DiscoveryResponse {}",
-                                       resource.type_url(), message.type_url(), message.DebugString()));
+                                       resource.type_url(), message.type_url(),
+                                       message.DebugString()));
     }
   }
   callbacks().onConfigUpdate(message.resources(), message.version_info());

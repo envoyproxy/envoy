@@ -1,13 +1,14 @@
 #pragma once
 
 #include "envoy/grpc/status.h"
+
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/config/api_version.h"
 #include "common/config/subscription_state.h"
 
-#include "absl/types/optional.h"
 #include "absl/container/node_hash_map.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -15,8 +16,9 @@ namespace Config {
 // Tracks the state of a delta xDS-over-gRPC protocol session.
 class DeltaSubscriptionState : public SubscriptionState {
 public:
-  DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map, std::chrono::milliseconds init_fetch_timeout,
-                                               Event::Dispatcher& dispatcher);
+  DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
+                         std::chrono::milliseconds init_fetch_timeout,
+                         Event::Dispatcher& dispatcher);
 
   ~DeltaSubscriptionState() override;
 
@@ -94,7 +96,8 @@ public:
   DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher);
   ~DeltaSubscriptionStateFactory() override;
   std::unique_ptr<SubscriptionState>
-  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout) override;
+  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        std::chrono::milliseconds init_fetch_timeout) override;
 
 private:
   Event::Dispatcher& dispatcher_;

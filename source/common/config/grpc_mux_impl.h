@@ -5,9 +5,9 @@
 #include <queue>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/common/token_bucket.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
+#include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
@@ -38,15 +38,16 @@ namespace Config {
 class GrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
-              bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info, envoy::config::core::v3::ApiVersion transport_api_version);
+              bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info,
+              envoy::config::core::v3::ApiVersion transport_api_version);
 
   Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder,
-			   std::chrono::milliseconds init_fetch_timeout,
-                           const bool use_namespace_matching = false) override;
+                  SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                  std::chrono::milliseconds init_fetch_timeout,
+                  const bool use_namespace_matching = false) override;
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources, const bool creating_namespace_watch = false) override;
+                   const std::set<std::string>& resources,
+                   const bool creating_namespace_watch = false) override;
   void removeWatch(const std::string& type_url, Watch* watch) override;
 
   ScopedResume pause(const std::string& type_url) override;
@@ -55,7 +56,10 @@ public:
   void start() override;
   void disableInitFetchTimeoutTimer() override;
   void registerVersionedTypeUrl(const std::string& type_url);
-  const absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionState>>& subscriptions() const { return subscriptions_; } 
+  const absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionState>>&
+  subscriptions() const {
+    return subscriptions_;
+  }
 
 protected:
   // Everything related to GrpcStream must remain abstract. GrpcStream (and the gRPC-using classes
@@ -85,7 +89,9 @@ protected:
     any_request_sent_yet_in_current_stream_ = value;
   }
   const LocalInfo::LocalInfo& local_info() const { return local_info_; }
-  const envoy::config::core::v3::ApiVersion& transport_api_version() const { return transport_api_version_; }
+  const envoy::config::core::v3::ApiVersion& transport_api_version() const {
+    return transport_api_version_;
+  }
 
 private:
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
@@ -135,24 +141,26 @@ private:
   const bool enable_type_url_downgrade_and_upgrade_;
 };
 
-class GrpcMuxDelta : public GrpcMuxImpl,
-                     public GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse> {
+class GrpcMuxDelta
+    : public GrpcMuxImpl,
+      public GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-               const Protobuf::MethodDescriptor& service_method, 
-	       envoy::config::core::v3::ApiVersion transport_api_version,
-	       Random::RandomGenerator& random,
-               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+               const Protobuf::MethodDescriptor& service_method,
+               envoy::config::core::v3::ApiVersion transport_api_version,
+               Random::RandomGenerator& random, Stats::Scope& scope,
+               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
+               bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
   void onWriteable() override;
-  void
-  onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
-                      ControlPlaneStats& control_plane_stats) override;
-  void requestOnDemandUpdate(const std::string& type_url, const std::set<std::string>& for_update) override;
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+      ControlPlaneStats& control_plane_stats) override;
+  void requestOnDemandUpdate(const std::string& type_url,
+                             const std::set<std::string>& for_update) override;
 
 protected:
   void establishGrpcStream() override;
@@ -162,7 +170,8 @@ protected:
   bool rateLimitAllowsDrain() override;
 
 private:
-  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest, envoy::service::discovery::v3::DeltaDiscoveryResponse>
+  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3::DeltaDiscoveryResponse>
       grpc_stream_;
 };
 
@@ -170,21 +179,24 @@ class GrpcMuxSotw : public GrpcMuxImpl,
                     public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-              const Protobuf::MethodDescriptor& service_method, 
-	      envoy::config::core::v3::ApiVersion transport_api_version,
-	      Random::RandomGenerator& random,
-              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+              const Protobuf::MethodDescriptor& service_method,
+              envoy::config::core::v3::ApiVersion transport_api_version,
+              Random::RandomGenerator& random, Stats::Scope& scope,
+              const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
+              bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
   void onWriteable() override;
-  void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message, ControlPlaneStats& control_plane_stats) override;
+  void
+  onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+                      ControlPlaneStats& control_plane_stats) override;
   void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   };
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest, envoy::service::discovery::v3::DiscoveryResponse>&
+  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+             envoy::service::discovery::v3::DiscoveryResponse>&
   grpcStreamForTest() {
     return grpc_stream_;
   }
@@ -197,39 +209,38 @@ protected:
   bool rateLimitAllowsDrain() override;
 
 private:
-  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest, envoy::service::discovery::v3::DiscoveryResponse> grpc_stream_;
+  GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
+             envoy::service::discovery::v3::DiscoveryResponse>
+      grpc_stream_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {
 public:
   void start() override {}
 
-  ScopedResume pause(const std::string&) override { return std::make_unique<Cleanup>([]() {}); }
-  ScopedResume pause(const std::vector<std::string>) override { return std::make_unique<Cleanup>([]() {}); }
+  ScopedResume pause(const std::string&) override {
+    return std::make_unique<Cleanup>([]() {});
+  }
+  ScopedResume pause(const std::vector<std::string>) override {
+    return std::make_unique<Cleanup>([]() {});
+  }
   bool paused(const std::string&) const override { return false; }
   void disableInitFetchTimeoutTimer() override {}
 
-  Watch* addWatch(const std::string&, 
-                           const std::set<std::string>&,
-                           SubscriptionCallbacks&,
-                           OpaqueResourceDecoder&,
-			   std::chrono::milliseconds,
-                           const bool) override {
-			     throw EnvoyException("ADS must be configured to support an ADS config source");
-			   }
-  void updateWatch(const std::string&, Watch*,
-                              const std::set<std::string>&,
-                              const bool) override {
-	  throw EnvoyException("ADS must be configured to support an ADS config source");
+  Watch* addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
+                  OpaqueResourceDecoder&, std::chrono::milliseconds, const bool) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
+  }
+  void updateWatch(const std::string&, Watch*, const std::set<std::string>&, const bool) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   void removeWatch(const std::string&, Watch*) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
-  }			   
+  }
 
   void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-
 };
 
 } // namespace Config

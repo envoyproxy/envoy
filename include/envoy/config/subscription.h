@@ -188,7 +188,8 @@ public:
    * @param resources vector of resource names to fetch. It's a (not unordered_)set so that it can
    * be passed to std::set_difference, which must be given sorted collections.
    */
-  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names, const bool use_namespace_matching = false) PURE;
+  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names,
+                                      const bool use_namespace_matching = false) PURE;
 
   /**
    * Creates a discovery request for resources.

@@ -85,19 +85,17 @@ public:
    * @return Watch* an opaque watch token added or updated, to be used in future addOrUpdateWatch
    *                calls.
    */
-  virtual Watch* addWatch(const std::string& type_url,
-                                   const std::set<std::string>& resources,
-                                   SubscriptionCallbacks& callbacks,
-                                   OpaqueResourceDecoder& resource_decoder,
-				   std::chrono::milliseconds init_fetch_timeout,
-                                   const bool use_namespace_matching) PURE;
+  virtual Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                          SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                          std::chrono::milliseconds init_fetch_timeout,
+                          const bool use_namespace_matching) PURE;
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   virtual void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources, const bool creating_namespace_watch) PURE;
-
+                           const std::set<std::string>& resources,
+                           const bool creating_namespace_watch) PURE;
 
   /**
    * Cleanup of a Watch* added by addOrUpdateWatch(). Receiving a Watch* from addOrUpdateWatch()
