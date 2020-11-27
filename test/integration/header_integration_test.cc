@@ -217,6 +217,7 @@ public:
                   type: EDS
                   eds_cluster_config:
                     eds_config:
+                      resource_api_version: V3
                       api_config_source:
                         api_type: GRPC
                         grpc_services:
@@ -359,8 +360,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
   }
 
@@ -383,7 +383,7 @@ public:
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
-            TestUtility::parseYaml<API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment)>(fmt::format(
+            TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:

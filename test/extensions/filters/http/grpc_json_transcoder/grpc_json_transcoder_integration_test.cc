@@ -35,7 +35,7 @@ public:
         R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
             )EOF";
@@ -120,23 +120,23 @@ protected:
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());
 
-    if (response->headers().get(Http::LowerCaseString("transfer-encoding")) == nullptr ||
+    if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
         !absl::StartsWith(response->headers()
-                              .get(Http::LowerCaseString("transfer-encoding"))
+                              .get(Http::LowerCaseString("transfer-encoding"))[0]
                               ->value()
                               .getStringView(),
                           "chunked")) {
-      EXPECT_EQ(response->headers().get(Http::LowerCaseString("trailer")), nullptr);
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("trailer")).empty());
     }
 
     response_headers.iterate(
         [response = response.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
           Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
           if (entry.value() == UnexpectedHeaderValue) {
-            EXPECT_FALSE(response->headers().get(lower_key));
+            EXPECT_TRUE(response->headers().get(lower_key).empty());
           } else {
             EXPECT_EQ(entry.value().getStringView(),
-                      response->headers().get(lower_key)->value().getStringView());
+                      response->headers().get(lower_key)[0]->value().getStringView());
           }
           return Http::HeaderMap::Iterate::Continue;
         });
@@ -427,7 +427,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
   EXPECT_EQ(response->body(), http_body.data());
   // As well as content-type header
   auto content_type = response->headers().get(Http::LowerCaseString("content-type"));
-  EXPECT_EQ("text/plain", content_type->value().getStringView());
+  EXPECT_EQ("text/plain", content_type[0]->value().getStringView());
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {
@@ -462,7 +462,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
               ignore_unknown_query_parameters : true
@@ -486,7 +486,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
@@ -511,7 +511,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
@@ -536,7 +536,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
@@ -744,6 +744,14 @@ std::string jsonStrToPbStrucStr(std::string json) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
+  // Lower the timeout for the 408 response.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_host->mutable_routes(0)->mutable_route()->mutable_idle_timeout()->set_seconds(5);
+      });
+
   HttpIntegrationTest::initialize();
   // Due to the limit of protobuf util, we can only compare to level 32.
   std::string deepJson = createDeepJson(32, true);
@@ -757,14 +765,13 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
       R"({"content":)" + deepJson + R"(})");
 
   // The valid deep struct is parsed successfully.
-  // Since we didn't set the response, it return 503.
-  // Response body is empty (not a valid JSON), so content type should be application/grpc.
+  // Since we didn't set a response, it will time out.
+  // Response body is empty (not a valid JSON), so the error response is plaintext.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
       createDeepJson(100, true), {}, {}, Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"content-type", "application/grpc"}},
-      "");
+      Http::TestResponseHeaderMapImpl{{":status", "408"}, {"content-type", "text/plain"}}, "");
 
   // The invalid deep struct is detected.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(

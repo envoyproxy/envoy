@@ -29,6 +29,7 @@ public:
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
   void initializeFilter(const std::string& config) {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     config_helper_.addFilter(config);
     HttpIntegrationTest::initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -93,13 +94,22 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   // Assert that the total bytes received upstream equal the sum of the uncompressed byte buffers
   // sent.
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ("chunked", upstream_request_->headers().TransferEncoding()->value().getStringView());
   EXPECT_EQ("gzip", upstream_request_->headers()
-                        .get(Http::LowerCaseString("accept-encoding"))
+                        .get(Http::LowerCaseString("accept-encoding"))[0]
                         ->value()
                         .getStringView());
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::LowerCaseString("content-encoding")));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
   EXPECT_EQ(uncompressed_request_length, upstream_request_->bodyLength());
+  EXPECT_EQ(std::to_string(compressed_request_length),
+            upstream_request_->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ(std::to_string(uncompressed_request_length),
+            upstream_request_->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
+                ->value()
+                .getStringView());
 
   // Verify stats
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.request.decompressed",
@@ -141,6 +151,16 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(uncompressed_response_length, response->body().length());
+  EXPECT_EQ(std::to_string(compressed_response_length),
+            response->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ(std::to_string(uncompressed_response_length),
+            response->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
+                ->value()
+                .getStringView());
 
   // Verify stats
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.response.decompressed",
@@ -203,12 +223,16 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ("chunked", upstream_request_->headers().TransferEncoding()->value().getStringView());
   EXPECT_EQ("gzip", upstream_request_->headers()
-                        .get(Http::LowerCaseString("accept-encoding"))
+                        .get(Http::LowerCaseString("accept-encoding"))[0]
                         ->value()
                         .getStringView());
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::LowerCaseString("content-encoding")));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
+  EXPECT_EQ(std::to_string(compressed_request_length),
+            upstream_request_->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
+                ->value()
+                .getStringView());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.request.decompressed",
@@ -244,6 +268,11 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(std::to_string(compressed_response_length),
+            response->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
+                ->value()
+                .getStringView());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.response.decompressed",

@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.RouterCheckToolSchema;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
@@ -20,7 +21,7 @@ message Validation {
 message ValidationItem {
   // Name of the test case. There is no uniqueness constraint among the test case names.
   // The name has to be non empty.
-  string test_name = 1 [(validate.rules).string.min_bytes = 1];
+  string test_name = 1 [(validate.rules).string.min_len = 1];
 
   // The input constraints of the test case.
   ValidationInput input = 2 [(validate.rules).message.required = true];
@@ -37,17 +38,17 @@ message ValidationInput {
   // This pseudo-header field includes the authority portion of the target URI.
   // Clients that generate HTTP/2 requests directly SHOULD use the :authority pseudo-header field
   // instead of the Host header field.
-  string authority = 1 [(validate.rules).string.min_bytes = 1];
+  string authority = 1 [(validate.rules).string.min_len = 1];
 
   // The :path pseudo-header field includes the path and query parts of the target URI.
   // This pseudo-header field MUST NOT be empty for http or https URIs.
   // http or https URIs that do not contain a path component MUST include a value of '/'
   // The exception to this rule is an OPTIONS request for an http or https URI that does not include
   // a path component.
-  string path = 2 [(validate.rules).string.min_bytes = 1];
+  string path = 2 [(validate.rules).string.min_len = 1];
 
   // This pseudo-header field includes the HTTP method.
-  string method = 4 [(validate.rules).string.min_bytes = 3];
+  string method = 4 [(validate.rules).string.min_len = 3];
 
   // An integer used to identify the target for weighted cluster selection.
   // The default value of random_value is 0.
@@ -99,11 +100,15 @@ message ValidationAssert {
   // Match the returned redirect path.
   google.protobuf.StringValue path_redirect = 6;
 
-  // Match the listed request or response header fields.
+  // Match the listed request or response header fields. These fields are deprecated, use *_header_matches instead.
+  repeated envoy.config.core.v3.HeaderValue request_header_fields = 9 [deprecated = true];
+  repeated envoy.config.core.v3.HeaderValue response_header_fields = 10 [deprecated = true];
+
+  // Match the listed request or response headers.
   // Example header fields include the “:path”, “cookie”, and “date” fields.
   // The header fields are checked after all other test cases.
   // Thus, the header fields checked will be those of the redirected or rewritten routes when
   // applicable.
-  repeated envoy.config.core.v3.HeaderValue request_header_fields = 9;
-  repeated envoy.config.core.v3.HeaderValue response_header_fields = 10;
+  repeated envoy.config.route.v3.HeaderMatcher request_header_matches = 11;
+  repeated envoy.config.route.v3.HeaderMatcher response_header_matches = 12;
 }

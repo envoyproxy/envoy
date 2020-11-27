@@ -118,8 +118,6 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer;
-  symbol_table_creator_test_peer.setUseFakeSymbolTables(false);
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -564,6 +562,7 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
 }
 
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeRequests)) {
+  v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
       ".*requests.*");
   initialize();
@@ -579,6 +578,7 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
 }
 
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeMultipleExact)) {
+  v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
       ".*live");

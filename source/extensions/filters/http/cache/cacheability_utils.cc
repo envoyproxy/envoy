@@ -43,7 +43,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // If needed to be handled properly refer to:
   // https://httpwg.org/specs/rfc7234.html#validation.received
   for (auto conditional_header : conditionalHeaders()) {
-    if (headers.get(*conditional_header)) {
+    if (!headers.get(*conditional_header).empty()) {
       return false;
     }
   }
@@ -56,24 +56,24 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
           forwarded_proto == header_values.SchemeValues.Https);
 }
 
-bool CacheabilityUtils::isCacheableResponse(
-    const Http::ResponseHeaderMap& headers,
-    const absl::flat_hash_set<std::string>& allowed_vary_headers) {
+bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,
+                                            const VaryHeader& vary_allow_list) {
   absl::string_view cache_control = headers.getInlineValue(response_cache_control_handle.handle());
   ResponseCacheControl response_cache_control(cache_control);
 
-  // Only cache responses with explicit validation data, either:
-  //    "no-cache" cache-control directive
-  //    "max-age" or "s-maxage" cache-control directives with date header
-  //    expires header
-  const bool has_validation_data =
-      response_cache_control.must_validate_ ||
-      (headers.Date() && response_cache_control.max_age_.has_value()) ||
-      headers.get(Http::Headers::get().Expires);
+  // Only cache responses with enough data to calculate freshness lifetime as per:
+  // https://httpwg.org/specs/rfc7234.html#calculating.freshness.lifetime.
+  // Either:
+  //    "no-cache" cache-control directive (requires revalidation anyway).
+  //    "max-age" or "s-maxage" cache-control directives.
+  //    Both "Expires" and "Date" headers.
+  const bool has_validation_data = response_cache_control.must_validate_ ||
+                                   response_cache_control.max_age_.has_value() ||
+                                   (headers.Date() && headers.getInline(expires_handle.handle()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
-         VaryHeader::isAllowed(allowed_vary_headers, headers);
+         vary_allow_list.isAllowed(headers);
 }
 
 } // namespace Cache

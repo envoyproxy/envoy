@@ -100,7 +100,7 @@ codec_type: auto
 stat_prefix: foo
 http_filters:
 - name: http_dynamo_filter
-  config: {}
+  typed_config: {}
     )EOF";
 
     EXPECT_CALL(outer_init_manager_, add(_));
@@ -109,7 +109,7 @@ http_filters:
         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
     rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-                start(_));
+                start(_, _));
     outer_init_manager_.initialize(init_watcher_);
   }
 
@@ -166,7 +166,7 @@ TEST_F(RdsImplTest, Basic) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": null
     }
@@ -196,7 +196,7 @@ TEST_F(RdsImplTest, Basic) {
   "version_info": "2",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": [
         {
@@ -248,7 +248,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "INVALID_NAME_FOR_route_config",
       "virtual_hosts": null
     }
@@ -517,7 +517,7 @@ dynamic_route_configs:
   // Static + dynamic.
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+              start(_, _));
   outer_init_manager_.initialize(init_watcher_);
 
   const std::string response1_json = R"EOF(
@@ -683,7 +683,7 @@ virtual_hosts:
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+              start(_, _));
   outer_init_manager_.initialize(init_watcher_);
   EXPECT_CALL(init_watcher_, ready());
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
@@ -692,7 +692,7 @@ TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
 TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+              start(_, _));
   outer_init_manager_.initialize(init_watcher_);
   envoy::config::route::v3::RouteConfiguration route_config;
   const auto decoded_resources = TestUtility::decodeResources({route_config, route_config});
@@ -724,13 +724,13 @@ dynamic_route_configs:
   // dynamic.
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
-              start(_));
+              start(_, _));
   outer_init_manager_.initialize(init_watcher_);
 
   const std::string response1_yaml = R"EOF(
 version_info: '1'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+- "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
   name: foo_route_config
   virtual_hosts:
   - name: integration

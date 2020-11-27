@@ -2,12 +2,12 @@
 
 set -e
 
-# This works only on Linux-{x86_64,s390x,aarch64} and macOS-x86_64.
+# This works only on Linux-{x86_64,s390x,aarch64,ppc64le} and macOS-x86_64.
 case "$$(uname -s)-$$(uname -m)" in
-Linux-x86_64|Linux-s390x|Linux-aarch64|Darwin-x86_64)
+Linux-x86_64|Linux-s390x|Linux-aarch64|Linux-ppc64le|Darwin-x86_64)
   ;;
 *)
-  echo "ERROR: wee8 is currently supported only on Linux-{x86_64,s390x,aarch64} and macOS-x86_64." >&2
+  echo "ERROR: wee8 is currently supported only on Linux-{x86_64,s390x,aarch64,ppc64le} and macOS-x86_64." >&2
   exit 1
 esac
 
@@ -19,7 +19,7 @@ pushd $$ROOT/wee8
 rm -rf out/wee8
 
 # Export compiler configuration.
-export CXXFLAGS="$${CXXFLAGS-} -Wno-deprecated-copy -Wno-unknown-warning-option"
+export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32"
 if [[ ( `uname` == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *"clang"* ]]; then
   export IS_CLANG=true
   export CC=$${CC:-clang}
@@ -87,6 +87,11 @@ WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
 # Support Arm64
 if [[ `uname -m` == "aarch64" ]]; then
   WEE8_BUILD_ARGS+=" target_cpu=\"arm64\""
+fi
+# Support ppc64
+# Only tests with gn 5da62d5
+if [[ `uname -m` == "ppc64le" ]]; then
+  WEE8_BUILD_ARGS+=" target_cpu=\"ppc64\""
 fi
 
 # Build wee8.

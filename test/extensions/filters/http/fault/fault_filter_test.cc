@@ -46,7 +46,6 @@ class FaultFilterTest : public testing::Test {
 public:
   const std::string fixed_delay_and_abort_nodes_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -62,7 +61,6 @@ public:
 
   const std::string fixed_delay_only_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -79,7 +77,6 @@ public:
 
   const std::string fixed_delay_and_abort_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -100,7 +97,6 @@ public:
 
   const std::string fixed_delay_and_abort_match_headers_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -118,7 +114,6 @@ public:
 
   const std::string delay_with_upstream_cluster_yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 100
       denominator: HUNDRED
@@ -208,7 +203,6 @@ TEST(FaultFilterBadConfigTest, BadDelayType) {
 TEST(FaultFilterBadConfigTest, BadDelayDuration) {
   const std::string yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 50
       denominator: HUNDRED
@@ -221,7 +215,6 @@ TEST(FaultFilterBadConfigTest, BadDelayDuration) {
 TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
   const std::string yaml = R"EOF(
   delay:
-    type: fixed
     percentage:
       numerator: 50
       denominator: HUNDRED
@@ -277,7 +270,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
@@ -324,7 +317,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
@@ -377,7 +370,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
@@ -427,7 +420,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
@@ -477,7 +470,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {

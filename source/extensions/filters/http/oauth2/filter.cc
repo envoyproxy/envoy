@@ -17,7 +17,6 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -56,6 +55,11 @@ constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
+
+constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
+constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
+constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
+constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
@@ -219,11 +223,16 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
                {Http::Headers::get().Location, state}})};
-      decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+      decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_RACE);
     }
 
     // Continue on with the filter stack.
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Save the request headers for later modification if needed.
+  if (config_->forwardBearerToken()) {
+    request_headers_ = &headers;
   }
 
   // If a bearer token is supplied as a header or param, we ingest it here and kick off the
@@ -232,9 +241,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   access_token_ = extractAccessToken(headers);
   if (!access_token_.empty()) {
     found_bearer_token_ = true;
-    request_headers_ = &headers;
     finishFlow();
-
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -272,7 +279,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
                     config_->clientId(), escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
-    decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+    decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
     config_->stats().oauth_unauthorized_rq_.inc();
 
@@ -323,7 +330,9 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   validator_->setParams(headers, config_->tokenSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
-    setBearerToken(headers, validator_->token());
+    if (config_->forwardBearerToken() && !validator_->token().empty()) {
+      setBearerToken(headers, validator_->token());
+    }
     return true;
   }
 
@@ -348,7 +357,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
   response_headers->setLocation(new_path);
-  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
 }
@@ -369,7 +378,9 @@ void OAuth2Filter::finishFlow() {
   // We have fully completed the entire OAuth flow, whether through Authorization header or from
   // user redirection to the auth server.
   if (found_bearer_token_) {
-    setBearerToken(*request_headers_, access_token_);
+    if (config_->forwardBearerToken()) {
+      setBearerToken(*request_headers_, access_token_);
+    }
     config_->stats().oauth_success_.inc();
     decoder_callbacks_->continueDecoding();
     return;
@@ -419,7 +430,7 @@ void OAuth2Filter::finishFlow() {
 
   response_headers->setLocation(state_);
 
-  decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
   decoder_callbacks_->continueDecoding();
 }

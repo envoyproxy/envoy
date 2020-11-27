@@ -22,7 +22,7 @@ Cluster::Cluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api),
+                                       added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
@@ -198,8 +198,8 @@ ClusterFactory::createClusterWithConfig(
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.tls(), context.random(),
-      context.runtime(), context.stats());
+      context.singletonManager(), context.dispatcher(), context.tls(),
+      context.api().randomGenerator(), context.runtime(), context.stats());
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (cluster_config.has_upstream_http_protocol_options()) {
     if (!proto_config.allow_insecure_cluster_options() &&

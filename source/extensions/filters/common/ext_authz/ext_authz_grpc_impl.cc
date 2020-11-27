@@ -1,7 +1,6 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/service/auth/v2alpha/external_auth.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "common/common/assert.h"
@@ -17,15 +16,13 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout,
-                               envoy::config::core::v3::ApiVersion transport_api_version,
-                               bool use_alpha)
-    : async_client_(std::move(async_client)), timeout_(timeout),
+                               envoy::config::core::v3::ApiVersion transport_api_version)
+    : async_client_(async_client), timeout_(timeout),
       service_method_(Grpc::VersionedMethods("envoy.service.auth.v3.Authorization.Check",
-                                             "envoy.service.auth.v2.Authorization.Check",
-                                             "envoy.service.auth.v2alpha.Authorization.Check")
-                          .getMethodDescriptorForVersion(transport_api_version, use_alpha)),
+                                             "envoy.service.auth.v2.Authorization.Check")
+                          .getMethodDescriptorForVersion(transport_api_version)),
       transport_api_version_(transport_api_version) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
@@ -38,13 +35,15 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& request,
-                           Tracing::Span& parent_span, const StreamInfo::StreamInfo&) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
+  Http::AsyncClient::RequestOptions options;
+  options.setTimeout(timeout_);
+  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
-  request_ = async_client_->send(service_method_, request, *this, parent_span,
-                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_),
+  request_ = async_client_->send(service_method_, request, *this, parent_span, options,
                                  transport_api_version_);
 }
 
@@ -57,6 +56,11 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       toAuthzResponseHeader(authz_response, response->ok_response().headers());
+      if (response->ok_response().headers_to_remove_size() > 0) {
+        for (const auto& header : response->ok_response().headers_to_remove()) {
+          authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
+        }
+      }
     }
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);

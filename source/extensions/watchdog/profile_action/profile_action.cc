@@ -6,6 +6,7 @@
 
 #include "common/profiler/profiler.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_format.h"
 
@@ -14,7 +15,7 @@ namespace Extensions {
 namespace Watchdog {
 namespace ProfileAction {
 namespace {
-static constexpr uint64_t DefaultMaxProfilePerTid = 10;
+static constexpr uint64_t DefaultMaxProfiles = 10;
 
 std::string generateProfileFilePath(const std::string& directory, const SystemTime& now) {
   auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
@@ -31,36 +32,53 @@ ProfileAction::ProfileAction(
     : path_(config.profile_path()),
       duration_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, profile_duration, 5000))),
-      max_profiles_per_tid_(config.max_profiles_per_thread() == 0
-                                ? DefaultMaxProfilePerTid
-                                : config.max_profiles_per_thread()),
-      running_profile_(false), profiles_started_(0), context_(context),
-      timer_cb_(context_.dispatcher_.createTimer([this] {
+      max_profiles_(config.max_profiles() == 0 ? DefaultMaxProfiles : config.max_profiles()),
+      profiles_attempted_(context.stats_.counterFromStatName(
+          Stats::StatNameManagedStorage(
+              absl::StrCat(context.guarddog_name_, ".profile_action.attempted"),
+              context.stats_.symbolTable())
+              .statName())),
+      profiles_successfully_captured_(context.stats_.counterFromStatName(
+          Stats::StatNameManagedStorage(
+              absl::StrCat(context.guarddog_name_, ".profile_action.successfully_captured"),
+              context.stats_.symbolTable())
+              .statName())),
+      context_(context), timer_cb_(context_.dispatcher_.createTimer([this] {
         if (Profiler::Cpu::profilerEnabled()) {
           Profiler::Cpu::stopProfiler();
           running_profile_ = false;
         } else {
           ENVOY_LOG_MISC(error,
                          "Profile Action's stop() was scheduled, but profiler isn't running!");
+          return;
         }
 
         if (!context_.api_.fileSystem().fileExists(profile_filename_)) {
           ENVOY_LOG_MISC(error, "Profile file {} wasn't created!", profile_filename_);
+        } else {
+          profiles_successfully_captured_.inc();
         }
       })) {}
 
 void ProfileAction::run(
     envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
-    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs,
+    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_last_checkin_pairs,
     MonotonicTime /*now*/) {
   if (running_profile_) {
     return;
   }
+  profiles_attempted_.inc();
 
   // Check if there's a tid that justifies profiling
-  auto trigger_tid = getTidTriggeringProfile(thread_ltt_pairs);
-  if (!trigger_tid.has_value()) {
-    ENVOY_LOG_MISC(warn, "Profile Action: None of the provided tids justify profiling");
+  if (thread_last_checkin_pairs.empty()) {
+    ENVOY_LOG_MISC(warn, "Profile Action: No tids were provided.");
+    return;
+  }
+
+  if (profiles_started_ >= max_profiles_) {
+    ENVOY_LOG_MISC(warn,
+                   "Profile Action: Unable to profile: enabled but already wrote {} profiles.",
+                   profiles_started_);
     return;
   }
 
@@ -78,7 +96,6 @@ void ProfileAction::run(
       // Update state
       running_profile_ = true;
       ++profiles_started_;
-      tid_to_profile_count_[*trigger_tid] += 1;
 
       // Schedule callback to stop
       timer_cb_->enableTimer(duration_);
@@ -90,19 +107,6 @@ void ProfileAction::run(
   }
 }
 
-// Helper to determine if we have a valid tid to start profiling.
-absl::optional<Thread::ThreadId> ProfileAction::getTidTriggeringProfile(
-    const std::vector<std::pair<Thread::ThreadId, MonotonicTime>>& thread_ltt_pairs) {
-
-  // Find a TID not over the max_profiles threshold
-  for (const auto& [tid, ltt] : thread_ltt_pairs) {
-    if (tid_to_profile_count_[tid] < max_profiles_per_tid_) {
-      return tid;
-    }
-  }
-
-  return absl::nullopt;
-}
 } // namespace ProfileAction
 } // namespace Watchdog
 } // namespace Extensions

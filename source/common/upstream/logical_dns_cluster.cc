@@ -48,7 +48,8 @@ LogicalDnsCluster::LogicalDnsCluster(
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
+                      factory_context.dispatcher().timeSource()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -63,7 +64,7 @@ LogicalDnsCluster::LogicalDnsCluster(
       time_source_(factory_context.dispatcher().timeSource()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(), factory_context.random());
+          cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
 
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {

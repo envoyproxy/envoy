@@ -32,9 +32,36 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Select the given values if use legacy codecs in test is on in the current build.
+# Selects the given values depending on the WASM runtimes enabled in the current build.
+def envoy_select_wasm(xs):
+    return select({
+        "@envoy//bazel:wasm_none": [],
+        "//conditions:default": xs,
+    })
+
+def envoy_select_wasm_v8(xs):
+    return select({
+        "@envoy//bazel:wasm_wasmtime": [],
+        "@envoy//bazel:wasm_wavm": [],
+        "@envoy//bazel:wasm_none": [],
+        "//conditions:default": xs,
+    })
+
+def envoy_select_wasm_wavm(xs):
+    return select({
+        "@envoy//bazel:wasm_wavm": xs,
+        "//conditions:default": [],
+    })
+
+def envoy_select_wasm_wasmtime(xs):
+    return select({
+        "@envoy//bazel:wasm_wasmtime": xs,
+        "//conditions:default": [],
+    })
+
+# Select the given values by default and remove if use new codecs are disabled for current build.
 def envoy_select_new_codecs_in_integration_tests(xs, repository = ""):
     return select({
-        repository + "//bazel:enable_new_codecs_in_integration_tests": xs,
-        "//conditions:default": [],
+        repository + "//bazel:enable_legacy_codecs_in_integration_tests": [],
+        "//conditions:default": xs,
     })

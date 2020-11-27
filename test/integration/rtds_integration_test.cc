@@ -47,6 +47,7 @@ layered_runtime:
     rtds_layer:
       name: some_rtds_layer
       rtds_config:
+        resource_api_version: V3
         api_config_source:
           api_type: {}
           grpc_services:
@@ -62,7 +63,7 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type, TestEnvironment::nullDevicePath());
+                     api_type, Platform::null_device_path);
 }
 
 class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
@@ -163,7 +164,9 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ("saz", getRuntimeKey("baz"));
 
   EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(0, test_server_->counter("runtime.update_failure")->value());
   EXPECT_EQ(initial_load_success_ + 2, test_server_->counter("runtime.load_success")->value());
+  EXPECT_EQ(2, test_server_->counter("runtime.update_success")->value());
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 }

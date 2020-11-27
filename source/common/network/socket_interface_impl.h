@@ -14,7 +14,6 @@ public:
                      bool socket_v6only) const override;
   IoHandlePtr socket(Socket::Type socket_type,
                      const Address::InstanceConstSharedPtr addr) const override;
-  IoHandlePtr socket(os_fd_t fd) override;
   bool ipFamilySupported(int domain) override;
 
   // Server::Configuration::BootstrapExtensionFactory
@@ -27,7 +26,8 @@ public:
   };
 
 protected:
-  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only) const;
+  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
+                                 absl::optional<int> domain) const;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

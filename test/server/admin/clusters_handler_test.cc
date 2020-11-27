@@ -14,11 +14,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, ClustersJson) {
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  cluster_map.emplace(cluster.info_->name_, cluster);
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
@@ -113,6 +113,23 @@ TEST_P(AdminInstanceTest, ClustersJson) {
     "value": 9
    },
    "added_via_api": true,
+   "circuit_breakers": {
+    "thresholds": [
+     {
+      "max_connections": 1,
+      "max_pending_requests": 1024,
+      "max_requests": 1024,
+      "max_retries": 1
+     },
+     {
+      "priority": "HIGH",
+      "max_connections": 1,
+      "max_pending_requests": 1024,
+      "max_requests": 1024,
+      "max_retries": 1
+     }
+    ]
+   },
    "host_statuses": [
     {
      "address": {
@@ -147,7 +164,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
        "name": "test_gauge",
        "value": "11",
        "type": "GAUGE"
-      },
+      }
      ],
      "health_status": {
       "eds_health_status": "DEGRADED",

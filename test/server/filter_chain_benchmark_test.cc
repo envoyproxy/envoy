@@ -94,6 +94,7 @@ public:
   absl::optional<Network::Address::IpVersion> ipVersion() const override {
     return Network::Address::IpVersion::v4;
   }
+  Network::SocketPtr duplicate() override { return nullptr; }
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void setRemoteAddress(const Network::Address::InstanceConstSharedPtr&) override {}
@@ -116,6 +117,7 @@ public:
     return {0, 0};
   }
   Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
 
 private:
   Network::IoHandlePtr io_handle_;
@@ -131,14 +133,14 @@ const char YamlHeader[] = R"EOF(
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      config: {}
+      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
       transport_socket:
-        name: tls
+        name: "envoy.transport_sockets.tls"
         typed_config:
-          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
@@ -151,9 +153,9 @@ const char YamlSingleServer[] = R"EOF(
         server_names: "server1.example.com"
         transport_protocol: "tls"
       transport_socket:
-        name: tls
+        name: "envoy.transport_sockets.tls"
         typed_config:
-          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
@@ -166,9 +168,9 @@ const char YamlSingleDstPortTop[] = R"EOF(
         destination_port: )EOF";
 const char YamlSingleDstPortBottom[] = R"EOF(
       transport_socket:
-        name: tls
+        name: "envoy.transport_sockets.tls"
         typed_config:
-          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
@@ -218,7 +220,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
     FilterChainManagerImpl filter_chain_manager{
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
         init_manager_};
-    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
+    filter_chain_manager.addFilterChains(filter_chains_, nullptr, dummy_builder_,
+                                         filter_chain_manager);
   }
 }
 
@@ -241,8 +244,10 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
       init_manager_};
 
-  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
+  filter_chain_manager.addFilterChains(filter_chains_, nullptr, dummy_builder_,
+                                       filter_chain_manager);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);
     }

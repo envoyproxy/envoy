@@ -49,9 +49,6 @@ TEST_F(DnsFilterUtilsTest, ServiceNameSynthesisTest) {
       {"name2", "_proto2", "test2.com", "_name2._proto2.test2.com"},
       {"_name3", "proto3", "test3.com", "_name3._proto3.test3.com"},
       {"name4", "proto4", "_sites.test4.com", "_name4._proto4._sites.test4.com"},
-      {"_name5", "", "test5.com", ""},
-      {"", "proto6", "test6.com", ""},
-      {"name7", "proto7", "", ""},
   };
 
   for (auto& ptr : service_data) {
@@ -87,8 +84,8 @@ TEST_F(DnsFilterUtilsTest, ServiceNameParsingTest) {
 }
 
 TEST_F(DnsFilterUtilsTest, GetAddressRecordTypeTest) {
-  const auto pipe =
-      std::make_shared<Network::Address::PipeInstance>(TestEnvironment::nullDevicePath(), 600);
+  const std::string pipe_path(Platform::null_device_path);
+  const auto pipe = std::make_shared<Network::Address::PipeInstance>(pipe_path, 600);
   auto addr_type = getAddressRecordType(pipe);
   EXPECT_EQ(addr_type, absl::nullopt);
 

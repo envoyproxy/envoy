@@ -40,15 +40,17 @@ HeaderValueExtractorImpl::HeaderValueExtractorImpl(
 
 std::unique_ptr<ScopeKeyFragmentBase>
 HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const {
-  const Envoy::Http::HeaderEntry* header_entry =
+  const auto header_entry =
       headers.get(Envoy::Http::LowerCaseString(header_value_extractor_config_.name()));
-  if (header_entry == nullptr) {
+  if (header_entry.empty()) {
     return nullptr;
   }
 
-  std::vector<absl::string_view> elements{header_entry->value().getStringView()};
+  // This is an implicitly untrusted header, so per the API documentation only the first
+  // value is used.
+  std::vector<absl::string_view> elements{header_entry[0]->value().getStringView()};
   if (header_value_extractor_config_.element_separator().length() > 0) {
-    elements = absl::StrSplit(header_entry->value().getStringView(),
+    elements = absl::StrSplit(header_entry[0]->value().getStringView(),
                               header_value_extractor_config_.element_separator());
   }
   switch (header_value_extractor_config_.extract_type_case()) {
@@ -149,6 +151,15 @@ ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
   auto iter = scoped_route_info_by_key_.find(scope_key->hash());
   if (iter != scoped_route_info_by_key_.end()) {
     return iter->second->routeConfig();
+  }
+  return nullptr;
+}
+
+ScopeKeyPtr ScopedConfigImpl::computeScopeKey(const Http::HeaderMap& headers) const {
+  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
+  if (scope_key &&
+      scoped_route_info_by_key_.find(scope_key->hash()) != scoped_route_info_by_key_.end()) {
+    return scope_key;
   }
   return nullptr;
 }

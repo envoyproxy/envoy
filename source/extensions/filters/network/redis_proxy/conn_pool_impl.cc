@@ -48,7 +48,7 @@ InstanceImpl::InstanceImpl(
       stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)), time_source_(api.timeSource()) {}
+      refresh_manager_(std::move(refresh_manager)) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
@@ -335,8 +335,7 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
         cluster_->info(), "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        // todo(nezdolik) check if parent is not nullptr
-        envoy::config::core::v3::UNKNOWN, parent_.lock()->time_source_)};
+        envoy::config::core::v3::UNKNOWN, dispatcher_.timeSource())};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);

@@ -24,6 +24,10 @@ struct GrpcStatsObject : public StreamInfo::FilterState::Object {
     msg->set_response_message_count(response_message_count);
     return msg;
   }
+
+  absl::optional<std::string> serializeAsString() const override {
+    return absl::StrCat(request_message_count, ",", response_message_count);
+  }
 };
 
 class GrpcStatsFilterConfigFactory

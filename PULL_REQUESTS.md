@@ -60,7 +60,7 @@ changes may be in [docs/root](docs/root) and/or inline with the API protos. Plea
 N/A if there were no documentation changes.
 
 Any PRs with structural changes to the dataplane should also update the [Life of a
-Request](docs/root/intro/life_of_a_request.md) documentation as appropriate.
+Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation as appropriate.
 
 ### <a name="relnotes"></a>Release notes
 
@@ -69,6 +69,16 @@ add a release note to the [version history](docs/root/version_history/current.rs
 current version. Please include any relevant links. Each release note should be prefixed with the
 relevant subsystem in **alphabetical order** (see existing examples as a guide) and include links
 to relevant parts of the documentation. Thank you! Please write in N/A if there are no release notes.
+
+### <a name="platform_specific_features"></a>Platform Specific Features
+
+If this change involves any platform specific features (e.g. utilizing OS-specific socket options)
+or only implements new features for a limited set of platforms (e.g. Linux amd64 only), please
+include an explanation that addresses the reasoning behind this. Please also open a new tracking
+issue for each platform this change is not implemented on (and link them in the PR) to enable
+maintainers and contributors to triage. Reviewers will look for the change to avoid
+`#ifdef <OSNAME>` and rather prefer feature guards to not enable the change on a given platform
+using the build system.
 
 ### <a name="runtime_guard"></a>Runtime guard
 

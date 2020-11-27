@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
@@ -152,7 +153,7 @@ public:
   /**
    * @return timestamp in milliseconds of when host was created.
    */
-  virtual std::chrono::milliseconds creationTime() const PURE;
+  virtual MonotonicTime creationTime() const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

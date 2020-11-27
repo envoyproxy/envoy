@@ -45,8 +45,9 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
-        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+        name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
+        init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
@@ -71,6 +72,9 @@ public:
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
+  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+    return absl::nullopt;
+  }
   ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -80,6 +84,7 @@ public:
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  Init::Manager& initManager() override { return *init_manager_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -173,6 +178,7 @@ public:
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  std::unique_ptr<Init::Manager> init_manager_;
 };
 
 // Parameterize the listener socket address version.

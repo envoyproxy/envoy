@@ -29,10 +29,12 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/udp_default_writer_config.h"
+#include "common/network/udp_listener_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/active_raw_udp_listener_config.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -207,7 +209,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  virtual void setEndStream(bool end) EXCLUSIVE_LOCKS_REQUIRED(lock_) { end_stream_ = end; }
+  virtual void setEndStream(bool end) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { end_stream_ = end; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -456,6 +458,7 @@ private:
   const Type type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
+  testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
@@ -468,6 +471,7 @@ public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : FakeConnectionBase(shared_connection, time_system) {}
   using ValidatorFunction = const std::function<bool(const std::string&)>;
+  ~FakeRawConnection() override;
 
   // Writes to data. If data is nullptr, discards the received data.
   ABSL_MUST_USE_RESULT
@@ -490,16 +494,7 @@ public:
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult initialize() override {
-    testing::AssertionResult result =
-        shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-          connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
-        });
-    if (!result) {
-      return result;
-    }
-    return FakeConnectionBase::initialize();
-  }
+  testing::AssertionResult initialize() override;
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contained in the incoming data string. Unlike many of Envoy waitFor functions,
@@ -508,6 +503,12 @@ public:
     return [data_to_wait_for](const std::string& data) -> bool {
       return data.find(data_to_wait_for) != std::string::npos;
     };
+  }
+
+  // Creates a ValidatorFunction which returns true when data_to_wait_for is
+  // contains at least bytes_read bytes.
+  static ValidatorFunction waitForAtLeastBytes(uint32_t bytes) {
+    return [bytes](const std::string& data) -> bool { return data.size() >= bytes; };
   }
 
 private:
@@ -521,6 +522,7 @@ private:
   };
 
   std::string data_ ABSL_GUARDED_BY(lock_);
+  std::weak_ptr<Network::ReadFilter> read_filter_;
 };
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
@@ -611,6 +613,13 @@ public:
     return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
   }
 
+  // Write into the outbound buffer of the network connection at the specified index.
+  // Note: that this write bypasses any processing by the upstream codec.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
@@ -655,8 +664,9 @@ private:
   public:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
-          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()) {}
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>(1)),
+          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()),
+          udp_listener_worker_router_(1), init_manager_(nullptr) {}
 
   private:
     // Network::ListenerConfig
@@ -679,6 +689,9 @@ private:
     Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
     }
+    Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+      return udp_listener_worker_router_;
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
@@ -688,6 +701,7 @@ private:
     }
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+    Init::Manager& initManager() override { return *init_manager_; }
 
     void setMaxConnections(const uint32_t num_connections) {
       connection_resource_.setMax(num_connections);
@@ -699,8 +713,10 @@ private:
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     const Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
+    Network::UdpListenerWorkerRouterImpl udp_listener_worker_router_;
     BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    std::unique_ptr<Init::Manager> init_manager_;
   };
 
   void threadRoutine();

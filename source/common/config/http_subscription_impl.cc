@@ -43,7 +43,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 }
 
 // Config::Subscription
-void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
+void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names, const bool) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       handleFailure(Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
@@ -70,10 +70,9 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request.headers().setPath(path_);
-  request.body() = std::make_unique<Buffer::OwnedImpl>(
-      VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
+  request.body().add(VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  request.headers().setContentLength(request.body()->length());
+  request.headers().setContentLength(request.body().length());
 }
 
 void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {

@@ -36,8 +36,23 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setRsaCertOcspStaple(bool rsa_cert_ocsp_staple) {
+      rsa_cert_ocsp_staple_ = rsa_cert_ocsp_staple;
+      return *this;
+    }
+
     ServerSslOptions& setEcdsaCert(bool ecdsa_cert) {
       ecdsa_cert_ = ecdsa_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setEcdsaCertOcspStaple(bool ecdsa_cert_ocsp_staple) {
+      ecdsa_cert_ocsp_staple_ = ecdsa_cert_ocsp_staple;
+      return *this;
+    }
+
+    ServerSslOptions& setOcspStapleRequired(bool ocsp_staple_required) {
+      ocsp_staple_required_ = ocsp_staple_required;
       return *this;
     }
 
@@ -52,7 +67,10 @@ public:
     }
 
     bool rsa_cert_{true};
+    bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
+    bool ecdsa_cert_ocsp_staple_{false};
+    bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
     bool expect_client_ecdsa_cert_{false};
   };
@@ -205,8 +223,11 @@ public:
   // and write it to the lds file.
   void setLds(absl::string_view version_info);
 
-  // Set limits on pending outbound frames.
-  void setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
+  // Set limits on pending downstream outbound frames.
+  void setDownstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
+
+  // Set limits on pending upstream outbound frames.
+  void setUpstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
 
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap() { return bootstrap_; }
@@ -220,6 +241,9 @@ public:
 
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
+
+  // Enable deprecated v2 API resources via the runtime.
+  void enableDeprecatedV2Api();
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

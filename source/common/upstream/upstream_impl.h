@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -139,7 +140,7 @@ public:
   Network::TransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
-  std::chrono::milliseconds creationTime() const override { return creation_time_; }
+  MonotonicTime creationTime() const override { return creation_time_; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
@@ -157,7 +158,7 @@ protected:
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
   Network::TransportSocketFactory& socket_factory_;
-  std::chrono::milliseconds creation_time_;
+  const MonotonicTime creation_time_;
 };
 
 /**
@@ -538,7 +539,8 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
-  float prefetchRatio() const override { return prefetch_ratio_; }
+  float perUpstreamPrefetchRatio() const override { return per_upstream_prefetch_ratio_; }
+  float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -665,7 +667,8 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
-  const float prefetch_ratio_;
+  const float per_upstream_prefetch_ratio_;
+  const float peekahead_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopePtr stats_scope_;
@@ -773,7 +776,7 @@ public:
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                   Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  Stats::ScopePtr&& stats_scope, bool added_via_api);
+                  Stats::ScopePtr&& stats_scope, bool added_via_api, TimeSource& time_source);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -813,6 +816,7 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
 
 protected:
+  TimeSource& time_source_;
   PrioritySetImpl priority_set_;
 
   void validateEndpointsForZoneAwareRouting(

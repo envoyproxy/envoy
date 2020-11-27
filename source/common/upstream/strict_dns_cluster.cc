@@ -14,7 +14,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api),
+                             added_via_api, factory_context.dispatcher().timeSource()),
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -22,7 +22,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       time_source_(factory_context.dispatcher().timeSource()) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(), factory_context.random());
+          cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment(

@@ -796,6 +796,22 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return optional<std::chrono::milliseconds> the route's maximum stream duration.
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the max grpc-timeout this route will allow.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the delta between grpc-timeout and enforced grpc
+   *         timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const PURE;
+
+  /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
    * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
    * header, while 0 represents infinity.
@@ -1154,7 +1170,7 @@ public:
    * when a stream is available or GenericConnectionPoolCallbacks::onPoolFailure
    * if stream creation fails.
    *
-   * The caller is responsible for calling cancelAnyPendingRequest() if stream
+   * The caller is responsible for calling cancelAnyPendingStream() if stream
    * creation is no longer desired. newStream may only be called once per
    * GenericConnPool.
    *
@@ -1164,11 +1180,7 @@ public:
   /**
    * Called to cancel any pending newStream request,
    */
-  virtual bool cancelAnyPendingRequest() PURE;
-  /**
-   * @return optionally returns the protocol for the connection pool.
-   */
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
+  virtual bool cancelAnyPendingStream() PURE;
   /**
    * @return optionally returns the host for the connection pool.
    */
@@ -1221,11 +1233,13 @@ public:
    *             connection pools the description may be different each time this is called.
    * @param upstream_local_address supplies the local address of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
+   * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info) PURE;
+                           const StreamInfo::StreamInfo& info,
+                           absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.
   //
@@ -1258,8 +1272,10 @@ public:
    * Encode headers, optionally indicating end of stream.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request.
+   * @return status indicating success. Encoding will fail if headers do not have required HTTP
+   * headers.
    */
-  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.

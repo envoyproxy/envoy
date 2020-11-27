@@ -9,7 +9,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/store.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
@@ -62,11 +62,6 @@ public:
   };
 
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
-
-  /**
-   * Updates deprecated feature use stats.
-   */
-  virtual void countDeprecatedFeatureUse() const PURE;
 
   /**
    * Returns true if a deprecated feature is allowed.
@@ -265,6 +260,11 @@ public:
    * @return Stats::Scope& the root scope.
    */
   virtual Stats::Scope& getRootScope() PURE;
+
+  /**
+   * Updates deprecated feature use stats.
+   */
+  virtual void countDeprecatedFeatureUse() const PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;

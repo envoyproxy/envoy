@@ -13,9 +13,11 @@ envoy_basic_cc_library(
     name = "base_includes",
     hdrs = [
         "exception.h",
+        "optref.h",
         "platform.h",
         "pure.h",
     ],
+    external_deps = ["abseil_optional"],
     include_prefix = "envoy/common",
 )
 

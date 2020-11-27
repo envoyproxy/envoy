@@ -287,9 +287,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
     ASSERT_TRUE(
-        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+        config_blob
+            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
     auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");
@@ -304,8 +305,8 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     runtime_filter->set_runtime_key("unused-key");
     auto* percent_sampled = runtime_filter->mutable_percent_sampled();
     percent_sampled->set_numerator(100);
-    percent_sampled->set_denominator(
-        envoy::type::FractionalPercent::DenominatorType::FractionalPercent_DenominatorType_HUNDRED);
+    percent_sampled->set_denominator(envoy::type::v3::FractionalPercent::DenominatorType::
+                                         FractionalPercent_DenominatorType_HUNDRED);
     config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
@@ -390,9 +391,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
     ASSERT_TRUE(
-        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+        config_blob
+            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
     auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
@@ -413,10 +415,70 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
     ASSERT_TRUE(
-        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+        config_blob
+            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
     auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+            .count());
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  std::string data(1024 * 16, 'a');
+  ASSERT_TRUE(tcp_client->write(data));
+  ASSERT_TRUE(fake_upstream_connection->write(data));
+
+  tcp_client->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithNoData) {
+  autonomous_upstream_ = true;
+
+  enable_half_close_ = false;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(
+        config_blob
+            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    tcp_proxy_config.mutable_max_downstream_connection_duration()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
+            .count());
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithLargeOutstandingData) {
+  config_helper_.setBufferLimits(1024, 1024);
+  enable_half_close_ = false;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(
+        config_blob
+            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    tcp_proxy_config.mutable_max_downstream_connection_duration()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
     config_blob->PackFrom(tcp_proxy_config);
@@ -1045,7 +1107,7 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
   // Ship some data upstream.
   Buffer::OwnedImpl buffer(data_to_send_upstream);
   ssl_client_->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != data_to_send_upstream.size()) {
+  while (client_write_buffer_->bytesDrained() != data_to_send_upstream.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
@@ -1112,7 +1174,7 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   const std::string& val("data");
   Buffer::OwnedImpl buffer(val);
   ssl_client_->write(buffer, false);
-  while (client_write_buffer_->bytes_drained() != val.size()) {
+  while (client_write_buffer_->bytesDrained() != val.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_TRUE(fake_upstream_connection_->waitForData(val.size()));

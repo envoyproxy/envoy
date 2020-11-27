@@ -114,10 +114,13 @@ public:
       values[1].asString() = "SLOTS";
       asArray().swap(values);
     }
+
     static ClusterSlotsRequest instance_;
   };
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  TimeSource& timeSource() const { return time_source_; }
 
 private:
   friend class RedisClusterTest;

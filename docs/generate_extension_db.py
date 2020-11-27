@@ -34,6 +34,8 @@ def IsMissing(value):
 
 
 def GetExtensionMetadata(target):
+  if not BUILDOZER_PATH:
+    raise ExtensionDbError('Buildozer not found!')
   r = subprocess.run(
       [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented', target],
       stdout=subprocess.PIPE,
@@ -61,5 +63,7 @@ if __name__ == '__main__':
       '//source/extensions/transport_sockets/tls:config')
   extension_db['envoy.upstreams.http.generic'] = GetExtensionMetadata(
       '//source/extensions/upstreams/http/generic:config')
+  extension_db['envoy.upstreams.tcp.generic'] = GetExtensionMetadata(
+      '//source/extensions/upstreams/tcp/generic:config')
 
   pathlib.Path(output_path).write_text(json.dumps(extension_db))

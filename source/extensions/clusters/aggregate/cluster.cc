@@ -18,9 +18,9 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api),
-      cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
-      tls_(tls.allocateSlot()), clusters_(config.clusters().begin(), config.clusters().end()) {}
+                                added_via_api, factory_context.dispatcher().timeSource()),
+      cluster_manager_(cluster_manager), runtime_(runtime), random_(random), tls_(tls),
+      clusters_(config.clusters().begin(), config.clusters().end()) {}
 
 PriorityContextPtr
 Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
@@ -90,7 +90,9 @@ void Cluster::startPreInit() {
 
 void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predicate) {
   // Post the priority set to worker threads.
-  tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()]() {
+  // TODO(mattklein123): Remove "this" capture.
+  tls_.runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()](
+                           OptRef<ThreadLocal::ThreadLocalObject>) {
     PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     ASSERT(cluster != nullptr);
@@ -172,9 +174,10 @@ ClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
-  auto new_cluster = std::make_shared<Cluster>(
-      cluster, proto_config, context.clusterManager(), context.runtime(), context.random(),
-      socket_factory_context, std::move(stats_scope), context.tls(), context.addedViaApi());
+  auto new_cluster =
+      std::make_shared<Cluster>(cluster, proto_config, context.clusterManager(), context.runtime(),
+                                context.api().randomGenerator(), socket_factory_context,
+                                std::move(stats_scope), context.tls(), context.addedViaApi());
   auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/network/io_handle.h"
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
@@ -565,16 +564,15 @@ public:
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
+  RawSlice frontSlice() const override;
   SliceDataPtr extractMutableFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
-  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   std::string toString() const override;
 
   // LibEventInstance

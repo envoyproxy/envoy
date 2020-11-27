@@ -12,6 +12,35 @@
 namespace Envoy {
 namespace Server {
 
+namespace {
+
+void addCircuitBreakerSettingsAsText(const std::string& cluster_name,
+                                     const std::string& priority_str,
+                                     Upstream::ResourceManager& resource_manager,
+                                     Buffer::Instance& response) {
+  response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
+                           resource_manager.connections().max()));
+  response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
+                           priority_str, resource_manager.pendingRequests().max()));
+  response.add(fmt::format("{}::{}_priority::max_requests::{}\n", cluster_name, priority_str,
+                           resource_manager.requests().max()));
+  response.add(fmt::format("{}::{}_priority::max_retries::{}\n", cluster_name, priority_str,
+                           resource_manager.retries().max()));
+}
+
+void addCircuitBreakerSettingsAsJson(const envoy::config::core::v3::RoutingPriority& priority,
+                                     Upstream::ResourceManager& resource_manager,
+                                     envoy::admin::v3::ClusterStatus& cluster_status) {
+  auto& thresholds = *cluster_status.mutable_circuit_breakers()->add_thresholds();
+  thresholds.set_priority(priority);
+  thresholds.mutable_max_connections()->set_value(resource_manager.connections().max());
+  thresholds.mutable_max_pending_requests()->set_value(resource_manager.pendingRequests().max());
+  thresholds.mutable_max_requests()->set_value(resource_manager.requests().max());
+  thresholds.mutable_max_retries()->set_value(resource_manager.retries().max());
+}
+
+} // namespace
+
 ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
 Http::Code ClustersHandler::handlerClusters(absl::string_view url,
@@ -71,12 +100,21 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
 // TODO(efimki): Add support of text readouts stats.
 void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
-  for (const auto& [name, cluster_ref] : server_.clusterManager().clusters()) {
+  // TODO(mattklein123): Add ability to see warming clusters in admin output.
+  auto all_clusters = server_.clusterManager().clusters();
+  for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
     const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
 
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
+
+    addCircuitBreakerSettingsAsJson(
+        envoy::config::core::v3::RoutingPriority::DEFAULT,
+        cluster.info()->resourceManager(Upstream::ResourcePriority::Default), cluster_status);
+    addCircuitBreakerSettingsAsJson(
+        envoy::config::core::v3::RoutingPriority::HIGH,
+        cluster.info()->resourceManager(Upstream::ResourcePriority::High), cluster_status);
 
     const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
     if (outlier_detector != nullptr &&
@@ -148,16 +186,19 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
 
 // TODO(efimki): Add support of text readouts stats.
 void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
-  for (const auto& [name, cluster_ref] : server_.clusterManager().clusters()) {
+  // TODO(mattklein123): Add ability to see warming clusters in admin output.
+  auto all_clusters = server_.clusterManager().clusters();
+  for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
     const Upstream::Cluster& cluster = cluster_ref.get();
     const std::string& cluster_name = cluster.info()->name();
     addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
 
-    addCircuitSettings(cluster_name, "default",
-                       cluster.info()->resourceManager(Upstream::ResourcePriority::Default),
-                       response);
-    addCircuitSettings(cluster_name, "high",
-                       cluster.info()->resourceManager(Upstream::ResourcePriority::High), response);
+    addCircuitBreakerSettingsAsText(
+        cluster_name, "default",
+        cluster.info()->resourceManager(Upstream::ResourcePriority::Default), response);
+    addCircuitBreakerSettingsAsText(
+        cluster_name, "high", cluster.info()->resourceManager(Upstream::ResourcePriority::High),
+        response);
 
     response.add(
         fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
@@ -228,20 +269,6 @@ void ClustersHandler::addOutlierInfo(const std::string& cluster_name,
         outlier_detector->successRateEjectionThreshold(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
   }
-}
-
-void ClustersHandler::addCircuitSettings(const std::string& cluster_name,
-                                         const std::string& priority_str,
-                                         Upstream::ResourceManager& resource_manager,
-                                         Buffer::Instance& response) {
-  response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
-                           resource_manager.connections().max()));
-  response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
-                           priority_str, resource_manager.pendingRequests().max()));
-  response.add(fmt::format("{}::{}_priority::max_requests::{}\n", cluster_name, priority_str,
-                           resource_manager.requests().max()));
-  response.add(fmt::format("{}::{}_priority::max_retries::{}\n", cluster_name, priority_str,
-                           resource_manager.retries().max()));
 }
 
 } // namespace Server

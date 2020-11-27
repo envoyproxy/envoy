@@ -4,14 +4,16 @@
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
 
-IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only) const {
-  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only);
+IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
+                                            absl::optional<int> domain) const {
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
@@ -36,15 +38,18 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
       ASSERT(version == Address::IpVersion::v4);
       domain = AF_INET;
     }
-  } else {
-    ASSERT(addr_type == Address::Type::Pipe);
+  } else if (addr_type == Address::Type::Pipe) {
     domain = AF_UNIX;
+  } else {
+    ASSERT(addr_type == Address::Type::EnvoyInternal);
+    // TODO(lambdai): Add InternalIoSocketHandleImpl to support internal address.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = makeSocket(result.rc_, socket_v6only);
+  IoHandlePtr io_handle = makeSocket(result.rc_, socket_v6only, domain);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
@@ -72,10 +77,6 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
     RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
   }
   return io_handle;
-}
-
-IoHandlePtr SocketInterfaceImpl::socket(os_fd_t fd) {
-  return std::make_unique<IoSocketHandleImpl>(fd);
 }
 
 bool SocketInterfaceImpl::ipFamilySupported(int domain) {

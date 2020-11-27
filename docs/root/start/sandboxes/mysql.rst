@@ -1,34 +1,26 @@
 .. _install_sandboxes_mysql:
 
-MySQL Filter
+MySQL filter
 ============
 
-In this example, we show how the :ref:`MySQL filter <config_network_filters_mysql_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a MySQL filter that parses queries and collects MySQL-specific
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
+
+In this example, we show how the :ref:`MySQL filter <config_network_filters_mysql_proxy>` can be used with the Envoy proxy.
+
+The Envoy proxy configuration includes a MySQL filter that parses queries and collects MySQL-specific
 metrics.
 
+Step 1: Build the sandbox
+*************************
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+Change to the ``examples/mysql`` directory.
 
-The following documentation runs through the setup of the services.
-
-**Step 1: Install Docker**
-
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
-
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
-
-**Step 2: Clone the Envoy repo**
-
-If you have not cloned the Envoy repo, clone it with:
-
-``git clone git@github.com:envoyproxy/envoy``
-
-or
-
-``git clone https://github.com/envoyproxy/envoy.git``
-
-**Step 3: Build the sandbox**
+Build and start the containers.
 
 Terminal 1
 
@@ -42,11 +34,11 @@ Terminal 1
 
       Name                   Command               State                             Ports
   ------------------------------------------------------------------------------------------------------------------
-  mysql_mysql_1   docker-entrypoint.sh mysqld      Up      0.0.0.0:3306->3306/tcp
+  mysql_mysql_1   docker-entrypoint.sh mysqld      Up      3306/tcp
   mysql_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
 
-
-**Step 4: Issue commands using mysql**
+Step 2: Issue commands using mysql
+**********************************
 
 Use ``mysql`` to issue some commands and verify they are routed via Envoy. Note
 that the current implementation of the protocol filter was tested with MySQL
@@ -57,7 +49,7 @@ Terminal 1
 
 .. code-block:: console
 
-  $ docker run --rm -it --network envoymesh mysql:5.5 mysql -h envoy -P 1999 -u root
+  $ docker run --rm -it --network envoymesh mysql:5.5 mysql -h proxy -P 1999 -u root
   ... snip ...
 
   mysql> CREATE DATABASE test;
@@ -90,7 +82,8 @@ Terminal 1
   mysql> exit
   Bye
 
-**Step 5: Check egress stats**
+Step 3: Check egress stats
+**************************
 
 Check egress stats were updated.
 
@@ -109,7 +102,8 @@ Terminal 1
   mysql.egress_mysql.sessions: 1
   mysql.egress_mysql.upgraded_to_ssl: 0
 
-**Step 6: Check TCP stats**
+Step 4: Check TCP stats
+***********************
 
 Check TCP stats were updated.
 
@@ -129,3 +123,14 @@ Terminal 1
   tcp.mysql_tcp.idle_timeout: 0
   tcp.mysql_tcp.upstream_flush_active: 0
   tcp.mysql_tcp.upstream_flush_total: 0
+
+.. seealso::
+
+   :ref:`Envoy MySQL filter <config_network_filters_mysql_proxy>`
+      Learn more about using the Envoy MySQL filter.
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.
+
+   `MySQL <https://www.mysql.com>`_
+      The MySQL database.

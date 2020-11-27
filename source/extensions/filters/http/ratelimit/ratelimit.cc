@@ -13,6 +13,7 @@
 #include "common/router/config_impl.h"
 
 #include "extensions/filters/http/ratelimit/ratelimit_headers.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,17 +51,30 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
 
-  // Get all applicable rate limit policy entries for the virtual host if the route opted to
-  // include the virtual host rate limits.
-  if (route_entry->includeVirtualHostRateLimits()) {
+  VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
+
+  switch (vh_rate_limit_option) {
+  case VhRateLimitOptions::Ignore:
+    break;
+  case VhRateLimitOptions::Include:
     populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
                                  route_entry, headers);
+    break;
+  case VhRateLimitOptions::Override:
+    if (route_entry->rateLimitPolicy().empty()) {
+      populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
+                                   route_entry, headers);
+    }
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan());
+    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan(),
+                   callbacks_->streamInfo());
     initiating_call_ = false;
   }
 }
@@ -156,11 +170,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
-    if (response_headers_to_add_ == nullptr) {
-      response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+    if (config_->enableXEnvoyRateLimitedHeader()) {
+      if (response_headers_to_add_ == nullptr) {
+        response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+      }
+      response_headers_to_add_->setReferenceEnvoyRateLimited(
+          Http::Headers::get().EnvoyRateLimitedValues.True);
     }
-    response_headers_to_add_->setReferenceEnvoyRateLimited(
-        Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
   }
 
@@ -232,6 +248,32 @@ void Filter::appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add) {
     Http::HeaderUtility::addHeaders(*request_headers_, *request_headers_to_add);
     request_headers_to_add = nullptr;
   }
+}
+
+VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route) {
+  if (route->routeEntry()->includeVirtualHostRateLimits()) {
+    vh_rate_limits_ = VhRateLimitOptions::Include;
+  } else {
+    const auto* specific_per_route_config =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+            HttpFilterNames::get().RateLimit, route);
+    if (specific_per_route_config != nullptr) {
+      switch (specific_per_route_config->virtualHostRateLimits()) {
+      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
+        vh_rate_limits_ = VhRateLimitOptions::Include;
+        break;
+      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE:
+        vh_rate_limits_ = VhRateLimitOptions::Ignore;
+        break;
+      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE:
+      default:
+        vh_rate_limits_ = VhRateLimitOptions::Override;
+      }
+    } else {
+      vh_rate_limits_ = VhRateLimitOptions::Override;
+    }
+  }
+  return vh_rate_limits_;
 }
 
 } // namespace RateLimitFilter

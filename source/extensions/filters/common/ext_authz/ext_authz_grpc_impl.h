@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
@@ -43,10 +44,9 @@ class GrpcClientImpl : public Client,
                        public ExtAuthzAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
-  // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
-  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::RawAsyncClientSharedPtr async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout,
-                 envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
+                 envoy::config::core::v3::ApiVersion transport_api_version);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client

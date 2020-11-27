@@ -9,6 +9,7 @@ api_proto_package(
         "//envoy/admin/v3:pkg",
         "//envoy/annotations:pkg",
         "//envoy/config/bootstrap/v4alpha:pkg",
+        "//envoy/config/cluster/v4alpha:pkg",
         "//envoy/config/core/v4alpha:pkg",
         "//envoy/config/tap/v4alpha:pkg",
         "//envoy/type/v3:pkg",

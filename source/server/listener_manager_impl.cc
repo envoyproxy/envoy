@@ -261,7 +261,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
-        worker_factory.createWorker(server.overloadManager(), absl::StrCat("worker_", i)));
+        worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
   }
 }
 
@@ -334,7 +334,11 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
-
+  RELEASE_ASSERT(
+      !config.address().has_envoy_internal_address(),
+      fmt::format("listener {} has envoy internal address {}. Internal address cannot be used by "
+                  "listener yet",
+                  config.name(), config.address().envoy_internal_address().DebugString()));
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
@@ -355,7 +359,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   if (!config.name().empty()) {
     name = config.name();
   } else {
-    name = server_.random().uuid();
+    name = server_.api().randomGenerator().uuid();
   }
 
   auto it = error_state_tracker_.find(name);
@@ -1017,11 +1021,14 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
 
-  auto filter_chain_res =
-      std::make_unique<FilterChainImpl>(config_factory.createTransportSocketFactory(
-                                            *message, factory_context_, std::move(server_names)),
-                                        listener_component_factory_.createNetworkFilterFactoryList(
-                                            filter_chain.filters(), *filter_chain_factory_context));
+  auto filter_chain_res = std::make_unique<FilterChainImpl>(
+      config_factory.createTransportSocketFactory(*message, factory_context_,
+                                                  std::move(server_names)),
+      listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
+                                                                 *filter_chain_factory_context),
+      std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)));
+
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;
 }

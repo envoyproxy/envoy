@@ -14,18 +14,23 @@ namespace Server {
 class SslContextManagerNoTlsStub final : public Envoy::Ssl::ContextManager {
   Ssl::ClientContextSharedPtr
   createSslClientContext(Stats::Scope& /* scope */,
-                         const Envoy::Ssl::ClientContextConfig& /* config */) override {
+                         const Envoy::Ssl::ClientContextConfig& /* config */,
+                         Envoy::Ssl::ClientContextSharedPtr /* old_context */) override {
     throwException();
   }
 
   Ssl::ServerContextSharedPtr
   createSslServerContext(Stats::Scope& /* scope */,
                          const Envoy::Ssl::ServerContextConfig& /* config */,
-                         const std::vector<std::string>& /* server_names */) override {
+                         const std::vector<std::string>& /* server_names */,
+                         Envoy::Ssl::ServerContextSharedPtr /* old_context */) override {
     throwException();
   }
 
   size_t daysUntilFirstCertExpires() const override { return std::numeric_limits<int>::max(); }
+  absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override {
+    return absl::nullopt;
+  }
 
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> /* callback */) override{};
 

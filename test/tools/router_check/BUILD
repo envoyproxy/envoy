@@ -38,6 +38,7 @@ envoy_cc_test_library(
         "//source/exe:platform_impl_lib",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:printers_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -48,5 +49,8 @@ envoy_cc_test_library(
 envoy_proto_library(
     name = "validation_proto",
     srcs = ["validation.proto"],
-    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg",
+        "@envoy_api//envoy/config/route/v3:pkg",
+    ],
 )

@@ -8,6 +8,15 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+// Returns the namespace part (if there's any) in the resource name.
+std::string namespaceFromName(const std::string& resource_name) {
+  const auto pos = resource_name.find_last_of('/');
+  // we are not interested in the "/" character in the namespace
+  return pos == std::string::npos ? "" : resource_name.substr(0, pos);
+}
+} // namespace
+
 Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
                           OpaqueResourceDecoder& resource_decoder) {
   auto watch = std::make_unique<Watch>(callbacks, resource_decoder);
@@ -59,8 +68,14 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
 }
 
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
-  absl::flat_hash_set<Watch*> ret = wildcard_watches_;
-  const auto watches_interested = watch_interest_.find(resource_name);
+  absl::flat_hash_set<Watch*> ret;
+  if (!use_namespace_matching_) {
+    ret = wildcard_watches_;
+  }
+
+  const auto prefix = namespaceFromName(resource_name);
+  const auto resource_key = use_namespace_matching_ && !prefix.empty() ? prefix : resource_name;
+  const auto watches_interested = watch_interest_.find(resource_key);
   if (watches_interested != watch_interest_.end()) {
     for (const auto& watch : watches_interested->second) {
       ret.insert(watch);
@@ -86,7 +101,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_updates;
   for (const auto& r : resources) {
     decoded_resources.emplace_back(
-        new DecodedResourceImpl((*watches_.begin())->resource_decoder_, r, version_info));
+        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info));
     const absl::flat_hash_set<Watch*>& interested_in_r =
         watchesInterestedIn(decoded_resources.back()->name());
     for (const auto& interested_watch : interested_in_r) {
@@ -118,32 +133,6 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
       watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
     }
   }
-}
-
-// For responses to on-demand requests, replace the original watch for an alias
-// with one for the resource's name
-AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
-    const envoy::service::discovery::v3::Resource& resource) {
-  absl::flat_hash_set<Watch*> watches_to_update;
-  for (const auto& alias : resource.aliases()) {
-    const auto interested_watches = watch_interest_.find(alias);
-    if (interested_watches != watch_interest_.end()) {
-      for (const auto& interested_watch : interested_watches->second) {
-        watches_to_update.insert(interested_watch);
-      }
-    }
-  }
-
-  auto ret = AddedRemoved({}, {});
-  for (const auto& watch : watches_to_update) {
-    const auto& converted_watches = updateWatchInterest(watch, {resource.name()});
-    std::copy(converted_watches.added_.begin(), converted_watches.added_.end(),
-              std::inserter(ret.added_, ret.added_.end()));
-    std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(),
-              std::inserter(ret.removed_, ret.removed_.end()));
-  }
-
-  return ret;
 }
 
 void WatchMap::onConfigUpdate(
@@ -202,6 +191,12 @@ void WatchMap::onConfigUpdate(
       continue;
     }
     cur_watch->callbacks_.onConfigUpdate({}, resource_to_remove, system_version_info);
+  }
+  // notify empty update
+  if (added_resources.empty() && removed_resources.empty()) {
+    for (auto& cur_watch : wildcard_watches_) {
+      cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info);
+    }
   }
 }
 

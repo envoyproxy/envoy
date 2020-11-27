@@ -3,6 +3,7 @@
 #include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/deferred_task.h"
 #include "common/event/dispatcher_impl.h"
@@ -10,6 +11,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/server/watch_dog.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -170,6 +172,47 @@ TEST_F(SchedulableCallbackImplTest, ScheduleChainingAndCancellation) {
   EXPECT_CALL(watcher2, ready());
   EXPECT_CALL(prepare_watcher, ready());
   EXPECT_CALL(watcher5, ready());
+  dispatcher_->run(Dispatcher::RunType::Block);
+}
+
+TEST_F(SchedulableCallbackImplTest, RescheduleNext) {
+  DispatcherImpl* dispatcher_impl = static_cast<DispatcherImpl*>(dispatcher_.get());
+  ReadyWatcher prepare_watcher;
+  evwatch_prepare_new(&dispatcher_impl->base(), onWatcherReady, &prepare_watcher);
+
+  ReadyWatcher watcher0;
+  createCallback([&]() {
+    watcher0.ready();
+    // Callback 1 was scheduled from the previous iteration, expect it to fire in the current
+    // iteration despite the attempt to reschedule.
+    callbacks_[1]->scheduleCallbackNextIteration();
+    // Callback 2 expected to execute next iteration because current called before next.
+    callbacks_[2]->scheduleCallbackCurrentIteration();
+    callbacks_[2]->scheduleCallbackNextIteration();
+    // Callback 3 expected to execute next iteration because next was called before current.
+    callbacks_[3]->scheduleCallbackNextIteration();
+    callbacks_[3]->scheduleCallbackCurrentIteration();
+  });
+
+  ReadyWatcher watcher1;
+  createCallback([&]() { watcher1.ready(); });
+  ReadyWatcher watcher2;
+  createCallback([&]() { watcher2.ready(); });
+  ReadyWatcher watcher3;
+  createCallback([&]() { watcher3.ready(); });
+
+  // Schedule callbacks 0 and 1 outside the loop, both will run in the same iteration of the event
+  // loop.
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  callbacks_[1]->scheduleCallbackNextIteration();
+
+  InSequence s;
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(watcher0, ready());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(prepare_watcher, ready());
+  EXPECT_CALL(watcher3, ready());
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
@@ -413,6 +456,51 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
   }
   // Not thread safe because it is not called within the dispatcher thread's context.
   EXPECT_FALSE(dispatcher_->isThreadSafe());
+}
+
+class TestFatalAction : public Server::Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
+  bool isAsyncSignalSafe() const override { return true; }
+  int getNumTimesRan() { return times_ran_; }
+
+private:
+  int times_ran_ = 0;
+};
+
+TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
+  FatalAction::FatalActionPtrList actions;
+  actions.emplace_back(std::make_unique<TestFatalAction>());
+  auto* action = dynamic_cast<TestFatalAction*>(actions.front().get());
+
+  ASSERT_EQ(action->getNumTimesRan(), 0);
+
+  // Should not run as dispatcher isn't running yet
+  auto non_running_dispatcher = api_->allocateDispatcher("non_running_thread");
+  static_cast<DispatcherImpl*>(non_running_dispatcher.get())
+      ->runFatalActionsOnTrackedObject(actions);
+  ASSERT_EQ(action->getNumTimesRan(), 0);
+
+  // Should not run when not on same thread
+  static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+  ASSERT_EQ(action->getNumTimesRan(), 0);
+
+  // Should run since on same thread as dispatcher
+  dispatcher_->post([this, &actions]() {
+    {
+      Thread::LockGuard lock(mu_);
+      static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  EXPECT_EQ(action->getNumTimesRan(), 1);
 }
 
 class NotStartedDispatcherImplTest : public testing::Test {
@@ -1017,8 +1105,10 @@ public:
                                           Dispatcher& dispatcher, Event::Timer& timer) {
     const auto start = time_system.monotonicTime();
     EXPECT_TRUE(timer.enabled());
-    while (true) {
-      dispatcher.run(Dispatcher::RunType::NonBlock);
+    dispatcher.run(Dispatcher::RunType::NonBlock);
+    while (timer.enabled()) {
+      time_system.advanceTimeAndRun(std::chrono::microseconds(1), dispatcher,
+                                    Dispatcher::RunType::NonBlock);
 #ifdef WIN32
       // The event loop runs for a single iteration in NonBlock mode on Windows. A few iterations
       // are required to ensure that next iteration callbacks have a chance to run before time
@@ -1026,11 +1116,6 @@ public:
       dispatcher.run(Dispatcher::RunType::NonBlock);
       dispatcher.run(Dispatcher::RunType::NonBlock);
 #endif
-      if (timer.enabled()) {
-        time_system.advanceTimeAsync(std::chrono::microseconds(1));
-      } else {
-        break;
-      }
     }
     return time_system.monotonicTime() - start;
   }
@@ -1107,6 +1192,75 @@ TEST_F(TimerUtilsTest, TimerValueConversion) {
 
   // Some arbitrary tests for good measure.
   checkConversion(std::chrono::milliseconds(600014), 600, 14000);
+}
+
+class DispatcherWithWatchdogTest : public testing::Test {
+protected:
+  DispatcherWithWatchdogTest()
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")),
+        os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+    dispatcher_->registerWatchdog(watchdog_, min_touch_interval_);
+  }
+
+  Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+  Api::OsSysCalls& os_sys_calls_;
+  std::shared_ptr<Server::MockWatchDog> watchdog_ = std::make_shared<Server::MockWatchDog>();
+  std::chrono::milliseconds min_touch_interval_ = std::chrono::seconds(10);
+};
+
+// The dispatcher creates a periodic touch timer for each registered watchdog.
+TEST_F(DispatcherWithWatchdogTest, PeriodicTouchTimer) {
+  // Advance by min_touch_interval_, verify that watchdog_ is touched.
+  EXPECT_CALL(*watchdog_, touch());
+  time_system_.advanceTimeAndRun(min_touch_interval_, *dispatcher_, Dispatcher::RunType::NonBlock);
+
+  // Advance by min_touch_interval_ again, verify that watchdog_ is touched.
+  EXPECT_CALL(*watchdog_, touch());
+  time_system_.advanceTimeAndRun(min_touch_interval_, *dispatcher_, Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeSchedulableCallback) {
+  ReadyWatcher watcher;
+
+  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+  cb->scheduleCallbackCurrentIteration();
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeTimer) {
+  ReadyWatcher watcher;
+
+  auto timer = dispatcher_->createTimer([&]() { watcher.ready(); });
+  timer->enableTimer(std::chrono::milliseconds(0));
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
+  os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_DGRAM, 0).rc_;
+  ASSERT_TRUE(SOCKET_VALID(fd));
+
+  ReadyWatcher watcher;
+
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  Event::FileEventPtr file_event = dispatcher_->createFileEvent(
+      fd, [&](uint32_t) -> void { watcher.ready(); }, trigger, FileReadyType::Read);
+  file_event->activate(FileReadyType::Read);
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch()).Times(2);
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 } // namespace

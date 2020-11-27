@@ -31,8 +31,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
   bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
-  bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream,
-                                        bool& headers_only);
+  bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
   bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
@@ -173,7 +172,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
@@ -184,7 +184,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void setDecoderBufferLimit(uint32_t limit) override;
   uint32_t decoderBufferLimit() override;
-  bool recreateStream() override;
+  bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
@@ -204,7 +204,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestRouteConfigUpdate(
       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-  absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
+  absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
@@ -254,6 +254,10 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void continueEncoding() override;
   const Buffer::Instance* encodingBuffer() override;
   void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override;
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   void responseDataTooLarge();
@@ -326,6 +330,11 @@ public:
    * in the case of multiple upstream calls.
    */
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
+
+  /**
+   * Updates response code stats based on the details in the headers.
+   */
+  virtual void chargeStats(const ResponseHeaderMap& headers) PURE;
 
   // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
   // callbacks instead of via the encode/decode callbacks on the filters.
@@ -429,8 +438,7 @@ public:
    * Update the current route configuration.
    */
   virtual void
-  requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
-                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   /**
    * Returns the current active span.
@@ -498,9 +506,7 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_)
-       << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
-       << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_) << "\n";
 
     DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -538,6 +544,19 @@ public:
 
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(request_headers, response_headers, response_trailers, stream_info_);
+    }
+  }
+
+  void onStreamComplete() {
+    for (auto& filter : decoder_filters_) {
+      filter->handle_->onStreamComplete();
+    }
+
+    for (auto& filter : encoder_filters_) {
+      // Do not call onStreamComplete twice for dual registered filters.
+      if (!filter->dual_filter_) {
+        filter->handle_->onStreamComplete();
+      }
     }
   }
 
@@ -644,6 +663,8 @@ public:
         filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
       state_.is_head_request_ = true;
     }
+    state_.is_grpc_request_ =
+        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders()->get());
   }
 
   /**
@@ -797,7 +818,7 @@ private:
   struct State {
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
-          created_filter_chain_(false), is_head_request_(false),
+          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false) {}
 
     uint32_t filter_call_state_{0};
@@ -810,7 +831,10 @@ private:
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_ : 1;
     bool created_filter_chain_ : 1;
+    // These two are latched on initial header read, to determine if the original headers
+    // constituted a HEAD or gRPC request, respectively.
     bool is_head_request_ : 1;
+    bool is_grpc_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
 
@@ -820,12 +844,6 @@ private:
     bool encoder_filters_streaming_{true};
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
-    // Whether a filter has indicated that the response should be treated as a headers only
-    // response.
-    bool encoding_headers_only_{false};
-    // Whether a filter has indicated that the request should be treated as a headers only
-    // request.
-    bool decoding_headers_only_{false};
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};

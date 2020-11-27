@@ -18,9 +18,28 @@ if [ ! -d "${SOURCE_DIRECTORY}" ]; then
   exit 1
 fi
 
-BRANCH=${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}
-GCS_LOCATION="${GCS_ARTIFACT_BUCKET}/${BRANCH}/${TARGET_SUFFIX}"
+if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+    # non-master upload to the last commit sha (first 7 chars) in the developers branch
+    UPLOAD_PATH="$(git log --pretty=%P -n 1 | cut -d' ' -f2 | head -c7)"
+else
+    UPLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+fi
+
+GCS_LOCATION="${GCS_ARTIFACT_BUCKET}/${UPLOAD_PATH}/${TARGET_SUFFIX}"
 
 echo "Uploading to gs://${GCS_LOCATION} ..."
-gsutil -mq rsync -dr ${SOURCE_DIRECTORY} gs://${GCS_LOCATION}
+gsutil -mq rsync -dr "${SOURCE_DIRECTORY}" "gs://${GCS_LOCATION}"
+
+# For PR uploads, add a redirect `PR_NUMBER` -> `COMMIT_SHA`
+if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+    REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+    TMP_REDIRECT="/tmp/redirect/${REDIRECT_PATH}/${TARGET_SUFFIX}"
+    mkdir -p "$TMP_REDIRECT"
+    echo "<meta http-equiv=\"refresh\" content=\"0; URL='https://storage.googleapis.com/${GCS_LOCATION}/index.html'\" />" \
+	 >  "${TMP_REDIRECT}/index.html"
+    GCS_REDIRECT="${GCS_ARTIFACT_BUCKET}/${REDIRECT_PATH}/${TARGET_SUFFIX}"
+    echo "Uploading redirect to gs://${GCS_REDIRECT} ..."
+    gsutil -h "Cache-Control:no-cache,max-age=0" -mq rsync -dr "${TMP_REDIRECT}" "gs://${GCS_REDIRECT}"
+fi
+
 echo "Artifacts uploaded to: https://storage.googleapis.com/${GCS_LOCATION}/index.html"

@@ -24,6 +24,7 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool implementsSecureTransport() const override { return true; }
+  bool usesProxyProtocolOptions() const override { return false; }
 };
 
 // TODO(danzh): when implement ProofSource, examine of it's necessary to

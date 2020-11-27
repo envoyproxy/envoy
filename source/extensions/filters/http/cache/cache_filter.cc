@@ -1,5 +1,7 @@
 #include "extensions/filters/http/cache/cache_filter.h"
 
+#include "envoy/http/header_map.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -28,11 +30,11 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&,
-                         const std::string&, Stats::Scope&, TimeSource& time_source,
-                         HttpCache& http_cache)
+CacheFilter::CacheFilter(
+    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config, const std::string&,
+    Stats::Scope&, TimeSource& time_source, HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache),
-      allowed_vary_headers_(VaryHeader::parseAllowlist()) {}
+      vary_allow_list_(config.allowed_vary_headers()) {}
 
 void CacheFilter::onDestroy() {
   filter_state_ = FilterState::Destroyed;
@@ -61,7 +63,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ASSERT(decoder_callbacks_);
 
-  LookupRequest lookup_request(headers, time_source_.systemTime(), allowed_vary_headers_);
+  LookupRequest lookup_request(headers, time_source_.systemTime(), vary_allow_list_);
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
@@ -95,11 +97,12 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   // Either a cache miss or a cache entry that is no longer valid.
   // Check if the new response can be cached.
   if (request_allows_inserts_ &&
-      CacheabilityUtils::isCacheableResponse(headers, allowed_vary_headers_)) {
-    // TODO(#12140): Add date internal header or metadata to cached responses.
+      CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
-    insert_->insertHeaders(headers, end_stream);
+    // Add metadata associated with the cached response. Right now this is only response_time;
+    const ResponseMetadata metadata = {time_source_.systemTime()};
+    insert_->insertHeaders(headers, metadata, end_stream);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -359,17 +362,18 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   response_headers.setStatus(lookup_result_->headers_->getStatusValue());
   response_headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
 
-  // A cache entry was successfully validated -> encode cached body and trailers.
-  // encodeCachedResponse also adds the age header to lookup_result_
-  // so it should be called before headers are merged.
-  encodeCachedResponse();
+  // A response that has been validated should not contain an Age header as it is equivalent to a
+  // freshly served response from the origin, unless the 304 response has an Age header, which
+  // means it was served by an upstream cache.
+  // Remove any existing Age header in the cached response.
+  lookup_result_->headers_->removeInline(age_handle.handle());
 
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
     // TODO(yosrym93): Try to avoid copying the header key twice.
     Http::LowerCaseString key(std::string(cached_header.key().getStringView()));
     absl::string_view value = cached_header.value().getStringView();
-    if (!response_headers.get(key)) {
+    if (response_headers.get(key).empty()) {
       response_headers.setCopy(key, value);
     }
     return Http::HeaderMap::Iterate::Continue;
@@ -377,8 +381,13 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
 
   if (should_update_cached_entry) {
     // TODO(yosrym93): else the cached entry should be deleted.
-    cache_.updateHeaders(*lookup_, response_headers);
+    // Update metadata associated with the cached response. Right now this is only response_time;
+    const ResponseMetadata metadata = {time_source_.systemTime()};
+    cache_.updateHeaders(*lookup_, response_headers, metadata);
   }
+
+  // A cache entry was successfully validated -> encode cached body and trailers.
+  encodeCachedResponse();
 }
 
 // TODO(yosrym93): Write a test that exercises this when SimpleHttpCache implements updateHeaders
@@ -416,7 +425,7 @@ void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_header
     absl::string_view etag = etag_header->value().getStringView();
     request_headers.setInline(if_none_match_handle.handle(), etag);
   }
-  if (CacheHeadersUtils::httpTime(last_modified_header) != SystemTime()) {
+  if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(last_modified_header))) {
     // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
     request_headers.setInline(if_modified_since_handle.handle(), last_modified);
@@ -435,8 +444,6 @@ void CacheFilter::encodeCachedResponse() {
 
   response_has_trailers_ = lookup_result_->has_trailers_;
   const bool end_stream = (lookup_result_->content_length_ == 0 && !response_has_trailers_);
-  // TODO(toddmgreer): Calculate age per https://httpwg.org/specs/rfc7234.html#age.calculations
-  lookup_result_->headers_->addReferenceKey(Http::Headers::get().Age, 0);
 
   // Set appropriate response flags and codes.
   Http::StreamFilterCallbacks* callbacks =
@@ -451,7 +458,8 @@ void CacheFilter::encodeCachedResponse() {
   // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders.
   // If the filter is decoding, we need to serve response headers from cache directly.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
-    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream);
+    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
+                                      CacheResponseCodeDetails::get().ResponseFromCacheFilter);
   }
 
   if (lookup_result_->content_length_ > 0) {
