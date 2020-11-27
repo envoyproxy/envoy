@@ -1,53 +1,46 @@
 .. _arch_overview_ip_transparency:
 
-IP Transparency
+IP 透明性
 ===============
 
-What is IP Transparency
+什么是 IP 透明
 -----------------------
 
-As a proxy, Envoy is an IP endpoint: it has its own IP address, distinct from that of any downstream
-requests. Consequently, when Envoy establishes connections to upstream hosts, the IP address of that
-connection will be different from that of any proxied connections.
+作为代理， Envoy 是一个 IP 端点： 它有自己的 IP 地址，不同于其他下游的请求的地址。因此，当 Envoy 建立到上游主机的
+连接时，该连接的 IP 地址会不同于任何被代理的连接的 IP 地址。
 
-Sometimes the upstream server or network may need to know the original IP address of the connection,
-called the *downstream remote address*, for many reasons. Some examples include:
+有时候上游服务器或者网络需要知道连接的源 IP 地址，由于很多原因被称为 *下游远程地址*。一些例子包括：
 
-* the IP address being used to form part of an identity,
-* the IP address being used to enforce network policy, or
-* the IP address being included in an audit.
+* IP 地址用于组成身份的一部分，
+* IP 地址用于强制执行网络策略，或者
+* IP 地址包含在审计中
 
-Envoy supports multiple methods for providing the downstream remote address to the upstream host.
-These techniques vary in complexity and applicability.
+Envoy 支持多种方法把下游远程地址提供给上游主机。
+这些技术在复杂性和可应用性上各不相同。
 
-HTTP Headers
+HTTP 头
 ------------
 
-HTTP headers may carry the original IP address of the request in the
-:ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. The upstream server
-can use this header to determine the downstream remote address. Envoy may also use this header to
-choose the IP address used by the
-:ref:`Original Src HTTP Filter <arch_overview_ip_transparency_original_src_http>`.
+HTTP 头部可能在 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 头部字段中携带请求的原始 IP 地址。
+上游服务器可以使用该头部确定下游远程地址。Envoy 也可以使用这个头部来选择 :ref:` 原始来源 HTTP 过滤器 <arch_overview_ip_transparency_original_src_http>`
+使用的 IP 地址。
 
-The HTTP header approach has a few downsides:
+HTTP 头部方法有一些缺点：
 
-* It is only applicable to HTTP.
-* It may not be supported by the upstream host.
-* It requires careful configuration.
+* 它只适用于 HTTP。
+* 它可能不被上游主机支持。
+* 它需要仔细配置。
 
 Proxy Protocol
 --------------
 
-`HAProxy Proxy Protocol <http://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_ defines a
-protocol for communicating metadata about a connection over TCP, prior to the main TCP stream. This
-metadata includes the source IP. Envoy supports consuming this information using
-:ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`, which may be used to recover
-the downstream remote address for propagation into an
-:ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header. It can also be used in
-conjunction with the
-:ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. Finally,
-Envoy supports generating this header using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`.
-Here is an example config for setting up the socket:
+`HAproxy Proxy Protocol <http://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_ 定义了一种协议，
+在主要 TCP 流之前，通讯 TCP 连接的元数据。该元数据包括来源 IP。Envoy 支持使用 :ref:`Proxy Protocol 过滤器 <config_listener_filters_proxy_protocol>`
+消费该信息，这可以用于恢复下游远程地址传播到 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 头部字段。
+它也可以和 :ref:` 原始来源监听过滤器 <arch_overview_ip_transparency_original_src_listener>` 连接使用。最后，
+Enovy 支持使用 :ref:`Proxy Protocol 传输套接字 <extension_envoy.transport_sockets.upstream_proxy_protocol>` 生成该头部。
+
+这里有一个创建套接字的样例配置：
 
 .. code-block:: yaml
 
@@ -66,52 +59,43 @@ Here is an example config for setting up the socket:
           name: envoy.transport_sockets.raw_buffer
       ...
 
-Note: If you are wrapping a TLS socket, the header will be sent before the TLS handshake occurs.
+注意：如果你正在封装 TLS 套接字，这个头部会在 TLS 握手发生前被发送。
 
-Some drawbacks to Proxy Protocol:
+一些 Proxy Protocol 的缺点：
 
-* It only supports TCP protocols.
-* It requires upstream host support.
+* 它只支持 TCP 协议。
+* 它需要上游主机支持。
 
 .. _arch_overview_ip_transparency_original_src_listener:
 
-Original Source Listener Filter
+原始来源监听过滤器
 -------------------------------
 
-In controlled deployments, it may be possible to replicate the downstream remote address on the
-upstream connection by using a
-:ref:`Original Source listener filter <config_listener_filters_original_src>`. No metadata is added
-to the upstream request or stream. Rather, the upstream connection itself will be established with
-the downstream remote address as its source address. This filter will work with any upstream
-protocol or host. However, it requires fairly complex configuration, and it may not be supported in
-all deployments due to routing constraints.
+在可控的部署中，有可能通过使用 :ref:` 原始来源监听过滤器 <config_listener_filters_original_src>` 在一个上游
+连接中复制下游远程地址。元数据不会加入到上游请求或者流中。相反，上游连接会用下游主机地址作为来源地址来建立。
+过滤器可以和任何上游协议或者主机一起工作。然而，它需要相当复杂的配置，并且它不支持所有的部署，因为路由的限制。
 
-Some drawbacks to the Original Source filter:
+原始来源监听过滤器的一些缺点：
 
-* It requires that Envoy have access to the downstream remote address.
-* Its configuration is relatively complex.
-* It may introduce a slight performance hit due to restrictions on connection pooling.
+* 它需要 Envoy 可以访问下游远程地址。
+* 它的配置相当复杂。
+* 由于连接池的限制，它可能会带来轻微的性能下降。
 
 .. _arch_overview_ip_transparency_original_src_http:
 
-Original Source HTTP Filter
+原始来源 HTTP 过滤器
 ---------------------------
 
-In controlled deployments, it may be possible to replicate the downstream remote address on the
-upstream connection by using a
-:ref:`Original Source HTTP filter <config_http_filters_original_src>`. This filter operates much like
-the :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. The
-main difference is that it can infer the original source address from HTTP headers, which is important
-for cases where a single downstream connection carries multiple HTTP requests from different original
-source addresses. Deployments with a front proxy forwarding to sidecar proxies are examples where case
-applies.
+在可控的部署中，有可能通过使用 :ref:` 原始来源 HTTP 过滤器 <config_http_filters_original_src>` 在一个上游
+连接中复制下游远程地址。 该过滤器操作上和 :ref:` 原始来源监听过滤 <arch_overview_ip_transparency_original_src_listener>`
+非常相似。 他们的主要不同是，它可以通过 HTTP 头部推断出原始来源地址，这对于单个下游连接携带多个来自不同
+原始来源地址的 HTTP 请求的情况非常重要。前端直连 sidecar 代理的部署是应用的样例。
 
-This filter will work with any upstream HTTP host. However, it requires fairly complex configuration,
-and it may not be supported in all deployments due to routing constraints.
+该过滤器可以和任何上游的 HTTP 主机一起工作。尽管如此，它需要相当复杂的配置，并且它由于路由限制可能不支持所有的部署。
 
-Some drawbacks to the Original Source filter:
+原始来源 HTTP 过滤器的一些缺点:
 
-* It requires that Envoy be properly configured to extract the downstream remote address from the
-  :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header.
-* Its configuration is relatively complex.
-* It may introduce a slight performance hit due to restrictions on connection pooling.
+* 它需要 Envoy 适当的配置，以便从 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 头部
+  提取下游远程地址。
+* 它的配置相当复杂。
+* 它可能会因为连接池的限制产生轻微的性能冲击。
