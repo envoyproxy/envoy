@@ -44,11 +44,11 @@ public:
                       : "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
         subscription_stats_(Config::Utility::generateStats(stats_)),
         api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
-        grpc_mux_(new Config::GrpcMuxImpl(
-            local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+        grpc_mux_(new Config::GrpcMuxSotw(
+            std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-            envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, {}, true)) {
+            envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, {}, local_info_, true)) {
     resetCluster(R"EOF(
       name: name
       connect_timeout: 0.25s
@@ -83,8 +83,8 @@ public:
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
-        grpc_mux_, *eds_callbacks_, resource_decoder_, subscription_stats_, type_url_, dispatcher_,
-        std::chrono::milliseconds(), false);
+        grpc_mux_, type_url_, *eds_callbacks_, resource_decoder_, subscription_stats_, 
+	dispatcher_.timeSource(), std::chrono::milliseconds(), false);
   }
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure
@@ -162,7 +162,7 @@ public:
   Api::ApiPtr api_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  Config::GrpcMuxImplSharedPtr grpc_mux_;
+  std::shared_ptr<Config::GrpcMuxSotw> grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;
 };
 

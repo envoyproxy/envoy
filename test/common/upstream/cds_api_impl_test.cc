@@ -166,58 +166,6 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
 }
 
-TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
-  {
-    InSequence s;
-    setup();
-  }
-  EXPECT_CALL(initialized_, ready());
-
-  {
-    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
-    {
-      envoy::config::cluster::v3::Cluster cluster;
-      cluster.set_name("cluster_1");
-      expectAdd("cluster_1", "v1");
-      auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
-      resource->set_name("cluster_1");
-      resource->set_version("v1");
-    }
-    {
-      envoy::config::cluster::v3::Cluster cluster;
-      cluster.set_name("cluster_2");
-      expectAdd("cluster_2", "v1");
-      auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
-      resource->set_name("cluster_2");
-      resource->set_version("v1");
-    }
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(resources);
-    cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1");
-  }
-
-  {
-    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
-    {
-      envoy::config::cluster::v3::Cluster cluster;
-      cluster.set_name("cluster_3");
-      expectAdd("cluster_3", "v2");
-      auto* resource = resources.Add();
-      resource->mutable_resource()->PackFrom(cluster);
-      resource->set_name("cluster_3");
-      resource->set_version("v2");
-    }
-    Protobuf::RepeatedPtrField<std::string> removed;
-    *removed.Add() = "cluster_1";
-    EXPECT_CALL(cm_, removeCluster(StrEq("cluster_1"))).WillOnce(Return(true));
-    const auto decoded_resources =
-        TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(resources);
-    cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed, "v2");
-  }
-}
-
 TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
   {
     InSequence s;

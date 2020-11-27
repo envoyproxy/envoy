@@ -11,6 +11,11 @@ void PausableAckQueue::push(UpdateAck x) { storage_.push_back(std::move(x)); }
 
 size_t PausableAckQueue::size() const { return storage_.size(); }
 
+void PausableAckQueue::clear() {
+//  pauses_.clear();
+  storage_.clear();
+}
+
 bool PausableAckQueue::empty() {
   for (const auto& entry : storage_) {
     if (pauses_[entry.type_url_] == 0) {

@@ -28,7 +28,7 @@ public:
       test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
       break;
     case SubscriptionType::DeltaGrpc:
-      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
+      test_harness_ = std::make_unique<DeltaSubscriptionTestHarness>(init_fetch_timeout);
       break;
     case SubscriptionType::Http:
       test_harness_ = std::make_unique<HttpSubscriptionTestHarness>(init_fetch_timeout);
@@ -152,22 +152,17 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
   if (GetParam() == SubscriptionType::Filesystem) {
     return; // initial_fetch_timeout not implemented for filesystem.
   }
-  InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
-  if (GetParam() == SubscriptionType::Http) {
-    expectDisableInitFetchTimeoutTimer();
-  }
   expectConfigUpdateFailed();
-
+  expectDisableInitFetchTimeoutTimer();
   callInitFetchTimeoutCb();
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 1, 0, 0, ""));
 }
 
 // Validate that initial fetch timer is disabled on config update
 TEST_P(SubscriptionImplInitFetchTimeoutTest, DisableInitTimeoutOnSuccess) {
-  InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
@@ -177,7 +172,6 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, DisableInitTimeoutOnSuccess) {
 
 // Validate that initial fetch timer is disabled on config update failed
 TEST_P(SubscriptionImplInitFetchTimeoutTest, DisableInitTimeoutOnFail) {
-  InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));

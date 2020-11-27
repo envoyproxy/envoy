@@ -105,7 +105,7 @@ fragments:
               envoy::config::core::v3::ApiVersion::V3);
 
           // Add grpc service for scoped rds.
-          if (isDelta()) {
+          if (sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
             srds_api_config_source->set_api_type(
                 envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
           } else {
@@ -193,7 +193,7 @@ fragments:
                         const std::vector<std::string>& to_add_list,
                         const std::vector<std::string>& to_delete_list,
                         const std::string& version) {
-    if (isDelta()) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
       sendDeltaScopedRdsResponse(to_add_list, to_delete_list, version);
     } else {
       sendSotwScopedRdsResponse(sotw_list, version);
@@ -243,8 +243,6 @@ fragments:
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
   }
-
-  bool isDelta() { return sotwOrDelta() == Grpc::SotwOrDelta::Delta; }
 
   const std::string srds_config_name_{"foo-scoped-routes"};
   FakeUpstreamInfo scoped_rds_upstream_info_;
@@ -313,7 +311,7 @@ key:
   }
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
                                  // update_attempt only increase after a response
-                                 isDelta() ? 1 : 2);
+                                 sotwOrDelta() == Grpc::SotwOrDelta::Delta ? 1 : 2);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
   // The version gauge should be set to xxHash64("1").
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",

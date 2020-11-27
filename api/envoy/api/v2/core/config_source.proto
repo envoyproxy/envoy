@@ -51,7 +51,7 @@ message ApiConfigSource {
     // the v2 protos is used.
     REST = 1;
 
-    // gRPC v2 API.
+    // "State of the world" gRPC v2 API, using Discovery{Request,Response} protos.
     GRPC = 2;
 
     // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}

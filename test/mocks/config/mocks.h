@@ -64,7 +64,7 @@ class MockSubscription : public Subscription {
 public:
   MOCK_METHOD(void, start,
               (const std::set<std::string>& resources, const bool use_prefix_matching));
-  MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names, const bool use_namespace_matching));
   MOCK_METHOD(void, requestOnDemandUpdate, (const std::set<std::string>& add_these_names));
 };
 
@@ -88,35 +88,25 @@ public:
   SubscriptionCallbacks* callbacks_{};
 };
 
-class MockGrpcMuxWatch : public GrpcMuxWatch {
-public:
-  MockGrpcMuxWatch();
-  ~MockGrpcMuxWatch() override;
-
-  MOCK_METHOD(void, cancel, ());
-};
-
 class MockGrpcMux : public GrpcMux {
 public:
   MockGrpcMux();
   ~MockGrpcMux() override;
 
+  MOCK_METHOD(Watch*, addWatch,
+              (const std::string& type_url, const std::set<std::string>& resources,
+               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+	       std::chrono::milliseconds init_fetch_timeout,
+               const bool use_prefix_matching));
+  MOCK_METHOD(void, updateWatch, (const std::string& type_url, Watch* watch,
+                   const std::set<std::string>& resources, const bool creating_namespace_watch));
+  MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch));
+
   MOCK_METHOD(void, start, (), (override));
   MOCK_METHOD(ScopedResume, pause, (const std::string& type_url), (override));
   MOCK_METHOD(ScopedResume, pause, (const std::vector<std::string> type_urls), (override));
-
-  MOCK_METHOD(void, addSubscription,
-              (const std::set<std::string>& resources, const std::string& type_url,
-               SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
-               std::chrono::milliseconds init_fetch_timeout));
-  MOCK_METHOD(void, updateResourceInterest,
-              (const std::set<std::string>& resources, const std::string& type_url));
-
-  MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
-              (const std::string& type_url, const std::set<std::string>& resources,
-               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-               const bool use_prefix_matching));
-
+  MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
+  MOCK_METHOD0(disableInitFetchTimeoutTimer, void());
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const std::string& type_url, const std::set<std::string>& add_these_names));
 };

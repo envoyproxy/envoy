@@ -21,7 +21,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -267,7 +266,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
-
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
   // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which
   // load endpoint definition from file are primary and
@@ -302,7 +300,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (dyn_resources.has_ads_config()) {
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
+      ads_mux_ = std::make_shared<Config::GrpcMuxDelta>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
                                                          dyn_resources.ads_config(), stats, false)
               ->create(),
@@ -316,10 +314,10 @@ ClusterManagerImpl::ClusterManagerImpl(
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "DeltaAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info, 
+	  dyn_resources.ads_config().set_node_on_first_message_only());
     } else {
-      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
-          local_info,
+      ads_mux_ = std::make_shared<Config::GrpcMuxSotw>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
                                                          dyn_resources.ads_config(), stats, false)
               ->create(),
@@ -334,8 +332,9 @@ ClusterManagerImpl::ClusterManagerImpl(
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "StreamAggregatedResources"),
           dyn_resources.ads_config().transport_api_version(), random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();

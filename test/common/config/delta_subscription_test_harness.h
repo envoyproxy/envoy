@@ -8,7 +8,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/grpc_subscription_impl.h"
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
@@ -41,13 +41,14 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    xds_context_ = std::make_shared<NewGrpcMuxImpl>(
+    grpc_mux_ = std::make_shared<GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
-        local_info_);
+        local_info_, false);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        xds_context_, callbacks_, resource_decoder_, stats_,
-        Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false);
+        grpc_mux_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_, stats_,
+        dispatcher_.timeSource(), init_fetch_timeout, false);
+
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
@@ -156,8 +157,8 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
-    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    auto shared_mux = subscription_->getGrpcMuxForTest();
+    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(response), control_plane_stats_);
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -172,7 +173,7 @@ public:
                         std::inserter(unsub, unsub.begin()));
 
     expectSendMessage(sub, unsub, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-    subscription_->updateResourceInterest(cluster_names);
+    subscription_->updateResourceInterest(cluster_names, false);
     last_cluster_names_ = cluster_names;
   }
 
@@ -197,8 +198,8 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  NewGrpcMuxImplSharedPtr xds_context_;
-  GrpcSubscriptionImplPtr subscription_;
+  std::shared_ptr<GrpcMux> grpc_mux_;
+  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;

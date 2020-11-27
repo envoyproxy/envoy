@@ -22,17 +22,17 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer_, enableTimer(_, _));
   subscription_->start({"cluster0", "cluster1"});
-  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
   // Ensure this doesn't cause an issue by sending a request, since we don't
   // have a gRPC stream.
-  subscription_->updateResourceInterest({"cluster2"});
+  subscription_->updateResourceInterest({"cluster2"}, false);
 
   // Retry and succeed.
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
   expectSendMessage({"cluster2"}, "", true);
   timer_cb_();
-  EXPECT_TRUE(statsAre(3, 0, 0, 1, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(3, 0, 0, 0, 0, 0, 0, ""));
   verifyControlPlaneStats(1);
 }
 
@@ -46,7 +46,10 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
       .Times(0);
   EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(random_, random());
-  mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+  auto shared_mux = subscription_->getGrpcMuxForTest();
+  static_cast<GrpcMuxSotw*>(shared_mux.get())
+      ->grpcStreamForTest()
+      .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
   verifyControlPlaneStats(0);
 
@@ -57,7 +60,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
 }
 
-// Validate that When the management server gets multiple requests for the same version, it can
+// Validate that when the management server gets multiple requests for the same version, it can
 // ignore later ones. This allows the nonce to be used.
 TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
   InSequence s;

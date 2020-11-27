@@ -23,9 +23,6 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
 
 MockSubscriptionFactory::~MockSubscriptionFactory() = default;
 
-MockGrpcMuxWatch::MockGrpcMuxWatch() = default;
-MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
-
 MockGrpcMux::MockGrpcMux() = default;
 MockGrpcMux::~MockGrpcMux() = default;
 

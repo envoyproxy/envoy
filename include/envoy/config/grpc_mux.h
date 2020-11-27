@@ -31,21 +31,7 @@ struct ControlPlaneStats {
                           GENERATE_TEXT_READOUT_STRUCT)
 };
 
-/**
- * Handle on a muxed gRPC subscription. The subscription is canceled on destruction.
- */
-class GrpcMuxWatch {
-public:
-  virtual ~GrpcMuxWatch() = default;
-
-  /**
-   * Updates the set of resources that the watch is interested in.
-   * @param resources set of resource names to watch for
-   */
-  virtual void update(const std::set<std::string>& resources) PURE;
-};
-
-using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
+struct Watch;
 
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
@@ -96,14 +82,44 @@ public:
    * @param use_namespace_matching if namespace watch should be created. This is used for creating
    * watches on collections of resources; individual members of a collection are identified by the
    * namespace in resource name.
-   * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
-   * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
+   * @return Watch* an opaque watch token added or updated, to be used in future addOrUpdateWatch
+   *                calls.
    */
-  virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
+  virtual Watch* addWatch(const std::string& type_url,
                                    const std::set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
                                    OpaqueResourceDecoder& resource_decoder,
+				   std::chrono::milliseconds init_fetch_timeout,
                                    const bool use_namespace_matching) PURE;
+
+  // Updates the list of resource names watched by the given watch. If an added name is new across
+  // the whole subscription, or if a removed name has no other watch interested in it, then the
+  // subscription will enqueue and attempt to send an appropriate discovery request.
+  virtual void updateWatch(const std::string& type_url, Watch* watch,
+                   const std::set<std::string>& resources, const bool creating_namespace_watch) PURE;
+
+
+  /**
+   * Cleanup of a Watch* added by addOrUpdateWatch(). Receiving a Watch* from addOrUpdateWatch()
+   * makes you responsible for eventually invoking this cleanup.
+   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
+   * @param watch the watch to be cleaned up.
+   */
+  virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
+
+  /**
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   * @return bool whether the API is paused.
+   */
+  virtual bool paused(const std::string& type_url) const PURE;
+
+  /**
+   * Passes through to all multiplexed SubscriptionStates. To be called when something
+   * definitive happens with the initial fetch: either an update is successfully received,
+   * or some sort of error happened.*/
+  virtual void disableInitFetchTimeoutTimer() PURE;
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
                                      const std::set<std::string>& for_update) PURE;

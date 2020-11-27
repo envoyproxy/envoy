@@ -24,12 +24,17 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 
 class DeltaSubscriptionStateTest : public testing::Test {
 protected:
-  DeltaSubscriptionStateTest() : state_(TypeUrl, callbacks_, local_info_) {
+  DeltaSubscriptionStateTest()
+      : state_(TypeUrl, callbacks_, std::chrono::milliseconds(0U), dispatcher_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_THAT(cur_request.resource_names_subscribe(),
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre("name1", "name2", "name3"));
+  }
+
+  std::unique_ptr<envoy::api::v2::DeltaDiscoveryRequest> getNextDeltaDiscoveryRequestAckless() {
+    auto* ptr = static_cast<envoy::api::v2::DeltaDiscoveryRequest*>(state_.getNextRequestAckless());
+    return std::unique_ptr<envoy::api::v2::DeltaDiscoveryRequest>(ptr);
   }
 
   UpdateAck deliverDiscoveryResponse(
@@ -45,7 +50,7 @@ protected:
       message.set_nonce(nonce.value());
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(expect_config_update_call ? 1 : 0);
-    return state_.handleResponse(message);
+    return state_.handleResponse(&message);
   }
 
   UpdateAck deliverBadDiscoveryResponse(
@@ -58,11 +63,10 @@ protected:
     message.set_system_version_info(version_info);
     message.set_nonce(nonce);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).WillOnce(Throw(EnvoyException(error_message)));
-    return state_.handleResponse(message);
+    return state_.handleResponse(&message);
   }
 
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   // We start out interested in three resources: name1, name2, and name3.
   DeltaSubscriptionState state_;
@@ -83,17 +87,15 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
     state_.updateSubscriptionInterest({"name4"}, {"name1"});
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
-    EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1"));
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
+    EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("name1"));
   }
   {
     state_.updateSubscriptionInterest({"name1"}, {"name3", "name4"});
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1"));
-    EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name3", "name4"));
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name1"));
+    EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("name3", "name4"));
   }
 }
 
@@ -109,9 +111,9 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
 TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
   state_.updateSubscriptionInterest({}, {"name3"});
   state_.updateSubscriptionInterest({"name3"}, {});
-  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
-  EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
+  auto cur_request = getNextDeltaDiscoveryRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
 }
 
 // Due to how our implementation provides the required behavior tested in RemoveThenAdd, the
@@ -125,9 +127,9 @@ TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
 TEST_F(DeltaSubscriptionStateTest, AddThenRemove) {
   state_.updateSubscriptionInterest({"name4"}, {});
   state_.updateSubscriptionInterest({}, {"name4"});
-  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
-  EXPECT_TRUE(cur_request.resource_names_subscribe().empty());
-  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name4"));
+  auto cur_request = getNextDeltaDiscoveryRequestAckless();
+  EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+  EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("name4"));
 }
 
 // add/remove/add == add.
@@ -135,9 +137,9 @@ TEST_F(DeltaSubscriptionStateTest, AddRemoveAdd) {
   state_.updateSubscriptionInterest({"name4"}, {});
   state_.updateSubscriptionInterest({}, {"name4"});
   state_.updateSubscriptionInterest({"name4"}, {});
-  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
-  EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
+  auto cur_request = getNextDeltaDiscoveryRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
 }
 
 // remove/add/remove == remove.
@@ -145,9 +147,9 @@ TEST_F(DeltaSubscriptionStateTest, RemoveAddRemove) {
   state_.updateSubscriptionInterest({}, {"name3"});
   state_.updateSubscriptionInterest({"name3"}, {});
   state_.updateSubscriptionInterest({}, {"name3"});
-  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
-  EXPECT_TRUE(cur_request.resource_names_subscribe().empty());
-  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name3"));
+  auto cur_request = getNextDeltaDiscoveryRequestAckless();
+  EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+  EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("name3"));
 }
 
 // Starts with 1,2,3. 4 is added/removed/added. In those same updates, 1,2,3 are
@@ -156,18 +158,18 @@ TEST_F(DeltaSubscriptionStateTest, BothAddAndRemove) {
   state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
   state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {"name4"});
   state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
-  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
-  EXPECT_THAT(cur_request.resource_names_unsubscribe(),
+  auto cur_request = getNextDeltaDiscoveryRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
+  EXPECT_THAT(cur_request->resource_names_unsubscribe(),
               UnorderedElementsAre("name1", "name2", "name3"));
 }
 
 TEST_F(DeltaSubscriptionStateTest, CumulativeUpdates) {
   state_.updateSubscriptionInterest({"name4"}, {});
   state_.updateSubscriptionInterest({"name5"}, {});
-  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4", "name5"));
-  EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
+  auto cur_request = getNextDeltaDiscoveryRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4", "name5"));
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
 }
 
 // Verifies that a sequence of good and bad responses from the server all get the appropriate
@@ -235,12 +237,11 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
         populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
     deliverDiscoveryResponse(add1_2, {}, "debugversion1");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
-    EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
-    EXPECT_EQ(cur_request.initial_resource_versions().end(),
-              cur_request.initial_resource_versions().find("name3"));
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_EQ("version1A", cur_request->initial_resource_versions().at("name1"));
+    EXPECT_EQ("version2A", cur_request->initial_resource_versions().at("name2"));
+    EXPECT_EQ(cur_request->initial_resource_versions().end(),
+              cur_request->initial_resource_versions().find("name3"));
   }
 
   {
@@ -251,12 +252,11 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove2.Add() = "name2";
     deliverDiscoveryResponse(add1_3, remove2, "debugversion2");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_EQ("version1B", cur_request.initial_resource_versions().at("name1"));
-    EXPECT_EQ(cur_request.initial_resource_versions().end(),
-              cur_request.initial_resource_versions().find("name2"));
-    EXPECT_EQ("version3A", cur_request.initial_resource_versions().at("name3"));
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_EQ("version1B", cur_request->initial_resource_versions().at("name1"));
+    EXPECT_EQ(cur_request->initial_resource_versions().end(),
+              cur_request->initial_resource_versions().find("name2"));
+    EXPECT_EQ("version3A", cur_request->initial_resource_versions().at("name3"));
   }
 
   {
@@ -266,19 +266,17 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove1_3.Add() = "name3";
     deliverDiscoveryResponse({}, remove1_3, "debugversion3");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_TRUE(cur_request.initial_resource_versions().empty());
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_TRUE(cur_request->initial_resource_versions().empty());
   }
 
   {
     // ...but our own map should remember our interest. In particular, losing interest in a
     // resource should cause its name to appear in the next request's resource_names_unsubscribe.
     state_.updateSubscriptionInterest({"name4"}, {"name1", "name2"});
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
-    EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", "name2"));
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
+    EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre("name1", "name2"));
   }
 }
 
@@ -297,7 +295,7 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
 
   state_.updateSubscriptionInterest({"name4"}, {"name1"});
   state_.markStreamFresh(); // simulate a stream reconnection
-  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  auto cur_request = getNextDeltaDiscoveryRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
   // name2: yes do include: we're interested and we have a version of it.
@@ -305,9 +303,9 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   // name4: yes do include: we are newly interested. (If this wasn't a stream reconnect, only
   // name4
   //                        would belong in this subscribe field).
-  EXPECT_THAT(cur_request.resource_names_subscribe(),
+  EXPECT_THAT(cur_request->resource_names_subscribe(),
               UnorderedElementsAre("name2", "name3", "name4"));
-  EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
+  EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
 }
 
 // initial_resource_versions should not be present on messages after the first in a stream.
@@ -320,11 +318,10 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
             {{"name1", "version1A"}, {"name2", "version2A"}, {"name3", "version3A"}});
     deliverDiscoveryResponse(add_all, {}, "debugversion1");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
-    EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
-    EXPECT_EQ("version3A", cur_request.initial_resource_versions().at("name3"));
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_EQ("version1A", cur_request->initial_resource_versions().at("name1"));
+    EXPECT_EQ("version2A", cur_request->initial_resource_versions().at("name2"));
+    EXPECT_EQ("version3A", cur_request->initial_resource_versions().at("name3"));
   }
   // Then, after updating the resources but not reconnecting the stream, verify that initial
   // versions are not sent.
@@ -337,9 +334,8 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
                                   {"name3", "version3B"},
                                   {"name4", "version4A"}});
     deliverDiscoveryResponse(add_all, {}, "debugversion2");
-    envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
-        state_.getNextRequestAckless();
-    EXPECT_TRUE(cur_request.initial_resource_versions().empty());
+    auto cur_request = getNextDeltaDiscoveryRequestAckless();
+    EXPECT_TRUE(cur_request->initial_resource_versions().empty());
   }
 }
 
@@ -386,6 +382,15 @@ TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
       deliverDiscoveryResponse(additions, removals, "debugversion1", absl::nullopt, false);
   EXPECT_EQ("duplicate name name1 found in the union of added+removed resources",
             ack.error_detail_.message());
+}
+
+TEST_F(DeltaSubscriptionStateTest, handleEstablishmentFailure) {
+  // Although establishment failure is not supposed to cause an onConfigUpdateFailed() on the
+  // ultimate actual subscription callbacks, DeltaSubscriptionState's callbacks are actually
+  // the WatchMap, which then calls GrpcSubscriptionImpl(s). It is the GrpcSubscriptionImpl
+  // that will decline to pass on an onConfigUpdateFailed(ConnectionFailure).
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  state_.handleEstablishmentFailure();
 }
 
 } // namespace
