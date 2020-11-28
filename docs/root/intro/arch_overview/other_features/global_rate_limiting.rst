@@ -1,38 +1,15 @@
 .. _arch_overview_global_rate_limit:
 
-Global rate limiting
+全局限流
 ====================
 
-Although distributed :ref:`circuit breaking <arch_overview_circuit_break>` is generally extremely
-effective in controlling throughput in distributed systems, there are times when it is not very
-effective and global rate limiting is desired. The most common case is when a large number of hosts
-are forwarding to a small number of hosts and the average request latency is low (e.g.,
-connections/requests to a database server). If the target hosts become backed up, the downstream
-hosts will overwhelm the upstream cluster. In this scenario it is extremely difficult to configure a
-tight enough circuit breaking limit on each downstream host such that the system will operate
-normally during typical request patterns but still prevent cascading failure when the system starts
-to fail. Global rate limiting is a good solution for this case.
+尽管分布式 :ref:`熔断器 <arch_overview_circuit_break>` 在大多数情况下控制分布式系统中的吞吐量非常有效，但有时它的效果并不是很好，这时候便需要全局限流。最常见的情况是当大量主机转发到少量主机并且平均请求延迟很短时（例如，发送给数据库服务器的连接/请求）。若目标主机成为备机，则下游主机将压垮上游集群。在这种情况下，很难对每个下游主机配置足够严格的熔断器，使得系统可以平稳运行，同时，当系统开始出现故障时，仍然可以防止级联故障。对于这种情况，全局限流是一个很好的解决方案。
 
-Envoy integrates directly with a global gRPC rate limiting service. Although any service that
-implements the defined RPC/IDL protocol can be used, Lyft provides a `reference implementation <https://github.com/lyft/ratelimit>`_
-written in Go which uses a Redis backend. Envoy’s rate limit integration has the following features:
+Envoy 可以直接与全局 gRPC 限流服务集成。尽管可以使用任何实现定义 RPC/IDL 协议的服务，但 Lyft 提供了 Go 编写的使用 Redis 后端的 `参考实现 <https://github.com/lyft/ratelimit>`_ 。Envoy 的限流具有以下功能：
 
-* **Network level rate limit filter**: Envoy will call the rate limit service for every new
-  connection on the listener where the filter is installed. The configuration specifies a specific
-  domain and descriptor set to rate limit on. This has the ultimate effect of rate limiting the
-  connections per second that transit the listener. :ref:`Configuration reference
-  <config_network_filters_rate_limit>`.
-* **HTTP level rate limit filter**: Envoy will call the rate limit service for every new request on
-  the listener where the filter is installed and where the route table specifies that the global
-  rate limit service should be called. All requests to the target upstream cluster as well as all
-  requests from the originating cluster to the target cluster can be rate limited.
-  :ref:`Configuration reference <config_http_filters_rate_limit>`
+* **网络级限流过滤器**：Envoy 将会对配置了该过滤器的监听器上的每一个新请求调用限流服务。该配置指定了要设置限流的特定域和描述符。最终会限制每秒经过监听器的并发连接。:ref:`参考配置 <config_network_filters_rate_limit>`。
+* **HTTP 级限流过滤器**：Envoy 将会对配置了该过滤器且路由表指定应调用全局限流服务的监听器上为每个新请求调用限流服务。所有向目标上游集群发出的请求以及从源集群向目标集群发出的所有请求都可以进行限流。:ref:`参考配置 <config_http_filters_rate_limit>`。
 
-Rate limit service :ref:`configuration <config_rate_limit_service>`.
+限流服务 :ref:`配置 <config_rate_limit_service>`。
 
-Note that Envoy also supports :ref:`local rate limiting <config_network_filters_local_rate_limit>`.
-Local rate limiting can be used in conjunction with global rate limiting to reduce load on the
-global rate limit service. For example, a local token bucket rate limit can absorb very large bursts
-in load that might otherwise overwhelm a global rate limit service. Thus, the rate limit is applied
-in two stages. The initial coarse grained limiting is performed by the token bucket limit before
-a fine grained global limit finishes the job.
+注意，Envoy 还支持 :ref:`本地限流 <config_network_filters_local_rate_limit>`。本地限流可以与全局限流结合使用，以减少全局限流服务的负载。例如，本地限流通过令牌桶可以承受非常大的突发负载，否则可能会压垮全局限流服务。因此，限流分为两个阶段。全局限流进行细粒度的分布式限流调控，本地限流通过令牌桶的方式进行粗粒度的限流。
