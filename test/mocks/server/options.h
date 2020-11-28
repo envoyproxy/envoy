@@ -47,7 +47,6 @@ public:
   MOCK_METHOD(bool, hotRestartDisabled, (), (const));
   MOCK_METHOD(bool, signalHandlingEnabled, (), (const));
   MOCK_METHOD(bool, mutexTracingEnabled, (), (const));
-  MOCK_METHOD(bool, fakeSymbolTableEnabled, (), (const));
   MOCK_METHOD(bool, cpusetThreadsEnabled, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, disabledExtensions, (), (const));
   MOCK_METHOD(Server::CommandLineOptionsPtr, toCommandLineOptions, (), (const));
