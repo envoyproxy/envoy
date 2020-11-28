@@ -1,129 +1,103 @@
 .. _arch_overview_tracing:
 
-Tracing
+追踪
 =======
 
-Overview
+概览
 --------
-Distributed tracing allows developers to obtain visualizations of call flows in large service
-oriented architectures. It can be invaluable in understanding serialization, parallelism, and
-sources of latency. Envoy supports three features related to system wide tracing:
+在大规模的面向服务的架构中，分布式追踪能让开发者得到调用流程的可视化展示。在了解序列化、并行情况和延迟来源的时候，
+可视化就显得格外重要。Envoy 支持三个系统范围内追踪的特性：
 
-* **Request ID generation**: Envoy will generate UUIDs when needed and populate the
-  :ref:`config_http_conn_man_headers_x-request-id` HTTP header. Applications can forward the
-  x-request-id header for unified logging as well as tracing. The behavior can be configured on per :ref:`HTTP connection manager<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_id_extension>` basis using an extension.
-* **Client trace ID joining**: The :ref:`config_http_conn_man_headers_x-client-trace-id` header can
-  be used to join untrusted request IDs to the trusted internal
-  :ref:`config_http_conn_man_headers_x-request-id`.
-* **External trace service integration**: Envoy supports pluggable external trace visualization
-  providers, that are divided into two subgroups:
+* **生成 Request ID**: Envoy 会在需要的时候生成 UUIDs，并且填充名为 :ref:`config_http_conn_man_headers_x-request-id` 的 HTTP header。
+    应用可以转发这个 x-request-id Header 来做到统一的记录和跟踪。这个行为可以通过用一个 extension 在每个基于 :ref:`HTTP connection manager<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_id_extension>` 上配置。
+* **客户端跟踪 ID 连接**: :ref:`config_http_conn_man_headers_x-client-trace-id` header 能够把不信任的请求 ID 连接到受信任的内部 :ref:`config_http_conn_man_headers_x-request-id` header 上。
+* **集成外部跟踪服务**: Envoy 支持插件式的外部可视化跟踪提供者，有两种不同的类型：
 
+  - 基于代码级别的外部跟踪服务，像 `LightStep <https://lightstep.com/>`_, `Zipkin <https://zipkin.io/>`_ 或者 任何兼容 Zipkin 的后端服务（例如：`Jaeger <https://github.com/jaegertracing/>`_），
+    还有 `Datadog <https://datadoghq.com>`_。
   - External tracers which are part of the Envoy code base, like `LightStep <https://lightstep.com/>`_,
     `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
     `Datadog <https://datadoghq.com>`_.
-  - External tracers which come as a third party plugin, like `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_.
+  - 外部追踪服务作为第三方库的插件，像 `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_。
 
-Support for other tracing providers would not be difficult to add.
+支持添加其它各种类型的的追踪服务也不是什么难事！
 
-How to initiate a trace
+如何初始化一个跟踪
 -----------------------
-The HTTP connection manager that handles the request must have the :ref:`tracing
-<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing>` object set. There are several ways tracing can be
-initiated:
+处理请求的 HTTP 管理器必须设置 :ref:`tracing
+<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing>` 对象。有多种不同的方式可以初始化跟踪：
 
-* By an external client via the :ref:`config_http_conn_man_headers_x-client-trace-id`
-  header.
-* By an internal service via the :ref:`config_http_conn_man_headers_x-envoy-force-trace`
-  header.
-* Randomly sampled via the :ref:`random_sampling <config_http_conn_man_runtime_random_sampling>`
-  runtime setting.
+* 外部客户端，使用 :ref:`config_http_conn_man_headers_x-client-trace-id` header。
+* 内部服务，使用 :ref:`config_http_conn_man_headers_x-envoy-force-trace` header。
+* 通过 :ref:`random_sampling <config_http_conn_man_runtime_random_sampling>` 运行时设置来进行随机采样。
 
-The router filter is also capable of creating a child span for egress calls via the
-:ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` option.
+路由过滤器可以使用 :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` 来为 egress 调用创建下级 span。
 
-Trace context propagation
+跟踪上下文的传递
 -------------------------
-Envoy provides the capability for reporting tracing information regarding communications between
-services in the mesh. However, to be able to correlate the pieces of tracing information generated
-by the various proxies within a call flow, the services must propagate certain trace context between
-the inbound and outbound requests.
+Envoy 提供了报告网格内服务间通信跟踪信息的能力。然而一个调用流中，会有多个代理服务器生成的跟踪信息碎片，
+跟踪服务必须在出入站的请求中传播上下文信息，才能拼出完整的跟踪信息。
 
-Whichever tracing provider is being used, the service should propagate the
-:ref:`config_http_conn_man_headers_x-request-id` to enable logging across the invoked services
-to be correlated.
+不管使用哪种跟踪方式，服务都应该传递 :ref:`config_http_conn_man_headers_x-request-id` 来开启调用服务的相关性记录。
 
-The tracing providers also require additional context, to enable the parent/child relationships
-between the spans (logical units of work) to be understood. This can be achieved by using the
-LightStep (via OpenTracing API) or Zipkin tracer directly within the service itself, to extract the
-trace context from the inbound request and inject it into any subsequent outbound requests. This
-approach would also enable the service to create additional spans, describing work being done
-internally within the service, that may be useful when examining the end-to-end trace.
+为了理解 Span（逻辑工作单元）之间的父子关系，跟踪服务自身也需要更多的上下文信息。这种需要可以
+通过在跟踪服务自身中直接使用 LightStep（OpenTracing API）或者 Zipkin 跟踪器来完成，从而
+在入站请求中提取跟踪上下文，然后把上下文信息注入到后续的出站请求中。这种方法还可以让服务能够
+创建附加的 Span，用来描述服务内部完成的工作。这对端到端跟踪的检查是很有帮助的。
 
-Alternatively the trace context can be manually propagated by the service:
+另外，跟踪上下文也可以由服务来完成手动传播：
 
-* When using the LightStep tracer, Envoy relies on the service to propagate the
-  :ref:`config_http_conn_man_headers_x-ot-span-context` HTTP header
-  while sending HTTP requests to other services.
+* 如果使用了 LightStep 跟踪器，在发送 HTTP 请求到其他服务时，Envoy 依赖这个服务来传播 :ref:`config_http_conn_man_headers_x-ot-span-context` Header。
 
-* When using the Zipkin tracer, Envoy relies on the service to propagate the
+* 如果使用的是 Zipkin，Envoy 依赖这个服务传播
   B3 HTTP headers (
   :ref:`config_http_conn_man_headers_x-b3-traceid`,
   :ref:`config_http_conn_man_headers_x-b3-spanid`,
   :ref:`config_http_conn_man_headers_x-b3-parentspanid`,
   :ref:`config_http_conn_man_headers_x-b3-sampled`, and
-  :ref:`config_http_conn_man_headers_x-b3-flags`). The :ref:`config_http_conn_man_headers_x-b3-sampled`
-  header can also be supplied by an external client to either enable or disable tracing for a particular
-  request. In addition, the single :ref:`config_http_conn_man_headers_b3` header propagation format is
-  supported, which is a more compressed format.
+  :ref:`config_http_conn_man_headers_x-b3-flags`)。 :ref:`config_http_conn_man_headers_x-b3-sampled`
+  header 也可以由外部客户端在一个特定的请求中打开或者关闭追踪。另外，单个 :ref:`config_http_conn_man_headers_b3` header 
+  传递格式是被支持的，这个格式是更加紧凑的格式。
 
-* When using the Datadog tracer, Envoy relies on the service to propagate the
-  Datadog-specific HTTP headers (
+* 如果使用的是 Datadog 追踪器, Envoy 依赖这个服务传递特定的 Datadog 
+  HTTP headers (
   :ref:`config_http_conn_man_headers_x-datadog-trace-id`,
   :ref:`config_http_conn_man_headers_x-datadog-parent-id`,
   :ref:`config_http_conn_man_headers_x-datadog-sampling-priority`).
 
-What data each trace contains
+每条追踪中包含哪些数据
 -----------------------------
-An end-to-end trace is comprised of one or more spans. A
-span represents a logical unit of work that has a start time and duration and can contain metadata
-associated with it. Each span generated by Envoy contains the following data:
+一条端到端的跟踪会包含一个或者多个 Span。一个 Span 就是一个逻辑上的工作单元，具有一个启动时间和时长，
+其中还会包含特定的 Metadata，每个 Envoy 生成的 Span 包含如下信息：
 
-* Originating service cluster set via :option:`--service-cluster`.
-* Start time and duration of the request.
-* Originating host set via :option:`--service-node`.
-* Downstream cluster set via the :ref:`config_http_conn_man_headers_downstream-service-cluster`
-  header.
-* HTTP request URL, method, protocol and user-agent.
-* Additional custom tags set via :ref:`custom_tags
-  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.custom_tags>`.
-* Upstream cluster name and address.
-* HTTP response status code.
-* GRPC response status and message (if available).
-* An error tag when HTTP status is 5xx or GRPC status is not "OK".
-* Tracing system-specific metadata.
+* 通过 :option:`--service-cluster` 设置的始发服务集群
+* 请求的启动时间和持续时间。
+* 使用 :option:`--service-node` 设置的始发服务主机。
+* :ref:`config_http_conn_man_headers_downstream-service-cluster` header 设置的下游集群。
+* HTTP 请求 URL, method, protocol 和 user-agent。
+* 通过 :ref:`custom_tags
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.custom_tags>` 设置的定制 tag。
+* 上游集群名字和地址。
+* HTTP 响应码。
+* GRPC 响应状态和信息（如果有）。
+* 当 HTTP 状态码是 5xx 或者 GRPC 状态不是 "OK" 的时候出现的错误 tag。
+* 跟踪系统的特定信息。
 
-The span also includes a name (or operation) which by default is defined as the host of the invoked
-service. However this can be customized using a :ref:`envoy_v3_api_msg_config.route.v3.Decorator` on
-the route. The name can also be overridden using the
-:ref:`config_http_filters_router_x-envoy-decorator-operation` header.
+Span 还有包含一个名称（或者操作），默认定义为被调用服务的服务名。当然，也可以在路由上使用 :ref:`envoy_v3_api_msg_config.route.v3.Decorator` 来进行自定义。还可以使用 :ref:`config_http_filters_router_x-envoy-decorator-operation` Header 来重写名称。
 
-Envoy automatically sends spans to tracing collectors. Depending on the tracing collector,
-multiple spans are stitched together using common information such as the globally unique
-request ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) or
-the trace ID configuration (Zipkin and Datadog). See
-:ref:`v3 API reference <envoy_v3_api_msg_config.trace.v3.Tracing>`
-for more information on how to setup tracing in Envoy.
+Envoy 自动发送 Span 给跟踪采集器。多个 Span 会被揉和在一起使用一些共同的信息，比如全局唯一的请求 ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) 或者跟踪 ID 配置（Zipkin 和 Datadog），当然这取决于跟踪采集器。
+
+查看 :ref:`v3 API reference <envoy_v3_api_msg_config.trace.v3.Tracing>` 来获取更多的关于在 Envoy 中设置跟踪的信息。
+
 
 Baggage
 -----------------------------
-Baggage provides a mechanism for data to be available throughout the entirety of a trace.
-While metadata such as tags are usually communicated to collectors out-of-band, baggage data is injected into the actual
-request context and available to applications during the duration of the request. This enables metadata to transparently
-travel from the beginning of the request throughout your entire mesh without relying on application-specific modifications for
-propagation. See `OpenTracing's documentation <https://opentracing.io/docs/overview/tags-logs-baggage/>`_ for more information about baggage.
+Baggage 提供一种数据在整个跟踪过程中都可用的机制。尽管诸如标签之类的元数据被用来和带外收集器进行通信，但是 baggage 数据会被注入到实际的请求上下文中，
+并且在请求持续的时间内对应用程序是可用的。这使得遍布在整个服务网格的元数据从请求的开始就是透明的，而无须依赖为了传递而修改特定的应用。
+查看 `OpenTracing 文档 <https://opentracing.io/docs/overview/tags-logs-baggage/>`_ 来了解更多关于 baggage 的信息。
 
-Tracing providers have varying level of support for getting and setting baggage:
+对于设置和获取 baggage，跟踪器提供商有着不同的水平：
 
-* Lightstep (and any OpenTracing-compliant tracer) can read/write baggage
-* Zipkin support is not yet implemented
-* X-Ray and OpenCensus don't support baggage
+* Lightstep (以及其它任何兼容 OpenTracing 的追踪器) 能够读/写 baggage
+* Zipkin 支持至今还没有实现
+* X-Ray 和 OpenCensus 不支持 baggage
