@@ -80,6 +80,10 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
     args.push_back(absl::StrJoin(headers, ","));
   }
 
+  auto temp_path = TestEnvironment::temporaryDirectory();
+  args.push_back("-T");
+  args.push_back(temp_path);
+
   args.push_back(options.method_name_);
   std::copy(options.method_args_.begin(), options.method_args_.end(), std::back_inserter(args));
 

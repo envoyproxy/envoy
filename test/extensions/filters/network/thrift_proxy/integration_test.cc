@@ -401,6 +401,9 @@ INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
 // Because of the protocol upgrade requests and the difficulty of separating them, we test this
 // protocol independently.
 TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
+// This test relies on an old Apache Thrift Python package
+// that is only available in Python2. Disabling the test on Windows.
+#ifndef WIN32
   initializeCall(DriverMode::Success);
 
   uint32_t upgrade_request_size = request_bytes_.peekBEInt<uint32_t>() + 4;
@@ -457,6 +460,7 @@ TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
   EXPECT_EQ(2U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_success");
   EXPECT_EQ(2U, counter->value());
+#endif
 }
 
 } // namespace ThriftProxy
