@@ -704,8 +704,7 @@ TEST_F(StatNameTest, SupportsAbslHash) {
 
 // Tests the memory savings realized from using symbol tables with 1k
 // clusters. This test shows the memory drops from almost 8M to less than
-// 2M. Note that only SymbolTableImpl is tested for memory consumption,
-// and not FakeSymbolTableImpl.
+// 2M.
 TEST(SymbolTableTest, Memory) {
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
