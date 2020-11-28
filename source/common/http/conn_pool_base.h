@@ -65,7 +65,6 @@ public:
     return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(ratio);
   }
   bool hasActiveConnections() const override;
-  Http::Protocol protocol() const override { return protocol_; }
 
   // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable*
@@ -85,7 +84,6 @@ public:
 protected:
   friend class ActiveClient;
   Random::RandomGenerator& random_generator_;
-  Http::Protocol protocol_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
