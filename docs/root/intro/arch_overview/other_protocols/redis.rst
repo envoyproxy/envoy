@@ -3,126 +3,98 @@
 Redis
 =======
 
-Envoy can act as a Redis proxy, partitioning commands among instances in a cluster.
-In this mode, the goals of Envoy are to maintain availability and partition tolerance
-over consistency. This is the key point when comparing Envoy to `Redis Cluster
-<https://redis.io/topics/cluster-spec>`_. Envoy is designed as a best-effort cache,
-meaning that it will not try to reconcile inconsistent data or keep a globally consistent
-view of cluster membership. It also supports routing commands from different workload to
-different to different upstream clusters based on their access patterns, eviction, or isolation
-requirements.
+Envoy 可以作为 Redis 代理，在集群的实例间对命令进行分区。在这种模式下， Envoy 的目标是在一致性前提下维护可用性和分区容错。这是 Envoy 和 `Redis 集群
+<https://redis.io/topics/cluster-spec>`_ 关键差异。 Envoy 被设计为尽力而为的缓存，意味着它不会试图协调不一致的数据或者保持全局集群成员一致视图。它还支持基于不同的访问模式，驱逐或隔离需求，将命令从不同的工作负载路由到不同的上游集群。
 
-The Redis project offers a thorough reference on partitioning as it relates to Redis. See
-"`Partitioning: how to split data among multiple Redis instances
-<https://redis.io/topics/partitioning>`_".
+Redis 项目中提供了与 Redis 分区相关的全面参考。请查看 "`分区: 如何在多个 Redis 实例间分片？
+<https://redis.io/topics/partitioning>`_"。
 
-**Features of Envoy Redis**:
+**Envoy Redis 特性**:
 
-* `Redis protocol <https://redis.io/topics/protocol>`_ codec.
-* Hash-based partitioning.
-* Ketama distribution.
-* Detailed command statistics.
-* Active and passive healthchecking.
-* Hash tagging.
-* Prefix routing.
-* Separate downstream client and upstream server authentication.
-* Request mirroring for all requests or write requests only.
-* Control :ref:`read requests routing<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.read_policy>`. This only works with Redis Cluster.
+* Redis 协议 <https://redis.io/topics/protocol>_ 编解码
+* 基于哈希的分区
+* Ketama 分布式一致性哈希算法
+* 命令统计详情
+* 主动和被动健康检查
+* 哈希标记
+* 路由前缀
+* 下游客户端和上游服务器分别进行身份验证
+* 针对所有请求或写请求监控
+* 管控 :ref:`读请求路由 <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.read_policy>`. 仅适用于 Redis 集群。
 
-**Planned future enhancements**:
+**计划的未来增强功能**：
 
-* Additional timing stats.
-* Circuit breaking.
-* Request collapsing for fragmented commands.
-* Replication.
-* Built-in retry.
-* Tracing.
+* 额外的时间统计
+* 熔断
+* 对分散的命令进行请求折叠
+* 复制
+* 内置重试
+* 追踪
 
 .. _arch_overview_redis_configuration:
 
-Configuration
+配置
 -------------
 
-For filter configuration details, see the Redis proxy filter
-:ref:`configuration reference <config_network_filters_redis_proxy>`.
+过滤器配置细节，请查看 Redis 代理过滤器 :ref:`配置参考 <config_network_filters_redis_proxy>`。
 
-The corresponding cluster definition should be configured with
-:ref:`ring hash load balancing <envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
+一致的集群定义应该配置 :ref:`环哈希负载均衡 <envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`。
 
-If :ref:`active health checking <arch_overview_health_checking>` is desired, the
-cluster should be configured with a :ref:`custom health check
-<envoy_v3_api_field_config.core.v3.HealthCheck.custom_health_check>` which configured as a
-:ref:`Redis health checker <config_health_checkers_redis>`.
+如果使用:ref:`主动健康检查 <arch_overview_health_checking>`，集群需要配置 :ref:` 自定义健康检查 <envoy_v3_api_field_config.core.v3。HealthCheck.custom_health_check>` 其配置为 :ref:`Redis 健康检查 <config_health_checkers_redis>`。
 
-If passive healthchecking is desired, also configure
-:ref:`outlier detection <arch_overview_outlier_detection>`.
+如果使用被动健康检查，需要配置 :ref: `异常检测 <arch_overview_outlier_detection>`。
 
-For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
-close map to 5xx. All other responses from Redis are counted as a success.
+为了进行被动健康检查，需要将连接超时、命令超时和连接关闭都映射到 5xx 响应，而来自 Redis 的所有其他响应都视为成功。
+
 
 .. _arch_overview_redis_cluster_support:
 
-Redis Cluster Support (Experimental)
+Redis 集群支持（实验性）
 ----------------------------------------
 
-Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+Envoy 目前为 `Redis 集群 <https://redis.io/topics/cluster-spec>`_ 提供实验性支持。
 
-When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
-implemented in any language to connect to the proxy as if it's a single node Redis instance.
-The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
-cluster according to the `spec <https://redis.io/topics/cluster-spec>`_. Advance features such as reading
-from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.
+服务可以使用以任意语言实现的非集群 Redis 客户端连接到代理，就像它是一个单节点 Redis 实例一样。Envoy 代理将跟踪集群拓扑，并根据 `规范 <https://redis.io/topics/cluster-spec>`_ 向集群中正确的 Redis 节点发送命令。还可以将高级功能（例如从副本中读取）添加到 Envoy 代理中，而不用更新每种语言的 Redis 客户端。
 
-Envoy proxy tracks the topology of the cluster by sending periodic
-`cluster slots <https://redis.io/commands/cluster-slots>`_ commands to a random node in the cluster, and maintains the
-following information:
+Envoy 通过定期向集群中的随机节点发送 cluster slot `cluster slots <https://redis.io/commands/cluster-slots>`_ 命令来跟踪群集的拓扑，并维护以下信息：
 
-* List of known nodes.
-* The primaries for each shard.
-* Nodes entering or leaving the cluster.
+* 已知节点列表
+* 每个分片的主节点
+* 集群节点的增加或减少
 
-For topology configuration details, see the Redis Cluster
-:ref:`v2 API reference <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.
+更多拓扑配置细节，请查看 Redis 集群 :ref:`v2 API 参考 <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.
 
-Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.redis_cluster.* with the following statistics:
+每个 Redis 集群都有它自己的额外信息统计树，根路径为 *cluster.<name>.redis_cluster.* 包含以下统计:
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  max_upstream_unknown_connections_reached, Counter, Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool's max_upstream_unknown_connections limit
-  upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
-  upstream_commands.upstream_rq_time, Histogram, Histogram of upstream request times for all types of requests
+  max_upstream_unknown_connections_reached, Counter, 重定向达到连接池 max_upstream_unknown_connections 限制后，上游到未知主机连接未创建的总数
+  upstream_cx_drained, Counter, 连接关闭前已退出的活跃请求的上游连接总数
+  upstream_commands.upstream_rq_time, Histogram, 所有类型请求的上游请求时间直方图
 
 .. _arch_overview_redis_cluster_command_stats:
 
-Per-cluster command statistics can be enabled via the setting :ref:`enable_command_stats <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_command_stats>`.:
+每个集群的命令统计可以通过设置 :ref:`enable_command_stats <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_command_stats>` 开启:
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  upstream_commands.[command].success, Counter, Total number of successful requests for a specific Redis command
-  upstream_commands.[command].failure, Counter, Total number of failed or cancelled requests for a specific Redis command
-  upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and failure)
-  upstream_commands.[command].latency, Histogram, Latency of requests for a specific Redis command
+  upstream_commands.[command].success, Counter, 特定 Redis 命令的请求成功总数
+  upstream_commands.[command].failure, Counter, 特定 Redis 命令的请求失败或撤销总数
+  upstream_commands.[command].total, Counter, 特定 Redis 命令的请求总数（成功和失败数总和）
+  upstream_commands.[command].latency, Histogram, 特定 Redis 命令的延迟
 
-Supported commands
+支持的命令
 ------------------
 
-At the protocol level, pipelines are supported. MULTI (transaction block) is not.
-Use pipelining wherever possible for the best performance.
+在协议级别支持管道。MULTI （事务块）不支持。尽可能使用管道以获得最佳性能。
 
-At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH and PING
-are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
-and no other commands will be processed until authentication is successful when a password has been
-configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream
-authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
-Arguments to PING are not allowed. All other supported commands must contain a key. Supported commands are
-functionally identical to the original Redis command except possibly in failure scenarios.
+在命令级别，Envoy 仅支持可以被可靠地哈希到一台服务器的命令。只有 AUTH 和 PING 命令例外。如果下游配置了密码，Envoy 将在本地处理 AUTH，并且在配置了密码之后，在身份认证成功之前，Envoy 不会处理任何其他命令。如果上游为整个集群配置了密码，Envoy 将在连接到上游服务器后透明地发送 AUTH 命令。Envoy 会立即为 PING 命令返回 PONG。PING 命令不接受参数。所有其他支持的参数必须包含一个 key。除了执行失败的情况外，所有支持的命令功能与原始 Redis 命令完全一致。
 
-For details on each command's usage see the official
-`Redis command reference <https://redis.io/commands>`_.
+每个命令的使用详情请参考官方文档 `Redis 命令参考 <https://redis.io/commands>`_。
 
 .. csv-table::
   :header: Command, Group
@@ -232,43 +204,31 @@ For details on each command's usage see the official
   SETRANGE, String
   STRLEN, String
 
-Failure modes
+失败模式
 -------------
 
-If Redis throws an error, we pass that error along as the response to the command. Envoy treats a
-response from Redis with the error datatype as a normal response and passes it through to the
-caller.
+如果 Redis 抛出错误，我们会将这个错误作为响应传递给命令。Envoy 将 Redis 返回的响应与错误数据类型视为正常响应，并将它传递给调用者。
 
-Envoy can also generate its own errors in response to the client.
+Envoy 也可以在响应中生成它自己的错误返回给客户端。
 
 .. csv-table::
-  :header: Error, Meaning
+  :header: 错误, 含义
   :widths: 1, 1
 
-  no upstream host, "The ring hash load balancer did not have a healthy host available at the
-  ring position chosen for the key."
-  upstream failure, "The backend did not respond within the timeout period or closed
-  the connection."
-  invalid request, "Command was rejected by the first stage of the command splitter due to
-  datatype or length."
-  unsupported command, "The command was not recognized by Envoy and therefore cannot be serviced
-  because it cannot be hashed to a backend server."
-  finished with n errors, "Fragmented commands which sum the response (e.g. DEL) will return the
-  total number of errors received if any were received."
-  upstream protocol error, "A fragmented command received an unexpected datatype or a backend
-  responded with a response that not conform to the Redis protocol."
-  wrong number of arguments for command, "Certain commands check in Envoy that the number of
-  arguments is correct."
-  "NOAUTH Authentication required.", "The command was rejected because a downstream authentication
-  password has been set and the client has not successfully authenticated."
-  ERR invalid password, "The authentication command failed due to an invalid password."
-  "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no
-  downstream authentication password has been configured."
+  no upstream host, "没有上游主机，环状哈希负载均衡器在为键选择环形位置上没有可用的健康主机"
+  upstream failure, "上游失败，后端未在超时期限内响应或关闭连接"
+  invalid request, "无效请求，因为数据类型或长度的原因，命令在命令拆分器的第一阶段被拒绝"
+  unsupported command, "不支持的命令，该命令 Envoy 不能识别，所以不能被哈希到一个后端主机，无法响应"
+  finished with n errors, "返回多个错误，分段的命令将会组合多个响应(例如 DEL 命令)，如果收到任何错误，将返回接收到的错误总数"
+  upstream protocol error, "上游协议错误，分段命令收到一个意外的数据类型或后端响应的数据不符合 Redis 协议"
+  wrong number of arguments for command, "命令参数数量错误，Envoy 中的命令参数数量检查未通过"
+  NOAUTH Authentication required., "NOAUTH 需要认证，因下游设置了认证密码且客户端没有认证成功，导致命令被拒绝"
+  ERR invalid password, "ERR 密码无效，因密码无效导致命令认证失败"
+  "ERR Client sent AUTH, but no password is set", "ERR 客户端发送了 AUTH，但未设置密码，收到认证命令，但没有配置下游认证密码"
 
 
-In the case of MGET, each individual key that cannot be fetched will generate an error response.
-For example, if we fetch five keys and two of the keys' backends time out, we would get an error
-response for each in place of the value.
+使用 MGET 时，每个无法获取的 key 将会生成一个错误响应。例如：如果我们获取 5 个 key 的值，其中 2 个出现后端超时，我们将会获得每个值的错误响应信息。
+
 
 .. code-block:: none
 
