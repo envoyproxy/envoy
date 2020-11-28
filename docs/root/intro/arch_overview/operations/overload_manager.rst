@@ -1,55 +1,39 @@
 .. _arch_overview_overload_manager:
 
-Overload manager
+过载管理
 ================
 
-The overload manager is an extensible component for protecting the Envoy server from overload
-with respect to various system resources (such as memory, cpu or file descriptors) due to too
-many client connections or requests. This is distinct from
-:ref:`circuit breaking <arch_overview_circuit_break>` which is primarily aimed at protecting
-upstream services.
+过载管理是一个用于保护 Envoy 服务器避免因太多的客户端连接或请求而导致各种资源(例如内存、CPU 或文件描述符)负载太重的可扩展组件。注意它与 :ref:`熔断器 <arch_overview_circuit_break>` 不同，后者的主要目的是用于保护上游服务。
 
-The overload manager is :ref:`configured <config_overload_manager>` by specifying a set of
-resources to monitor and a set of overload actions that will be taken when some of those
-resources exceed certain pressure thresholds.
+过载管理是可以 :ref:`配置 <config_overload_manager>` 的，可以配置一组资源来监视，并定义当资源的压力超过阈值时该如何操作。
 
-Architecture
+架构
 ------------
 
-The overload manager works by periodically polling the *pressure* of a set of **resources**,
-feeding those through **triggers**, and taking **actions** based on the triggers. The set of
-resource monitors, triggers, and actions are specified at startup.
+过载管理的工作机制是：周期性地检测**资源**的*压力*并把值传递给**触发器**，由触发器来执行**操作**。资源监视器、触发器和动作都是在启动时就配置好的。
 
-Resources
+资源
 ~~~~~~~~~
 
-A resource is a thing that can be monitored by the overload manager, and whose *pressure* is
-represented by a real value in the range [0, 1]. The pressure of a resource is evaluated by a
-*resource monitor*. See the :ref:`configuration page <config_overload_manager>` for setting up
-resource monitors.
+资源可以被过载管理监视，它们的*压力*表示为 [0,1] 这个区间的值。资源的压力是由*资源监视器*评估计算的。从 :ref:`配置 <config_overload_manager>` 页面可以查看资源监视器的配置。
 
-Triggers
+触发器
 ~~~~~~~~
 
-Triggers are evaluated on each resource pressure update, and convert a resource pressure value
-into an action state. An action state has a value in the range [0, 1], and is categorized into one of two groups:
+触发器负责在每一次资源压力更新时进行评测，并把压力转换为一个操作状态。操作状态有一个处于 [0,1] 之间的值，并分为以下两组:
 
 .. _arch_overview_overload_manager-triggers-state:
 
 .. csv-table::
-  :header: action state, value, description
+  :header: 操作状态, 值, 描述
   :widths: 1, 1, 2
 
-  scaling,   "[0, 1)", the resource pressure is below the configured saturation point; action may be taken
-  saturated, 1, the resource pressure is at or above the configured saturation point; drastic action should be taken
+  scaling,   "[0, 1)", 资源的压力低于配置项中的阈值，操作可能会被执行
+  saturated, 1, 资源的压力等于或高于配置项中的阈值，操作一定会被执行
 
-When a resource pressure value is updated, the relevant triggers are reevaluated. For each action
-with at least one trigger, the resulting action state is the maximum value over the configured
-triggers. What effect the action state has depends on the action's configuration and implementation.
+只要资源压力值更新后，相关的触发器就会再次进行评估。每个操作至少关联着一个触发器，操作状态的值的计算结果是超过阈值的那个最大值。操作状态产生的效果取决于操作的配置和具体实现。
 
-Actions
+操作
 ~~~~~~~
 
-When a trigger changes state, the value is sent to registered actions, which can then affect how
-connections and requests are processed. Each action interprets the input states differently, and
-some may ignore the *scaling* state altogether, taking effect only when *saturated*.
+当一个触发器改变了状态，值就会被发送给注册好的操作，这会影响连接和请求的处理方式。每个操作对输入状态有不同的解析方式，有些可能会完全忽略 *scaling* 状态，只有 *saturated* 的才处理。
