@@ -33,7 +33,7 @@ namespace Common {
 namespace Statsd {
 namespace {
 
-class TcpStatsdSinkTest : public testing::Test {
+class TcpStatsdSinkTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   TcpStatsdSinkTest() {
     sink_ = std::make_unique<TcpStatsdSink>(
@@ -46,7 +46,7 @@ public:
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = connection_;
     conn_info.host_description_ = Upstream::makeTestHost(
-        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80");
+        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80", simTime());
 
     EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
         .WillOnce(Return(conn_info));
