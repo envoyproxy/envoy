@@ -101,10 +101,12 @@ TEST(VarUInt32Deserializer, ShouldDeserializeEdgeValues) {
     Buffer::OwnedImpl buffer;
 
     // when
+    const uint32_t expected_size = encoder.computeCompactSize(values[i]);
     const uint32_t written = encoder.encodeCompact(values[i], buffer);
 
     // then
     ASSERT_EQ(written, i + 1);
+    ASSERT_EQ(written, expected_size);
     absl::string_view data = {getRawData(buffer), 1024};
     // All bits in lower bytes need to be set.
     for (auto j = 0; j + 1 < i; ++j) {
@@ -430,6 +432,17 @@ TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
 
 TEST(NullableCompactArrayDeserializer, ShouldConsumeNullArray) {
   const NullableArray<int32_t> value = absl::nullopt;
+  serializeCompactThenDeserializeAndCheckEquality<
+      NullableCompactArrayDeserializer<Int32Deserializer>>(value);
+}
+
+TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfDataForLargeInput) {
+  std::vector<int32_t> raw;
+  raw.reserve(4096);
+  for (int32_t i = 0; i < 4096; ++i) {
+    raw.push_back(i);
+  }
+  const NullableArray<int32_t> value{raw};
   serializeCompactThenDeserializeAndCheckEquality<
       NullableCompactArrayDeserializer<Int32Deserializer>>(value);
 }
