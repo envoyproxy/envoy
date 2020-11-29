@@ -6,7 +6,7 @@
 * :ref:`网络过滤器配置 <config_network_filters_rbac>`。
 * :ref:`HTTP 过滤器配置 <config_http_filters_rbac>`。
 
-基于角色的权限访问控制（RBAC）过滤器会检查传入请求是否是经过授权的。区别与外部授权的是，RBAC 过滤器的检查是发生在 Envoy 流程中的，是基于一系列来自于过滤器配置的策略。
+基于角色的权限访问控制（RBAC）过滤器会检查传入请求是否是经过授权的。区别于外部授权的是，RBAC 过滤器的检查是发生在 Envoy 流程中的，是基于一系列来自于过滤器配置的策略。
 
 RBAC 过滤器可以被配置成 :ref:`网络过滤器 <config_network_filters_rbac>`，或者 :ref:`HTTP 过滤器 <config_http_filters_rbac>` 或者同时配置成两者。如果请求被网络过滤器视为是未授权的，则连接将被关闭。如果请求被 HTTP 过滤器视为是未经授权的，则请求会被拒绝并返回 403（禁止）响应。
 
