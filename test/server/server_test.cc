@@ -287,7 +287,7 @@ public:
   CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counterFromString("stats.flushed")) {}
 
   // Stats::Sink
-  void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); }
+  void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); };
 
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
@@ -521,10 +521,8 @@ protected:
 
   void flushStats() {
     if (manual_flush_) {
-      // drive the flush through the admin interface
-      Http::TestResponseHeaderMapImpl response_headers;
-      std::string body;
-      EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
+      server_->flushStats();
+      server_->dispatcher().run(Event::Dispatcher::RunType::Block);
     } else {
       // Default flush interval is 5 seconds.
       simTime().advanceTimeAndRun(std::chrono::seconds(6), server_->dispatcher(),
@@ -550,9 +548,6 @@ INSTANTIATE_TEST_SUITE_P(
     ipFlushingModeTestParamsToString);
 
 TEST_P(ServerStatsTest, FlushStats) {
-  if (manual_flush_) {
-    options_.config_proto_.set_stats_flush_on_admin(true);
-  }
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
 
   Stats::Gauge& recent_lookups = stats_store_.gaugeFromString(
@@ -574,6 +569,33 @@ TEST_P(ServerStatsTest, FlushStats) {
   Stats::StatNameDynamicStorage dynamic_stat("c.d", stats_store_.symbolTable());
   flushStats();
   EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
+}
+
+TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  options_.bootstrap_version_ = 3;
+  options_.config_proto_.set_stats_flush_on_admin(true);
+
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
+  EXPECT_EQ(true, server_->statsFlushOnAdmin());
+  EXPECT_EQ(std::chrono::seconds(1), server_->statsFlushInterval());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(2));
+  EXPECT_EQ(0L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+
+  // flush via admin
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
+  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(2));
+  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
 }
 
 // Default validation mode

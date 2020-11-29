@@ -86,6 +86,7 @@ TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
+  EXPECT_EQ(false, config.statsFlushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
@@ -160,9 +161,14 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
   EXPECT_THROW(TestUtility::validate(bootstrap), Envoy::ProtoValidationException);
 }
 
-TEST_F(ConfigurationImplTest, NoStatsFlush) {
+// this should throw an exception in the v4 api as both fields
+// will be apart of a oneof, `stats_flush`.
+TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
   std::string json = R"EOF(
   {
+    "stats_flush_on_admin": true,
+    "stats_flush_interval": "0.500s",
+
     "admin": {
       "access_log_path": "/dev/null",
       "address": {
@@ -176,12 +182,10 @@ TEST_F(ConfigurationImplTest, NoStatsFlush) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
-  EXPECT_EQ(false, config.statsFlushOnAdmin());
+  EXPECT_EQ(true, config.statsFlushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {

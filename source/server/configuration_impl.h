@@ -121,7 +121,7 @@ private:
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::list<Stats::SinkPtr> stats_sinks_;
   std::chrono::milliseconds stats_flush_interval_;
-  bool stats_flush_on_admin_;
+  bool stats_flush_on_admin_{false};
   std::unique_ptr<Watchdog> main_thread_watchdog_;
   std::unique_ptr<Watchdog> worker_watchdog_;
 };
