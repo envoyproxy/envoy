@@ -1055,6 +1055,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
+using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream
 } // namespace Envoy

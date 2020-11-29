@@ -71,7 +71,7 @@ public:
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
     ON_CALL(thread_local_cluster_, prioritySet()).WillByDefault(ReturnRef(priority_set_));
-    EXPECT_CALL(factory_context_.cluster_manager_, get(_))
+    EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillRepeatedly(Return(&thread_local_cluster_));
   }
 
@@ -421,7 +421,8 @@ route_config:
 )EOF";
   initializeFilter(yaml);
 
-  EXPECT_CALL(factory_context_.cluster_manager_, get(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillRepeatedly(Return(nullptr));
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::GetRouteInfoByTopic);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
