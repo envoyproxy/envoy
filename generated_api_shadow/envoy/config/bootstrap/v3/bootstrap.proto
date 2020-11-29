@@ -177,8 +177,8 @@ message Bootstrap {
   ];
 
   oneof stats_flush {
-    // Flush stats to sinks only when queried for on the admin interface. Stats flushing
-    // defaults to the timer
+    // Flush stats to sinks only when queried for on the admin interface. If set,
+    // a flush timer is not created.
     bool stats_flush_on_admin = 29 [(validate.rules).bool = {const: true}];
   }
 
