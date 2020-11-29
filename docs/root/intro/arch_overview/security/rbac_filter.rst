@@ -15,8 +15,8 @@ RBAC 过滤器可以被配置成 :ref:`网络过滤器 <config_network_filters_r
 
 RBAC 过滤器会基于一系列的 :ref:`策略 <envoy_v3_api_field_config.rbac.v3.RBAC.policies>` 来检查请求。一个策略包含一系列的 :ref:`权限 <envoy_v3_api_msg_config.rbac.v3.Permission>` 和 :ref:`主体 <envoy_v3_api_msg_config.rbac.v3.Principal>`。权限说明了请求所做的动作，比如，HTTP 请求的方法和路径。主体则说明了下游客户端是如何识别请求的，比如，下游客户端证书的 URI SAN。如果策略的权限和主体同时被匹配，则说明这个策略被完全匹配。
 
-影子策略
---------
+影子（Shadow）策略
+------------------
 
 过滤器可以配置一个 :ref:`影子策略 <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules>`，此策略除了会发出统计信息并记录结果外，没有任何其他作用。这种方式对于将规则应用在生产之前进行测试时是非常有用的。
 
@@ -97,4 +97,4 @@ RBAC 过滤器会基于一系列的 :ref:`策略 <envoy_v3_api_field_config.rbac
    upstream.transport_failure_reason, string, 上游传输失败原因，比如，证书验证失败
 
 
-大部分属性都是可选项且提供基于属性类型的默认值。CEL 支持属性的存在检查，使用的是 `has()` 语法，比如 `has(request.referer)`。
+大部分属性都是可选项且提供基于属性类型的默认值。CEL 支持使用 `has()` 语法检查属性的存在，比如 `has(request.referer)`。
