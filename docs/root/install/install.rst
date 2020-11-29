@@ -1,7 +1,7 @@
 .. _install:
 
-Building and installation
-=========================
+构建和安装
+==========
 
 .. toctree::
   :maxdepth: 2
