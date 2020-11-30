@@ -70,14 +70,15 @@ def getGitInfo(CI_TARGET):
   os.system('sh -c "git remote -v > ${TMP_OUTPUT_PROCESS_XML}"')
   os.system('sh -c "git describe --all >> ${TMP_OUTPUT_PROCESS_XML}"')
   os.system('sh -c "git show >> ${TMP_OUTPUT_PROCESS_XML}"')
-  f = open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+', encoding='utf-8')
   # Fetching the URL from predefined env variable
   envoy_link = os.environ["REPO_URI"]
-  for line in [next(f) for x in range(6)]:
-    if line.split('/')[0] == 'remotes':
-      for token in line.split('/')[1:-1]:
-        envoy_link += '/' + token
-    ret += line
+
+  with open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+', encoding='utf-8') as f:
+    for line in [next(f) for x in range(6)]:
+      if line.split('/')[0] == 'remotes':
+        for token in line.split('/')[1:-1]:
+          envoy_link += '/' + token
+      ret += line
 
   ret += "link for additional content: " + envoy_link + " \n"
   ret += "azure build URI: " + os.environ["BUILD_URI"] + " \n"
@@ -106,17 +107,12 @@ if __name__ == "__main__":
   os.system(
       'sh -c "/usr/bin/find {} -name attempt_*.xml > ${{TMP_OUTPUT_PROCESS_XML}}"'.format(find_dir))
 
-  f = open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+')
-  if f.closed:
-    print("cannot open {}".format(os.environ['TMP_OUTPUT_PROCESS_XML']))
-    sys.exit(1)
-
   # All output of find command should be either failed or flaky tests, as only then will
   # a test be rerun and have an 'attempt_n.xml' file. problematic_tests holds a lookup
   # table between the last_attempt xml filepath and the failed previous attempt filepath.
   problematic_tests = {}
-  processFindOutput(f, problematic_tests)
-  f.close()
+  with open(os.environ['TMP_OUTPUT_PROCESS_XML'], 'r+') as f:
+    processFindOutput(f, problematic_tests)
 
   # Needed to make sure no duplicate flaky tests are going to be reported.
   visited = set()
