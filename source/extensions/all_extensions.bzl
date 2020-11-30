@@ -53,4 +53,4 @@ _thrift_filter_prefix = "envoy.filters.thrift"
 def envoy_all_network_filters():
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
-    return [v for k, v in all_extensions.items() if k.startswith(_network_filter_prefix) or k.startswith(_thrift_filter_prefix)]
+    return [v for k, v in all_extensions.items() if (k.startswith(_network_filter_prefix) or k.startswith(_thrift_filter_prefix)) and k not in GLOBAL_DENYLIST]
