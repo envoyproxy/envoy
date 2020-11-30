@@ -181,6 +181,8 @@ bool ConnectionManager::passthroughEnabled() const {
     return false;
   }
 
+  // This is called right after the metadata has been parsed, and the ActiveRpc being processed must
+  // be in the rpcs_ list.
   ASSERT(!rpcs_.empty());
   return (*rpcs_.begin())->passthroughSupported();
 }
