@@ -65,6 +65,6 @@ message ZipkinConfig {
   CollectorEndpointVersion collector_endpoint_version = 5;
 
   // Optional hostname to use when sending spans to the collector_cluster. Useful for collectors
-  // that require a specific hostname. Defaults to `collector_cluster` above.
+  // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
   string collector_hostname = 6;
 }
