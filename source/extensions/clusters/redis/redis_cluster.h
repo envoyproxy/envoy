@@ -114,10 +114,13 @@ public:
       values[1].asString() = "SLOTS";
       asArray().swap(values);
     }
+
     static ClusterSlotsRequest instance_;
   };
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  TimeSource& timeSource() const { return time_source_; }
 
 private:
   friend class RedisClusterTest;
@@ -145,7 +148,8 @@ private:
   class RedisHost : public Upstream::HostImpl {
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary)
+              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
+              TimeSource& time_source)
         : Upstream::HostImpl(
               cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -153,7 +157,8 @@ private:
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),
               parent.lbEndpoint().endpoint().health_check_config(),
-              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status(),
+              time_source),
           primary_(primary) {}
 
     bool isPrimary() const { return primary_; }
