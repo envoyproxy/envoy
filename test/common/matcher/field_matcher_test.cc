@@ -40,7 +40,7 @@ public:
   std::vector<FieldMatcherPtr<TestData>> createMatchers(std::vector<bool> values) {
     std::vector<std::pair<bool, DataInputGetResult::DataAvailability>> new_values;
 
-    new_values.reserve(values);
+    new_values.reserve(values.size());
     for (const auto v : values) {
       new_values.emplace_back(v, DataInputGetResult::DataAvailability::AllDataAvailable);
     }
