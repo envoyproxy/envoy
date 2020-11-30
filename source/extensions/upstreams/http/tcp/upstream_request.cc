@@ -47,8 +47,7 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
 Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&,
                                                bool end_stream) {
   if (!upstream_request_) {
-    // TODO(snowp): Should this return something else in this case?
-    return Envoy::Http::okStatus();
+    return Envoy::Http::streamAlreadyReset();
   }
 
   // Headers should only happen once, so use this opportunity to add the proxy
