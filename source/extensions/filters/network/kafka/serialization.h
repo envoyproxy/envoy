@@ -96,8 +96,7 @@ protected:
 class Int8Deserializer : public IntDeserializer<int8_t> {
 public:
   int8_t get() const override {
-    int8_t result;
-    memcpy(&result, buf_, sizeof(int8_t)); // NOLINT(safe-memcpy)
+    int8_t result = buf_[0];
     return result;
   }
 };

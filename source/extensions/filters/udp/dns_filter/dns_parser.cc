@@ -744,8 +744,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
   buffer.writeBEInt<uint16_t>(query_context->response_header_.id);
 
   uint16_t flags;
-  ::memcpy(&flags, // NOLINT(safe-memcpy)
-           static_cast<void*>(&query_context->response_header_.flags), sizeof(uint16_t));
+  safeMemcpy(&flags, &(query_context->response_header_.flags));
   buffer.writeBEInt<uint16_t>(flags);
 
   buffer.writeBEInt<uint16_t>(query_context->response_header_.questions);

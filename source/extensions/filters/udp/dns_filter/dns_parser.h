@@ -9,6 +9,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
+#include "common/common/safe_memcpy.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 

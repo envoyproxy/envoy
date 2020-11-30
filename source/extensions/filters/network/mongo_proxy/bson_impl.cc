@@ -24,7 +24,7 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
 
   int32_t val;
   void* mem = data.linearize(sizeof(int32_t));
-  std::memcpy(reinterpret_cast<void*>(&val), mem, sizeof(int32_t)); // NOLINT(safe-memcpy)
+  safeMemcpy(&val, reinterpret_cast<const uint32_t*>(mem));
   return le32toh(val);
 }
 

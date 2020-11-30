@@ -20,6 +20,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
+#include "common/common/safe_memcpy.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -194,7 +195,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   auto buffer = std::unique_ptr<char[]>(new char[s]);
   char* b = buffer.get();
   uint32_t n = response.size();
-  memcpy(b, &n, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  safeMemcpy(reinterpret_cast<uint8_t(*)[4]>(b), &n);
   b += sizeof(uint32_t);
   for (auto& e : response) {
     uint32_t ttl = e.ttl_.count();

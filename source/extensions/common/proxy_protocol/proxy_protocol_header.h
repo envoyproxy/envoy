@@ -5,6 +5,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
+#include "common/common/safe_memcpy.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

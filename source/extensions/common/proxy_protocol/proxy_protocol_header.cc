@@ -71,8 +71,10 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
         Network::Address::Ipv4Instance(src_addr, src_port).ip()->ipv4()->address();
     const auto net_dst_addr =
         Network::Address::Ipv4Instance(dst_addr, dst_port).ip()->ipv4()->address();
-    memcpy(addrs, &net_src_addr, 4);     // NOLINT(safe-memcpy)
-    memcpy(&addrs[4], &net_dst_addr, 4); // NOLINT(safe-memcpy)
+    safeMemcpy(reinterpret_cast<uint8_t(*)[4]>(addrs),
+               reinterpret_cast<const uint32_t*>(&net_src_addr));
+    safeMemcpy(reinterpret_cast<uint8_t(*)[4]>(&addrs[4]),
+               reinterpret_cast<const uint32_t*>(&net_dst_addr));
     out.add(addrs, 8);
     break;
   }
@@ -94,8 +96,10 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
   uint8_t ports[4];
   const auto net_src_port = htons(static_cast<uint16_t>(src_port));
   const auto net_dst_port = htons(static_cast<uint16_t>(dst_port));
-  memcpy(ports, &net_src_port, 2);     // NOLINT(safe-memcpy)
-  memcpy(&ports[2], &net_dst_port, 2); // NOLINT(safe-memcpy)
+  safeMemcpy(reinterpret_cast<uint8_t(*)[2]>(ports),
+             reinterpret_cast<const uint16_t*>(&net_src_port));
+  safeMemcpy(reinterpret_cast<uint8_t(*)[2]>(&ports[2]),
+             reinterpret_cast<const uint16_t*>(&net_dst_port));
   out.add(ports, 4);
 }
 
