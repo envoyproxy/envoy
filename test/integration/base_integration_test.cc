@@ -289,7 +289,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, use_real_stats_, v2_bootstrap_);
+      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
+      v2_bootstrap_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 

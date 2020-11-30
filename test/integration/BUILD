@@ -322,6 +322,7 @@ envoy_cc_test(
     deps = [
         ":autonomous_upstream_lib",
         ":http_integration_lib",
+        ":tracked_watermark_buffer_lib",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:backpressure_filter_config_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
@@ -1255,6 +1256,19 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tracked_watermark_buffer_lib",
+    srcs = [
+        "tracked_watermark_buffer.cc",
+    ],
+    hdrs = [
+        "tracked_watermark_buffer.h",
+    ],
+    deps = [
+        "//source/common/buffer:watermark_buffer_lib",
     ],
 )
 

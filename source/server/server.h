@@ -217,7 +217,8 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context);
+               std::unique_ptr<ProcessContext> process_context,
+               Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   ~InstanceImpl() override;
 
