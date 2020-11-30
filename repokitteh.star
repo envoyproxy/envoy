@@ -49,3 +49,4 @@ def _cr(event):
   print(event)
   
 handlers.check_run(func=_cr)
+handlers.check_suite(func=_cr)
