@@ -37,7 +37,6 @@ namespace ExtAuthz {
   COUNTER(ok)                                                                                      \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
-  COUNTER(timeout)                                                                                 \
   COUNTER(disabled)                                                                                \
   COUNTER(failure_mode_allowed)
 
@@ -83,7 +82,6 @@ public:
         ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
         ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
-        ext_authz_timeout_(pool_.add(createPoolStatName(config.stat_prefix(), "timeout"))),
         ext_authz_failure_mode_allowed_(
             pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {}
 
@@ -183,7 +181,6 @@ public:
   const Stats::StatName ext_authz_ok_;
   const Stats::StatName ext_authz_denied_;
   const Stats::StatName ext_authz_error_;
-  const Stats::StatName ext_authz_timeout_;
   const Stats::StatName ext_authz_failure_mode_allowed_;
 };
 

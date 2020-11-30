@@ -18,7 +18,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api),
+                                added_via_api, factory_context.dispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random), tls_(tls),
       clusters_(config.clusters().begin(), config.clusters().end()) {}
 

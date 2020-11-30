@@ -1,5 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("@thrift_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -23,6 +24,7 @@ py_binary(
         "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
         "@com_github_twitter_common_rpc//:twitter_common_rpc",
+        requirement("six"),
     ],
 )
 
@@ -35,5 +37,6 @@ py_binary(
         "//test/extensions/filters/network/thrift_proxy/driver/finagle:finagle_lib",
         "//test/extensions/filters/network/thrift_proxy/driver/generated/example:example_lib",
         "@com_github_twitter_common_rpc//:twitter_common_rpc",
+        requirement("six"),
     ],
 )
