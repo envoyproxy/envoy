@@ -30,22 +30,67 @@ namespace Buffer {
  *                   |
  *                   data()
  */
-class Slice : public SliceData {
+class Slice {
 public:
   using Reservation = RawSlice;
 
-  ~Slice() override { callAndClearDrainTrackers(); }
+  Slice() : storage_(nullptr), base_(nullptr), data_(0), reservable_(0), capacity_(0) {}
 
-  // SliceData
-  absl::Span<uint8_t> getMutableData() override {
-    RELEASE_ASSERT(isMutable(), "Not allowed to call getMutableData if slice is immutable");
-    return {base_ + data_, static_cast<absl::Span<uint8_t>::size_type>(reservable_ - data_)};
+  Slice(uint64_t size)
+      : storage_(new uint8_t[size]), base_(storage_.get()), data_(0), reservable_(0),
+        capacity_(size) {}
+
+  Slice(BufferFragment& fragment)
+      : storage_(nullptr), base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
+        data_(0), reservable_(fragment.size()), capacity_(fragment.size()) {
+    addDrainTracker([&fragment]() { fragment.done(); });
   }
+
+  Slice(Slice&& rhs) noexcept {
+    storage_ = std::move(rhs.storage_);
+    drain_trackers_ = std::move(rhs.drain_trackers_);
+    base_ = rhs.base_;
+    data_ = rhs.data_;
+    reservable_ = rhs.reservable_;
+    capacity_ = rhs.capacity_;
+
+    rhs.base_ = nullptr;
+    rhs.data_ = 0;
+    rhs.reservable_ = 0;
+    rhs.capacity_ = 0;
+  }
+
+  Slice& operator=(Slice&& rhs) noexcept {
+    if (this != &rhs) {
+      callAndClearDrainTrackers();
+
+      storage_ = std::move(rhs.storage_);
+      drain_trackers_ = std::move(rhs.drain_trackers_);
+      base_ = rhs.base_;
+      data_ = rhs.data_;
+      reservable_ = rhs.reservable_;
+      capacity_ = rhs.capacity_;
+
+      rhs.base_ = nullptr;
+      rhs.data_ = 0;
+      rhs.reservable_ = 0;
+      rhs.capacity_ = 0;
+    }
+
+    return *this;
+  }
+
+  ~Slice() { callAndClearDrainTrackers(); }
 
   /**
    * @return true if the data in the slice is mutable
    */
-  virtual bool isMutable() const { return false; }
+  bool isMutable() const { return storage_ != nullptr; }
+
+  /**
+   * @return true if content in this Slice can be coalesced into another Slice.
+   */
+  bool canCoalesce() const { return storage_ != nullptr; }
 
   /**
    * @return a pointer to the start of the usable content.
@@ -132,7 +177,7 @@ public:
   bool commit(const Reservation& reservation) {
     if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
         reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
-      // The reservation is not from this OwnedSlice.
+      // The reservation is not from this Slice.
       return false;
     }
     reservable_ += reservation.len_;
@@ -188,11 +233,6 @@ public:
   }
 
   /**
-   * @return true if content in this Slice can be coalesced into another Slice.
-   */
-  virtual bool canCoalesce() const { return true; }
-
-  /**
    * Describe the in-memory representation of the slice. For use
    * in tests that want to make assertions about the specific arrangement of
    * bytes in a slice.
@@ -233,10 +273,11 @@ public:
   }
 
 protected:
-  Slice(uint64_t data, uint64_t reservable, uint64_t capacity)
-      : data_(data), reservable_(reservable), capacity_(capacity) {}
+  /** Backing storage for mutable slices which own their own storage. This storage should never be
+   * accessed directly; access base_ instead. */
+  std::unique_ptr<uint8_t[]> storage_;
 
-  /** Start of the slice - subclasses must set this */
+  /** Start of the slice. Points to storage_ iff the slice owns its own storage. */
   uint8_t* base_{nullptr};
 
   /** Offset in bytes from the start of the slice to the start of the Data section */
@@ -248,43 +289,37 @@ protected:
   /** Total number of bytes in the slice */
   uint64_t capacity_;
 
+  /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
 };
 
-using SlicePtr = std::unique_ptr<Slice>;
+class SliceDataImpl : public SliceData {
+public:
+  explicit SliceDataImpl(Slice&& slice) : slice_(std::move(slice)) {}
 
-class OwnedSlice final : public Slice {
+  // SliceData
+  absl::Span<uint8_t> getMutableData() override {
+    RELEASE_ASSERT(slice_.isMutable(), "Not allowed to call getMutableData if slice is immutable");
+    return {slice_.data(), slice_.dataSize()};
+  }
+
+private:
+  Slice slice_;
+};
+
+class OwnedSlice {
 public:
   /**
    * Create an empty OwnedSlice.
    * @param capacity number of bytes of space the slice should have.
    * @return an OwnedSlice with at least the specified capacity.
    */
-  static SlicePtr create(uint64_t capacity) {
+  static Slice create(uint64_t capacity) {
     uint64_t slice_capacity = sliceSize(capacity);
-    return SlicePtr{new OwnedSlice(slice_capacity)};
-  }
-
-  /**
-   * Create an OwnedSlice and initialize it with a copy of the supplied copy.
-   * @param data the content to copy into the slice.
-   * @param size length of the content.
-   * @return an OwnedSlice containing a copy of the content, which may (dependent on
-   *         the internal implementation) have a nonzero amount of reservable space at the end.
-   */
-  static SlicePtr create(const void* data, uint64_t size) {
-    auto slice = create(size);
-    slice->append(data, size);
-    return slice;
+    return Slice(slice_capacity);
   }
 
 private:
-  OwnedSlice(uint64_t size) : Slice(0, 0, size), storage_(new uint8_t[size]) {
-    base_ = storage_.get();
-  }
-
-  bool isMutable() const override { return true; }
-
   /**
    * Compute a slice size big enough to hold a specified amount of data.
    * @param data_size the minimum amount of data the slice must be able to store, in bytes.
@@ -295,12 +330,10 @@ private:
     const uint64_t num_pages = (data_size + PageSize - 1) / PageSize;
     return num_pages * PageSize;
   }
-
-  std::unique_ptr<uint8_t[]> storage_;
 };
 
 /**
- * Queue of SlicePtr that supports efficient read and write access to both
+ * Queue of Slice that supports efficient read and write access to both
  * the front and the back of the queue.
  * @note This class has similar properties to std::deque<T>. The reason for using
  *       a custom deque implementation is that benchmark testing during development
@@ -332,14 +365,14 @@ public:
     return *this;
   }
 
-  void emplace_back(SlicePtr&& slice) {
+  void emplace_back(Slice&& slice) {
     growRing();
     size_t index = internalIndex(size_);
     ring_[index] = std::move(slice);
     size_++;
   }
 
-  void emplace_front(SlicePtr&& slice) {
+  void emplace_front(Slice&& slice) {
     growRing();
     start_ = (start_ == 0) ? capacity_ - 1 : start_ - 1;
     ring_[start_] = std::move(slice);
@@ -349,19 +382,25 @@ public:
   bool empty() const { return size() == 0; }
   size_t size() const { return size_; }
 
-  SlicePtr& front() { return ring_[start_]; }
-  const SlicePtr& front() const { return ring_[start_]; }
-  SlicePtr& back() { return ring_[internalIndex(size_ - 1)]; }
-  const SlicePtr& back() const { return ring_[internalIndex(size_ - 1)]; }
+  Slice& front() { return ring_[start_]; }
+  const Slice& front() const { return ring_[start_]; }
+  Slice& back() { return ring_[internalIndex(size_ - 1)]; }
+  const Slice& back() const { return ring_[internalIndex(size_ - 1)]; }
 
-  SlicePtr& operator[](size_t i) { return ring_[internalIndex(i)]; }
-  const SlicePtr& operator[](size_t i) const { return ring_[internalIndex(i)]; }
+  Slice& operator[](size_t i) {
+    ASSERT(size_ > 0);
+    return ring_[internalIndex(i)];
+  }
+  const Slice& operator[](size_t i) const {
+    ASSERT(size_ > 0);
+    return ring_[internalIndex(i)];
+  }
 
   void pop_front() {
     if (size() == 0) {
       return;
     }
-    front() = SlicePtr();
+    front() = Slice();
     size_--;
     start_++;
     if (start_ == capacity_) {
@@ -373,7 +412,7 @@ public:
     if (size() == 0) {
       return;
     }
-    back() = SlicePtr();
+    back() = Slice();
     size_--;
   }
 
@@ -384,7 +423,7 @@ public:
    */
   class ConstIterator {
   public:
-    const SlicePtr& operator*() { return deque_[index_]; }
+    const Slice& operator*() { return deque_[index_]; }
 
     ConstIterator operator++() {
       index_++;
@@ -424,10 +463,7 @@ private:
       return;
     }
     const size_t new_capacity = capacity_ * 2;
-    auto new_ring = std::make_unique<SlicePtr[]>(new_capacity);
-    for (size_t i = 0; i < new_capacity; i++) {
-      ASSERT(new_ring[i] == nullptr);
-    }
+    auto new_ring = std::make_unique<Slice[]>(new_capacity);
     size_t src = start_;
     size_t dst = 0;
     for (size_t i = 0; i < size_; i++) {
@@ -436,41 +472,18 @@ private:
         src = 0;
       }
     }
-    for (size_t i = 0; i < capacity_; i++) {
-      ASSERT(ring_[i].get() == nullptr);
-    }
     external_ring_.swap(new_ring);
     ring_ = external_ring_.get();
     start_ = 0;
     capacity_ = new_capacity;
   }
 
-  SlicePtr inline_ring_[InlineRingCapacity];
-  std::unique_ptr<SlicePtr[]> external_ring_;
-  SlicePtr* ring_; // points to start of either inline or external ring.
+  Slice inline_ring_[InlineRingCapacity];
+  std::unique_ptr<Slice[]> external_ring_;
+  Slice* ring_; // points to start of either inline or external ring.
   size_t start_{0};
   size_t size_{0};
   size_t capacity_;
-};
-
-class UnownedSlice : public Slice {
-public:
-  UnownedSlice(BufferFragment& fragment)
-      : Slice(0, fragment.size(), fragment.size()), fragment_(fragment) {
-    base_ = static_cast<uint8_t*>(const_cast<void*>(fragment.data()));
-  }
-
-  ~UnownedSlice() override { fragment_.done(); }
-
-  /**
-   * BufferFragment objects encapsulated by UnownedSlice are used to track when response content
-   * is written into transport connection. As a result these slices can not be coalesced when moved
-   * between buffers.
-   */
-  bool canCoalesce() const override { return false; }
-
-private:
-  BufferFragment& fragment_;
 };
 
 /**
@@ -595,7 +608,7 @@ public:
    * in tests that want to make assertions about the specific arrangement of
    * bytes in the buffer.
    */
-  std::vector<OwnedSlice::SliceRepresentation> describeSlicesForTest() const;
+  std::vector<Slice::SliceRepresentation> describeSlicesForTest() const;
 
 private:
   /**
@@ -613,7 +626,7 @@ private:
    * into an existing slice.
    * NOTE: the caller is responsible for draining the buffer that contains the `other_slice`.
    */
-  void coalesceOrAddSlice(SlicePtr&& other_slice);
+  void coalesceOrAddSlice(Slice&& other_slice);
 
   /** Ring buffer of slices. */
   SliceDeque slices_;
