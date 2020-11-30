@@ -114,12 +114,16 @@ void serializeCompactThenDeserializeAndCheckEqualityInOneGo(AT expected) {
 
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
+  const uint32_t expected_written_size = encoder.computeCompactSize(expected);
   const uint32_t written = encoder.encodeCompact(expected, buffer);
+  ASSERT_EQ(written, expected_written_size);
   // Insert garbage after serialized payload.
   const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
+  const char* raw_buffer_ptr =
+      reinterpret_cast<const char*>(buffer.linearize(written + garbage_size));
   // Tell parser that there is more data, it should never consume more than written.
-  const absl::string_view orig_data = {getRawData(buffer), written + garbage_size};
+  const absl::string_view orig_data = {raw_buffer_ptr, written + garbage_size};
   absl::string_view data = orig_data;
 
   // when
@@ -147,11 +151,16 @@ void serializeCompactThenDeserializeAndCheckEqualityWithChunks(AT expected) {
 
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
+  const uint32_t expected_written_size = encoder.computeCompactSize(expected);
   const uint32_t written = encoder.encodeCompact(expected, buffer);
+  ASSERT_EQ(written, expected_written_size);
   // Insert garbage after serialized payload.
   const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
-  const absl::string_view orig_data = {getRawData(buffer), written + garbage_size};
+  const char* raw_buffer_ptr =
+      reinterpret_cast<const char*>(buffer.linearize(written + garbage_size));
+  // Tell parser that there is more data, it should never consume more than written.
+  const absl::string_view orig_data = {raw_buffer_ptr, written + garbage_size};
 
   // when
   absl::string_view data = orig_data;

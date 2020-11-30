@@ -23,6 +23,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -123,7 +124,8 @@ private:
 
 enum class UpdateOrder { RemovesFirst, Simultaneous };
 
-class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
+class SubsetLoadBalancerTest : public Event::TestUsingSimulatedTime,
+                               public testing::TestWithParam<UpdateOrder> {
 public:
   SubsetLoadBalancerTest()
       : scope_(stats_store_.createScope("testprefix")),
@@ -256,7 +258,7 @@ public:
           .set_string_value(m_it.second);
     }
 
-    return makeTestHost(info_, url, m);
+    return makeTestHost(info_, url, m, simTime());
   }
   HostSharedPtr makeHost(const std::string& url, const HostListMetadata& metadata) {
     envoy::config::core::v3::Metadata m;
@@ -268,7 +270,7 @@ public:
       }
     }
 
-    return makeTestHost(info_, url, m);
+    return makeTestHost(info_, url, m, simTime());
   }
 
   ProtobufWkt::Struct makeDefaultSubset(HostMetadata metadata) {
@@ -1421,7 +1423,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   HostVector hosts;
-  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
+  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80", simTime()));
   hosts.emplace_back(makeHost("tcp://127.0.0.1:81", {{"version", "1.0"}}));
 
   host_set_.hosts_ = hosts;

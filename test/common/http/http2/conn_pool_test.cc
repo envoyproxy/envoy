@@ -62,7 +62,7 @@ public:
 
 class ActiveTestRequest;
 
-class Http2ConnPoolImplTest : public testing::Test {
+class Http2ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   struct TestCodecClient {
     Http::MockClientConnection* codec_;
@@ -132,7 +132,8 @@ public:
       test_client.codec_client_ = new CodecClientForTest(
           CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
           [this](CodecClient*) -> void { onClientDestroy(); },
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+          *test_client.client_dispatcher_);
       if (buffer_limits) {
         EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes())
             .Times(num_clients)
@@ -210,7 +211,7 @@ public:
   Api::ApiPtr api_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime())};
   std::unique_ptr<TestConnPoolImpl> pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -335,7 +336,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
 
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
-  host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80");
+  host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime());
   pool_ = std::make_unique<TestConnPoolImpl>(
       dispatcher_, random_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);
 
