@@ -33,13 +33,6 @@ public:
                              const Address::InstanceConstSharedPtr addr) const PURE;
 
   /**
-   * Wrap socket file descriptor in IoHandle
-   * @param fd socket file descriptor to be wrapped
-   * @return @ref Network::IoHandlePtr that wraps the socket file descriptor
-   */
-  virtual IoHandlePtr socket(os_fd_t fd) PURE;
-
-  /**
    * Returns true if the given family is supported on this machine.
    * @param domain the IP family.
    */
@@ -49,7 +42,7 @@ public:
 using SocketInterfacePtr = std::unique_ptr<SocketInterface>;
 
 /**
- * Create IoHandle for given address
+ * Create IoHandle for given address.
  * @param type type of socket to be requested
  * @param addr address that is gleaned for address type, version and socket interface name
  * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor

@@ -86,7 +86,6 @@ public:
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  absl::optional<Router::ConfigConstSharedPtr> routeConfig() override { return {}; }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -256,6 +255,15 @@ private:
       }
     }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
+    absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+      return absl::nullopt;
+    }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }
@@ -367,30 +375,30 @@ private:
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
-    stream_info_.setResponseCodeDetails(details);
     if (encoded_response_headers_) {
       resetStream();
       return;
     }
     Utility::sendLocalReply(
         remote_closed_,
-        Utility::EncodeFunctions{
-            nullptr, nullptr,
-            [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-              if (modify_headers != nullptr) {
-                modify_headers(*headers);
-              }
-              encodeHeaders(std::move(headers), end_stream);
-            },
-            [this](Buffer::Instance& data, bool end_stream) -> void {
-              encodeData(data, end_stream);
-            }},
+        Utility::EncodeFunctions{nullptr, nullptr,
+                                 [this, modify_headers, &details](ResponseHeaderMapPtr&& headers,
+                                                                  bool end_stream) -> void {
+                                   if (modify_headers != nullptr) {
+                                     modify_headers(*headers);
+                                   }
+                                   encodeHeaders(std::move(headers), end_stream, details);
+                                 },
+                                 [this](Buffer::Instance& data, bool end_stream) -> void {
+                                   encodeData(data, end_stream);
+                                 }},
         Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
   void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
-  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                     absl::string_view details) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&&) override {}
@@ -403,7 +411,7 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
-  bool recreateStream() override { return false; }
+  bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
@@ -460,7 +468,7 @@ private:
     // The request is already fully buffered. Note that this is only called via the async client's
     // internal use of the router filter which uses this function for buffering.
   }
-  const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
+  const Buffer::Instance* decodingBuffer() override { return &request_->body(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }

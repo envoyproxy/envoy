@@ -69,10 +69,10 @@ message RateLimitDescriptor {
         "envoy.api.v2.ratelimit.RateLimitDescriptor.Entry";
 
     // Descriptor key.
-    string key = 1 [(validate.rules).string = {min_bytes: 1}];
+    string key = 1 [(validate.rules).string = {min_len: 1}];
 
     // Descriptor value.
-    string value = 2 [(validate.rules).string = {min_bytes: 1}];
+    string value = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   // Override rate limit to apply to this descriptor instead of the limit

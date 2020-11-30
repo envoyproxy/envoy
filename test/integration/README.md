@@ -99,6 +99,9 @@ cluster:
 
 In addition to the existing test framework, which allows for carefully timed interaction and ordering of events between downstream, Envoy, and Upstream, there is now an “autonomous” framework which simplifies the common case where the timing is not essential (or bidirectional streaming is desired). When AutonomousUpstream is used, by setting `autonomous_upstream_ = true` before `initialize()`, upstream will by default create AutonomousHttpConnections for each incoming connection and AutonomousStreams for each incoming stream. By default, the streams will respond to each complete request with “200 OK” and 10 bytes of payload, but this behavior can be altered by setting various request headers, as documented in [`autonomous_upstream.h`](autonomous_upstream.h)
 
+## Common Problems
+- If a response body length does not match the `content-length` header, any mock calls to wait for the response completion such as `sendRequestAndWaitForResponse` or `response_->waitForEndStream` could time out. Also, any asserts that the response was completed such as `EXPECT_TRUE(response_->complete())` could fail. Make sure that the response body length matches the `content-length` header.
+
 # Extending the test framework
 
 The Envoy integration test framework is most definitely a work in progress.
@@ -170,33 +173,4 @@ going on. If your failure mode isn't documented below, ideally some combination
 of cerr << logging and trace logs will help you sort out what is going on (and
 please add to this document as you figure it out!)
 
-## Unexpected disconnects
-
-As commented in `HttpIntegrationTest::cleanupUpstreamAndDownstream()`, the
-tear-down sequence between upstream, Envoy, and client is somewhat sensitive to
-ordering. If a given unit test does not use the provided member variables, for
-example opens multiple client or upstream connections, the test author should be
-aware of test best practices for clean-up which boil down to "Clean up upstream
-first".
-
-Upstream connections run in their own threads, so if the client disconnects with
-open streams, there's a race where Envoy detects the disconnect, and kills the
-corresponding upstream stream, which is indistinguishable from an unexpected
-disconnect and triggers test failure. Because the client is run from the main
-thread, if upstream is closed first, the client will not detect the inverse
-close, so no test failure will occur.
-
-## Unparented upstream connections
-
-The most common failure mode here is if the test adds additional fake
-upstreams for *DS connections (ADS, EDS etc) which are not properly shut down
-(for a very sensitive test framework)
-
-The failure mode here is that during test teardown one closes the DS connection
-and then shuts down Envoy. Unfortunately as Envoy is running in its own thread,
-it will try to re-establish the *DS connection, sometimes creating a connection
-which is then "unparented". The solution here is to explicitly allow Envoy
-reconnects before closing the connection, using
-
-`my_ds_upstream_->set_allow_unexpected_disconnects(true);`
 

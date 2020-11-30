@@ -143,6 +143,22 @@ private:
   std::string regex_str_;
 };
 
+/**
+ * Perform a match against an HTTP CONNECT request.
+ */
+class ConnectMatcherImpl : public BaseMatcherImpl {
+public:
+  ConnectMatcherImpl(const RequirementRule& rule) : BaseMatcherImpl(rule) {}
+
+  bool matches(const Http::RequestHeaderMap& headers) const override {
+    if (Http::HeaderUtility::isConnect(headers) && BaseMatcherImpl::matchRoute(headers)) {
+      ENVOY_LOG(debug, "CONNECT requirement matched.");
+      return true;
+    }
+
+    return false;
+  }
+};
 } // namespace
 
 MatcherConstPtr Matcher::create(const RequirementRule& rule) {
@@ -155,12 +171,7 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
   case RouteMatch::PathSpecifierCase::kSafeRegex:
     return std::make_unique<RegexMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kConnectMatcher:
-    // TODO: When CONNECT match support is implemented, remove the manual clean-up of CONNECT
-    // matching in the filter fuzzer implementation:
-    // //test/extensions/filters/http/common/fuzz/uber_per_filter.cc
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  // path specifier is required.
-  case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
+    return std::make_unique<ConnectMatcherImpl>(rule);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

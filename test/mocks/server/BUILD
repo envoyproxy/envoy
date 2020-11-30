@@ -23,6 +23,7 @@ envoy_cc_mock(
     hdrs = ["admin.h"],
     deps = [
         "//include/envoy/server:admin_interface",
+        "//test/mocks/network:socket_mocks",
         "//test/mocks/server:config_tracker_mocks",
     ],
 )
@@ -33,6 +34,14 @@ envoy_cc_mock(
     hdrs = ["bootstrap_extension_factory.h"],
     deps = [
         "//include/envoy/server:bootstrap_extension_config_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "fatal_action_factory_mocks",
+    hdrs = ["fatal_action_factory.h"],
+    deps = [
+        "//include/envoy/server:fatal_action_interface",
     ],
 )
 
@@ -72,6 +81,16 @@ envoy_cc_mock(
     hdrs = ["watch_dog.h"],
     deps = [
         "//include/envoy/server:watchdog_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "watchdog_config_mocks",
+    srcs = ["watchdog_config.cc"],
+    hdrs = ["watchdog_config.h"],
+    deps = [
+        "//include/envoy/server:configuration_interface",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -150,7 +169,8 @@ envoy_cc_mock(
     srcs = ["overload_manager.cc"],
     hdrs = ["overload_manager.h"],
     deps = [
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
+        "//test/mocks/event:event_mocks",
     ],
 )
 
@@ -192,12 +212,10 @@ envoy_cc_mock(
 
 envoy_cc_mock(
     name = "main_mocks",
-    srcs = ["main.cc"],
     hdrs = ["main.h"],
     deps = [
         "//include/envoy/server:configuration_interface",
-        "//include/envoy/server:overload_manager_interface",
-        "//test/test_common:utility_lib",
+        "//include/envoy/server/overload:overload_manager_interface",
     ],
 )
 
@@ -296,6 +314,7 @@ envoy_cc_mock(
         "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:filter_chain_factory_context_mocks",
         "//test/mocks/server:guard_dog_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",

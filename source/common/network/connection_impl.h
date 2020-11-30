@@ -55,11 +55,13 @@ public:
   void addWriteFilter(WriteFilterSharedPtr filter) override;
   void addFilter(FilterSharedPtr filter) override;
   void addReadFilter(ReadFilterSharedPtr filter) override;
+  void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
+  bool isHalfCloseEnabled() override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
@@ -78,6 +80,7 @@ public:
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
+  bool connecting() const override { return connecting_; }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
@@ -90,6 +93,7 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override;
+  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
@@ -105,7 +109,7 @@ public:
   IoHandle& ioHandle() final { return socket_->ioHandle(); }
   const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
-  void raiseEvent(ConnectionEvent event) final;
+  void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() override {
     return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
@@ -115,7 +119,10 @@ public:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
+  void setReadBufferReady() override {
+    transport_wants_read_ = true;
+    ioHandle().activateFileEvents(Event::FileReadyType::Read);
+  }
   void flushWriteBuffer() override;
 
   // Obtain global next connection ID. This should only be used in tests.
@@ -125,11 +132,10 @@ protected:
   // A convenience function which returns true if
   // 1) The read disable count is zero or
   // 2) The read disable count is one due to the read buffer being overrun.
-  // In either case the consumer of the data would like to read from the buffer.
-  // If the read count is greater than one, or equal to one when the buffer is
-  // not overrun, then the consumer of the data has called readDisable, and does
-  // not want to read.
-  bool consumerWantsToRead();
+  // In either case the filter chain would like to process data from the read buffer or transport
+  // socket. If the read count is greater than one, or equal to one when the buffer is not overrun,
+  // then the filter chain has called readDisable, and does not want additional data.
+  bool filterChainWantsData();
 
   // Network::ConnectionImplBase
   void closeConnectionImmediately() final;
@@ -158,7 +164,6 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
-  Event::FileEventPtr file_event_;
 
 private:
   friend class Envoy::RandomPauseFilter;
@@ -195,6 +200,30 @@ private:
   bool write_end_stream_ : 1;
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
+  // True if the most recent call to the transport socket's doRead method invoked setReadBufferReady
+  // to schedule read resumption after yielding due to shouldDrainReadBuffer(). When true,
+  // readDisable must schedule read resumption when read_disable_count_ == 0 to ensure that read
+  // resumption happens when remaining bytes are held in transport socket internal buffers.
+  bool transport_wants_read_ : 1;
+};
+
+class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
+public:
+  ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
+                       bool connected);
+
+  // ServerConnection impl
+  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
+  void raiseEvent(ConnectionEvent event) override;
+
+private:
+  void onTransportSocketConnectTimeout();
+
+  bool transport_connect_pending_{true};
+  // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
+  // call to setTransportSocketConnectTimeout and is reset when the connection is established.
+  Event::TimerPtr transport_socket_connect_timer_;
 };
 
 /**

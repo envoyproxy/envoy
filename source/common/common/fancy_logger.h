@@ -13,6 +13,7 @@ namespace Envoy {
 using SpdLoggerSharedPtr = std::shared_ptr<spdlog::logger>;
 using FancyMap = absl::flat_hash_map<std::string, SpdLoggerSharedPtr>;
 using FancyMapPtr = std::shared_ptr<FancyMap>;
+using FancyLogLevelMap = absl::flat_hash_map<std::string, spdlog::level::level_enum>;
 
 /**
  * Stores the lock and functions used by Fancy Logger's macro so that we don't need to declare
@@ -54,6 +55,12 @@ public:
    * Sets the levels of all loggers.
    */
   void setAllFancyLoggers(spdlog::level::level_enum level) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
+  /**
+   * Obtain a map from logger key to log level. Useful for testing, e.g. in macros such as
+   * EXPECT_LOG_CONTAINS_ALL_OF_HELPER.
+   */
+  FancyLogLevelMap getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
 private:
   /**
@@ -97,8 +104,10 @@ FancyContext& getFancyContext();
       ::Envoy::getFancyContext().initFancyLogger(FANCY_KEY, flogger);                              \
       local_flogger = flogger.load(std::memory_order_relaxed);                                     \
     }                                                                                              \
-    local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                           \
-                       ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                    \
+    if (ENVOY_LOG_COMP_LEVEL(*local_flogger, LEVEL)) {                                             \
+      local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
+                         ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \
+    }                                                                                              \
   } while (0)
 
 /**

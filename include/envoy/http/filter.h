@@ -28,14 +28,52 @@ namespace Http {
 enum class FilterHeadersStatus {
   // Continue filter chain iteration.
   Continue,
-  // Do not iterate to any of the remaining filters in the chain. Returning
-  // FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // Do not iterate for headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from decodeData()/encodeData() or calling
   // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for headers as well as data and
+  // trailers for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIteration,
-  // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
-  // results in creating a header only request/response.
-  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
-  ContinueAndEndStream,
+  // Continue headers iteration to remaining filters, but delay ending the stream. This status MUST
+  // NOT be returned when end_stream is already set to false.
+  //
+  // Used when a filter wants to add a body to a headers-only request/response, but this body is not
+  // readily available. Delaying end_stream allows the filter to add the body once it's available
+  // without stopping headers iteration.
+  //
+  // The filter is responsible to continue the stream by providing a body through calling
+  // injectDecodedDataToFilterChain()/injectEncodedDataToFilterChain(), possibly multiple times
+  // if the body needs to be divided into several chunks. The filter may need to handle
+  // watermark events when injecting a body, see:
+  // https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md.
+  //
+  // The last call to inject data MUST have end_stream set to true to conclude the stream.
+  // If the filter cannot provide a body the stream should be reset.
+  //
+  // Adding a body through calling addDecodedData()/addEncodedData() then
+  // continueDecoding()/continueEncoding() is currently NOT supported and causes an assert failure.
+  //
+  // Adding trailers in this scenario is currently NOT supported.
+  //
+  // The filter MUST NOT attempt to continue the stream without providing a body using
+  // continueDecoding()/continueEncoding().
+  //
+  // TODO(yosrym93): Support adding a body in this case by calling addDecodedData()/addEncodedData()
+  // then continueDecoding()/continueEncoding(). To support this a new FilterManager::IterationState
+  // needs to be added and set when a filter returns this status in
+  // FilterManager::decodeHeaders/FilterManager::encodeHeaders()
+  // Currently, when a filter returns this, the IterationState is Continue. This causes ASSERTs in
+  // FilterManager::commonContinue() to fail when continueDecoding()/continueEncoding() is called;
+  // due to trying to continue iteration when the IterationState is already Continue.
+  // In this case, a different ASSERT will be needed to make sure the filter does not try to
+  // continue without adding a body first.
+  //
+  // TODO(yosrym93): Support adding trailers in this case by implementing new functions to inject
+  // trailers, similar to the inject data functions.
+  ContinueAndDontEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
   // be called if continued filter iteration is desired.
@@ -96,6 +134,10 @@ enum class FilterDataStatus {
   // body data for later dispatching. Returning FilterDataStatus::Continue from
   // decodeData()/encodeData() or calling continueDecoding()/continueEncoding() MUST be called if
   // continued filter iteration is desired.
+  //
+  // Note that if a local reply was sent, no further iteration for either data or trailers
+  // for the current filter and the filters following will happen. A local reply can be
+  // triggered via sendLocalReply() or encodeHeaders().
   StopIterationNoBuffer
 };
 
@@ -379,8 +421,10 @@ public:
    *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
+   * @param details supplies the details of why this response was sent.
    */
-  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
+                             absl::string_view details) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -451,19 +495,24 @@ public:
    */
   virtual uint32_t decoderBufferLimit() PURE;
 
-  // Takes a stream, and acts as if the headers are newly arrived.
-  // On success, this will result in a creating a new filter chain and likely upstream request
-  // associated with the original downstream stream.
-  // On failure, if the preconditions outlined below are not met, the caller is
-  // responsible for handling or terminating the original stream.
-  //
-  // This is currently limited to
-  //   - streams which are completely read
-  //   - streams which do not have a request body.
-  //
-  // Note that HttpConnectionManager sanitization will *not* be performed on the
-  // recreated stream, as it is assumed that sanitization has already been done.
-  virtual bool recreateStream() PURE;
+  /**
+   * Takes a stream, and acts as if the headers are newly arrived.
+   * On success, this will result in a creating a new filter chain and likely
+   * upstream request associated with the original downstream stream. On
+   * failure, if the preconditions outlined below are not met, the caller is
+   * responsible for handling or terminating the original stream.
+   *
+   * This is currently limited to
+   *   - streams which are completely read
+   *   - streams which do not have a request body.
+   *
+   * Note that HttpConnectionManager sanitization will *not* be performed on the
+   * recreated stream, as it is assumed that sanitization has already been done.
+   *
+   * @param original_response_headers Headers used for logging in the access logs and for charging
+   * stats. Ignored if null.
+   */
+  virtual bool recreateStream(const ResponseHeaderMap* original_response_headers) PURE;
 
   /**
    * Adds socket options to be applied to any connections used for upstream requests. Note that
@@ -486,23 +535,30 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
-
-  /**
-   *
-   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
-   * route config provider is used. Scoped RDS provides are not supported at the moment, as
-   * retrieval of a route configuration in their case requires passing of http request headers
-   * as a parameter.
-   */
-  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };
 
 /**
- * Common base class for both decoder and encoder filters.
+ * Common base class for both decoder and encoder filters. Functions here are related to the
+ * lifecycle of a filter. Currently the life cycle is as follows:
+ * - All filters receive onStreamComplete()
+ * - All log handlers receive log()
+ * - All filters receive onDestroy()
+ *
+ * This means:
+ * - onStreamComplete can be used to make state changes that are intended to appear in the access
+ * logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
+ * - onDestroy is used to cleanup all pending filter resources like pending http requests and
+ * timers.
  */
 class StreamFilterBase {
 public:
   virtual ~StreamFilterBase() = default;
+
+  /**
+   * This routine is called before the access log handlers' log() is called. Filters can use this
+   * callback to enrich the data passed in to the log handlers.
+   */
+  virtual void onStreamComplete() {}
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -671,6 +727,27 @@ public:
    */
   virtual ResponseTrailerMap& addEncodedTrailers() PURE;
 
+  /**
+   * Attempts to create a locally generated response using the provided response_code and body_text
+   * parameters. If the request was a gRPC request the local reply will be encoded as a gRPC
+   * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
+   * provided parameters.
+   *
+   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
+   *
+   * @param response_code supplies the HTTP response code.
+   * @param body_text supplies the optional body text which is sent using the text/plain content
+   *                  type, or encoded in the grpc-message header.
+   * @param modify_headers supplies an optional callback function that can modify the
+   *                       response headers.
+   * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+   * @param details a string detailing why this local reply was sent.
+   */
+  virtual void sendLocalReply(Code response_code, absl::string_view body_text,
+                              std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
   /**
    * Adds new metadata to be encoded.
    *

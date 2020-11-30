@@ -116,7 +116,9 @@ are noted.
 
 Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
 the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
-strings are rendered as ``""``.
+strings are rendered as ``""``. :ref:`omit_empty_values
+<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option could be used
+to omit empty values entirely.
 
 Unless otherwise noted, command operators produce string outputs for typed JSON logs.
 
@@ -185,6 +187,10 @@ The following command operators are supported:
     HTTP response code. Note that a response code of '0' means that the server never sent the
     beginning of a response. This generally means that the (downstream) client disconnected.
 
+    Note that in the case of 100-continue responses, only the response code of the final headers
+    will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
+    If a 100-continue results in a disconnect, the 100 will be logged.
+
   TCP
     Not implemented ("-").
 
@@ -199,6 +205,13 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-")
+
+.. _config_access_log_format_connection_termination_details:
+
+%CONNECTION_TERMINATION_DETAILS%
+  HTTP and TCP
+    Connection termination details may provide additional information about why the connection was
+    terminated by Envoy for L4 reasons.
 
 %BYTES_SENT%
   HTTP
@@ -353,6 +366,15 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+.. _config_access_log_format_connection_id:
+
+%CONNECTION_ID%
+  An identifier for the downstream connection. It can be used to
+  cross-reference TCP access logs across multiple log sinks, or to
+  cross-reference timer-based reports for the same connection. The identifier
+  is unique with high likelihood within an execution, but can duplicate across
+  multiple instances or between restarts.
 
 %GRPC_STATUS%
   gRPC status code which is easy to interpret with text message corresponding with number.

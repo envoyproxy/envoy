@@ -1,4 +1,4 @@
-version: '2'
+version: '3.7'
 services:
 
   front-envoy:
@@ -7,9 +7,6 @@ services:
       dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
-    expose:
-      - "8000"
-      - "8001"
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -21,11 +18,7 @@ services:
     volumes:
       - ../service-envoy.yaml:/etc/service-envoy.yaml
     networks:
-      envoymesh:
-        aliases:
-          - service
-    expose:
-      - "8000"
+      - envoymesh
 
 networks:
   envoymesh: {}

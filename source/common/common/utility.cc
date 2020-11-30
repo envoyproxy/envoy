@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <ios>
+#include <iostream>
 #include <iterator>
 #include <regex>
 #include <string>
@@ -221,6 +223,19 @@ std::string DateFormatter::now(TimeSource& time_source) {
   return fromTime(time_source.systemTime());
 }
 
+MutableMemoryStreamBuffer::MutableMemoryStreamBuffer(char* base, size_t size) {
+  this->setp(base, base + size);
+}
+
+OutputBufferStream::OutputBufferStream(char* data, size_t size)
+    : MutableMemoryStreamBuffer{data, size}, std::ostream{static_cast<std::streambuf*>(this)} {}
+
+int OutputBufferStream::bytesWritten() const { return pptr() - pbase(); }
+
+absl::string_view OutputBufferStream::contents() const {
+  return absl::string_view(pbase(), bytesWritten());
+}
+
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
   // std::streambuf won't modify `data`, but the interface still requires a char* for convenience,
   // so we need to const_cast.
@@ -309,7 +324,7 @@ bool StringUtil::findToken(absl::string_view source, absl::string_view delimiter
                            absl::string_view key_token, bool trim_whitespace) {
   const auto tokens = splitToken(source, delimiters, trim_whitespace);
   if (trim_whitespace) {
-    for (const auto token : tokens) {
+    for (const auto& token : tokens) {
       if (key_token == trim(token)) {
         return true;
       }

@@ -1,0 +1,69 @@
+health_check_config {
+  timeout {
+    seconds: 1
+    nanos: 2097152
+  }
+  interval {
+    seconds: 1
+  }
+  interval_jitter {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+    value: 2
+  }
+  reuse_connection {
+  }
+  tcp_health_check {
+    send {
+      binary: "\001\000\000\r"
+    }
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+        headers {
+          key: "x-envoy-degraded"
+          value: "true"
+        }
+      }
+      status: 200
+    }
+    tcp_respond {
+      data: "0"
+    }
+  }
+}
+actions {
+  trigger_interval_timer {
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+      }
+      status: 200
+    }
+    tcp_respond {
+    }
+    grpc_respond {
+      grpc_respond_headers {
+        
+      }
+    }
+  }
+}

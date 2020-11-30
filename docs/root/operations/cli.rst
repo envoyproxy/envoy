@@ -116,9 +116,6 @@ following are the command line options that Envoy supports.
    *(optional)* The format string to use for laying out the log message metadata. If this is not
    set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"`` is used.
 
-   When used in conjunction with :option:`--log-format-prefix-with-location` set to 1, the logger can be
-   configured to prefix ``%v`` by a file path and a line number.
-
    When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
    in the :ref:`application logging configuration <config_application_logs>` section.
@@ -126,6 +123,7 @@ following are the command line options that Envoy supports.
    The supported format flags are (with example output):
 
    :%v:	The actual message to log ("some user text")
+   :%_:	The actual message to log, but with escaped newlines (from (if using ``%v``) "some user text\nbelow", to "some user text\\nbelow")
    :%t:	Thread id ("1232")
    :%P:	Process id ("3456")
    :%n:	Logger's name ("filter")
@@ -160,14 +158,6 @@ following are the command line options that Envoy supports.
    :%#: Source line ("123")
    :%!: Source function ("myFunc")
 
-.. option:: --log-format-prefix-with-location <1|0>
-
-   *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
-   ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
-   default value 0 is used.
-
-   **NOTE**: The flag will be removed at 1.17.0 release.
-
 .. option:: --log-format-escaped
 
   *(optional)* This flag enables application log sanitization to escape C-style escape sequences.
@@ -188,9 +178,24 @@ following are the command line options that Envoy supports.
 
   *(optional)* Enables fine-grain logger with file level log control and runtime update at administration
   interface. If enabled, main log macros including `ENVOY_LOG`, `ENVOY_CONN_LOG`, `ENVOY_STREAM_LOG` and
-  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any 
-  more. The administration interface usage is similar. Please see `Administration interface 
+  `ENVOY_FLUSH_LOG` will use a per-file logger, and the usage doesn't need `Envoy::Logger::Loggable` any
+  more. The administration interface usage is similar. Please see `Administration interface
   <https://www.envoyproxy.io/docs/envoy/latest/operations/admin>`_ for more detail.
+
+.. option:: --socket-path <path string>
+
+  *(optional)* The output file path to the socket address for :ref:`hot restart <arch_overview_hot_restart>`.
+  Default to "@envoy_domain_socket" which will be created in the abstract namespace. Suffix _{role}_{id}
+  is appended to provide name. All envoy processes wanting to participate in hot-restart together must
+  use the same value for this option.
+
+  **NOTE**: The path started with "@" will be created in the abstract namespace.
+
+.. option:: --socket-mode <string>
+
+  *(optional)* The socket file permission for :ref:`hot restart <arch_overview_hot_restart>`.
+  This must be a valid octal file permission, such as 644. The default value is 600.
+  This flag may not be used when :option:`--socket-path` is start with "@" or not set.
 
 .. option:: --hot-restart-version
 
@@ -327,7 +332,7 @@ following are the command line options that Envoy supports.
   extensions cannot be used by static or dynamic configuration, though they are still linked into
   Envoy and may run start-up code or have other runtime effects. Extension names are created by
   joining the extension category and name with a forward slash,
-  e.g. ``grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
+  e.g. ``envoy.grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
 
 .. option:: --version
 

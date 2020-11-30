@@ -28,7 +28,7 @@ public:
       filters:
         - name: thrift
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
+            "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy
             stat_prefix: thrift_stats
             route_config:
               name: "routes"
@@ -259,7 +259,6 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
-  expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write(partial_request));
@@ -377,7 +376,6 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 1);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
-  expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write(partial_request));
@@ -403,6 +401,9 @@ INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
 // Because of the protocol upgrade requests and the difficulty of separating them, we test this
 // protocol independently.
 TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
+// This test relies on an old Apache Thrift Python package
+// that is only available in Python2. Disabling the test on Windows.
+#ifndef WIN32
   initializeCall(DriverMode::Success);
 
   uint32_t upgrade_request_size = request_bytes_.peekBEInt<uint32_t>() + 4;
@@ -459,6 +460,7 @@ TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
   EXPECT_EQ(2U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_success");
   EXPECT_EQ(2U, counter->value());
+#endif
 }
 
 } // namespace ThriftProxy

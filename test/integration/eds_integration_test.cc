@@ -147,11 +147,6 @@ TEST_P(EdsIntegrationTest, Http2UpdatePriorities) {
   codec_client_type_ = envoy::type::v3::HTTP2;
   initializeTest(true);
 
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-  fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
-  fake_upstreams_[2]->set_allow_unexpected_disconnects(true);
-  fake_upstreams_[3]->set_allow_unexpected_disconnects(true);
-
   setEndpointsInPriorities(2, 2);
 
   setEndpointsInPriorities(4, 0);
@@ -164,7 +159,6 @@ TEST_P(EdsIntegrationTest, Http2UpdatePriorities) {
 TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   codec_client_type_ = envoy::type::v3::HTTP2;
   initializeTest(true);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -214,7 +208,6 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
 // then fails health checking is removed.
 TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   initializeTest(true);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -244,7 +237,6 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
 
   // Endpoints are initially excluded.
   initializeTest(true);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);
 
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
@@ -267,7 +259,6 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
 
   // Endpoints are initially excluded.
   initializeTest(true);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);
 
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
@@ -325,9 +316,9 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   setEndpoints(4, 4, 0);
   auto get_and_compare = [this](const uint32_t expected_factor) {
     const auto& cluster_map = test_server_->server().clusterManager().clusters();
-    EXPECT_EQ(1, cluster_map.size());
-    EXPECT_EQ(1, cluster_map.count("cluster_0"));
-    const auto& cluster_ref = cluster_map.find("cluster_0")->second;
+    EXPECT_EQ(1, cluster_map.active_clusters_.size());
+    EXPECT_EQ(1, cluster_map.active_clusters_.count("cluster_0"));
+    const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
     const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
     EXPECT_EQ(1, hostset_per_priority.size());
     const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
@@ -349,7 +340,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
   auto& priority_set = test_server_->server()
                            .clusterManager()
                            .clusters()
-                           .find("cluster_0")
+                           .active_clusters_.find("cluster_0")
                            ->second.get()
                            .prioritySet();
 

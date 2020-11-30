@@ -54,7 +54,7 @@ public:
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<> tls_;
   const std::vector<std::string> clusters_;
 
 private:
@@ -77,6 +77,10 @@ public:
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+  // Prefetching not yet implemented for extensions.
+  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+    return nullptr;
+  }
 
 private:
   // Use inner class to extend LoadBalancerBase. When initializing AggregateClusterLoadBalancer, the
@@ -92,6 +96,10 @@ private:
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    // Prefetching not yet implemented for extensions.
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
 
     // Upstream::LoadBalancerBase
     Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {

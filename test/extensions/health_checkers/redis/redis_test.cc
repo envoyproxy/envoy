@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::DoAll;
@@ -33,7 +34,8 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 
 class RedisHealthCheckerTest
-    : public testing::Test,
+    : public Event::TestUsingSimulatedTime,
+      public testing::Test,
       public Extensions::NetworkFilters::Common::Redis::Client::ClientFactory {
 public:
   RedisHealthCheckerTest()
@@ -59,7 +61,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -95,7 +97,7 @@ public:
     EXPECT_CALL(*cluster_->info_, extensionProtocolOptions(_)).WillRepeatedly(Return(options));
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -119,7 +121,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -143,7 +145,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -180,7 +182,7 @@ public:
     EXPECT_CALL(*cluster_->info_, extensionProtocolOptions(_)).WillRepeatedly(Return(options));
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -203,7 +205,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -227,7 +229,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
-        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
@@ -267,7 +269,8 @@ public:
   }
 
   void exerciseStubs() {
-    Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:100");
+    Upstream::HostSharedPtr host =
+        Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:100", simTime());
     RedisHealthChecker::RedisActiveHealthCheckSessionPtr session =
         std::make_unique<RedisHealthChecker::RedisActiveHealthCheckSession>(*health_checker_, host);
 
@@ -286,7 +289,6 @@ public:
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Random::MockRandomGenerator> random_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
@@ -308,7 +310,7 @@ TEST_F(RedisHealthCheckerTest, PingWithAuth) {
   setupWithAuth();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -356,7 +358,7 @@ TEST_F(RedisHealthCheckerTest, ExistsWithAuth) {
   setupExistsHealthcheckWithAuth();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -402,7 +404,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   exerciseStubs();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -470,7 +472,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   setupAlwaysLogHealthCheckFailures();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -528,7 +530,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   setup();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -574,11 +576,12 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
 }
 
 TEST_F(RedisHealthCheckerTest, DEPRECATED_FEATURE_TEST(ExistsDeprecated)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   InSequence s;
   setupExistsHealthcheckDeprecated(false);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -630,7 +633,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   setupExistsHealthcheck();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -682,7 +685,7 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   setupExistsHealthcheck();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -726,7 +729,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   setupDontReuseConnection();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();

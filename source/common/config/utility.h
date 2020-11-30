@@ -9,7 +9,6 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -213,8 +212,8 @@ public:
   /**
    * Get a Factory from the registry with a particular name (and templated type) with error checking
    * to ensure the name and factory are valid.
-   * @param name string identifier for the particular implementation. Note: this is a proto string
-   * because it is assumed that this value will be pulled directly from the configuration proto.
+   * @param name string identifier for the particular implementation.
+   * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
@@ -229,6 +228,32 @@ public:
     }
 
     return *factory;
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name or return nullptr.
+   * @param name string identifier for the particular implementation.
+   */
+  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+    if (name.empty()) {
+      return nullptr;
+    }
+
+    return Registry::FactoryRegistry<Factory>::getFactory(name);
+  }
+
+  /**
+   * Get a Factory from the registry or return nullptr.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory* getFactory(const ProtoMessage& message) {
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return factory;
+    }
+
+    return Utility::getFactoryByName<Factory>(message.name());
   }
 
   /**

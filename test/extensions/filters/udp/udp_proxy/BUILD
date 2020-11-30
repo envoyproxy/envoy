@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["udp_proxy_filter_test.cc"],
     extension_name = "envoy.filters.udp_listener.udp_proxy",
     deps = [
+        "//source/common/common:hash_lib",
         "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:socket_mocks",
@@ -25,6 +26,18 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "hash_policy_impl_test",
+    srcs = ["hash_policy_impl_test.cc"],
+    extension_name = "envoy.filters.udp_listener.udp_proxy",
+    deps = [
+        "//source/common/common:hash_lib",
+        "//source/common/network:address_lib",
+        "//source/extensions/filters/udp/udp_proxy:hash_policy_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )

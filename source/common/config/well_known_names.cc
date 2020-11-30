@@ -82,6 +82,9 @@ TagNameValues::TagNameValues() {
   // tcp.(<stat_prefix>.)<base_stat>
   addRegex(TCP_PREFIX, R"(^tcp\.((.*?)\.)\w+?$)");
 
+  // udp.(<stat_prefix>.)<base_stat>
+  addRegex(UDP_PREFIX, R"(^udp\.((.*?)\.)\w+?$)");
+
   // auth.clientssl.(<stat_prefix>.)<base_stat>
   addRegex(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((.*?)\.)\w+?$)");
 
@@ -89,7 +92,7 @@ TagNameValues::TagNameValues() {
   addRegex(RATELIMIT_PREFIX, R"(^ratelimit\.((.*?)\.)\w+?$)");
 
   // cluster.(<cluster_name>.)*
-  addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
+  addRe2(CLUSTER_NAME, "^cluster\\.(([^\\.]+)\\.).*");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
   addRegex(HTTP_CONN_MANAGER_PREFIX, R"(^listener(?=\.).*?\.http\.((.*?)\.))", ".http.");
@@ -116,7 +119,12 @@ TagNameValues::TagNameValues() {
 
 void TagNameValues::addRegex(const std::string& name, const std::string& regex,
                              const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor(name, regex, substr));
+  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, Regex::Type::StdRegex});
+}
+
+void TagNameValues::addRe2(const std::string& name, const std::string& regex,
+                           const std::string& substr) {
+  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, Regex::Type::Re2});
 }
 
 } // namespace Config

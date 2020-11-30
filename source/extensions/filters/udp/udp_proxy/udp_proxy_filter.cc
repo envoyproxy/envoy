@@ -95,9 +95,10 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
       return;
     }
 
-    // TODO(mattklein123): Pass a context and support hash based routing.
-    Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(nullptr);
+    UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_.peer_);
+    Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
     if (host == nullptr) {
+      ENVOY_LOG(debug, "cannot find any valid host. failed to create a session.");
       cluster_.info()->stats().upstream_cx_none_healthy_.inc();
       return;
     }
@@ -110,8 +111,8 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
 
-      // TODO(mattklein123): Pass a context and support hash based routing.
-      Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(nullptr);
+      UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_.peer_);
+      Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
       if (host != nullptr && host->health() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
@@ -160,11 +161,12 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
-      socket_(cluster.filter_.createSocket(host)),
-      socket_event_(socket_->ioHandle().createFileEvent(
-          cluster.filter_.read_callbacks_->udpListener().dispatcher(),
-          [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
-          Event::FileReadyType::Read)) {
+      socket_(cluster.filter_.createSocket(host)) {
+
+  socket_->ioHandle().initializeFileEvent(
+      cluster.filter_.read_callbacks_->udpListener().dispatcher(),
+      [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host->address()->asStringView());

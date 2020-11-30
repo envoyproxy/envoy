@@ -1,7 +1,7 @@
 # C++ coding style
 
 * The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
-  issues are taken care of automatically. The CircleCI tests will automatically check
+  issues are taken care of automatically. The Azure Pipelines will automatically check
   the code format and fail. There are make targets that can both check the format
   (check_format) as well as fix the code format for you (fix_format). Errors in
   .clang-tidy are enforced while other warnings are suggestions. Note that code and
@@ -19,7 +19,7 @@
 # Documentation
 
 * If you are modifying the data plane structually, please keep the [Life of a
-  Request](docs/root/intro/life_of_a_request.md) documentation up-to-date.
+  Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation up-to-date.
 
 # Deviations from Google C++ style guidelines
 
@@ -105,17 +105,18 @@
 A few general notes on our error handling philosophy:
 
 * All error code returns should be checked.
-* At a very high level, our philosophy is that errors that are *likely* to happen should be
-  gracefully handled. Examples of likely errors include any type of network error, disk IO error,
-  bad data returned by an API call, bad data read from runtime files, etc. Errors that are
-  *unlikely* to happen should lead to process death, under the assumption that the additional burden
-  of defensive coding and testing is not an effective use of time for an error that should not happen
-  given proper system setup. Examples of these types of errors include not being able to open the shared
-  memory region, an invalid initial JSON config read from disk, system calls that should not fail
-  assuming correct parameters (which should be validated via tests), etc. Examples of system calls
-  that should not fail when passed valid parameters include most usages of `setsockopt()`,
-  `getsockopt()`, the kernel returning a valid `sockaddr` after a successful call to `accept()`,
-  `pthread_create()`, `pthread_join()`, etc.
+* At a very high level, our philosophy is that errors should be handled gracefully when caused by:
+  - Untrusted network traffic OR
+  - Raised by the Envoy process environment and are *likely* to happen
+* Examples of likely environnmental errors include any type of network error, disk IO error, bad
+  data returned by an API call, bad data read from runtime files, etc. Errors in the Envoy
+  environment that are *unlikely* to happen after process initialization, should lead to process
+  death, under the assumption that the additional burden of defensive coding and testing is not an
+  effective use of time for an error that should not happen given proper system setup. Examples of
+  these types of errors include not being able to open the shared memory region, system calls that
+  should not fail assuming correct parameters (which should be validated via tests), etc. Examples
+  of system calls that should not fail when passed valid parameters include the kernel returning a
+  valid `sockaddr` after a successful call to `accept()`, `pthread_create()`, `pthread_join()`, etc.
 * OOM events (both memory and FDs) are considered fatal crashing errors. An OOM error should never
   silently be ignored and should crash the process either via the C++ allocation error exception, an
   explicit `RELEASE_ASSERT` following a third party library call, or an obvious crash on a subsequent

@@ -295,12 +295,12 @@ FakeHttpConnection::FakeHttpConnection(
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
 #ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        shared_connection_.connection(), *this, stats, random_, http2_options,
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
 #else
     codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        shared_connection_.connection(), *this, stats, random_, http2_options,
+        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
 #endif
     ASSERT(type == Type::HTTP2);
   }
@@ -446,9 +446,9 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
-      handler_(new Server::ConnectionHandlerImpl(*dispatcher_)),
-      allow_unexpected_disconnects_(false), read_disable_on_new_connection_(true),
-      enable_half_close_(enable_half_close), listener_(*this),
+      handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)),
+      read_disable_on_new_connection_(true), enable_half_close_(enable_half_close),
+      listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
@@ -470,8 +470,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   if (read_disable_on_new_connection_) {
     connection.readDisable(true);
   }
-  auto connection_wrapper =
-      std::make_unique<SharedConnectionWrapper>(connection, allow_unexpected_disconnects_);
+  auto connection_wrapper = std::make_unique<SharedConnectionWrapper>(connection);
   LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
   return true;
 }
@@ -610,6 +609,45 @@ void FakeUpstream::sendUdpDatagram(const std::string& buffer,
                                                     nullptr, *peer);
     EXPECT_TRUE(rc.rc_ == buffer.length());
   });
+}
+
+testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::string& data,
+                                                          bool end_stream,
+                                                          std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  auto iter = consumed_connections_.begin();
+  std::advance(iter, index);
+  return (*iter)->executeOnDispatcher(
+      [data, end_stream](Network::Connection& connection) {
+        ASSERT(connection.state() == Network::Connection::State::Open);
+        Buffer::OwnedImpl buffer(data);
+        connection.write(buffer, end_stream);
+      },
+      timeout);
+}
+
+FakeRawConnection::~FakeRawConnection() {
+  // If the filter was already deleted, it means the shared_connection_ was too, so don't try to
+  // access it.
+  if (auto filter = read_filter_.lock(); filter != nullptr) {
+    EXPECT_TRUE(shared_connection_.executeOnDispatcher(
+        [filter = std::move(filter)](Network::Connection& connection) {
+          connection.removeReadFilter(filter);
+        }));
+  }
+}
+
+testing::AssertionResult FakeRawConnection::initialize() {
+  auto filter = Network::ReadFilterSharedPtr{new ReadFilter(*this)};
+  read_filter_ = filter;
+  testing::AssertionResult result = shared_connection_.executeOnDispatcher(
+      [filter = std::move(filter)](Network::Connection& connection) {
+        connection.addReadFilter(filter);
+      });
+  if (!result) {
+    return result;
+  }
+  return FakeConnectionBase::initialize();
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,

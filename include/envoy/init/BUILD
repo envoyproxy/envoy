@@ -27,5 +27,6 @@ envoy_cc_library(
     deps = [
         ":target_interface",
         ":watcher_interface",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

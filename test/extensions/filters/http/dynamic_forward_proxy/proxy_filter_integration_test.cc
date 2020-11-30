@@ -92,10 +92,9 @@ typed_config:
 
   void createUpstreams() override {
     if (upstream_tls_) {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
-                                                             factory_context_),
-                           0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+      addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
+                                                        factory_context_),
+                      FakeHttpConnection::Type::HTTP1);
     } else {
       HttpIntegrationTest::createUpstreams();
     }
@@ -288,8 +287,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
-      {":authority", fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()),
-                                 fake_upstreams_[0]->localAddress()->ip()->port())}};
+      {":authority", fake_upstreams_[0]->localAddress()->asString()}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
@@ -310,9 +308,6 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
   upstream_tls_ = true;
   upstream_cert_name_ = "upstream";
   setup();
-  // The upstream connection is going to fail handshake so make sure it can read and we expect
-  // it to disconnect.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

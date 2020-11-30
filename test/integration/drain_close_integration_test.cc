@@ -79,7 +79,6 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   drain_strategy_ = Server::DrainStrategy::Immediate;
   drain_time_ = std::chrono::seconds(999);
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   uint32_t http_port = lookupPort("http");
   codec_client_ = makeHttpConnection(http_port);
 
@@ -134,7 +133,6 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   // behaviour isn't conflated with whether the drain sequence has started.
   drain_time_ = std::chrono::seconds(999);
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   uint32_t http_port = lookupPort("http");
   codec_client_ = makeHttpConnection(http_port);
 

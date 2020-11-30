@@ -26,9 +26,10 @@ class LdsApiImpl : public LdsApi,
                    Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
-  LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config, Upstream::ClusterManager& cm,
-             Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
-             ProtobufMessage::ValidationVisitor& validation_visitor);
+  LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
+             const xds::core::v3::ResourceLocator* lds_resources_locator,
+             Upstream::ClusterManager& cm, Init::Manager& init_manager, Stats::Scope& scope,
+             ListenerManager& lm, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }

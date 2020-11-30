@@ -57,7 +57,7 @@ TEST_F(TcpConnPoolTest, Basic) {
   conn_pool_->newStream(&mock_generic_callbacks_);
 
   EXPECT_CALL(mock_generic_callbacks_, upstreamToDownstream());
-  EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _));
+  EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _, _));
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection));
   conn_pool_->onPoolReady(std::move(data), host_);
@@ -72,21 +72,21 @@ TEST_F(TcpConnPoolTest, OnPoolFailure) {
                             host_);
 
   // Make sure that the pool failure nulled out the pending request.
-  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
 }
 
 TEST_F(TcpConnPoolTest, Cancel) {
   // Initially cancel should fail as there is no pending request.
-  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
 
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
   // Canceling should now return true as there was an active request.
-  EXPECT_TRUE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_TRUE(conn_pool_->cancelAnyPendingStream());
 
   // A second cancel should return false as there is not a pending request.
-  EXPECT_FALSE(conn_pool_->cancelAnyPendingRequest());
+  EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
 }
 
 class TcpUpstreamTest : public ::testing::Test {
@@ -117,7 +117,7 @@ TEST_F(TcpUpstreamTest, Basic) {
   // Swallow the request headers and generate response headers.
   EXPECT_CALL(connection_, write(_, false)).Times(0);
   EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   // Proxy the data.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
@@ -154,7 +154,7 @@ TEST_F(TcpUpstreamTest, V1Header) {
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   // Data is proxied as usual.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
@@ -177,7 +177,7 @@ TEST_F(TcpUpstreamTest, V2Header) {
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection_, write(BufferEqual(&expected_data), false));
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   // Data is proxied as usual.
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
@@ -187,7 +187,7 @@ TEST_F(TcpUpstreamTest, V2Header) {
 
 TEST_F(TcpUpstreamTest, TrailersEndStream) {
   // Swallow the headers.
-  tcp_upstream_->encodeHeaders(request_, false);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
 
   EXPECT_CALL(connection_, write(BufferStringEqual(""), true));
   Envoy::Http::TestRequestTrailerMapImpl trailers{{"foo", "bar"}};
@@ -196,7 +196,7 @@ TEST_F(TcpUpstreamTest, TrailersEndStream) {
 
 TEST_F(TcpUpstreamTest, HeaderEndStreamHalfClose) {
   EXPECT_CALL(connection_, write(BufferStringEqual(""), true));
-  tcp_upstream_->encodeHeaders(request_, true);
+  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, true).ok());
 }
 
 TEST_F(TcpUpstreamTest, ReadDisable) {

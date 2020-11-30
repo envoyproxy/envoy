@@ -43,7 +43,7 @@ public:
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(2);
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0);
+    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0);
     hot_restart_->drainParentListeners();
 
     // We close both sockets.
@@ -87,7 +87,7 @@ TEST_F(HotRestartImplTest, DomainSocketAlreadyInUse) {
       .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
   EXPECT_CALL(os_sys_calls_, close(_)).Times(1);
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0),
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0),
                Server::HotRestartDomainSocketInUseException);
 }
 
@@ -98,7 +98,7 @@ TEST_F(HotRestartImplTest, DomainSocketError) {
       .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_ACCESS}));
   EXPECT_CALL(os_sys_calls_, close(_)).Times(1);
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0), EnvoyException);
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, "@envoy_domain_socket", 0), EnvoyException);
 }
 
 } // namespace

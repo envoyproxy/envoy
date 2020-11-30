@@ -10,16 +10,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "quiche_platform_test",
-    srcs = ["quiche_platform_test.cc"],
-    external_deps = ["quiche_common_platform"],
-    deps = [
-        "@com_googlesource_quiche//:quiche_common_platform",
-        "@com_googlesource_quiche//:quiche_common_platform_endian",
-    ],
-)
-
-envoy_cc_test(
     name = "http2_platform_test",
     srcs = ["http2_platform_test.cc"],
     external_deps = ["quiche_http2_platform"],
@@ -37,7 +27,10 @@ envoy_cc_test(
         "//bazel:linux": ["quic_platform_test.cc"],
         "//conditions:default": [],
     }),
-    copts = ["-Wno-unused-parameter"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": ["-Wno-unused-parameter"],
+    }),
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
@@ -60,7 +53,6 @@ envoy_cc_test(
         "@com_googlesource_quiche//:quic_platform_mem_slice_span",
         "@com_googlesource_quiche//:quic_platform_mem_slice_storage",
         "@com_googlesource_quiche//:quic_platform_mock_log",
-        "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
         "@com_googlesource_quiche//:quic_platform_system_event_loop",
         "@com_googlesource_quiche//:quic_platform_test",
@@ -145,17 +137,6 @@ envoy_cc_test_library(
     hdrs = ["quic_mock_log_impl.h"],
     tags = ["nofips"],
     deps = ["@com_googlesource_quiche//:quic_platform_base"],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_port_utils_impl_lib",
-    srcs = ["quic_port_utils_impl.cc"],
-    hdrs = ["quic_port_utils_impl.h"],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/network:utility_lib",
-        "//test/test_common:environment_lib",
-    ],
 )
 
 envoy_cc_test_library(

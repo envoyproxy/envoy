@@ -31,7 +31,7 @@ message Filter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
@@ -65,6 +65,18 @@ message Filter {
 // to be used (e.g. for SNI ``www.example.com`` the most specific match would be
 // ``www.example.com``, then ``*.example.com``, then ``*.com``, then any filter
 // chain without ``server_names`` requirements).
+//
+// A different way to reason about the filter chain matches:
+// Suppose there exists N filter chains. Prune the filter chain set using the above 8 steps.
+// In each step, filter chains which most specifically matches the attributes continue to the next step.
+// The listener guarantees at most 1 filter chain is left after all of the steps.
+//
+// Example:
+//
+// For destination port, filter chains specifying the destination port of incoming traffic are the
+// most specific match. If none of the filter chains specifies the exact destination port, the filter
+// chains which do not specify ports are the most specific match. Filter chains specifying the
+// wrong port can never be the most specific match.
 //
 // [#comment: Implemented rules are kept in the preference order, with deprecated fields
 // listed at the end, because that's how we want to list them in the docs.
@@ -169,7 +181,7 @@ message FilterChainMatch {
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
 // various other parameters.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message FilterChain {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.FilterChain";
 
@@ -214,6 +226,11 @@ message FilterChain {
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
   core.v3.TransportSocket transport_socket = 6;
+
+  // If present and nonzero, the amount of time to allow incoming connections to complete any
+  // transport socket negotiations. If this expires before the transport reports connection
+  // establishment, the connection is summarily closed.
+  google.protobuf.Duration transport_socket_connect_timeout = 9;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
@@ -299,7 +316,7 @@ message ListenerFilter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.

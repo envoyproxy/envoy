@@ -60,7 +60,7 @@ struct Watch {
 // A WatchMap is assumed to be dedicated to a single type_url type of resource (EDS, CDS, etc).
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
-  WatchMap() = default;
+  WatchMap(const bool use_namespace_matching) : use_namespace_matching_(use_namespace_matching) {}
 
   // Adds 'callbacks' to the WatchMap, with every possible resource being watched.
   // (Use updateWatchInterest() to narrow it down to some specific names).
@@ -78,10 +78,6 @@ public:
   // Expects that the watch to be removed has already had all of its resource names removed via
   // updateWatchInterest().
   void removeWatch(Watch* watch);
-
-  // checks is a watch for an alias exists and replaces it with the resource's name
-  AddedRemoved
-  convertAliasWatchesToNameWatches(const envoy::service::discovery::v3::Resource& resource);
 
   // UntypedConfigUpdateCallbacks.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -125,6 +121,8 @@ private:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
+
+  const bool use_namespace_matching_;
 };
 
 } // namespace Config
