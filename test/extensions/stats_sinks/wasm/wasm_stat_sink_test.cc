@@ -2,6 +2,7 @@
 
 #include "extensions/common/wasm/wasm.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/wasm_base.h"
 
@@ -54,20 +55,8 @@ public:
   std::unique_ptr<TestContext> context_;
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8",
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm",
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-    "wasmtime",
-#endif
-    "null");
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest, testing_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
+                         Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmCommonContextTest, OnStat) {
   std::string code;

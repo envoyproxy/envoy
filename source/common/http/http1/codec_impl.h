@@ -87,6 +87,7 @@ protected:
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
+  bool connect_request_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
 
@@ -162,7 +163,6 @@ public:
 private:
   bool upgrade_request_{};
   bool head_request_{};
-  bool connect_request_{};
 };
 
 /**
@@ -580,6 +580,7 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   Status onMessageBegin() override { return okStatus(); }
   Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

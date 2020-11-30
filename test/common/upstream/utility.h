@@ -78,49 +78,52 @@ inline envoy::config::cluster::v3::Cluster defaultStaticCluster(const std::strin
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-                                  const std::string& url, uint32_t weight = 1) {
+                                  const std::string& url, TimeSource& time_source,
+                                  uint32_t weight = 1) {
   return std::make_shared<HostImpl>(
       cluster, hostname, Network::Utility::resolveUrl(url), nullptr, weight,
       envoy::config::core::v3::Locality(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-      envoy::config::core::v3::UNKNOWN);
+      envoy::config::core::v3::UNKNOWN, time_source);
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
-                                  uint32_t weight = 1, uint32_t priority = 0) {
+                                  TimeSource& time_source, uint32_t weight = 1,
+                                  uint32_t priority = 0) {
   return std::make_shared<HostImpl>(
       cluster, "", Network::Utility::resolveUrl(url), nullptr, weight,
       envoy::config::core::v3::Locality(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), priority,
-      envoy::config::core::v3::UNKNOWN);
+      envoy::config::core::v3::UNKNOWN, time_source);
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                   const envoy::config::core::v3::Metadata& metadata,
-                                  uint32_t weight = 1) {
+                                  TimeSource& time_source, uint32_t weight = 1) {
   return std::make_shared<HostImpl>(
       cluster, "", Network::Utility::resolveUrl(url),
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), weight,
       envoy::config::core::v3::Locality(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-      envoy::config::core::v3::UNKNOWN);
+      envoy::config::core::v3::UNKNOWN, time_source);
 }
 
 inline HostSharedPtr
 makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
              const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-             uint32_t weight = 1) {
+             TimeSource& time_source, uint32_t weight = 1) {
   return std::make_shared<HostImpl>(cluster, "", Network::Utility::resolveUrl(url), nullptr, weight,
                                     envoy::config::core::v3::Locality(), health_check_config, 0,
-                                    envoy::config::core::v3::UNKNOWN);
+                                    envoy::config::core::v3::UNKNOWN, time_source);
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
-                                                             const std::string& url) {
+                                                             const std::string& url,
+                                                             TimeSource& time_source) {
   return std::make_shared<HostDescriptionImpl>(
       cluster, "", Network::Utility::resolveUrl(url), nullptr,
       envoy::config::core::v3::Locality().default_instance(),
-      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0);
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0, time_source);
 }
 
 inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& locality_hosts,

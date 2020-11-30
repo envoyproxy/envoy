@@ -5,6 +5,7 @@
 #include <csignal>
 
 #include "common/common/assert.h"
+#include "common/signal/fatal_action.h"
 #include "common/version/version.h"
 
 namespace Envoy {
@@ -22,8 +23,31 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
   }
   tracer.logTrace();
 
-  // Finally after logging the stack trace, call any registered crash handlers.
-  FatalErrorHandler::callFatalErrorHandlers(std::cerr);
+  // Finally after logging the stack trace, call the crash handlers
+  // in order from safe to unsafe.
+  auto status = FatalErrorHandler::runSafeActions();
+
+  switch (status) {
+  case FatalAction::Status::Success:
+    FatalErrorHandler::callFatalErrorHandlers(std::cerr);
+    FatalErrorHandler::runUnsafeActions();
+    break;
+  case FatalAction::Status::ActionManagerUnset:
+    FatalErrorHandler::callFatalErrorHandlers(std::cerr);
+    break;
+  case FatalAction::Status::RunningOnAnotherThread: {
+    // We should wait for some duration for the other thread to finish
+    // running. We should add support for this scenario, even though the
+    // probability of it occurring is low.
+    // TODO(kbaichoo): Implement a configurable call to sleep
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    break;
+  }
+  case FatalAction::Status::AlreadyRanOnThisThread:
+    // We caused another fatal signal to be raised.
+    std::cerr << "Our FatalActions triggered a fatal signal.\n";
+    break;
+  }
 
   signal(sig, SIG_DFL);
   raise(sig);

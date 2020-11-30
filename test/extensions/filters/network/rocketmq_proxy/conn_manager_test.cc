@@ -39,7 +39,7 @@ private:
   RocketmqFilterStats stats_;
 };
 
-class RocketmqConnectionManagerTest : public testing::Test {
+class RocketmqConnectionManagerTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   RocketmqConnectionManagerTest() : stats_(RocketmqFilterStats::generateStats("test.", store_)) {}
 
@@ -93,7 +93,8 @@ public:
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_info_, "tcp://127.0.0.1:80")};
+  Upstream::HostSharedPtr host_{
+      Upstream::makeTestHost(cluster_info_, "tcp://127.0.0.1:80", simTime())};
   Upstream::PrioritySetImpl priority_set_;
   NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
 };

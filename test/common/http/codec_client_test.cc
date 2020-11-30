@@ -40,7 +40,7 @@ namespace Envoy {
 namespace Http {
 namespace {
 
-class CodecClientTest : public testing::Test {
+class CodecClientTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   CodecClientTest() {
     connection_ = new NiceMock<Network::MockClientConnection>();
@@ -72,7 +72,7 @@ public:
   std::shared_ptr<Upstream::MockIdleTimeEnabledClusterInfo> cluster_{
       new NiceMock<Upstream::MockIdleTimeEnabledClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
-      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
@@ -279,7 +279,8 @@ TEST_F(CodecClientTest, SSLConnectionInfo) {
 }
 
 // Test the codec getting input from a real TCP connection.
-class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class CodecNetworkTest : public Event::TestUsingSimulatedTime,
+                         public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource()) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
@@ -355,7 +356,7 @@ protected:
   std::unique_ptr<CodecClientForTest> client_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
-      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
   Network::ConnectionPtr upstream_connection_;
   NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
   Network::ClientConnection* client_connection_{};
@@ -374,6 +375,7 @@ TEST_P(CodecNetworkTest, SendData) {
   upstream_connection_->write(data, false);
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     EXPECT_EQ(full_data, data.toString());
+    data.drain(data.length());
     dispatcher_->exit();
     return Http::okStatus();
   }));
@@ -397,10 +399,12 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
       .Times(2)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ("", data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }));
   // Because the headers are not complete, the disconnect will reset the stream.
@@ -435,6 +439,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
       .Times(2)
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
         EXPECT_EQ(full_data, data.toString());
+        data.drain(data.length());
         return Http::okStatus();
       }))
       .WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
