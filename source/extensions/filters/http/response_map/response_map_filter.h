@@ -28,7 +28,7 @@ using ResponseMapFilterConfigSharedPtr = std::shared_ptr<ResponseMapFilterConfig
 
 /*
  * Per-route configuration for the response map filter.
- * Allows the response map to be overriden or disabled.
+ * Allows the response map to be overridden or disabled.
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
