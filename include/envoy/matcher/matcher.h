@@ -110,7 +110,7 @@ public:
   virtual ~InputMatcher() = default;
 
   /**
-   * whether the provided input is a match.
+   * Whether the provided input is a match.
    * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
    * lookup failed.
    */
@@ -134,7 +134,7 @@ struct DataInputGetResult {
     // The data is not yet available.
     NotAvailable,
     // Some data is available, but more might arrive.
-    MoreDataAvailable,
+    MoreDataMightBeAvailable,
     // All the data is available.
     AllDataAvailable
   };
@@ -153,7 +153,7 @@ struct DataInputGetResult {
     case DataInputGetResult::DataAvailability::NotAvailable:
       out << " (not available)";
       break;
-    case DataInputGetResult::DataAvailability::MoreDataAvailable:
+    case DataInputGetResult::DataAvailability::MoreDataMightBeAvailable:
       out << " (more data available)";
       break;
     case DataInputGetResult::DataAvailability::AllDataAvailable:;

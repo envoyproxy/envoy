@@ -37,7 +37,7 @@ public:
         return {true, OnMatch<DataType>{result.action_cb_, nullptr}};
       }
     } else if (input.data_availability_ ==
-               DataInputGetResult::DataAvailability::MoreDataAvailable) {
+               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       // It's possible that we were attempting a lookup with a partial value, so delay matching
       // until we know that we actually failed.
       return {false, absl::nullopt};

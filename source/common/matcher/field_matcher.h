@@ -6,14 +6,28 @@
 namespace Envoy {
 namespace Matcher {
 
+/**
+ * Base class for matching against a single input.
+ */
 template <class DataType> class FieldMatcher {
 public:
   virtual ~FieldMatcher() = default;
 
+  /**
+   * Attempts to match against the provided data.
+   * @returns absl::optional<bool> if matching was possible, the result of the match. Otherwise
+   * absl::nullopt if the data is not available.
+   */
   virtual absl::optional<bool> match(const DataType& data) PURE;
 };
 template <class DataType> using FieldMatcherPtr = std::unique_ptr<FieldMatcher<DataType>>;
 
+/**
+ * A FieldMatcher that attempts to match multiple FieldMatchers, evaluating to true iff all the
+ * FieldMatchers evaluate to true.
+ *
+ * If any of the underlying FieldMatchers are unable to produce a result, absl::nullopt is returned.
+ */
 template <class DataType> class AllFieldMatcher : public FieldMatcher<DataType> {
 public:
   explicit AllFieldMatcher(std::vector<FieldMatcherPtr<DataType>>&& matchers)
@@ -39,6 +53,13 @@ private:
   const std::vector<FieldMatcherPtr<DataType>> matchers_;
 };
 
+/**
+ * A FieldMatcher that attempts to match multiple FieldMatchers, evaluating to true iff any of the
+ * FieldMatchers evaluate to true.
+ *
+ * If any of the underlying FieldMatchers are unable to produce a result before we see a successful
+ * match, absl::nullopt is returned.
+ */
 template <class DataType> class AnyFieldMatcher : public FieldMatcher<DataType> {
 public:
   explicit AnyFieldMatcher(std::vector<FieldMatcherPtr<DataType>>&& matchers)
@@ -79,8 +100,8 @@ public:
     }
 
     const auto current_match = input_matcher_->match(input.data_);
-    if (!current_match &&
-        input.data_availability_ == DataInputGetResult::DataAvailability::MoreDataAvailable) {
+    if (!current_match && input.data_availability_ ==
+                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       ENVOY_LOG(debug, "No match yet; delaying result as more data might be available.");
       return absl::nullopt;
     }

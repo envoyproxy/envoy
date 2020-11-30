@@ -107,12 +107,12 @@ TEST_F(ExactMapMatcherTest, DataNotAvailable) {
   verifyNotEnoughDataForMatch(result);
 }
 
-TEST_F(ExactMapMatcherTest, MoreDataAvailableNoMatch) {
+TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
   const auto no_match_config = stringValue("no_match");
 
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataAvailable, "no match"}),
+          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
       OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
@@ -122,10 +122,10 @@ TEST_F(ExactMapMatcherTest, MoreDataAvailableNoMatch) {
   verifyNotEnoughDataForMatch(result);
 }
 
-TEST_F(ExactMapMatcherTest, MoreDataAvailableMatch) {
+TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataAvailable, "match"}),
+          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
       OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
