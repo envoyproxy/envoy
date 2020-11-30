@@ -76,10 +76,7 @@ void ActiveClient::StreamWrapper::onDecodeComplete() {
     parent_.codec_client_->close();
   } else {
     auto* pool = &parent_.parent();
-    if (pool->hasPendingStreams()) {
-      // SchedulableCallback guarantees callback will only be scheduled if not already enabled.
-      pool->upstreamReadyCallback()->scheduleCallbackCurrentIteration();
-    }
+    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
     parent_.stream_wrapper_.reset();
 
     pool->checkForDrained();

@@ -55,8 +55,7 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
           wrapTransportSocketOptions(transport_socket_options, protocols), state),
-      random_generator_(random_generator),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {
+      random_generator_(random_generator) {
   ASSERT(!protocols.empty());
 }
 
