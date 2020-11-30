@@ -111,11 +111,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg enable_fine_grain_logging(
       "", "enable-fine-grain-logging",
       "Logger mode: enable file level log control(Fancy Logger)or not", cmd, false);
-  TCLAP::ValueArg<bool> log_format_prefix_with_location(
-      "", "log-format-prefix-with-location",
-      "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "
-      "').",
-      false, false, "bool", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
@@ -152,10 +147,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg cpuset_threads(
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
-  TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
-                                              "Use fake symbol table implementation", false, false,
-                                              "bool", cmd);
-
   TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
                                                   "Comma-separated list of extensions to disable",
                                                   false, "", "string", cmd);
@@ -186,11 +177,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
-  fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
-  if (fake_symbol_table_enabled_) {
-    ENVOY_LOG(warn, "Fake symbol tables have been removed. Please remove references to "
-                    "--use-fake-symbol-table");
-  }
 
   cpuset_threads_ = cpuset_threads.getValue();
 
@@ -201,9 +187,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   log_format_ = log_format.getValue();
-  if (log_format_prefix_with_location.getValue()) {
-    log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
-  }
   log_format_escaped_ = log_format_escaped.getValue();
   enable_fine_grain_logging_ = enable_fine_grain_logging.getValue();
 
@@ -431,8 +414,8 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
       parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
       mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
-      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false),
-      socket_path_("@envoy_domain_socket"), socket_mode_(0) {}
+      mutex_tracing_enabled_(false), cpuset_threads_(false), socket_path_("@envoy_domain_socket"),
+      socket_mode_(0) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

@@ -618,9 +618,11 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
     ],
 )
@@ -721,6 +723,7 @@ envoy_cc_test_library(
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
@@ -1069,10 +1072,14 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -1139,8 +1146,13 @@ envoy_cc_test(
         "sds_dynamic_integration_test.cc",
     ],
     data = [
+        "sds_dynamic_key_rotation_setup.sh",
         "//test/config/integration/certs",
     ],
+    # TODO(envoyproxy/windows-dev): The key rotation in SdsDynamicKeyRotationIntegrationTest via
+    # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
+    # correctly handle symlinks.
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
@@ -1564,7 +1576,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
         "//test/test_common:logging_lib",
-        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -1589,5 +1600,21 @@ envoy_cc_test(
         ":integration_lib",
         "//test/common/http/http2:http2_frame",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "cluster_upstream_extension_integration_test",
+    srcs = [
+        "cluster_upstream_extension_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/protobuf",
+        "//test/integration/upstreams:per_host_upstream_config",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

@@ -9,7 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/subscription_factory_impl.h"
-#include "common/config/udpa_resource.h"
+#include "common/config/xds_resource.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -49,8 +49,8 @@ public:
         resource_decoder_);
   }
 
-  SubscriptionPtr collectionSubscriptionFromUrl(const std::string& udpa_url) {
-    const auto resource_locator = UdpaResourceIdentifier::decodeUrl(udpa_url);
+  SubscriptionPtr collectionSubscriptionFromUrl(const std::string& xds_url) {
+    const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
     return subscription_factory_.collectionSubscriptionFromUrl(
         resource_locator, {}, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
         callbacks_, resource_decoder_);

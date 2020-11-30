@@ -15,7 +15,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/collection_entry.proto";
+import "xds/core/v3/collection_entry.proto";
 
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Listener list collections. Entries are *Listener* resources or references.
 // [#not-implemented-hide:]
 message ListenerCollection {
-  repeated udpa.core.v1.CollectionEntry entries = 1;
+  repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
 // [#next-free-field: 26]
