@@ -80,10 +80,14 @@ public:
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
+  Event::SchedulableCallback* upstreamReadyCallback() { return upstream_ready_cb_.get(); }
 
 protected:
   friend class ActiveClient;
   Random::RandomGenerator& random_generator_;
+
+  // onUpstreamReady callback only used by HTTP/1.1 implementation.
+  Event::SchedulableCallbackPtr upstream_ready_cb_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
