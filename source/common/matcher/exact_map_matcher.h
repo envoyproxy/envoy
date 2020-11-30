@@ -47,7 +47,8 @@ public:
   }
 
   void addChild(std::string value, OnMatch<DataType>&& on_match) {
-    children_.emplace(value, std::move(on_match));
+    const auto itr_and_exists = children_.emplace(value, std::move(on_match));
+    ASSERT(itr_and_exists.second);
   }
 
 private:
