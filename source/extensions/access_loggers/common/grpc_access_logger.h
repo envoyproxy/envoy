@@ -12,6 +12,7 @@
 
 #include "common/common/assert.h"
 #include "common/grpc/typed_async_client.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"

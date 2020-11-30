@@ -34,6 +34,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:typed_async_client_lib",
+        "//source/common/protobuf:utility_lib",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
