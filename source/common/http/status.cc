@@ -116,7 +116,8 @@ Status inboundFramesWithEmptyPayloadError() {
 }
 
 Status streamAlreadyReset() {
-  absl::Status status(absl::StatusCode::kInternal, "Attempted to proxy headers after stream has been reset.");
+  absl::Status status(absl::StatusCode::kInternal,
+                      "Attempted to proxy headers after stream has been reset.");
   storePayload(status, EnvoyStatusPayload(StatusCode::StreamAlreadyReset));
   return status;
 }
