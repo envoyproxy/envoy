@@ -9,7 +9,7 @@ namespace Matcher {
 
 /**
  * A match tree that iterates over a list of matchers to find the first one that matches. If one
- * does, the MatchResult will be the one specified by the invidiual matcher.
+ * does, the MatchResult will be the one specified by the individual matcher.
  */
 template <class DataType> class ListMatcher : public MatchTree<DataType> {
 public:
