@@ -1,11 +1,15 @@
 #include "common/matcher/field_matcher.h"
+#include "common/matcher/matcher.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Matcher {
 
-struct TestData {};
+struct TestData {
+  static absl::string_view name() { return "test"; }
+};
+
 class FieldMatcherTest : public testing::Test {
 public:
   SingleFieldMatcherPtr<TestData>

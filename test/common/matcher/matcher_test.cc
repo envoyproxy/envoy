@@ -17,7 +17,9 @@
 namespace Envoy {
 namespace Matcher {
 
-struct TestData {};
+struct TestData {
+  static absl::string_view name() { return "test"; }
+};
 
 class TestDataInput : public DataInput<TestData> {
 public:

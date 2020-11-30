@@ -24,6 +24,7 @@ envoy_cc_test(
     srcs = ["field_matcher_test.cc"],
     deps = [
         "//source/common/matcher:field_matcher_lib",
+        "//source/common/matcher:matcher_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -179,9 +179,21 @@ template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataTyp
  */
 template <class DataType> class DataInputFactory : public Config::TypedFactory {
 public:
+  /**
+   * Creates a DataInput from the provided config.
+   */
   virtual DataInputPtr<DataType> createDataInput(const Protobuf::Message& config) PURE;
 
-  std::string category() const override { return "envoy.matching.input"; }
+  /**
+   * The category of this factory depends on the DataType, so we require a name() function to exist
+   * that allows us to get a string representation of the data type for categorization.
+   */
+  std::string category() const override {
+    // Static assert to guide implementors to understand what is required.
+    static_assert(std::is_convertible<absl::string_view, decltype(DataType::name())>(),
+                  "DataType must implement valid name() function");
+    return fmt::format("envoy.matching.{}.input", DataType::name());
+  }
 };
 
 } // namespace Matcher

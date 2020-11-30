@@ -12,7 +12,9 @@
 namespace Envoy {
 namespace Matcher {
 
-struct TestData {};
+struct TestData {
+  static absl::string_view name() { return "test"; }
+};
 
 struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
   explicit StringAction(const std::string& string) : string_(string) {}
@@ -111,8 +113,8 @@ TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
   const auto no_match_config = stringValue("no_match");
 
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
       OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
@@ -124,8 +126,8 @@ TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
 
 TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
       OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
 
   matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
