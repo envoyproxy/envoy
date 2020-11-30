@@ -45,3 +45,7 @@ def _backport():
 handlers.command(name='backport', func=_backport)
 
 
+def _cr(event):
+  print(event)
+  
+handlers.check_run(func=_cr)
