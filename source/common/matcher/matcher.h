@@ -70,7 +70,7 @@ public:
       return createTreeMatcher(config);
     case envoy::config::common::matcher::v3::Matcher::kMatcherList:
       return createListMatcher(config);
-    case envoy::config::common::matcher::v3::Matcher::MATCHER_TYPE_NOT_SET:
+    default:
       NOT_REACHED_GCOVR_EXCL_LINE;
       return nullptr;
     }

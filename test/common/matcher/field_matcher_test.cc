@@ -27,6 +27,7 @@ public:
   createMatchers(std::vector<std::pair<bool, DataInputGetResult::DataAvailability>> values) {
     std::vector<FieldMatcherPtr<TestData>> matchers;
 
+    matchers.reserve(values.size());
     for (const auto& v : values) {
       matchers.emplace_back(std::make_unique<SingleFieldMatcher<TestData>>(
           std::make_unique<TestInput>(absl::nullopt, v.second),
@@ -39,6 +40,7 @@ public:
   std::vector<FieldMatcherPtr<TestData>> createMatchers(std::vector<bool> values) {
     std::vector<std::pair<bool, DataInputGetResult::DataAvailability>> new_values;
 
+    new_values.reserve(values);
     for (const auto v : values) {
       new_values.emplace_back(v, DataInputGetResult::DataAvailability::AllDataAvailable);
     }
