@@ -8,8 +8,8 @@ namespace Envoy {
 namespace Matcher {
 
 /**
- * Matcher that attempts to match a list of matchers, selecting the oneof of the first matcher that
- * matches.
+ * A match tree that iterates over a list of matchers to find the first one that matches. If one does, the
+ * MatchResult will be the one specified by the invidiual matcher.
  */
 template <class DataType> class ListMatcher : public MatchTree<DataType> {
 public:

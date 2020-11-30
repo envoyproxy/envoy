@@ -66,11 +66,12 @@ public:
       : validation_visitor_(validation_visitor) {}
 
   MatchTreeSharedPtr<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
-    if (config.has_matcher_tree()) {
+    switch (config.matcher_type_case()) {
+    case envoy::config::common::matcher::v3::Matcher::kMatcherTree:
       return createTreeMatcher(config);
-    } else if (config.has_matcher_list()) {
+    case envoy::config::common::matcher::v3::Matcher::kMatcherList:
       return createListMatcher(config);
-    } else {
+    case envoy::config::common::matcher::v3::Matcher::MATCHER_TYPE_NOT_SET:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }

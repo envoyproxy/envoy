@@ -85,6 +85,13 @@ private:
   const std::vector<FieldMatcherPtr<DataType>> matchers_;
 };
 
+/**
+ * Implementation of a FieldMatcher that extracts an input value from the provided data and attempts
+ * to match using an InputMatcher. absl::nullopt is returned whenever the data is not available or
+ * if we failed to match and there is more data available.
+ * A consequence of this is that if a match result is desired, care should be taken so that matching
+ * is done with all the data available at some point.
+ */
 template <class DataType>
 class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
