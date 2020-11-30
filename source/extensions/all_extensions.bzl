@@ -1,7 +1,7 @@
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load("@envoy_build_config//:extensions_build_config.bzl", "DISABLED_BY_DEFAULT_EXTENSIONS", "EXTENSIONS")
 
-GLOBAL_DENYLIST = [k for k, v in DISABLED_BY_DEFAULT_EXTENSIONS.items()]
+GLOBAL_DENYLIST = [k for k in DISABLED_BY_DEFAULT_EXTENSIONS.keys()]
 
 # These extensions are registered using the extension system but are required for the core Envoy build.
 # The map may be overridden by extensions specified in envoy_build_config.
