@@ -20,6 +20,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -40,6 +41,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/signal/fatal_error_handler.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
@@ -244,6 +246,14 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
+ProcessContextOptRef InstanceImpl::processContext() {
+  if (process_context_ == nullptr) {
+    return absl::nullopt;
+  }
+
+  return *process_context_;
+}
+
 namespace {
 // Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
 void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
@@ -258,7 +268,7 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
     envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
     load_function(bootstrap_v2, false);
     Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
-    MessageUtil::onVersionUpgradeWarn("v2 bootstrap");
+    MessageUtil::onVersionUpgradeDeprecation("v2 bootstrap", false);
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
@@ -418,6 +428,26 @@ void InstanceImpl::initialize(const Options& options,
         factory);
     bootstrap_extensions_.push_back(
         factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
+
+  // Register the fatal actions.
+  {
+    FatalAction::FatalActionPtrList safe_actions;
+    FatalAction::FatalActionPtrList unsafe_actions;
+    for (const auto& action_config : bootstrap_.fatal_actions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::FatalActionFactory>(
+              action_config.config());
+      auto action = factory.createFatalActionFromProto(action_config, this);
+
+      if (action->isAsyncSignalSafe()) {
+        safe_actions.push_back(std::move(action));
+      } else {
+        unsafe_actions.push_back(std::move(action));
+      }
+    }
+    Envoy::FatalErrorHandler::registerFatalActions(
+        std::move(safe_actions), std::move(unsafe_actions), api_->threadFactory());
   }
 
   if (!bootstrap_.default_socket_interface().empty()) {
@@ -736,6 +766,7 @@ void InstanceImpl::terminate() {
   restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
+  FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }

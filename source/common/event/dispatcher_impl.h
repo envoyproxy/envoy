@@ -94,6 +94,9 @@ public:
     }
   }
 
+  void
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
+
 private:
   // Holds a reference to the watchdog registered with this dispatcher and the timer used to ensure
   // that the dog is touched periodically.

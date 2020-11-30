@@ -1256,6 +1256,13 @@ TEST_F(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
   TestBufferMove(4096 - 127, 128, 2);
 }
 
+TEST_F(OwnedImplTest, FrontSlice) {
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(0, buffer.frontSlice().len_);
+  buffer.add("a");
+  EXPECT_EQ(1, buffer.frontSlice().len_);
+}
+
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

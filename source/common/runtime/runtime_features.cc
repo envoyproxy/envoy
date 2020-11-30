@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.always_apply_route_header_rules",
-    "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.reloadable_features.activate_timers_next_event_loop",
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_prefetch",
@@ -101,6 +100,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // v2 is fatal-by-default.
+    "envoy.reloadable_features.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
@@ -110,9 +111,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // gRPC Timeout header is missing (#13580)
-    "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
-
 };
 
 RuntimeFeatures::RuntimeFeatures() {

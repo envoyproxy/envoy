@@ -5,12 +5,13 @@ Is there a contract my HTTP filter must adhere to?
 
 * Headers encoding/decoding
 
-  * During encoding/decoding of headers if a filter returns ``FilterHeadersStatus::StopIteration``,
-    the processing can be resumed if ``encodeData()``/``decodeData()`` return
+  * During encoding/decoding of headers if a local reply wasn't sent and a filter
+    returns ``FilterHeadersStatus::StopIteration``, the processing can be resumed
+    if ``encodeData()``/``decodeData()`` return
     ``FilterDataStatus::Continue`` or by explicitly calling
     ``continueEncoding()``/``continueDecoding()``.
 
-  * During encoding/decoding of headers if a filter returns
+  * During encoding/decoding of headers if a local reply wasn't sent and a filter returns
     ``FilterHeadersStatus::StopAllIterationAndBuffer`` or
     ``FilterHeadersStatus::StopAllIterationAndWatermark``, the processing can be resumed by calling
     ``continueEncoding()``/``continueDecoding()``.
@@ -24,7 +25,7 @@ Is there a contract my HTTP filter must adhere to?
 
 * Data encoding/decoding
 
-  * During encoding/decoding of data if a filter returns
+  * During encoding/decoding of data if a local reply wasn't sent and a filter returns
     ``FilterDataStatus::StopIterationAndBuffer``, ``FilterDataStatus::StopIterationAndWatermark``,
     or ``FilterDataStatus::StopIterationNoBuffer``, the processing can be resumed if
     ``encodeData()``/``decodeData()`` return ``FilterDataStatus::Continue`` or by explicitly
@@ -32,7 +33,8 @@ Is there a contract my HTTP filter must adhere to?
 
 * Trailers encoding/decoding
 
-  * During encoding/decoding of trailers if a filter returns ``FilterTrailersStatus::StopIteration``,
+  * During encoding/decoding of trailers if a local reply wasn't sent and a filter
+    returns ``FilterTrailersStatus::StopIteration``,
     the processing can be resumed by explicitly calling ``continueEncoding()``/``continueDecoding()``.
 
 Are there well-known headers that will appear in the given headers map of ``decodeHeaders()``?

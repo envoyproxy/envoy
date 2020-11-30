@@ -17,6 +17,7 @@ public:
   ~MockHttp1StreamEncoderOptions() override;
 
   MOCK_METHOD(void, disableChunkEncoding, ());
+  MOCK_METHOD(void, enableHalfClose, ());
 };
 
 class MockRequestEncoder : public RequestEncoder {

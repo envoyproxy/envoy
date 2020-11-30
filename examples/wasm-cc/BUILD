@@ -11,7 +11,7 @@ envoy_package()
 
 selects.config_setting_group(
     name = "include_wasm_config",
-    match_all = ["//bazel:x86", "//bazel:wasm_all"],
+    match_all = ["//bazel:x86", "//bazel:wasm_v8"],
 )
 
 filegroup(

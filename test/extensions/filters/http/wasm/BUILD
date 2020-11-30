@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:metadata_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/wasm:wasm_filter_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
         "//test/extensions/filters/http/wasm/test_data:test_cpp_plugin",
         "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
@@ -57,6 +59,7 @@ envoy_extension_cc_test(
         "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/filters/http/wasm:config",
+        "//test/extensions/common/wasm:wasm_runtime",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/http/wasm/v3:pkg_cc_proto",

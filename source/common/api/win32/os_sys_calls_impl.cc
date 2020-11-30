@@ -144,14 +144,22 @@ SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t leng
 }
 
 SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags) {
-  DWORD bytes_received;
+  DWORD bytes_received = 0;
   LPFN_WSARECVMSG recvmsg_fn_ptr = getFnPtrWSARecvMsg();
   wsamsgResult wsamsg = msghdrToWSAMSG(msg);
   // Windows supports only a single flag on input to WSARecvMsg
   wsamsg.wsamsg_->dwFlags = flags & MSG_PEEK;
   const int rc = recvmsg_fn_ptr(sockfd, wsamsg.wsamsg_.get(), &bytes_received, nullptr, nullptr);
   if (rc == SOCKET_ERROR) {
-    return {-1, ::WSAGetLastError()};
+    // We try to match the UNIX behavior for truncated packages. In that case the return code is
+    // the length of the allocated buffer and we get the value from `dwFlags`.
+    auto last_error = ::WSAGetLastError();
+    if (last_error == WSAEMSGSIZE) {
+      msg->msg_flags = wsamsg.wsamsg_->dwFlags;
+      return {bytes_received, 0};
+    }
+
+    return {rc, last_error};
   }
   msg->msg_namelen = wsamsg.wsamsg_->namelen;
   msg->msg_flags = wsamsg.wsamsg_->dwFlags;

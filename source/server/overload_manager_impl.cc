@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/config/overload/v3/overload.pb.validate.h"
-#include "envoy/server/overload_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -49,6 +48,11 @@ public:
     const Event::ScaledTimerMinimum minimum =
         minimum_it != timer_minimums_.end() ? minimum_it->second
                                             : Event::ScaledTimerMinimum(Event::ScaledMinimum(1.0));
+    return scaled_timer_manager_->createTimer(minimum, std::move(callback));
+  }
+
+  Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
+                                    Event::TimerCb callback) override {
     return scaled_timer_manager_->createTimer(minimum, std::move(callback));
   }
 

@@ -25,6 +25,7 @@ envoy_cc_extension(
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/thread_local:thread_local_object",
         "//source/common/common:cleanup_lib",
         "//source/common/http:codes_lib",
         "//source/common/runtime:runtime_lib",
