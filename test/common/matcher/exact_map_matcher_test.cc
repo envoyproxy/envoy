@@ -71,6 +71,17 @@ TEST_F(ExactMapMatcherTest, NoMatch) {
   verifyNoMatch(result);
 }
 
+TEST_F(ExactMapMatcherTest, NoMatchDueToNoData) {
+  ExactMapMatcher<TestData> matcher(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt}),
+      absl::nullopt);
+
+  TestData data;
+  const auto result = matcher.match(data);
+  verifyNoMatch(result);
+}
+
 TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(

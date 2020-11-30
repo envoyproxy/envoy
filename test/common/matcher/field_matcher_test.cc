@@ -1,5 +1,6 @@
 #include "common/matcher/field_matcher.h"
 #include "common/matcher/matcher.h"
+#include "envoy/matcher/matcher.h"
 
 #include "gtest/gtest.h"
 
@@ -14,31 +15,47 @@ class FieldMatcherTest : public testing::Test {
 public:
   SingleFieldMatcherPtr<TestData>
   createSingleMatcher(absl::optional<std::string> input,
-                      std::function<bool(absl::optional<absl::string_view>)> predicate) {
-    return std::make_unique<SingleFieldMatcher<TestData>>(std::make_unique<TestInput>(input),
-                                                          std::make_unique<TestMatcher>(predicate));
+                      std::function<bool(absl::optional<absl::string_view>)> predicate,
+                      DataInputGetResult::DataAvailability availability =
+                          DataInputGetResult::DataAvailability::AllDataAvailable) {
+    return std::make_unique<SingleFieldMatcher<TestData>>(
+        std::make_unique<TestInput>(input, availability), std::make_unique<TestMatcher>(predicate));
   }
 
-  std::vector<FieldMatcherPtr<TestData>> createMatchers(std::vector<bool> values) {
+  std::vector<FieldMatcherPtr<TestData>>
+  createMatchers(std::vector<std::pair<bool, DataInputGetResult::DataAvailability>> values) {
     std::vector<FieldMatcherPtr<TestData>> matchers;
 
-    for (const auto v : values) {
+    for (const auto& v : values) {
       matchers.emplace_back(std::make_unique<SingleFieldMatcher<TestData>>(
-          std::make_unique<TestInput>(absl::nullopt), std::make_unique<BoolMatcher>(v)));
+          std::make_unique<TestInput>(absl::nullopt, v.second),
+          std::make_unique<BoolMatcher>(v.first)));
     }
 
     return matchers;
   }
 
+  std::vector<FieldMatcherPtr<TestData>> createMatchers(std::vector<bool> values) {
+    std::vector<std::pair<bool, DataInputGetResult::DataAvailability>> new_values;
+
+    for (const auto v : values) {
+      new_values.emplace_back(v, DataInputGetResult::DataAvailability::AllDataAvailable);
+    }
+
+    return createMatchers(new_values);
+  }
+
   struct TestInput : public DataInput<TestData> {
-    explicit TestInput(absl::optional<std::string> input) : input_(input) {}
+    TestInput(absl::optional<std::string> input, DataInputGetResult::DataAvailability availability)
+        : input_(input), availability_(availability) {}
 
     DataInputGetResult get(const TestData&) override {
-      return {DataInputGetResult::DataAvailability::AllDataAvailable,
+      return {availability_,
               input_ ? absl::make_optional(absl::string_view(*input_)) : absl::nullopt};
     }
 
     absl::optional<std::string> input_;
+    DataInputGetResult::DataAvailability availability_;
   };
 
   struct BoolMatcher : public InputMatcher {
@@ -61,6 +78,14 @@ public:
 
 TEST_F(FieldMatcherTest, SingleFieldMatcher) {
   EXPECT_TRUE(createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()));
+  EXPECT_FALSE(createSingleMatcher(
+                  absl::nullopt, [](auto v) { return v == "foo"; },
+                  DataInputGetResult::DataAvailability::NotAvailable)
+                  ->match(TestData()));
+  EXPECT_FALSE(createSingleMatcher(
+                  "fo", [](auto v) { return v == "foo"; },
+                  DataInputGetResult::DataAvailability::MoreDataMightBeAvailable)
+                  ->match(TestData()));
   EXPECT_TRUE(*createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()));
   EXPECT_FALSE(*createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()));
   EXPECT_TRUE(*createSingleMatcher(absl::nullopt, [](auto v) {
@@ -74,12 +99,26 @@ TEST_F(FieldMatcherTest, AnyMatcher) {
   EXPECT_TRUE(*AnyFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()));
   EXPECT_TRUE(*AnyFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()));
   EXPECT_FALSE(*AnyFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()));
+  EXPECT_FALSE(
+      AnyFieldMatcher<TestData>(
+          createMatchers(
+              {std::make_pair(false,
+                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
+               std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)}))
+          .match(TestData()));
 }
 
 TEST_F(FieldMatcherTest, AllMatcher) {
   EXPECT_FALSE(*AllFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()));
   EXPECT_TRUE(*AllFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()));
   EXPECT_FALSE(*AllFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()));
+  EXPECT_FALSE(
+      AllFieldMatcher<TestData>(
+          createMatchers(
+              {std::make_pair(false,
+                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
+               std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)}))
+          .match(TestData()));
 }
 
 } // namespace Matcher
