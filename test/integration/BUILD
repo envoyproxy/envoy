@@ -618,9 +618,11 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
     ],
 )
@@ -721,6 +723,7 @@ envoy_cc_test_library(
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
@@ -1573,7 +1576,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
         "//test/test_common:logging_lib",
-        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
