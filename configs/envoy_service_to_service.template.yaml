@@ -184,6 +184,7 @@ static_resources:
             config_source:
                api_config_source:
                  api_type: GRPC
+                 transport_api_version: V3
                  grpc_services:
                    envoy_grpc:
                      cluster_name: "rds"
@@ -544,6 +545,7 @@ dynamic_resources:
   cds_config:
     api_config_source:
       api_type: REST
+      transport_api_version: V3
       cluster_names:
       - cds_cluster
       refresh_delay: 30s

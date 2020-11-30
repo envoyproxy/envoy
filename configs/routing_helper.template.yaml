@@ -17,6 +17,7 @@
     eds_config:
       api_config_source:
         api_type: REST
+        transport_api_version: V3
         cluster_names:
         - sds
         refresh_delay: 30s

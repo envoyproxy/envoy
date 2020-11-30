@@ -311,6 +311,24 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
 }
 
+// Validate that the use of V2 transport version is rejected by default.
+TEST_P(AdsIntegrationTest, RejectV2TransportConfigByDefault) {
+  initialize();
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  auto cluster = buildCluster("cluster_0");
+  auto* api_config_source =
+      cluster.mutable_eds_cluster_config()->mutable_eds_config()->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V2);
+  envoy::config::core::v3::GrpcService* grpc_service = api_config_source->add_grpc_services();
+  setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "1");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  EXPECT_EQ(1, test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value());
+}
+
 // Regression test for the use-after-free crash when processing RDS update (#3953).
 TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
   initialize();
@@ -1386,6 +1404,7 @@ TEST_P(AdsClusterV2Test, RejectV2ConfigByDefault) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", true);
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  EXPECT_EQ(1, test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value());
 }
 
 // Verify CDS is paused during cluster warming.

@@ -658,11 +658,14 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
-// Validate that bootstrap pb_text loads.
-TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
-  EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
-                          initialize("test/server/test_data/server/node_bootstrap.pb_text"));
-  EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
+// Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
+// set.
+TEST_P(ServerInstanceImplTest, FailToLoadV2TransportWithoutExplicitVersion) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/dynamic_v2.yaml"), DeprecatedMajorVersionException,
+      "V2 .and AUTO. xDS transport protocol versions are deprecated in.*"
+      "Support for v2 will be removed from Envoy at the start of Q1 2021. You may make use of v2 "
+      "in Q4 2020 by setting");
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
@@ -672,7 +675,7 @@ TEST_P(ServerInstanceImplTest,
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       DeprecatedMajorVersionException,
       "Support for v2 will be removed from Envoy at the start of Q1 2021. You may make use of v2 "
-      "in Q3 2020 by setting");
+      "in Q4 2020 by setting");
 }
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
@@ -795,6 +798,19 @@ TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromYaml) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
       EnvoyException, "has unknown fields");
+}
+
+// Validate that bootstrap with v2 dynamic transport loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest, LoadsV2TransportWithoutExplicitVersion) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/dynamic_v2.yaml");
+}
+
+// Validate that bootstrap pb_text loads.
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
+  EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
+                          initialize("test/server/test_data/server/node_bootstrap.pb_text"));
+  EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
 }
 
 // Validate that we blow up on invalid version number.

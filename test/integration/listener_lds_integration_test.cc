@@ -65,6 +65,7 @@ protected:
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               rds_config->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
@@ -84,6 +85,7 @@ protected:
       lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
       lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
       envoy::config::core::v3::GrpcService* grpc_service =
           lds_api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());

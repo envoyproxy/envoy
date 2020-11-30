@@ -22,6 +22,8 @@ public:
     tls_xds_upstream_ = false;
     defer_listener_finalization_ = true;
     skipPortUsageValidation();
+    // Keep using V2 bootstrap for now to allow V2 transport version.
+    v2_bootstrap_ = true;
   }
 
   static bool hasHiddenEnvoyDeprecated(const Protobuf::Message& message) {
