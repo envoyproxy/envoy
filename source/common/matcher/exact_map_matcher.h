@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Matcher {
 
 /**
- * Implementation of a `sublinear` matcher that provides O(1) lookup of exact values,
+ * Implementation of a `sublinear` match tree that provides O(1) lookup of exact values,
  * with one OnMatch per result.
  */
 template <class DataType>
