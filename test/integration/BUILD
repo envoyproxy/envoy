@@ -218,6 +218,8 @@ envoy_cc_test(
     ],
     tags = [
         "fails_on_windows",
+        # https://github.com/envoyproxy/envoy/issues/9784
+        "no_tsan",
     ],
     deps = [
         ":http_integration_lib",
@@ -837,10 +839,14 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )
 
