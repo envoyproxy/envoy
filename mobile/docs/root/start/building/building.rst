@@ -3,8 +3,6 @@
 Building
 ========
 
-.. _building_requirements:
-
 To build Envoy Mobile, your system must also be set up for building Envoy.
 To get started, you can use `this quick start guide
 <https://github.com/envoyproxy/envoy/tree/master/bazel#quick-start-bazel-build-for-developers>`_.
@@ -17,6 +15,8 @@ If the repo was not initially cloned recursively, you can manually initialize th
 
 ``git submodule update --init``
 
+.. _releases: https://github.com/lyft/envoy-mobile/releases
+
 ------------------
 Bazel requirements
 ------------------
@@ -25,7 +25,7 @@ Envoy Mobile is compiled using the version of Bazel specified in the
 :repo:`.bazelversion <.bazelversion>` file.
 
 To simplify build consistency across environments, bazelisk is used.
-Follow the Envoy instructions `here <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#installing-bazelisk-as-bazel>`_ to install bazelisk as bazel.
+Follow `these Envoy instructions <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#installing-bazelisk-as-bazel>`_ to install bazelisk as bazel.
 
 --------------------
 Android requirements
@@ -55,7 +55,8 @@ This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and 
 
 Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`dist/envoy.aar <dist>`.
 
-Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_.
+Alternatively, you can use the **prebuilt artifact** from Envoy Mobile's releases_
+or from :ref:`Maven <maven>`.
 
 The ``envoy_mobile_android`` Bazel rule defined in the :repo:`dist BUILD file <dist/BUILD>` provides
 an example of how this artifact may be used.
@@ -81,7 +82,8 @@ This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and 
 Upon completion of the build, you'll see a ``Envoy.framework`` directory at
 :repo:`dist/Envoy.framework <dist>`.
 
-Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_.
+Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_
+or from :ref:`CocoaPods <cocoapods>`.
 
 The ``envoy_mobile_ios`` Bazel rule defined in the :repo:`dist BUILD file <dist/BUILD>` provides an
 example of how this artifact may be used.
@@ -93,14 +95,23 @@ example of how this artifact may be used.
 
 For a demo of a working app using this artifact, see the :ref:`hello_world` example.
 
-.. _releases: https://github.com/lyft/envoy-mobile/releases
+.. _maven:
+
+-----
+Maven
+-----
+
+Envoy Mobile Android artifacts are also uploaded to Maven, and can be accessed/downloaded
+`here <https://mvnrepository.com/artifact/io.envoyproxy.envoymobile/envoy>`_.
+
+.. _cocoapods:
 
 ---------
 CocoaPods
 ---------
 
-If you use CocoaPods, you can add the following to your ``Podfile`` to use the latest version of the
-prebuilt Envoy Mobile framework.
+If you use CocoaPods on iOS, you can add the following to your ``Podfile`` to use the latest version
+of the prebuilt Envoy Mobile framework.
 
 ``pod 'EnvoyMobile'``
 
