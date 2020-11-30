@@ -73,8 +73,8 @@ TEST_F(ExactMapMatcherTest, NoMatch) {
 
 TEST_F(ExactMapMatcherTest, NoMatchDueToNoData) {
   ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt}),
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt}),
       absl::nullopt);
 
   TestData data;

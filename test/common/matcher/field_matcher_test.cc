@@ -1,6 +1,7 @@
+#include "envoy/matcher/matcher.h"
+
 #include "common/matcher/field_matcher.h"
 #include "common/matcher/matcher.h"
-#include "envoy/matcher/matcher.h"
 
 #include "gtest/gtest.h"
 
@@ -79,13 +80,13 @@ public:
 TEST_F(FieldMatcherTest, SingleFieldMatcher) {
   EXPECT_TRUE(createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()));
   EXPECT_FALSE(createSingleMatcher(
-                  absl::nullopt, [](auto v) { return v == "foo"; },
-                  DataInputGetResult::DataAvailability::NotAvailable)
-                  ->match(TestData()));
+                   absl::nullopt, [](auto v) { return v == "foo"; },
+                   DataInputGetResult::DataAvailability::NotAvailable)
+                   ->match(TestData()));
   EXPECT_FALSE(createSingleMatcher(
-                  "fo", [](auto v) { return v == "foo"; },
-                  DataInputGetResult::DataAvailability::MoreDataMightBeAvailable)
-                  ->match(TestData()));
+                   "fo", [](auto v) { return v == "foo"; },
+                   DataInputGetResult::DataAvailability::MoreDataMightBeAvailable)
+                   ->match(TestData()));
   EXPECT_TRUE(*createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()));
   EXPECT_FALSE(*createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()));
   EXPECT_TRUE(*createSingleMatcher(absl::nullopt, [](auto v) {
