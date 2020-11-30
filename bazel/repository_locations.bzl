@@ -106,7 +106,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{underscore_version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-10-21",
+        release_date = "2020-11-19",
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
     com_github_circonus_labs_libcircllhist = dict(
@@ -414,7 +414,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.jwt_authn"],
-        release_date = "2020-11-04",
+        release_date = "2020-11-05",
         cpe = "N/A",
     ),
     com_github_nodejs_http_parser = dict(
@@ -513,7 +513,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2020-11-12",
+        release_date = "2020-11-13",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
