@@ -70,6 +70,9 @@ public:
       }
       stream->Write(response);
       request.Clear();
+      if (response.has_status()) {
+        return grpc::Status::OK;
+      }
     }
     return grpc::Status::OK;
   }
