@@ -17,7 +17,6 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "external/envoy_api/envoy/config/core/v3/extension.pb.h"
 
 namespace Envoy {
 namespace Matcher {
