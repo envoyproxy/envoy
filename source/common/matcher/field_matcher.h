@@ -81,18 +81,23 @@ public:
       : matchers_(std::move(matchers)) {}
 
   FieldMatchResult match(const DataType& data) override {
+    bool unable_to_match_some_matchers = false;
     for (const auto& matcher : matchers_) {
       const auto result = matcher->match(data);
 
-      // If we are unable to decide on a match at this point, propagate this up to defer
-      // the match result until we have the requisite data.
       if (result.match_state_ == MatchState::UnableToMatch) {
-        return result;
+        unable_to_match_some_matchers = true;
       }
 
       if (result.result()) {
         return {MatchState::MatchComplete, true};
       }
+    }
+
+    // If we didn't find a successful match but not all matchers could be evaluated,
+    // return UnableToMatch to defer the match result.
+    if (unable_to_match_some_matchers) {
+      return {MatchState::UnableToMatch, absl::nullopt};
     }
 
     return {MatchState::MatchComplete, false};

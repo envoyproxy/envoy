@@ -110,6 +110,14 @@ TEST_F(FieldMatcherTest, AnyMatcher) {
   EXPECT_TRUE(AnyFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()).result());
   EXPECT_FALSE(
       AnyFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()).result());
+  EXPECT_EQ(AnyFieldMatcher<TestData>(
+                createMatchers(
+                    {std::make_pair(false,
+                                    DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
+                     std::make_pair(true, DataInputGetResult::DataAvailability::AllDataAvailable)}))
+                .match(TestData())
+                .match_state_,
+            MatchState::MatchComplete);
   EXPECT_EQ(
       AnyFieldMatcher<TestData>(
           createMatchers(
