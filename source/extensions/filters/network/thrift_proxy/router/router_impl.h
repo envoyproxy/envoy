@@ -178,13 +178,15 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
 public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
          Stats::Scope& scope)
-      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)) {}
+      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
+        passthrough_supported_(false) {}
 
   ~Router() override = default;
 
   // ThriftFilters::DecoderFilter
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
+  bool passthroughSupported() const override { return passthrough_supported_; }
 
   // ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -265,6 +267,8 @@ private:
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
+
+  bool passthrough_supported_ : 1;
 };
 
 } // namespace Router

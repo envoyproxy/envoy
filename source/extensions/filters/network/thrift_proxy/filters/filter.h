@@ -123,6 +123,12 @@ public:
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * @return True if payload passthrough is supported. Called by the connection manager once after
+   * messageBegin.
+   */
+  virtual bool passthroughSupported() const PURE;
 };
 
 using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;

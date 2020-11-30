@@ -21,6 +21,7 @@ public:
   ~ThriftBase() override = default;
 
   // DecoderEventHandler
+  FilterStatus passthroughData(Buffer::Instance&) override { return FilterStatus::Continue; }
   FilterStatus transportBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }
   FilterStatus transportEnd() override { return FilterStatus::Continue; }
   FilterStatus messageBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }
@@ -246,6 +247,7 @@ public:
     complete_ = true;
     return FilterStatus::Continue;
   }
+  bool passthroughEnabled() const override { return false; }
 
   // ThriftObject
   bool onData(Buffer::Instance& buffer) override;
