@@ -183,7 +183,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
                                                 scope_, "test.");
 
-  // auth_scopes was not set, should return default value
+  // Auth_scopes was not set, should return default value.
   std::vector<std::string> default_scope = {"user"};
   EXPECT_EQ(test_config_->authScopes(), default_scope);
 }

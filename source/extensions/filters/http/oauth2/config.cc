@@ -36,7 +36,6 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
     return secret_manager.findStaticGenericSecretProvider(config.name());
   }
 }
-
 } // namespace
 
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
