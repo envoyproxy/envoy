@@ -41,7 +41,7 @@ template <class DataType>
 static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
                                              const DataType& data) {
   const auto result = match_tree.match(data);
-  if (!result.match_completed_) {
+  if (result.match_state_ == MatchState::UnableToMatch) {
     return MaybeMatchResult{nullptr, false};
   }
 
@@ -72,6 +72,7 @@ public:
       return createListMatcher(config);
     case envoy::config::common::matcher::v3::Matcher::MATCHER_TYPE_NOT_SET:
       NOT_REACHED_GCOVR_EXCL_LINE;
+      return nullptr;
     }
   }
 

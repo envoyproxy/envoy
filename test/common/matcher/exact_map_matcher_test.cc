@@ -38,13 +38,13 @@ public:
   }
 
   void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
-    EXPECT_TRUE(result.match_completed_);
+    EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
     EXPECT_FALSE(result.on_match_.has_value());
   }
 
   void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
                             absl::string_view expected_value) {
-    EXPECT_TRUE(result.match_completed_);
+    EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
     EXPECT_TRUE(result.on_match_.has_value());
 
     EXPECT_EQ(nullptr, result.on_match_->matcher_);
@@ -55,7 +55,7 @@ public:
   }
 
   void verifyNotEnoughDataForMatch(const MatchTree<TestData>::MatchResult& result) {
-    EXPECT_FALSE(result.match_completed_);
+    EXPECT_EQ(MatchState::UnableToMatch, result.match_state_);
     EXPECT_FALSE(result.on_match_.has_value());
   }
 };

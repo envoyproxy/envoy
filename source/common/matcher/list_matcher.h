@@ -20,16 +20,16 @@ public:
       const auto maybe_match = matcher.first->match(matching_data);
 
       // One of the matchers don't have enough information, bail on evaluating the match.
-      if (!maybe_match) {
-        return {false, {}};
+      if (maybe_match.match_state_ == MatchState::UnableToMatch) {
+        return {MatchState::UnableToMatch, {}};
       }
 
-      if (*maybe_match) {
-        return {true, matcher.second};
+      if (maybe_match.result()) {
+        return {MatchState::MatchComplete, matcher.second};
       }
     }
 
-    return {true, on_no_match_};
+    return {MatchState::MatchComplete, on_no_match_};
   }
 
   void addMatcher(FieldMatcherPtr<DataType>&& matcher, OnMatch<DataType> action) {

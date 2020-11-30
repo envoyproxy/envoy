@@ -82,6 +82,20 @@ template <class DataType> struct OnMatch {
 };
 
 /**
+ * State enum for the result of an attempted match.
+ */
+enum class MatchState {
+  /**
+   * The match could not be completed, e.g. due to the required data not being available.
+   */
+  UnableToMatch,
+  /**
+   * The match was completed.
+   */
+  MatchComplete,
+};
+
+/**
  * MatchTree provides the interface for performing matches against the data provided by DataType.
  */
 template <class DataType> class MatchTree {
@@ -93,7 +107,7 @@ public:
   // Completed the match, no match: {true, {}}
   // Completed the match, match: {true, on_match}
   struct MatchResult {
-    const bool match_completed_;
+    const MatchState match_state_;
     const absl::optional<OnMatch<DataType>> on_match_;
   };
 
