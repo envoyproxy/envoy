@@ -23,7 +23,7 @@ public:
    * Returns the host's currently resolved address. This address may change periodically due to
    * async re-resolution.
    */
-  virtual Network::Address::InstanceConstSharedPtr address() PURE;
+  virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
@@ -175,7 +175,7 @@ public:
   /**
    * @return all hosts currently stored in the cache.
    */
-  virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
+  virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hostMapCopy() PURE;
 
   /**
    * Retrieve the DNS host info of a given host currently stored in the cache.

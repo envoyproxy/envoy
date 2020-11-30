@@ -60,4 +60,70 @@ TEST(RaiiListElementTest, DeleteOnErase) {
   EXPECT_EQ(l.size(), 0);
 }
 
+TEST(RaiiMapOfListElement, DeleteOnDestruction) {
+  absl::flat_hash_map<int, std::list<int>> map;
+  {
+    EXPECT_EQ(map.size(), 0);
+    RaiiMapOfListElement<int, int> element(map, 1, 1);
+    EXPECT_EQ(map.size(), 1);
+    auto it = map.find(1);
+    ASSERT_NE(map.end(), it);
+    EXPECT_EQ(it->second.size(), 1);
+  }
+  EXPECT_EQ(map.size(), 0);
+}
+
+TEST(RaiiMapOfListElementTest, CancelDelete) {
+  absl::flat_hash_map<int, std::list<int>> map;
+
+  {
+    EXPECT_EQ(map.size(), 0);
+    RaiiMapOfListElement<int, int> element(map, 1, 1);
+    EXPECT_EQ(map.size(), 1);
+    auto it = map.find(1);
+    ASSERT_NE(map.end(), it);
+    EXPECT_EQ(it->second.size(), 1);
+    element.cancel();
+  }
+  EXPECT_EQ(map.size(), 1);
+  auto it = map.find(1);
+  ASSERT_NE(map.end(), it);
+  EXPECT_EQ(it->second.size(), 1);
+}
+
+TEST(RaiiMapOfListElementTest, DeleteOnErase) {
+  absl::flat_hash_map<int, std::list<int>> map;
+
+  {
+    EXPECT_EQ(map.size(), 0);
+    RaiiMapOfListElement<int, int> element(map, 1, 1);
+    element.erase();
+    EXPECT_EQ(map.size(), 0);
+  }
+  EXPECT_EQ(map.size(), 0);
+}
+
+TEST(RaiiMapOfListElement, MultipleEntriesSameKey) {
+  absl::flat_hash_map<int, std::list<int>> map;
+  {
+    EXPECT_EQ(map.size(), 0);
+    RaiiMapOfListElement<int, int> element(map, 1, 1);
+    EXPECT_EQ(map.size(), 1);
+    auto it = map.find(1);
+    ASSERT_NE(map.end(), it);
+    EXPECT_EQ(it->second.size(), 1);
+    {
+      RaiiMapOfListElement<int, int> second_element(map, 1, 2);
+      EXPECT_EQ(map.size(), 1);
+      it = map.find(1);
+      ASSERT_NE(map.end(), it);
+      EXPECT_EQ(it->second.size(), 2);
+    }
+    it = map.find(1);
+    ASSERT_NE(map.end(), it);
+    EXPECT_EQ(it->second.size(), 1);
+  }
+  EXPECT_EQ(map.size(), 0);
+}
+
 } // namespace Envoy

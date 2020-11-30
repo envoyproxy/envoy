@@ -25,8 +25,7 @@ Cluster::Cluster(
                                        added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
-      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
-      host_map_(std::make_shared<HostInfoMap>()) {
+      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {
   // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
   // support these parameters dynamically in the future. This is not an exhaustive list of
   // parameters that don't make sense but should be the most obvious ones that a user might set
@@ -44,23 +43,23 @@ Cluster::Cluster(
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
-  auto existing_hosts = dns_cache_->hosts();
+  // TODO: Can we just loop over the actual DNS cache map here rather than a copy?
+  auto existing_hosts = dns_cache_->hostMapCopy();
   if (!existing_hosts.empty()) {
-    std::shared_ptr<HostInfoMap> new_host_map;
+    absl::WriterMutexLock lock{&host_map_lock_};
     std::unique_ptr<Upstream::HostVector> hosts_added;
     for (const auto& existing_host : existing_hosts) {
-      addOrUpdateWorker(existing_host.first, existing_host.second, new_host_map, hosts_added);
+      addOrUpdateHost(existing_host.first, existing_host.second, hosts_added);
     }
-    swapAndUpdateMap(new_host_map, *hosts_added, {});
+    updatePriorityState(*hosts_added, {});
   }
 
   onPreInitComplete();
 }
 
-void Cluster::addOrUpdateWorker(
+void Cluster::addOrUpdateHost(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-    std::shared_ptr<HostInfoMap>& new_host_map,
     std::unique_ptr<Upstream::HostVector>& hosts_added) {
   // We should never get a host with no address from the cache.
   ASSERT(host_info->address() != nullptr);
@@ -70,10 +69,8 @@ void Cluster::addOrUpdateWorker(
   // maximum hosts on a cluster. We currently assume that host data shared via shared pointer is a
   // marginal memory cost above that already used by connections and requests, so relying on
   // connection/request circuit breakers is sufficient. We may have to revisit this in the future.
-
-  HostInfoMapSharedPtr current_map = getCurrentHostMap();
-  const auto host_map_it = current_map->find(host);
-  if (host_map_it != current_map->end()) {
+  const auto host_map_it = host_map_.find(host);
+  if (host_map_it != host_map_.end()) {
     // If we only have an address change, we can do that swap inline without any other updates.
     // The appropriate R/W locking is in place to allow this. The details of this locking are:
     //  - Hosts are not thread local, they are global.
@@ -100,14 +97,11 @@ void Cluster::addOrUpdateWorker(
 
   ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
 
-  if (new_host_map == nullptr) {
-    new_host_map = std::make_shared<HostInfoMap>(*current_map);
-  }
   const auto emplaced =
-      new_host_map->try_emplace(host, host_info,
-                                std::make_shared<Upstream::LogicalHost>(
-                                    info(), host, host_info->address(), dummy_locality_lb_endpoint_,
-                                    dummy_lb_endpoint_, nullptr, time_source_));
+      host_map_.try_emplace(host, host_info,
+                            std::make_shared<Upstream::LogicalHost>(
+                                info(), host, host_info->address(), dummy_locality_lb_endpoint_,
+                                dummy_lb_endpoint_, nullptr, time_source_));
   if (hosts_added == nullptr) {
     hosts_added = std::make_unique<Upstream::HostVector>();
   }
@@ -117,29 +111,24 @@ void Cluster::addOrUpdateWorker(
 void Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
-  std::shared_ptr<HostInfoMap> new_host_map;
+  ENVOY_LOG(debug, "Adding host info for {}", host);
+  absl::WriterMutexLock lock{&host_map_lock_};
   std::unique_ptr<Upstream::HostVector> hosts_added;
-  addOrUpdateWorker(host, host_info, new_host_map, hosts_added);
+  addOrUpdateHost(host, host_info, hosts_added);
   if (hosts_added != nullptr) {
-    ASSERT(!new_host_map->empty());
+    ASSERT(!host_map_.empty());
     ASSERT(!hosts_added->empty());
     // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
     // the host set update.
-    swapAndUpdateMap(new_host_map, *hosts_added, {});
+    updatePriorityState(*hosts_added, {});
   }
 }
 
-void Cluster::swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
-                               const Upstream::HostVector& hosts_added,
-                               const Upstream::HostVector& hosts_removed) {
-  {
-    absl::WriterMutexLock lock(&host_map_lock_);
-    host_map_ = new_hosts_map;
-  }
-
+void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
+                                  const Upstream::HostVector& hosts_removed) {
   Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   priority_state_manager.initializePriorityFor(dummy_locality_lb_endpoint_);
-  for (const auto& host : (*new_hosts_map)) {
+  for (const auto& host : host_map_) {
     priority_state_manager.registerHostForPriority(host.second.logical_host_,
                                                    dummy_locality_lb_endpoint_);
   }
@@ -149,18 +138,14 @@ void Cluster::swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
-  HostInfoMapSharedPtr current_map = getCurrentHostMap();
-  const auto host_map_it = current_map->find(host);
-  ASSERT(host_map_it != current_map->end());
-  const auto new_host_map = std::make_shared<HostInfoMap>(*current_map);
+  absl::WriterMutexLock lock{&host_map_lock_};
+  const auto host_map_it = host_map_.find(host);
+  ASSERT(host_map_it != host_map_.end());
   Upstream::HostVector hosts_removed;
   hosts_removed.emplace_back(host_map_it->second.logical_host_);
-  new_host_map->erase(host);
+  host_map_.erase(host);
   ENVOY_LOG(debug, "removing dfproxy cluster host '{}'", host);
-
-  // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
-  // the host set update.
-  swapAndUpdateMap(new_host_map, {}, hosts_removed);
+  updatePriorityState({}, hosts_removed);
 }
 
 Upstream::HostConstSharedPtr
@@ -180,8 +165,9 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
-  const auto host_it = host_map_->find(host);
-  if (host_it == host_map_->end()) {
+  absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
+  const auto host_it = cluster_.host_map_.find(host);
+  if (host_it == cluster_.host_map_.end()) {
     return nullptr;
   } else {
     host_it->second.shared_host_info_->touch();

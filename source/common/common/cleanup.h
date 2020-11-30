@@ -55,4 +55,39 @@ private:
   bool cancelled_;
 };
 
+template <class Key, class Value> class RaiiMapOfListElement {
+public:
+  using MapOfList = absl::flat_hash_map<Key, std::list<Value>>;
+
+  template <typename ConvertibleToKey>
+  RaiiMapOfListElement(MapOfList& map, const ConvertibleToKey& key, Value value)
+      : map_(map), list_(map_.try_emplace(key).first->second), key_(key), cancelled_(false) {
+    it_ = list_.emplace(list_.begin(), value);
+  }
+
+  virtual ~RaiiMapOfListElement() {
+    if (!cancelled_) {
+      erase();
+    }
+  }
+
+  void cancel() { cancelled_ = true; }
+
+  void erase() {
+    ASSERT(!cancelled_);
+    list_.erase(it_);
+    if (list_.empty()) {
+      map_.erase(key_);
+    }
+    cancelled_ = true;
+  }
+
+private:
+  MapOfList& map_;
+  std::list<Value>& list_;
+  // Because of absl::flat_hash_map iterator instability we have to keep a copy of the key
+  const Key key_;
+  typename MapOfList::mapped_type::iterator it_;
+  bool cancelled_;
+};
 } // namespace Envoy

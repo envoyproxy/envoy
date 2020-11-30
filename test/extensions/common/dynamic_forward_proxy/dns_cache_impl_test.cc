@@ -569,7 +569,7 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   resolve_cb1(Network::DnsResolver::ResolutionStatus::Success,
               TestUtility::makeDnsResponse({"10.0.0.2"}));
 
-  auto hosts = dns_cache_->hosts();
+  auto hosts = dns_cache_->hostMapCopy();
   EXPECT_EQ(2, hosts.size());
   EXPECT_THAT(hosts["bar.com"], DnsHostInfoEquals("10.0.0.1:443", "bar.com", false));
   EXPECT_THAT(hosts["foo.com"], DnsHostInfoEquals("10.0.0.2:80", "foo.com", false));
