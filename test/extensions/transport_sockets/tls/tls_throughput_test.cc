@@ -129,7 +129,9 @@ static void testThroughput(benchmark::State& state) {
 
     state.ResumeTiming();
     uint32_t num_writes = 0;
+    uint32_t num_times_linearize_did_something = 0;
     while (write_buf.length() > 0) {
+      const Buffer::RawSlice initial = write_buf.frontSlice();
       void* mem;
       size_t len = std::min<uint64_t>(write_buf.length(), 16384);
       if (full_linearize) {
@@ -139,6 +141,9 @@ static void testThroughput(benchmark::State& state) {
         mem = slice.mem_;
         len = slice.len_;
       }
+      if (write_buf.frontSlice() != initial) {
+        num_times_linearize_did_something++;
+      }
 
       err = SSL_write(client_ssl, mem, len);
       RELEASE_ASSERT(err == static_cast<int>(len), "SSL_write");
@@ -147,6 +152,7 @@ static void testThroughput(benchmark::State& state) {
     }
 
     state.counters["writes_per_iteration"] = num_writes;
+    state.counters["num_times_linearize_did_something"] = num_times_linearize_did_something;
   }
   state.counters["throughput"] = benchmark::Counter(bytes_written, benchmark::Counter::kIsRate);
   ::close(sockets[0]);
