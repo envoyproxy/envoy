@@ -103,6 +103,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
+  bool statsFlushOnAdmin() const override { return config_.statsFlushOnAdmin(); }
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
