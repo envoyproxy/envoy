@@ -30,6 +30,7 @@ HTTP filters
   header_to_metadata_filter
   ip_tagging_filter
   jwt_authn_filter
+  kill_request_filter
   local_rate_limit_filter
   lua_filter
   oauth2_filter

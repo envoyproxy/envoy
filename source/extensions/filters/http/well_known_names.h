@@ -82,6 +82,8 @@ public:
   const std::string AwsLambda = "envoy.filters.http.aws_lambda";
   // OAuth filter
   const std::string OAuth = "envoy.filters.http.oauth2";
+  // KillRequest filter
+  const std::string KillRequest = "envoy.filters.http.kill_request";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
