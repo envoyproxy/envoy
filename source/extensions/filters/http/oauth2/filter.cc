@@ -75,13 +75,13 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
 }
 
 // Transforms the proto list of 'auth_scopes' into a vector of std::string, also
-// handling the default value logic
-template <class T> std::vector<std::string> authScopesList(const T& auth_scopes_protos) {
+// handling the default value logic.
+std::vector<std::string>
+authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos) {
   std::vector<std::string> scopes;
 
-  // if 'auth_scopes' is empty it must return a list with the default value.
+  // If 'auth_scopes' is empty it must return a list with the default value.
   if (auth_scopes_protos.empty()) {
-    scopes.reserve(1);
     scopes.emplace_back(DEFAULT_AUTH_SCOPE);
   } else {
     scopes.reserve(auth_scopes_protos.size());
