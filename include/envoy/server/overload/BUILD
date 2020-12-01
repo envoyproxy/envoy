@@ -26,5 +26,6 @@ envoy_cc_library(
         "//include/envoy/event:scaled_timer_minimum",
         "//include/envoy/event:timer_interface",
         "//include/envoy/thread_local:thread_local_object",
+        "//source/common/common:interval_value",
     ],
 )

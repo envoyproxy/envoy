@@ -31,7 +31,7 @@ public:
       const NamedOverloadActionSymbolTable& action_symbol_table,
       const absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>& timer_minimums)
       : action_symbol_table_(action_symbol_table), timer_minimums_(timer_minimums),
-        actions_(action_symbol_table.size(), OverloadActionState(0)),
+        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
         scaled_timer_action_(action_symbol_table.lookup(OverloadActionNames::get().ReduceTimeouts)),
         scaled_timer_manager_(std::move(scaled_timer_manager)) {}
 
@@ -46,8 +46,9 @@ public:
                                     Event::TimerCb callback) override {
     auto minimum_it = timer_minimums_.find(timer_type);
     const Event::ScaledTimerMinimum minimum =
-        minimum_it != timer_minimums_.end() ? minimum_it->second
-                                            : Event::ScaledTimerMinimum(Event::ScaledMinimum(1.0));
+        minimum_it != timer_minimums_.end()
+            ? minimum_it->second
+            : Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat::max()));
     return scaled_timer_manager_->createTimer(minimum, std::move(callback));
   }
 
@@ -72,7 +73,7 @@ private:
   const Event::ScaledRangeTimerManagerPtr scaled_timer_manager_;
 };
 
-const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{0.0};
+const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
 
 namespace {
 
@@ -113,8 +114,8 @@ public:
     } else if (value >= saturated_threshold_) {
       state_ = OverloadActionState::saturated();
     } else {
-      state_ = OverloadActionState((value - scaling_threshold_) /
-                                   (saturated_threshold_ - scaling_threshold_));
+      state_ = OverloadActionState(
+          UnitFloat((value - scaling_threshold_) / (saturated_threshold_ - scaling_threshold_)));
     }
     return state_.value() != old_state.value();
   }
@@ -169,7 +170,7 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
             ? Event::ScaledTimerMinimum(Event::AbsoluteMinimum(std::chrono::milliseconds(
                   DurationUtil::durationToMilliseconds(scale_timer.min_timeout()))))
             : Event::ScaledTimerMinimum(
-                  Event::ScaledMinimum(scale_timer.min_scale().value() / 100.0));
+                  Event::ScaledMinimum(UnitFloat(scale_timer.min_scale().value() / 100.0)));
 
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
     if (!inserted) {

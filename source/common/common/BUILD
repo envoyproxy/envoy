@@ -117,6 +117,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "interval_value",
+    hdrs = ["interval_value.h"],
+)
+
+envoy_cc_library(
     name = "linked_object",
     hdrs = ["linked_object.h"],
     deps = [":assert_lib"],

@@ -44,7 +44,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "scaled_timer_minimum",
     hdrs = ["scaled_timer_minimum.h"],
-    deps = [],
+    deps = [
+        "//source/common/common:interval_value",
+    ],
 )
 
 envoy_cc_library(

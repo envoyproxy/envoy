@@ -4,6 +4,8 @@
 #include "envoy/event/scaled_timer_minimum.h"
 #include "envoy/event/timer.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Event {
 
