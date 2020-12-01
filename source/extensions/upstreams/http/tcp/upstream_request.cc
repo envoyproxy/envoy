@@ -11,6 +11,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/status.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/router/router.h"
 
@@ -45,6 +46,10 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
 
 Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&,
                                                bool end_stream) {
+  if (!upstream_request_) {
+    return Envoy::Http::streamAlreadyReset();
+  }
+
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
   ASSERT(upstream_request_->routeEntry().connectConfig().has_value());
@@ -86,7 +91,16 @@ void TcpUpstream::resetStream() {
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  if (!upstream_request_) {
+    return;
+  }
+
   upstream_request_->decodeData(data, end_stream);
+  // This ensures that if we get a reset after end_stream we won't propagate two
+  // "end streams" to the upstream_request_.
+  if (end_stream) {
+    upstream_request_ = nullptr;
+  }
 }
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {
