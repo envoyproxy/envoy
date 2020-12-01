@@ -8,7 +8,7 @@
 * 每个连接的数据流可以记录任意数量的访问日志。
 * 通过自定义的访问日志过滤器可以将不同类型的请求和响应写入到不同的访问日志。
 
-下游连接的访问日志可以通过设置:ref:` listener 访问日志<envoy_v3_api_field_config.listener.v3.Listener.access_log>`的方式进行记录。listener 访问日志可以补充
+下游连接的访问日志可以通过设置:ref:` listener 访问日志 <envoy_v3_api_field_config.listener.v3.Listener.access_log>` 的方式进行记录。监听器访问日志可以补充
 HTTP 请求访问日志，并且可以独立于filter访问日志。
 
 .. _arch_overview_access_log_filters:
