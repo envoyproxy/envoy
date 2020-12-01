@@ -60,7 +60,7 @@ public:
   void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root,
                  std::string root_id = "", std::string vm_configuration = "",
                  bool fail_open = false, std::string plugin_configuration = "",
-                 absl::flat_hash_set<std::string> allowed_capabilities = {}) {
+                 AllowedCapabilitiesMap allowed_capabilities = {}) {
     envoy::extensions::wasm::v3::VmConfig vm_config;
     vm_config.set_vm_id("vm_id");
     vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
@@ -69,8 +69,12 @@ public:
     vm_config.mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config.mutable_code()->mutable_local()->set_inline_bytes(code);
     envoy::extensions::wasm::v3::CapabilityRestrictionConfig cr_config;
-    *cr_config.mutable_allowed_capabilities() = {allowed_capabilities.begin(),
-                                                 allowed_capabilities.end()};
+    Protobuf::Map<std::string, SanitizationConfig> allowed_capabilities_;
+    for (auto& capability : allowed_capabilities) {
+      // TODO(ryanapilado): populate SanitizationConfig when sanitization is implemented
+      allowed_capabilities_[capability.first] = SanitizationConfig();
+    }
+    *cr_config.mutable_allowed_capabilities() = allowed_capabilities_;
     Api::ApiPtr api = Api::createApiForTest(stats_store_);
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
     auto name = "plugin_name";

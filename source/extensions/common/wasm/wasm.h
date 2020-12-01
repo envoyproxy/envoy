@@ -43,11 +43,13 @@ struct WasmStats {
   ALL_WASM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+using AllowedCapabilitiesMap = absl::flat_hash_map<std::string, std::vector<std::string>>;
+
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
 public:
   Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
-       absl::string_view vm_key, absl::flat_hash_set<std::string> allowed_capabilities,
+       absl::string_view vm_key, AllowedCapabilitiesMap allowed_capabilities,
        const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
        Event::Dispatcher& dispatcher);
   Wasm(std::shared_ptr<WasmHandle> other, Event::Dispatcher& dispatcher);

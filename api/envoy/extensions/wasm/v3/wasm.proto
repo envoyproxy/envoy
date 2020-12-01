@@ -18,10 +18,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Wasm]
 // [#extension: envoy.bootstrap.wasm]
 
+// Configuration for sanitization of an allowed capability.
+message SanitizationConfig {
+}
+
 // Configuration for restricting proxy-wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
-  // The list of proxy-wasm capabilities which will be exposed to the module.
-  repeated string allowed_capabilities = 1;
+  // The proxy-wasm capabilities which will be exposed to the module.
+  map<string, SanitizationConfig> allowed_capabilities = 1;
 }
 
 // Configuration for a Wasm VM.

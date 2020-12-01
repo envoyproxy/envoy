@@ -18,6 +18,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Wasm {
 
+using Envoy::Extensions::Common::Wasm::AllowedCapabilitiesMap;
 using Envoy::Extensions::Common::Wasm::Context;
 using Envoy::Extensions::Common::Wasm::Plugin;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
@@ -46,7 +47,7 @@ public:
   ~WasmNetworkFilterTest() override = default;
 
   void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false,
-                   absl::flat_hash_set<std::string> allowed_capabilities = {}) {
+                   AllowedCapabilitiesMap allowed_capabilities = {}) {
     if (code.empty()) {
       setupWasmCode(vm_configuration);
     } else {
@@ -200,8 +201,11 @@ TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  absl::flat_hash_set<std::string> allowed_capabilities = {
-      "proxy_on_context_create", "proxy_get_property", "proxy_log", "proxy_on_new_connection"};
+  AllowedCapabilitiesMap allowed_capabilities = {
+      {"proxy_on_context_create", std::vector<std::string>()},
+      {"proxy_get_property", std::vector<std::string>()},
+      {"proxy_log", std::vector<std::string>()},
+      {"proxy_on_new_connection", std::vector<std::string>()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
@@ -223,9 +227,11 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  absl::flat_hash_set<std::string> allowed_capabilities = {"proxy_on_context_create",
-                                                           "proxy_get_property", "proxy_log",
-                                                           "proxy_on_downstream_connection_close"};
+  AllowedCapabilitiesMap allowed_capabilities = {
+      {"proxy_on_context_create", std::vector<std::string>()},
+      {"proxy_get_property", std::vector<std::string>()},
+      {"proxy_log", std::vector<std::string>()},
+      {"proxy_on_downstream_connection_close", std::vector<std::string>()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
@@ -247,9 +253,11 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  absl::flat_hash_set<std::string> allowed_capabilities = {
-      "proxy_on_context_create", "proxy_get_property", "proxy_on_new_connection",
-      "proxy_on_downstream_connection_close"};
+  AllowedCapabilitiesMap allowed_capabilities = {
+      {"proxy_on_context_create", std::vector<std::string>()},
+      {"proxy_get_property", std::vector<std::string>()},
+      {"proxy_on_new_connection", std::vector<std::string>()},
+      {"proxy_on_downstream_connection_close", std::vector<std::string>()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 

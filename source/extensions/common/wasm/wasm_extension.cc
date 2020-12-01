@@ -59,8 +59,11 @@ WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
             const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
             Event::Dispatcher& dispatcher, Server::ServerLifecycleNotifier& lifecycle_notifier,
             absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
-    absl::flat_hash_set<std::string> allowed_capabilities(cr_config.allowed_capabilities().begin(),
-                                                          cr_config.allowed_capabilities().end());
+    AllowedCapabilitiesMap allowed_capabilities;
+    for (auto& capability : cr_config.allowed_capabilities()) {
+      // TODO(ryanapilado): populate vector when sanitization is implemented
+      allowed_capabilities[capability.first] = std::vector<std::string>();
+    }
     auto wasm = std::make_shared<Wasm>(vm_config.runtime(), vm_config.vm_id(),
                                        anyToBytes(vm_config.configuration()), vm_key,
                                        allowed_capabilities, scope, cluster_manager, dispatcher);

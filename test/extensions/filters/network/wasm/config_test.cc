@@ -189,7 +189,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
         local:
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
-      allowed_capabilities: []
+      allowed_capabilities:
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
@@ -217,8 +217,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
       allowed_capabilities:
-        - proxy_log
-        - proxy_on_new_connection
+        proxy_log:
+        proxy_on_new_connection:
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
@@ -246,9 +246,9 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
           filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
     capability_restriction_config:
       allowed_capabilities:
-        - proxy_on_vm_start
-        - proxy_get_property
-        - proxy_on_context_create
+        proxy_on_vm_start:
+        proxy_get_property:
+        proxy_on_context_create:
   )EOF"));
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
