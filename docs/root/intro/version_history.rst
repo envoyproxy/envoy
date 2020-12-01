@@ -6,6 +6,7 @@ Version history
 Changes
 -------
 * listener: fix crash when disabling or re-enabling listeners due to overload while processing LDS updates.
+* udp: fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.
 
 1.14.5 (September 29, 2020)
 ===========================

@@ -12,6 +12,20 @@ using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
 namespace Envoy {
+
+namespace {
+constexpr int messageTruncatedOption() {
+#if defined(__APPLE__)
+  // OSX does not support passing `MSG_TRUNC` to recvmsg and recvmmsg. This does not effect
+  // functionality and it primarily used for logging.
+  return 0;
+#else
+  return MSG_TRUNC;
+#endif
+}
+
+} // namespace
+
 namespace Network {
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
@@ -234,8 +248,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_flags = 0;
   hdr.msg_control = cbuf.begin();
   hdr.msg_controllen = cmsg_space_;
-  const Api::SysCallSizeResult result = Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, 0);
+  Api::SysCallSizeResult result =
+      Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
   if (result.rc_ < 0) {
+    return sysCallResultToIoCallResult(result);
+  }
+  if ((hdr.msg_flags & MSG_TRUNC) != 0) {
+    ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.rc_);
+    result.rc_ = 0;
+    (*output.dropped_packets_)++;
+    output.msg_[0].truncated_and_dropped_ = true;
     return sysCallResultToIoCallResult(result);
   }
 
@@ -260,7 +282,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       if (output.dropped_packets_ != nullptr) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ = *maybe_dropped;
+          *output.dropped_packets_ += *maybe_dropped;
+          continue;
         }
       }
     }
@@ -306,8 +329,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   // Set MSG_WAITFORONE so that recvmmsg will not waiting for
   // |num_packets_per_mmsg_call| packets to arrive before returning when the
   // socket is a blocking socket.
-  const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().recvmmsg(
-      fd_, mmsg_hdr.data(), num_packets_per_mmsg_call, MSG_TRUNC | MSG_WAITFORONE, nullptr);
+  const Api::SysCallIntResult result =
+      Api::OsSysCallsSingleton::get().recvmmsg(fd_, mmsg_hdr.data(), num_packets_per_mmsg_call,
+                                               messageTruncatedOption() | MSG_WAITFORONE, nullptr);
 
   if (result.rc_ <= 0) {
     return sysCallResultToIoCallResult(result);
@@ -316,18 +340,18 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   int num_packets_read = result.rc_;
 
   for (int i = 0; i < num_packets_read; ++i) {
-    if (mmsg_hdr[i].msg_len == 0) {
+    msghdr& hdr = mmsg_hdr[i].msg_hdr;
+    if ((hdr.msg_flags & MSG_TRUNC) != 0) {
+      ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", mmsg_hdr[i].msg_len);
+      (*output.dropped_packets_)++;
+      output.msg_[i].truncated_and_dropped_ = true;
       continue;
     }
-    msghdr& hdr = mmsg_hdr[i].msg_hdr;
+
     RELEASE_ASSERT((hdr.msg_flags & MSG_CTRUNC) == 0,
                    fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
     RELEASE_ASSERT(hdr.msg_namelen > 0,
                    fmt::format("Unable to get remote address from recvmmsg() for fd: {}", fd_));
-    if ((hdr.msg_flags & MSG_TRUNC) != 0) {
-      ENVOY_LOG_MISC(warn, "Dropping truncated UDP packet with size: {}.", mmsg_hdr[i].msg_len);
-      continue;
-    }
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
@@ -353,7 +377,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ = *maybe_dropped;
+          *output.dropped_packets_ += *maybe_dropped;
         }
       }
     }

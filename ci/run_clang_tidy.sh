@@ -37,7 +37,7 @@ trap cleanup EXIT
 # TODO(scw00): We should run clang-tidy against win32 impl. But currently we only have 
 # linux ci box.
 function exclude_win32_impl() {
-  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32
+  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
