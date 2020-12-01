@@ -42,9 +42,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scaled_timer_minimum",
+    hdrs = ["scaled_timer_minimum.h"],
+    deps = [],
+)
+
+envoy_cc_library(
     name = "scaled_range_timer_manager_interface",
     hdrs = ["scaled_range_timer_manager.h"],
     deps = [
+        ":scaled_timer_minimum",
         ":timer_interface",
     ],
 )

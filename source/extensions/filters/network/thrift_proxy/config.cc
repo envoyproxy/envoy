@@ -121,7 +121,8 @@ ConfigImpl::ConfigImpl(
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
-      route_matcher_(new Router::RouteMatcher(config.route_config())) {
+      route_matcher_(new Router::RouteMatcher(config.route_config())),
+      payload_passthrough_(config.payload_passthrough()) {
 
   if (config.thrift_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");

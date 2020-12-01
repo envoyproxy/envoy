@@ -77,18 +77,20 @@ public:
             }));
   }
 
-  Http::ConnectionPool::InstancePtr allocateConnPool(
-      Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
-      const Network::ConnectionSocket::OptionsSharedPtr& options,
-      const Network::TransportSocketOptionsSharedPtr& transport_socket_options) override {
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   ClusterConnectivityState& state) override {
     return Http::ConnectionPool::InstancePtr{
-        allocateConnPool_(host, options, transport_socket_options)};
+        allocateConnPool_(host, options, transport_socket_options, state)};
   }
 
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
                       const Network::ConnectionSocket::OptionsSharedPtr&,
-                      Network::TransportSocketOptionsSharedPtr) override {
+                      Network::TransportSocketOptionsSharedPtr,
+                      Upstream::ClusterConnectivityState&) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
@@ -115,7 +117,7 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
               (HostConstSharedPtr host, Network::ConnectionSocket::OptionsSharedPtr,
-               Network::TransportSocketOptionsSharedPtr));
+               Network::TransportSocketOptionsSharedPtr, ClusterConnectivityState&));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
