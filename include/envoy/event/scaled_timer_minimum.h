@@ -3,6 +3,8 @@
 #include <chrono>
 #include <ostream>
 
+#include "common/common/interval_value.h"
+
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -12,15 +14,15 @@ namespace Event {
  * Describes a minimum timer value that is equal to a scale factor applied to the maximum.
  */
 struct ScaledMinimum {
-  explicit constexpr ScaledMinimum(double scale_factor) : scale_factor_(scale_factor) {}
+  explicit constexpr ScaledMinimum(UnitFloat scale_factor) : scale_factor_(scale_factor) {}
   inline bool operator==(const ScaledMinimum& other) const {
-    return other.scale_factor_ == scale_factor_;
+    return other.scale_factor_.value() == scale_factor_.value();
   }
   inline friend std::ostream& operator<<(std::ostream& output, const ScaledMinimum& minimum) {
-    return output << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_ << " }";
+    return output << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_.value() << " }";
   }
 
-  const double scale_factor_;
+  const UnitFloat scale_factor_;
 };
 
 /**
@@ -53,8 +55,8 @@ public:
     struct Visitor {
       explicit Visitor(std::chrono::milliseconds value) : value_(value) {}
       std::chrono::milliseconds operator()(ScaledMinimum scale_factor) {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(scale_factor.scale_factor_ *
-                                                                     value_);
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            scale_factor.scale_factor_.value() * value_);
       }
       std::chrono::milliseconds operator()(AbsoluteMinimum absolute_value) {
         return absolute_value.value_;

@@ -246,6 +246,14 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
+ProcessContextOptRef InstanceImpl::processContext() {
+  if (process_context_ == nullptr) {
+    return absl::nullopt;
+  }
+
+  return *process_context_;
+}
+
 namespace {
 // Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
 void loadBootstrap(absl::optional<uint32_t> bootstrap_version,

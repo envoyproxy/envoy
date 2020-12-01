@@ -500,10 +500,10 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
 
 // These are the timer types according to the reduced timeouts config above.
 constexpr std::pair<OverloadTimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
-    {OverloadTimerType::UnscaledRealTimerForTest, Event::ScaledMinimum(1.0)},
+    {OverloadTimerType::UnscaledRealTimerForTest, Event::ScaledMinimum(UnitFloat(1.0))},
     {OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
      Event::AbsoluteMinimum(std::chrono::seconds(2))},
-    {OverloadTimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(0.1)},
+    {OverloadTimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
 };
 
 TEST_F(OverloadManagerImplTest, TimerTypesProduceCorrectMinimums) {
