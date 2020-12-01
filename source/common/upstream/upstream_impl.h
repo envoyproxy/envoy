@@ -669,7 +669,8 @@ private:
   Runtime::Loader& runtime_;
   const std::string name_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
-  const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
+  const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
+      extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const uint64_t max_requests_per_connection_;
   const uint32_t max_response_headers_count_;

@@ -76,6 +76,7 @@ getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
   return nullptr;
 }
 
+// TODO(alyssawilk) move this to the new config library in a follow-up.
 uint64_t
 parseFeatures(const envoy::config::cluster::v3::Cluster& config,
               std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
@@ -184,7 +185,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
-std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
+absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   if (!config.typed_extension_protocol_options().empty() &&
@@ -193,7 +194,7 @@ std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtoco
                          "extension_protocol_options can be specified");
   }
 
-  std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
+  absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
@@ -690,9 +691,9 @@ private:
   Api::Api& api_;
 };
 
-const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> createOptions(
-    const envoy::config::cluster::v3::Cluster& config,
-    const std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options) {
+std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
+createOptions(const envoy::config::cluster::v3::Cluster& config,
+              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options) {
   if (options) {
     return std::move(options);
   }

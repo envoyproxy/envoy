@@ -51,7 +51,7 @@ public:
         *dynamic_cast<const envoy::extensions::upstreams::http::v3::HttpProtocolOptions*>(&config);
     return std::make_shared<ProtocolOptionsConfigImpl>(typed_config);
   }
-  std::string category() const override { return "envoy.upstreams"; }
+  std::string category() const override { return "envoy.upstream_options"; }
   std::string name() const override {
     return "envoy.extensions.upstreams.http.v3.HttpProtocolOptions";
   }
