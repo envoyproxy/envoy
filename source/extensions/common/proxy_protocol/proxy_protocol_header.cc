@@ -81,10 +81,14 @@ void generateV2Header(const std::string& src_addr, const std::string& dst_addr, 
         Network::Address::Ipv6Instance(src_addr, src_port).ip()->ipv6()->address();
     const absl::uint128 net_dst_addr =
         Network::Address::Ipv6Instance(dst_addr, dst_port).ip()->ipv6()->address();
-    out.add(&(net_src_addr.Uint128Low64()), 8);
-    out.add(&(net_src_addr.Uint128High64()), 8);
-    out.add(&(net_dst_addr.Uint128Low64()), 8);
-    out.add(&(net_dst_addr.Uint128High64()), 8);
+    const uint64_t net_src_addr_lo = absl::Uint128Low64(net_src_addr);
+    out.add(&net_src_addr_lo, 8);
+    const uint64_t net_src_addr_hi = absl::Uint128High64(net_src_addr);
+    out.add(&net_src_addr_hi, 8);
+    const uint64_t net_dst_addr_lo = absl::Uint128Low64(net_dst_addr);
+    out.add(&net_dst_addr_lo, 8);
+    const uint64_t net_dst_addr_hi = absl::Uint128High64(net_dst_addr);
+    out.add(&net_dst_addr_hi, 8);
     break;
   }
   }
