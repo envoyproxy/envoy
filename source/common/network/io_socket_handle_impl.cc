@@ -16,6 +16,21 @@ using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
 
 namespace Envoy {
+
+namespace {
+
+constexpr int messageTruncatedOption() {
+#if defined(__APPLE__)
+  // OSX does not support passing `MSG_TRUNC` to recvmsg and recvmmsg. This does not effect
+  // functionality and it primarily used for logging.
+  return 0;
+#else
+  return MSG_TRUNC;
+#endif
+}
+
+} // namespace
+
 namespace Network {
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
@@ -243,9 +258,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   cmsg->cmsg_len = cmsg_space;
   hdr.msg_control = cmsg;
   hdr.msg_controllen = cmsg_space;
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_sys_calls.recvmsg(fd_, &hdr, 0);
+  Api::SysCallSizeResult result =
+      Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
   if (result.rc_ < 0) {
+    return sysCallResultToIoCallResult(result);
+  }
+  if ((hdr.msg_flags & MSG_TRUNC) != 0) {
+    ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.rc_);
+    result.rc_ = 0;
+    (*output.dropped_packets_)++;
+    output.msg_[0].truncated_and_dropped_ = true;
     return sysCallResultToIoCallResult(result);
   }
 
@@ -287,7 +309,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       if (output.dropped_packets_ != nullptr) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ = *maybe_dropped;
+          *output.dropped_packets_ += *maybe_dropped;
+          continue;
         }
       }
     }

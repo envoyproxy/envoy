@@ -536,11 +536,11 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
   ASSERT(num_slices == 1);
 
-  IoHandle::RecvMsgOutput output(packets_dropped);
+  IoHandle::RecvMsgOutput output(1, packets_dropped);
   Api::IoCallUint64Result result =
       handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
 
-  if (!result.ok()) {
+  if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
     return result;
   }
 
@@ -579,12 +579,6 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
     if (!result.ok()) {
       // No more to read or encountered a system error.
       return std::move(result.err_);
-    }
-
-    if (result.rc_ == 0) {
-      // TODO(conqerAtapple): Is zero length packet interesting? If so add stats
-      // for it. Otherwise remove the warning log below.
-      ENVOY_LOG_MISC(trace, "received 0-length packet");
     }
 
     if (packets_dropped != old_packets_dropped) {

@@ -94,7 +94,7 @@ protected:
   SocketSharedPtr server_socket_;
   SocketPtr client_socket_;
   Address::InstanceConstSharedPtr send_to_addr_;
-  MockUdpListenerCallbacks listener_callbacks_;
+  NiceMock<MockUdpListenerCallbacks> listener_callbacks_;
   std::unique_ptr<UdpListenerImpl> listener_;
 };
 
@@ -170,6 +170,44 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test a large datagram that gets dropped using recvmsg.
+TEST_P(UdpListenerImplTest, LargeDatagramRecvmsg) {
+  client_socket_ = createClientSocket(false);
+
+  // This will get dropped.
+  const std::string first(4096, 'a');
+  const void* void_pointer = static_cast<const void*>(first.c_str());
+  Buffer::RawSlice first_slice{const_cast<void*>(void_pointer), first.length()};
+  const std::string second("second");
+  void_pointer = static_cast<const void*>(second.c_str());
+  Buffer::RawSlice second_slice{const_cast<void*>(void_pointer), second.length()};
+  // This will get dropped.
+  const std::string third(4096, 'b');
+  void_pointer = static_cast<const void*>(third.c_str());
+  Buffer::RawSlice third_slice{const_cast<void*>(void_pointer), third.length()};
+
+  auto send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &first_slice, 1,
+                                                 nullptr, *send_to_addr_);
+  ASSERT_EQ(send_rc.rc_, first.length());
+  send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &second_slice, 1, nullptr,
+                                            *send_to_addr_);
+  ASSERT_EQ(send_rc.rc_, second.length());
+  send_rc = Network::Utility::writeToSocket(client_socket_->ioHandle(), &third_slice, 1, nullptr,
+                                            *send_to_addr_);
+  ASSERT_EQ(send_rc.rc_, third.length());
+
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+    validateRecvCallbackParams(data);
+    EXPECT_EQ(data.buffer_->toString(), second);
+
+    dispatcher_->exit();
+  }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, listener_->packetsDropped());
 }
 
 /**

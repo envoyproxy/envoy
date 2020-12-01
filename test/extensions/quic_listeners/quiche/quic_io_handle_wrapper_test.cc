@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 
+#include <cstddef>
 #include <memory>
 
 #include "common/network/address_impl.h"
@@ -17,6 +18,20 @@ using testing::Return;
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+
+constexpr int messageTruncatedOption() {
+#if defined(__APPLE__)
+  // OSX does not support passing `MSG_TRUNC` to recvmsg and recvmmsg. This does not effect
+  // functionality and it primarily used for logging.
+  return 0;
+#else
+  return MSG_TRUNC;
+#endif
+}
+
+} // namespace
 
 class QuicIoHandleWrapperTest : public testing::Test {
 public:
@@ -56,18 +71,20 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_CALL(os_sys_calls_, sendmsg(fd, _, 0)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
 
-  Network::IoHandle::RecvMsgOutput output(nullptr);
-  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, 0)).WillOnce(Invoke([](int, struct msghdr* msg, int) {
-    sockaddr_storage ss;
-    auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
-    memset(ipv6_addr, 0, sizeof(sockaddr_in6));
-    ipv6_addr->sin6_family = AF_INET6;
-    ipv6_addr->sin6_addr = in6addr_loopback;
-    ipv6_addr->sin6_port = htons(54321);
-    *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
-    msg->msg_namelen = sizeof(sockaddr_in6);
-    return Api::SysCallSizeResult{5u, 0};
-  }));
+  Network::IoHandle::RecvMsgOutput output(1, nullptr);
+  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, messageTruncatedOption()))
+      .WillOnce(Invoke([](int, msghdr* msg, int) {
+        sockaddr_storage ss;
+        auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+        memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+        ipv6_addr->sin6_family = AF_INET6;
+        ipv6_addr->sin6_addr = in6addr_loopback;
+        ipv6_addr->sin6_port = htons(54321);
+        *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
+        msg->msg_namelen = sizeof(sockaddr_in6);
+        msg->msg_controllen = 0;
+        return Api::SysCallSizeResult{5u, 0};
+      }));
   wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
 
   EXPECT_TRUE(wrapper_->close().ok());
