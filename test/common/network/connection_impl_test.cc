@@ -359,7 +359,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
 
   auto* mock_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(mocks.overload_state_,
-              createScaledTimer_(Server::OverloadTimerType::TransportSocketConnectTimeout, _))
+              createScaledTypedTimer_(Server::OverloadTimerType::TransportSocketConnectTimeout, _))
       .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_, mocks.overload_state_,
@@ -399,7 +399,7 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
 
   auto* mock_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(mocks.overload_state_,
-              createScaledTimer_(Server::OverloadTimerType::TransportSocketConnectTimeout, _))
+              createScaledTypedTimer_(Server::OverloadTimerType::TransportSocketConnectTimeout, _))
       .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_, mocks.overload_state_,
