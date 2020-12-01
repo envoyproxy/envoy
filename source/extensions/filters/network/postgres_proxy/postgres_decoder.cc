@@ -299,7 +299,7 @@ void DecoderImpl::decodeBackendStatements() {
     // take the whole message.
     position = message_.find('\0');
   }
-  std::string statement = message_.substr(0, position);
+  const std::string statement = message_.substr(0, position);
 
   auto it = BE_statements_.find(statement);
   if (it != BE_statements_.end()) {
