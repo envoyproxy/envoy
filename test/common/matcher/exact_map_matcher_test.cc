@@ -5,38 +5,15 @@
 #include "common/matcher/exact_map_matcher.h"
 #include "common/matcher/matcher.h"
 
-#include "test/test_common/utility.h"
+#include "test/common/matcher/test_utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Matcher {
 
-struct TestData {
-  static absl::string_view name() { return "test"; }
-};
-
-struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
-  explicit StringAction(const std::string& string) : string_(string) {}
-
-  const std::string string_;
-
-  bool operator==(const StringAction& other) const { return string_ == other.string_; }
-};
-
-struct TestInput : public DataInput<TestData> {
-  explicit TestInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) override { return result_; }
-
-  DataInputGetResult result_;
-};
-
 class ExactMapMatcherTest : public ::testing::Test {
 public:
-  std::unique_ptr<StringAction> stringValue(absl::string_view value) {
-    return std::make_unique<StringAction>(std::string(value));
-  }
-
   void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
     EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
     EXPECT_FALSE(result.on_match_.has_value());
@@ -86,7 +63,7 @@ TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
-      OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
+      stringOnMatch<TestData>("no_match"));
 
   TestData data;
   const auto result = matcher.match(data);
@@ -94,13 +71,12 @@ TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
 }
 
 TEST_F(ExactMapMatcherTest, Match) {
-  const auto no_match_config = stringValue("no_match");
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
-      OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
+      stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
+  matcher.addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
   const auto result = matcher.match(data);
@@ -108,12 +84,11 @@ TEST_F(ExactMapMatcherTest, Match) {
 }
 
 TEST_F(ExactMapMatcherTest, DataNotAvailable) {
-  ExactMapMatcher<TestData> matcher(
-      std::make_unique<TestInput>(
-          DataInputGetResult{DataInputGetResult::DataAvailability::NotAvailable, {}}),
-      OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
+  ExactMapMatcher<TestData> matcher(std::make_unique<TestInput>(DataInputGetResult{
+                                        DataInputGetResult::DataAvailability::NotAvailable, {}}),
+                                    stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
+  matcher.addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
   const auto result = matcher.match(data);
@@ -121,14 +96,12 @@ TEST_F(ExactMapMatcherTest, DataNotAvailable) {
 }
 
 TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
-  const auto no_match_config = stringValue("no_match");
-
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
           DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
-      OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
+      stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
+  matcher.addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
   const auto result = matcher.match(data);
@@ -139,9 +112,9 @@ TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
   ExactMapMatcher<TestData> matcher(
       std::make_unique<TestInput>(DataInputGetResult{
           DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
-      OnMatch<TestData>{[this]() { return stringValue("no_match"); }, nullptr});
+      stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", OnMatch<TestData>{[this]() { return stringValue("match"); }, nullptr});
+  matcher.addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
   const auto result = matcher.match(data);

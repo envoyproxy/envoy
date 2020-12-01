@@ -9,6 +9,7 @@
 #include "common/matcher/matcher.h"
 #include "common/protobuf/utility.h"
 
+#include "test/common/matcher/test_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -16,84 +17,11 @@
 
 namespace Envoy {
 namespace Matcher {
-
-struct TestData {
-  static absl::string_view name() { return "test"; }
-};
-
-class TestDataInput : public DataInput<TestData> {
-public:
-  explicit TestDataInput(const std::string& value) : value_(value) {}
-
-  DataInputGetResult get(const TestData&) override {
-    return {DataInputGetResult::DataAvailability::AllDataAvailable, value_};
-  }
-
-private:
-  const std::string value_;
-};
-
-class TestDataInputFactory : public DataInputFactory<TestData> {
-public:
-  TestDataInputFactory(absl::string_view factory_name, absl::string_view data)
-      : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
-
-  DataInputPtr<TestData> createDataInput(const Protobuf::Message&) override {
-    return std::make_unique<TestDataInput>(value_);
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
-  }
-  std::string name() const override { return factory_name_; }
-
-private:
-  const std::string factory_name_;
-  const std::string value_;
-  Registry::InjectFactory<DataInputFactory<TestData>> injection_;
-};
-
-class TestAction : public ActionBase<ProtobufWkt::StringValue> {};
-
-class TestActionFactory : public ActionFactory {
-public:
-  ActionFactoryCb createActionFactoryCb(const Protobuf::Message&) override {
-    return []() { return std::make_unique<TestAction>(); };
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
-  }
-  std::string name() const override { return "test_action"; }
-};
-
-class NeverMatch : public InputMatcher {
-public:
-  bool match(absl::optional<absl::string_view>) override { return false; }
-};
-
-class NeverMatchFactory : public InputMatcherFactory {
-public:
-  NeverMatchFactory() : inject_factory_(*this) {}
-
-  InputMatcherPtr createInputMatcher(const Protobuf::Message&) override {
-    return std::make_unique<NeverMatch>();
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
-  }
-
-  std::string name() const override { return "never_match"; }
-
-  Registry::InjectFactory<InputMatcherFactory> inject_factory_;
-};
-
 class MatcherTest : public ::testing::Test {
 public:
   MatcherTest() : inject_action_(action_factory_) {}
 
-  TestActionFactory action_factory_;
+  StringActionFactory action_factory_;
   Registry::InjectFactory<ActionFactory> inject_action_;
 };
 

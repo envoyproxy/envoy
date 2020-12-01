@@ -3,26 +3,15 @@
 #include "common/matcher/field_matcher.h"
 #include "common/matcher/matcher.h"
 
+#include "test/common/matcher/test_utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Matcher {
 
-struct TestData {
-  static absl::string_view name() { return "test"; }
-};
-
 class FieldMatcherTest : public testing::Test {
 public:
-  SingleFieldMatcherPtr<TestData>
-  createSingleMatcher(absl::optional<std::string> input,
-                      std::function<bool(absl::optional<absl::string_view>)> predicate,
-                      DataInputGetResult::DataAvailability availability =
-                          DataInputGetResult::DataAvailability::AllDataAvailable) {
-    return std::make_unique<SingleFieldMatcher<TestData>>(
-        std::make_unique<TestInput>(input, availability), std::make_unique<TestMatcher>(predicate));
-  }
-
   std::vector<FieldMatcherPtr<TestData>>
   createMatchers(std::vector<std::pair<bool, DataInputGetResult::DataAvailability>> values) {
     std::vector<FieldMatcherPtr<TestData>> matchers;
@@ -30,7 +19,7 @@ public:
     matchers.reserve(values.size());
     for (const auto& v : values) {
       matchers.emplace_back(std::make_unique<SingleFieldMatcher<TestData>>(
-          std::make_unique<TestInput>(absl::nullopt, v.second),
+          std::make_unique<TestInput>(DataInputGetResult{v.second, absl::nullopt}),
           std::make_unique<BoolMatcher>(v.first)));
     }
 
@@ -47,36 +36,6 @@ public:
 
     return createMatchers(new_values);
   }
-
-  struct TestInput : public DataInput<TestData> {
-    TestInput(absl::optional<std::string> input, DataInputGetResult::DataAvailability availability)
-        : input_(input), availability_(availability) {}
-
-    DataInputGetResult get(const TestData&) override {
-      return {availability_,
-              input_ ? absl::make_optional(absl::string_view(*input_)) : absl::nullopt};
-    }
-
-    absl::optional<std::string> input_;
-    DataInputGetResult::DataAvailability availability_;
-  };
-
-  struct BoolMatcher : public InputMatcher {
-    explicit BoolMatcher(bool value) : value_(value) {}
-
-    bool match(absl::optional<absl::string_view>) override { return value_; }
-
-    const bool value_;
-  };
-
-  struct TestMatcher : public InputMatcher {
-    explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
-        : predicate_(predicate) {}
-
-    bool match(absl::optional<absl::string_view> input) override { return predicate_(input); }
-
-    std::function<bool(absl::optional<absl::string_view>)> predicate_;
-  };
 };
 
 TEST_F(FieldMatcherTest, SingleFieldMatcher) {
