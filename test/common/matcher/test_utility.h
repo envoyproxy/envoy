@@ -54,7 +54,7 @@ struct BoolMatcher : public InputMatcher {
   const bool value_;
 };
 
-// An InputMatcher that evalutes the input against a provided callback.
+// An InputMatcher that evaluates the input against a provided callback.
 struct TestMatcher : public InputMatcher {
   explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
       : predicate_(predicate) {}
