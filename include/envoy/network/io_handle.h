@@ -85,6 +85,9 @@ public:
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
+    // If true indicates a successful syscall, but the packet was dropped due to truncation. We do
+    // not support receiving truncated packets.
+    bool truncated_and_dropped_{false};
   };
 
   /**
