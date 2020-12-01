@@ -503,8 +503,9 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field, pro
       field.LABEL_REQUIRED: 'required ',
       field.LABEL_REPEATED: 'repeated ',
   }
-  comment = '(%s) ' % ', '.join([pretty_label_names[field.label] + FormatFieldType(type_context, field)] +
-                                field_annotations) + formatted_leading_comment
+  comment = '(%s) ' % ', '.join(
+      [pretty_label_names[field.label] + FormatFieldType(type_context, field)] +
+      field_annotations) + formatted_leading_comment
   return anchor + field.name + '\n' + MapLines(functools.partial(
       Indent, 2), comment + formatted_oneof_comment) + formatted_security_options
 
