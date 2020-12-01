@@ -274,9 +274,10 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
 
   // Advance time to cause another health check.
-  timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
 
   ASSERT_TRUE(clusters_[cluster_idx].host_upstream_->waitForHttpConnection(
       *dispatcher_, clusters_[cluster_idx].host_fake_connection_));
@@ -292,12 +293,13 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 2);
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
 // Tests that health checking properly handles a GOAWAY with an error, followed by a reset.
-TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayErrorAndReset) {
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   initialize();
 
   // GOAWAY doesn't exist in HTTP1.
@@ -311,13 +313,14 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayErrorAndReset) {
   // Send a GOAWAY with an error. The health checker should treat this as an
   // error and cancel the request.
   clusters_[cluster_idx].host_fake_connection_->encodeProtocolError();
+
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
   // Advance time to cause another health check.
-  timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
 
   ASSERT_TRUE(clusters_[cluster_idx].host_upstream_->waitForHttpConnection(
       *dispatcher_, clusters_[cluster_idx].host_fake_connection_));
@@ -333,7 +336,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayErrorAndReset) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }

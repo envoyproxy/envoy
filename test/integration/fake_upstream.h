@@ -431,7 +431,7 @@ public:
   // Should only be called for HTTP2, sends a GOAWAY frame with NO_ERROR.
   void encodeGoAway();
 
-  // Should only be called for HTTP2, sends a GOAWAY frame with PROTOCOL_ERROR.
+  // Should only be called for HTTP2, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
   void encodeProtocolError();
 
 private:
