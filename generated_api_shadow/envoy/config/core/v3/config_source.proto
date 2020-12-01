@@ -7,7 +7,7 @@ import "envoy/config/core/v3/grpc_service.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/authority.proto";
+import "xds/core/v3/authority.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -153,11 +153,11 @@ message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
 
   // Authorities that this config source may be used for. An authority specified
-  // in a *udpa.core.v1.ResourceLocator* is resolved to a *ConfigSource* prior
+  // in a *xds.core.v3.ResourceLocator* is resolved to a *ConfigSource* prior
   // to configuration fetch. This field provides the association between
   // authority name and configuration source.
   // [#not-implemented-hide:]
-  repeated udpa.core.v1.Authority authorities = 7;
+  repeated xds.core.v3.Authority authorities = 7;
 
   oneof config_source_specifier {
     option (validate.required) = true;
