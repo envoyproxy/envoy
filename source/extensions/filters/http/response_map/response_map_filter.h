@@ -125,6 +125,8 @@ public:
   void doRewrite();
 
 private:
+  friend class ResponseMapFilterTest;
+
   ResponseMapFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
