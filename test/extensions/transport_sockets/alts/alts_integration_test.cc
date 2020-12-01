@@ -82,7 +82,8 @@ public:
   grpc::gcp::RpcProtocolVersions server_versions;
 };
 
-class AltsIntegrationTestBase : public testing::TestWithParam<Network::Address::IpVersion>,
+class AltsIntegrationTestBase : public Event::TestUsingSimulatedTime,
+                                public testing::TestWithParam<Network::Address::IpVersion>,
                                 public HttpIntegrationTest {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
@@ -168,7 +169,7 @@ public:
     HttpIntegrationTest::cleanupUpstreamAndDownstream();
     dispatcher_->clearDeferredDeleteList();
     if (fake_handshaker_server_ != nullptr) {
-      fake_handshaker_server_->Shutdown(std::chrono::system_clock::now());
+      fake_handshaker_server_->Shutdown(timeSystem().systemTime());
     }
     fake_handshaker_server_thread_->join();
   }
