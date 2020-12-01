@@ -1489,6 +1489,168 @@ TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
   loadRq(hosts_[0], 5, 500);
 }
 
+// Test verifies that ejection time increases each time the node is ejected,
+// and decreases when node stays healthy.
+#define EJECT_PERIOD_TICK(x) x * 10000
+TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
+  // Setup ejection time to 10 secs.
+  ON_CALL(runtime_.snapshot_, getInteger("outlier_detection.base_ejection_time_ms", _))
+      .WillByDefault(Return(10000UL));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Eject the host.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(0)));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true));
+  // Cause a consecutive 5xx error.
+  loadRq(hosts_[0], 5, 500);
+  // Make sure that node has been ejected.
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Ejection base time is 10 secs. The host has been ejected just once.
+  // It should be brought back after 10 secs.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(1)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  interval_timer_->invokeCallback();
+  // Make sure that node has been brought back.
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // Cause ejection again.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 5, 500);
+  // Make sure that node has been ejected.
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // This is the second ejection in the row.
+  // Host should stay ejected for twice the base_ejection_time: 20 secs.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(2)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  // Make sure that node has been ejected.
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(3)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  interval_timer_->invokeCallback();
+  // Make sure that node has been brought back.
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // Third ejection in the row. It starts at 30 secs. The Host should be ejected for 3*10 secs.
+  // It should not be brought back until 60 secs.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 5, 500);
+  // Make sure that node has been ejected.
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Host should stay ejected after 10 secs of ejection time.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(4)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Host should stay ejected after 20 secs of ejection time.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(5)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Host should be brought back after being ejected for 30 secs.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(6)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  interval_timer_->invokeCallback();
+  // Make sure that node has been brought back.
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // During the next 2 timer intervals, the host is healthy. This should decrease
+  // the eject time backoff.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(7)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(8)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  // Trigger the next ejection. The host should be ejected for 20 secs.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 5, 500);
+  // Make sure that node has been ejected.
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Host should be brought back after being ejected for 20 secs.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(10)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  interval_timer_->invokeCallback();
+  // Make sure that node has been brought back.
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  // Now simulate long period of no errors.
+  // The host will not be ejected and the eject backoff time should
+  // drop to the initial value of 1 * eject_period.
+  for (auto i = 1; i <= 50; i++) {
+    time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(10 + i)));
+    EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+    interval_timer_->invokeCallback();
+  }
+
+  // Trigger ejection.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(61)));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true));
+
+  // Cause a consecutive 5xx error.
+  loadRq(hosts_[0], 5, 500);
+  // Make sure that node has been ejected.
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // The host should be brought back after 10 secs.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(EJECT_PERIOD_TICK(62)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  interval_timer_->invokeCallback();
+  // cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
+  // Make sure that node has been ejected.
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+}
+
 TEST(DetectorHostMonitorNullImplTest, All) {
   DetectorHostMonitorNullImpl null_sink;
 

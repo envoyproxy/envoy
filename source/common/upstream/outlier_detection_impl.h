@@ -144,6 +144,13 @@ public:
   void eject(MonotonicTime ejection_time);
   void uneject(MonotonicTime ejection_time);
 
+  uint32_t ejectTimeBackoff() const { return eject_time_backoff_; }
+  void onNoEjection() {
+    if (eject_time_backoff_ != 0) {
+      eject_time_backoff_--;
+    };
+  }
+
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
   void resetConsecutiveLocalOriginFailure() { consecutive_local_origin_failure_ = 0; }
@@ -188,6 +195,10 @@ private:
   absl::optional<MonotonicTime> last_ejection_time_;
   absl::optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
+  // Determines ejection time. Each time a node is ejected,
+  // the eject_time_backoff is incremented. The value is decremented
+  // each time the node was healthy and not ejected.
+  uint32_t eject_time_backoff_{};
 
   // counters for externally generated failures
   std::atomic<uint32_t> consecutive_5xx_{0};

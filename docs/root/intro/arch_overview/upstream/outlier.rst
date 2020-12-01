@@ -65,8 +65,11 @@ ejection algorithm works as follows:
    :ref:`panic <arch_overview_load_balancing_panic_threshold>` scenario. The number of milliseconds
    is equal to the :ref:`outlier_detection.base_ejection_time_ms
    <envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` value
-   multiplied by the number of times the host has been ejected. This causes hosts to get ejected
-   for longer and longer periods if they continue to fail.
+   multiplied by the number of times the host has been ejected in a row. This causes hosts to get ejected
+   for longer and longer periods if they continue to fail. When the host becomes healthy, the ejection time 
+   multiplier decreases with time. Eventually, if the host stays healthy for long time, 
+   the host would be ejected for default time :ref:`outlier_detection.base_ejection_time_ms
+   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` milliseconds, in case it was determined to be an outlier.
 #. An ejected host will automatically be brought back into service after the ejection time has
    been satisfied. Generally, outlier detection is used alongside :ref:`active health checking
    <arch_overview_health_checking>` for a comprehensive health checking solution.

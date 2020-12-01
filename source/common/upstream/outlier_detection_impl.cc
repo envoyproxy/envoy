@@ -52,6 +52,7 @@ void DetectorHostMonitorImpl::eject(MonotonicTime ejection_time) {
   ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   num_ejections_++;
+  eject_time_backoff_++;
   last_ejection_time_ = ejection_time;
 }
 
@@ -327,6 +328,8 @@ void DetectorImpl::armIntervalTimer() {
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
                                        MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+    // Node seems to be healthy and was not ejected since the last check.
+    monitor->onNoEjection();
     return;
   }
 
@@ -334,7 +337,8 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
       std::chrono::milliseconds(runtime_.snapshot().getInteger(
           "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
   ASSERT(monitor->numEjections() > 0);
-  if ((base_eject_time * monitor->numEjections()) <= (now - monitor->lastEjectionTime().value())) {
+  if ((base_eject_time * monitor->ejectTimeBackoff()) <=
+      (now - monitor->lastEjectionTime().value())) {
     ejections_active_helper_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
