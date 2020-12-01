@@ -322,6 +322,12 @@ build:clang-cl --define clang_cl=1
 # Override determinism flags (DATE etc) is valid on clang-cl compiler
 build:clang-cl --copt="-Wno-macro-redefined"
 build:clang-cl --copt="-Wno-builtin-macro-redefined"
+# Workaround problematic missing override declarations of mocks
+# TODO: resolve this class of problematic mocks, e.g.
+# ./test/mocks/http/stream.h(16,21): error: 'addCallbacks'
+#     overrides a member function but is not marked 'override'
+#   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
+build:clang-cl --copt="-Wno-inconsistent-missing-override"
 build:clang-cl --action_env=USE_CLANG_CL=1
 
 # Defaults to 'auto' - Off for windows, so override to linux behavior
