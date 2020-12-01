@@ -14,11 +14,6 @@ using Envoy::Api::SysCallSizeResult;
 namespace Envoy {
 
 namespace {
-/**
- * On different platforms the sockaddr struct for unix domain
- * sockets is different. We use this function to get the
- * length of the platform specific struct.
- */
 constexpr int messageTruncatedOption() {
 #if defined(__APPLE__)
   // OSX does not support passing `MSG_TRUNC` to recvmsg and recvmmsg. This does not effect
