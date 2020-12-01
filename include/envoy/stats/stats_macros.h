@@ -92,6 +92,7 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gaugeFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_MODE_
 #define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogramFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_UNIT_
 #define POOL_TEXT_READOUT_PREFIX(POOL, PREFIX) (POOL).textReadoutFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
+#define POOL_STAT_NAME_PREFIX(POOL, PREFIX) (POOL).symbolTable().textReadoutFromString(Envoy::statPrefixJoin(PREFIX, FINISH_STAT_DECL_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")
@@ -116,6 +117,12 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define MAKE_STATS_STRUCT_GAUGE_HELPER_(NAME, MODE)                                                \
   , NAME##_(Envoy::Stats::Utility::gaugeFromStatNames(scope, {prefix, stat_names.NAME##_},         \
                                                       Envoy::Stats::Gauge::ImportMode::MODE))
+#define MAKE_STATS_STRUCT_HISTOGRAM_HELPER_(NAME, UNIT)                                            \
+  , NAME##_(Envoy::Stats::Utility::histogramFromStatNames(scope, {prefix, stat_names.NAME##_},     \
+                                                          Envoy::Stats::Histogram::Unit::UNIT))
+#define MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_(NAME)                                               \
+  , NAME##_(Envoy::Stats::Utility::textReadoutFromStatNames(scope, {prefix, stat_names.NAME##_}))
+
 #define MAKE_STATS_STRUCT_STATNAME_HELPER_(name)
 #define GENERATE_STATNAME_STRUCT(name)
 
@@ -126,10 +133,12 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define MAKE_STAT_NAMES_STRUCT(StatNamesStruct, ALL_STATS)                                         \
   struct StatNamesStruct {                                                                         \
     explicit StatNamesStruct(Envoy::Stats::SymbolTable& symbol_table)                              \
-        : pool_(symbol_table) ALL_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT,          \
-                                        GENERATE_STAT_NAME_INIT) {}                                \
+        : pool_(symbol_table)                                                                      \
+              ALL_STATS(GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT, \
+                        GENERATE_STAT_NAME_INIT, GENERATE_STAT_NAME_INIT) {}                       \
     Envoy::Stats::StatNamePool pool_;                                                              \
-    ALL_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)     \
+    ALL_STATS(GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT,     \
+              GENERATE_STAT_NAME_STRUCT, GENERATE_STAT_NAME_STRUCT)                                \
   }
 
 /**
@@ -142,9 +151,12 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
                 Envoy::Stats::StatName prefix = Envoy::Stats::StatName())                          \
         : scope_(scope)                                                                            \
               ALL_STATS(MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_,        \
+                        MAKE_STATS_STRUCT_HISTOGRAM_HELPER_,                                       \
+                        MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_,                                    \
                         MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
     Envoy::Stats::Scope& scope_;                                                                   \
-    ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_STATNAME_STRUCT)            \
+    ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,           \
+              GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)                              \
   }
 
 } // namespace Envoy

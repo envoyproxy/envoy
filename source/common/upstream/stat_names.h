@@ -8,7 +8,7 @@ namespace Upstream {
 /**
  * All cluster manager stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE, STATNAME)                                        \
+#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
   COUNTER(cluster_removed)                                                                         \
