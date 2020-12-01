@@ -60,7 +60,7 @@ def _envoy_linkopts():
             "-pagezero_size 10000",
             "-image_base 100000000",
         ],
-        "@envoy//bazel:clang_cl_opt_build": [
+        "@envoy//bazel:windows_opt_build": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
             "-DEBUG:FULL",

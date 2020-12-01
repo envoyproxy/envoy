@@ -51,6 +51,8 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
+    # TODO(envoyproxy/windows-dev): Diagnose flake in msvc-cl pipeline, observed timeout in
+    # IpVersions/ProxyFilterIntegrationTest.ReloadClusterAndAttachToCache/IPv6
     tags = ["flaky_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",

@@ -537,11 +537,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Bazel rules for the C++ language",
         project_url = "https://github.com/bazelbuild/rules_cc",
         # TODO(lizan): pin to a point releases when there's a released version.
-        version = "818289e5613731ae410efb54218a4077fb9dbb03",
-        sha256 = "9d48151ea71b3e225adfb6867e6d2c7d0dce46cbdc8710d9a9a628574dfd40a0",
+        version = "b1c40e1de81913a3c40e5948f78719c28152486d",
+        sha256 = "71d037168733f26d2a9648ad066ee8da4a34a13f51d24843a42efa6b65c2420f",
         strip_prefix = "rules_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_cc/archive/{version}.tar.gz"],
-        release_date = "2020-05-13",
+        release_date = "2020-11-11",
         use_category = ["build"],
     ),
     rules_foreign_cc = dict(

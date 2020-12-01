@@ -164,10 +164,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = ["active_quic_listener_test.cc"],
-    tags = [
-        "fails_on_windows",
-        "nofips",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",

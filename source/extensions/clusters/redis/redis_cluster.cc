@@ -274,8 +274,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   Upstream::HostSharedPtr host;
   if (parent_.hosts_.empty()) {
     const int rand_idx = parent_.random_.random() % discovery_address_list_.size();
-    auto it = discovery_address_list_.begin();
-    std::next(it, rand_idx);
+    auto it = std::next(discovery_address_list_.begin(), rand_idx);
     host = Upstream::HostSharedPtr{
         new RedisHost(parent_.info(), "", *it, parent_, true, parent_.timeSource())};
   } else {

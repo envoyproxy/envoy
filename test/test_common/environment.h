@@ -196,10 +196,13 @@ public:
    * @param filename: the fully qualified name of the file to use
    * @param require_existence if true, RELEASE_ASSERT if the file does not exist.
    *   If false, an empty string will be returned if the file is not present.
+   * @param read_binary if true, read file verbatim, otherwise convert to POSIX
+   *   carriage control
    * @return string the contents of the file.
    */
   static std::string readFileToStringForTest(const std::string& filename,
-                                             bool require_existence = true);
+                                             bool require_existence = true,
+                                             bool read_binary = true);
 
   /**
    * Create a path on the filesystem (mkdir -p ... equivalent).
