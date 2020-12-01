@@ -863,17 +863,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-11-12",
         cpe = "N/A",
     ),
-    emscripten_toolchain = dict(
-        project_name = "Emscripten SDK",
-        project_desc = "Emscripten SDK (use by Wasm)",
-        project_url = "https://github.com/emscripten-core/emsdk",
-        version = "2.0.7",
-        sha256 = "ce7a5c76e8b425aca874cea329fd9ac44b203b777053453b6a37b4496c5ce34f",
-        strip_prefix = "emsdk-{version}",
-        urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
-        use_category = ["build"],
-        release_date = "2020-10-13",
-    ),
     io_bazel_rules_rust = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
