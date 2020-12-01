@@ -109,7 +109,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
     context->setBodySize(4);
     auto result = serializer.deserializeRpcResult(buffer, context);
     EXPECT_TRUE(result.second);
-    EXPECT_TRUE(result.first->hasException());
+    EXPECT_FALSE(result.first->hasException());
   }
 
   // incorrect body size
