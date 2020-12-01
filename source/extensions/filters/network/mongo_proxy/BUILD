@@ -35,7 +35,6 @@ envoy_cc_library(
         "//source/common/common:byte_order_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
     ],
 )

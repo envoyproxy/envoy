@@ -8,7 +8,6 @@
 #include "common/common/byte_order.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
-#include "common/common/safe_memcpy.h"
 #include "common/common/utility.h"
 
 namespace Envoy {
@@ -23,8 +22,7 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
   }
 
   int32_t val;
-  void* mem = data.linearize(sizeof(int32_t));
-  safeMemcpy(&val, reinterpret_cast<const uint32_t*>(mem));
+  val = data.peekLEInt<uint32_t>();
   return le32toh(val);
 }
 
@@ -89,9 +87,7 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
   }
 
   int64_t val;
-  void* mem = data.linearize(sizeof(int64_t));
-  safeMemcpy(&val, reinterpret_cast<const uint64_t*>(mem));
-  data.drain(sizeof(int64_t));
+  val = data.drainLEInt<uint64_t>();
   return le64toh(val);
 }
 
