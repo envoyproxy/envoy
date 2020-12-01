@@ -21,6 +21,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
+#include "common/http/utility.h"
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -52,7 +53,6 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredHeaders(headers));
-
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   quic::QuicStream* writing_stream =
       quic::VersionUsesHttp3(transport_version())
@@ -138,12 +138,27 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   ASSERT(headers_decompressed() && !header_list.empty());
 
-  response_decoder_->decodeHeaders(
-      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list),
-      /*end_stream=*/fin);
+  ENVOY_STREAM_LOG(debug, "decodeHeaders: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
   }
+  std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list);
+  const uint64_t status = Http::Utility::getResponseStatus(*headers);
+  if (status >= 100 && status < 200) {
+    // These are Informational 1xx headers, not the actual response headers.
+    ENVOY_STREAM_LOG(debug, "Received informational response code: {}", *this, status);
+    set_headers_decompressed(false);
+    if (status == 100 && !decoded_100_continue_) {
+      // This is 100 Continue, only decode it once to support Expect:100-Continue header.
+      decoded_100_continue_ = true;
+      response_decoder_->decode100ContinueHeaders(std::move(headers));
+    }
+  } else {
+    response_decoder_->decodeHeaders(std::move(headers),
+                                     /*end_stream=*/fin);
+  }
+
   ConsumeHeaderList();
 }
 
@@ -151,6 +166,9 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   ASSERT(read_disable_counter_ == 0);
   ASSERT(!in_decode_data_callstack_);
+  if (rst_sent()) {
+    return;
+  }
   in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -178,10 +196,10 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   // already delivered it or decodeTrailers will be called.
   bool skip_decoding = (buffer->length() == 0 && !fin_read_and_no_trailers) || end_stream_decoded_;
   if (!skip_decoding) {
-    response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
     if (fin_read_and_no_trailers) {
       end_stream_decoded_ = true;
     }
+    response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
   }
 
   if (!sequencer()->IsClosed()) {
@@ -204,6 +222,9 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
+  if (rst_sent()) {
+    return;
+  }
   quic::QuicSpdyStream::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
@@ -215,9 +236,10 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     ASSERT(!received_trailers().empty());
     // Only decode trailers after finishing decoding body.
+    end_stream_decoded_ = true;
+    ENVOY_STREAM_LOG(debug, "decodeTrailers: {}.", *this, received_trailers().DebugString());
     response_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
-    end_stream_decoded_ = true;
     MarkTrailersConsumed();
   }
 }
@@ -236,7 +258,9 @@ void EnvoyQuicClientStream::Reset(quic::QuicRstStreamErrorCode error) {
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
-  runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+  if (!end_stream_decoded_) {
+    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+  }
 }
 
 void EnvoyQuicClientStream::OnClose() {

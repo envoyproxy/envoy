@@ -72,6 +72,8 @@ private:
   void maybeDecodeTrailers();
 
   Http::ResponseDecoder* response_decoder_{nullptr};
+
+  bool decoded_100_continue_{false};
 };
 
 } // namespace Quic

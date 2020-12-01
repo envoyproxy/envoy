@@ -129,6 +129,9 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
     // of propagating original reset reason. In QUICHE if a stream stops reading
     // before FIN or RESET received, it resets the steam with QUIC_STREAM_NO_ERROR.
+
+    // Upper layers expect calling resetStream() to immediately raise reset callbacks.
+    runResetCallbacks(reason);
     StopReading();
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));
@@ -155,13 +158,13 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
   ASSERT(headers_decompressed() && !header_list.empty());
-
-  request_decoder_->decodeHeaders(
-      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list),
-      /*end_stream=*/fin);
+  ENVOY_STREAM_LOG(debug, "decodeHeaders: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
   }
+  request_decoder_->decodeHeaders(
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list),
+      /*end_stream=*/fin);
   ConsumeHeaderList();
 }
 
@@ -169,6 +172,9 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   ASSERT(read_disable_counter_ == 0);
   ASSERT(!in_decode_data_callstack_);
+  if (rst_sent()) {
+    return;
+  }
   in_decode_data_callstack_ = true;
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -195,10 +201,10 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // already delivered it or decodeTrailers will be called.
   bool skip_decoding = (buffer->length() == 0 && !fin_read_and_no_trailers) || end_stream_decoded_;
   if (!skip_decoding) {
-    request_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
     if (fin_read_and_no_trailers) {
       end_stream_decoded_ = true;
     }
+    request_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
   }
 
   if (!sequencer()->IsClosed()) {
@@ -221,6 +227,9 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
+  if (rst_sent()) {
+    return;
+  }
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
@@ -228,13 +237,19 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
   }
 }
 
+void EnvoyQuicServerStream::OnHeadersTooLarge() {
+  ENVOY_STREAM_LOG(debug, "Headers too large.", *this);
+  quic::QuicSpdyServerStreamBase::OnHeadersTooLarge();
+}
+
 void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     ASSERT(!received_trailers().empty());
     // Only decode trailers after finishing decoding body.
+    end_stream_decoded_ = true;
+    ENVOY_STREAM_LOG(debug, "decodeTrailers: {}.", *this, received_trailers().DebugString());
     request_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
-    end_stream_decoded_ = true;
     MarkTrailersConsumed();
   }
 }
