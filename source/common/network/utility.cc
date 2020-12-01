@@ -156,6 +156,16 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+Address::InstanceConstSharedPtr
+Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only) {
+  try {
+    return parseInternetAddressAndPort(ip_address, v6only);
+  } catch (const EnvoyException& ee) {
+    ENVOY_LOG_MISC(debug, ee.what());
+    return nullptr;
+  }
+}
+
 Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
                                                                      bool v6only) {
   if (ip_address.empty()) {

@@ -261,29 +261,36 @@ bool Filter::parseV1Header(char* buf, size_t len) {
       return false;
     }
 
-    // TODO(gsagula): parseInternetAddressAndPort() could be modified to take two string_view
+    // TODO(gsagula): parseInternetAddressAndPortNoThrow() could be modified to take two string_view
     // arguments, so we can eliminate allocation here.
-    try {
-      if (line_parts[1] == "TCP4") {
-        proxy_protocol_header_.emplace(
-            WireHeader{0, Network::Address::IpVersion::v4,
-                       Network::Utility::parseInternetAddressAndPort(
-                           std::string{line_parts[2]} + ":" + std::string{line_parts[4]}),
-                       Network::Utility::parseInternetAddressAndPort(
-                           std::string{line_parts[3]} + ":" + std::string{line_parts[5]})});
-      } else if (line_parts[1] == "TCP6") {
-        proxy_protocol_header_.emplace(
-            WireHeader{0, Network::Address::IpVersion::v6,
-                       Network::Utility::parseInternetAddressAndPort(
-                           "[" + std::string{line_parts[2]} + "]:" + std::string{line_parts[4]}),
-                       Network::Utility::parseInternetAddressAndPort(
-                           "[" + std::string{line_parts[3]} + "]:" + std::string{line_parts[5]})});
-      } else {
-        ENVOY_LOG(debug, "failed to read proxy protocol");
+    if (line_parts[1] == "TCP4") {
+      const Network::Address::InstanceConstSharedPtr remote_address =
+          Network::Utility::parseInternetAddressAndPortNoThrow(std::string{line_parts[2]} + ":" +
+                                                               std::string{line_parts[4]});
+      const Network::Address::InstanceConstSharedPtr local_address =
+          Network::Utility::parseInternetAddressAndPortNoThrow(std::string{line_parts[3]} + ":" +
+                                                               std::string{line_parts[5]});
+
+      if (remote_address == nullptr || local_address == nullptr) {
         return false;
       }
-    } catch (const EnvoyException& ee) {
-      ENVOY_LOG(debug, "failed to parse IP address and port");
+      proxy_protocol_header_.emplace(
+          WireHeader{0, Network::Address::IpVersion::v4, remote_address, local_address});
+    } else if (line_parts[1] == "TCP6") {
+      const Network::Address::InstanceConstSharedPtr remote_address =
+          Network::Utility::parseInternetAddressAndPortNoThrow("[" + std::string{line_parts[2]} +
+                                                               "]:" + std::string{line_parts[4]});
+      const Network::Address::InstanceConstSharedPtr local_address =
+          Network::Utility::parseInternetAddressAndPortNoThrow("[" + std::string{line_parts[3]} +
+                                                               "]:" + std::string{line_parts[5]});
+
+      if (remote_address == nullptr || local_address == nullptr) {
+        return false;
+      }
+      proxy_protocol_header_.emplace(
+          WireHeader{0, Network::Address::IpVersion::v6, remote_address, local_address});
+    } else {
+      ENVOY_LOG(debug, "failed to read proxy protocol");
       return false;
     }
   }
