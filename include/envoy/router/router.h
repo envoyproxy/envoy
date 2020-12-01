@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
@@ -1254,9 +1255,8 @@ public:
  *
  * It is similar logically to RequestEncoder, only without the getStream interface.
  */
-class GenericUpstream {
+class GenericUpstream : public Event::DeferredDeletable {
 public:
-  virtual ~GenericUpstream() = default;
   /**
    * Encode a data frame.
    * @param data supplies the data to encode. The data may be moved by the encoder.
