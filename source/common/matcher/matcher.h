@@ -33,7 +33,7 @@ private:
 
 struct MaybeMatchResult {
   const ActionPtr result_;
-  const bool final_;
+  const MatchState match_state_;
 };
 
 // TODO(snowp): Make this a class that tracks the progress to speed up subsequent traversals.
@@ -42,18 +42,18 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
                                              const DataType& data) {
   const auto result = match_tree.match(data);
   if (result.match_state_ == MatchState::UnableToMatch) {
-    return MaybeMatchResult{nullptr, false};
+    return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
   }
 
   if (!result.on_match_) {
-    return {nullptr, true};
+    return {nullptr, MatchState::MatchComplete};
   }
 
   if (result.on_match_->matcher_) {
     return evaluateMatch(*result.on_match_->matcher_, data);
   }
 
-  return MaybeMatchResult{result.on_match_->action_cb_(), true};
+  return MaybeMatchResult{result.on_match_->action_cb_(), MatchState::MatchComplete};
 }
 
 /**

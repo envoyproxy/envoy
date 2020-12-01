@@ -6,6 +6,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
+#include "common/matcher/list_matcher.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/utility.h"
 
@@ -272,8 +273,32 @@ matcher_list:
   EXPECT_EQ(result.on_match_->action_cb_, nullptr);
 
   const auto recursive_result = evaluateMatch(*match_tree, TestData());
-  EXPECT_TRUE(recursive_result.final_);
+  EXPECT_EQ(recursive_result.match_state_, MatchState::MatchComplete);
   EXPECT_NE(recursive_result.result_, nullptr);
+}
+
+TEST_F(MatcherTest, RecursiveMatcherNoMatch) {
+  ListMatcher<TestData> matcher(absl::nullopt);
+
+  matcher.addMatcher(createSingleMatcher(absl::nullopt, [](auto) { return false; }),
+                     stringOnMatch<TestData>("match"));
+
+  const auto recursive_result = evaluateMatch(matcher, TestData());
+  EXPECT_EQ(recursive_result.match_state_, MatchState::MatchComplete);
+  EXPECT_EQ(recursive_result.result_, nullptr);
+}
+
+TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
+  ListMatcher<TestData> matcher(absl::nullopt);
+
+  matcher.addMatcher(createSingleMatcher(
+                         absl::nullopt, [](auto) { return false; },
+                         DataInputGetResult::DataAvailability::NotAvailable),
+                     stringOnMatch<TestData>("match"));
+
+  const auto recursive_result = evaluateMatch(matcher, TestData());
+  EXPECT_EQ(recursive_result.match_state_, MatchState::UnableToMatch);
+  EXPECT_EQ(recursive_result.result_, nullptr);
 }
 } // namespace Matcher
 } // namespace Envoy
