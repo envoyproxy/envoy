@@ -42,7 +42,7 @@ export TEST_TMPDIR=${BUILD_DIR}/tmp
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=(--nocache_test_results)
 
-BAZEL_STARTUP_OPTIONS+=("--output_base=c:/_eb")
+BAZEL_STARTUP_OPTIONS+=("--output_base=${TEST_TMPDIR/\/c/c:}")
 BAZEL_BUILD_OPTIONS=(
     -c opt
     --show_task_finish
@@ -79,6 +79,6 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... 
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
 
 # Summarize tests bypasssed to monitor the progress of porting to Windows
-echo "Tests bypassed as skip_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
-echo "Tests bypassed as fails_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
-echo "Tests bypassed as flaky_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "flaky_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unstable tests"
+echo "Tests bypassed as skip_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
+echo "Tests bypassed as fails_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
+echo "Tests bypassed as flaky_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "flaky_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unstable tests"

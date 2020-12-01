@@ -139,5 +139,7 @@ generate_config(SCRIPT_DIR,
                 mongos_servers=mongos_servers)
 
 shutil.copy(os.path.join(SCRIPT_DIR, 'envoyproxy_io_proxy.yaml'), OUT_DIR)
-shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_connect.yaml'), OUT_DIR)
-shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_connect.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_http1_connect.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'encapsulate_in_http2_connect.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_http1_connect.yaml'), OUT_DIR)
+shutil.copy(os.path.join(SCRIPT_DIR, 'terminate_http2_connect.yaml'), OUT_DIR)

@@ -85,6 +85,14 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_cl_build",
+    values = {
+        "cpu": "x64_windows",
+        "define": "clang_cl=1",
+    },
+)
+
+config_setting(
     name = "clang_cl_opt_build",
     values = {
         "cpu": "x64_windows",
@@ -277,8 +285,8 @@ config_setting(
 )
 
 config_setting(
-    name = "enable_new_codecs_in_integration_tests",
-    values = {"define": "use_new_codecs_in_integration_tests=true"},
+    name = "enable_legacy_codecs_in_integration_tests",
+    values = {"define": "use_new_codecs_in_integration_tests=false"},
 )
 
 cc_proto_library(

@@ -12,6 +12,9 @@
     // Uncomment next line if you have devcontainer.env
     // "--env-file=.devcontainer/devcontainer.env"
   ],
+  "containerEnv": {
+    "ENVOY_SRCDIR": "${containerWorkspaceFolder}",
+  },
   "settings": {
     "terminal.integrated.shell.linux": "/bin/bash",
     "bazel.buildifierFixOnFormat": true,

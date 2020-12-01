@@ -81,6 +81,7 @@ public:
   TransportPtr createTransport() override;
   ProtocolPtr createProtocol() override;
   Router::Config& routerConfig() override { return *this; }
+  bool payloadPassthrough() const override { return payload_passthrough_; }
 
 private:
   void processFilter(
@@ -94,6 +95,7 @@ private:
   std::unique_ptr<Router::RouteMatcher> route_matcher_;
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
+  const bool payload_passthrough_;
 };
 
 } // namespace ThriftProxy
