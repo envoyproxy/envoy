@@ -466,8 +466,8 @@ sw8
 ----------
 
 The *sw8* HTTP header is used by the SkyWalking tracer in Envoy. It contains the key
-tracing context for SkyWalking tracer and is used to establish the relationship between
-tracing spans of downstream and Envoy. See more on SkyWalking tracing
+tracing context for the SkyWalking tracer and is used to establish the relationship between
+the tracing spans of downstream and Envoy. See more on SkyWalking tracing
 `here <https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md>`__.
 
 .. _config_http_conn_man_headers_custom_request_headers:
