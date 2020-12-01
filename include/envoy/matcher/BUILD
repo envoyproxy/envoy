@@ -18,5 +18,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -5,11 +5,11 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "external/envoy_api/envoy/config/core/v3/extension.pb.h"
 
 namespace Envoy {
 namespace Matcher {
