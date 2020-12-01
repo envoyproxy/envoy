@@ -287,7 +287,7 @@ public:
   CustomStatsSink(Stats::Scope& scope) : stats_flushed_(scope.counterFromString("stats.flushed")) {}
 
   // Stats::Sink
-  void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); };
+  void flush(Stats::MetricSnapshot&) override { stats_flushed_.inc(); }
 
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
@@ -549,7 +549,6 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(ServerStatsTest, FlushStats) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
-
   Stats::Gauge& recent_lookups = stats_store_.gaugeFromString(
       "server.stats_recent_lookups", Stats::Gauge::ImportMode::NeverImport);
   EXPECT_EQ(0, recent_lookups.value());
