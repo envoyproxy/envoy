@@ -47,9 +47,9 @@ ActiveTcpClient::~ActiveTcpClient() {
 }
 
 void ActiveTcpClient::clearCallbacks() {
-  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
+  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY) {
     auto* pool = &parent_;
-    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->scheduleOnUpstreamReady();
   }
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;

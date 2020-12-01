@@ -120,22 +120,17 @@ public:
   }
 
   void expectEnableUpstreamReady() {
-    EXPECT_FALSE(upstream_ready_enabled_);
     EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
         .Times(1)
         .RetiresOnSaturation();
   }
 
-  void expectAndRunUpstreamReady() {
-    EXPECT_TRUE(upstream_ready_enabled_);
-    mock_upstream_ready_cb_->invokeCallback();
-    EXPECT_FALSE(upstream_ready_enabled_);
-  }
+  void expectAndRunUpstreamReady() { mock_upstream_ready_cb_->invokeCallback(); }
 
   Upstream::ClusterConnectivityState state_;
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
-  NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
+  Event::MockSchedulableCallback* mock_upstream_ready_cb_;
   std::vector<TestCodecClient> test_clients_;
 };
 
@@ -305,7 +300,9 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
 
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
-  new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  EXPECT_CALL(dispatcher_, createSchedulableCallback_(_))
+      .WillOnce(Return(upstream_ready_cb_))
+      .RetiresOnSaturation();
   conn_pool_ =
       std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_, upstream_ready_cb_);
   NiceMock<MockResponseDecoder> outer_decoder;

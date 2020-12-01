@@ -16,10 +16,7 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::ClusterConnectivityState& state)
     : state_(state), host_(host), priority_(priority), dispatcher_(dispatcher),
       socket_options_(options), transport_socket_options_(transport_socket_options),
-      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
-        upstream_ready_enabled_ = false;
-        onUpstreamReady();
-      })) {}
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
@@ -219,8 +216,7 @@ bool ConnPoolImplBase::maybePrefetch(float global_prefetch_ratio) {
 }
 
 void ConnPoolImplBase::scheduleOnUpstreamReady() {
-  if (!pending_streams_.empty() && !upstream_ready_enabled_) {
-    upstream_ready_enabled_ = true;
+  if (hasPendingStreams()) {
     upstream_ready_cb_->scheduleCallbackCurrentIteration();
   }
 }

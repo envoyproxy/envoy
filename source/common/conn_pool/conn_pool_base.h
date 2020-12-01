@@ -154,7 +154,6 @@ public:
                          Network::ConnectionEvent event);
   // See if the drain process has started and/or completed.
   void checkForDrained();
-  // Schedule onUpstreamReady.
   void scheduleOnUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
   // Called if this pool is likely to be picked soon, to determine if it's worth
@@ -244,7 +243,6 @@ protected:
 
   void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;
-  bool upstream_ready_enabled_{false};
 
 private:
   std::list<PendingStreamPtr> pending_streams_;
