@@ -108,38 +108,6 @@ Network::FilterStatus StartTlsSwitchFilter::onData(Buffer::Instance& buf, bool) 
 // to the client completes.
 Network::FilterStatus StartTlsSwitchFilter::onWrite(Buffer::Instance& buf, bool) {
   return onCommand(buf, false);
-
-  const std::string message = buf.toString();
-
-  // Skip empty messages.
-  if (message.empty()) {
-    return Network::FilterStatus::Continue;
-    ;
-  }
-
-  // Stop processing if unrecognized message has been received.
-  if (allowed_messages_.find(message) == allowed_messages_.end()) {
-    return Network::FilterStatus::StopIteration;
-  }
-
-  if (message == "switch") {
-    if (read_callbacks_->connection().transportProtocol() ==
-        Extensions::TransportSockets::TransportProtocolNames::get().StartTls) {
-      buf.drain(buf.length());
-      buf.add("usetls");
-      read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
-        // Wait until 6 bytes long "usetls" has been sent.
-        if (bytes >= 6) {
-          read_callbacks_->connection().startSecureTransport();
-          // Unsubscribe the callback.
-          // Switch to tls has been completed.
-          return false;
-        }
-        return true;
-      });
-    }
-  }
-  return Network::FilterStatus::Continue;
 }
 
 // Config factory for StartTlsSwitchFilter.
