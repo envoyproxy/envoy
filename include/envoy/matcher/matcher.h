@@ -150,7 +150,7 @@ public:
 // available. This return type allows the DataInput to indicate this, as this might influence
 // the match decision.
 //
-// Conceptually the data availabilty will start at being NotAvailable, transition to
+// Conceptually the data availability should start at being NotAvailable, transition to
 // MoreDataMightBeAvailable (optional, this doesn't make sense for all data) and finally
 // AllDataAvailable as the data becomes available.
 struct DataInputGetResult {
