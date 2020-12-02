@@ -36,6 +36,7 @@ public:
   void move(Instance& rhs, uint64_t length) override;
   SliceDataPtr extractMutableFrontSlice() override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
+  Reservation reserve(uint64_t preferred_length) override;
   void commit(Reservation& reservation, uint64_t length) override;
   void postProcess() override { checkLowWatermark(); }
   void appendSliceForTest(const void* data, uint64_t size) override;

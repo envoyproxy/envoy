@@ -62,6 +62,29 @@ SliceDataPtr WatermarkBuffer::extractMutableFrontSlice() {
   return result;
 }
 
+// Adjust the reservation size based on space available before hitting
+// the high watermark to avoid overshooting by a lot and thus violating the limits
+// the watermark is imposing.
+Reservation WatermarkBuffer::reserve(uint64_t preferred_length) {
+  uint64_t adjusted_length = preferred_length;
+
+  if (high_watermark_ > 0 && preferred_length > 0) {
+    const uint64_t current_length = OwnedImpl::length();
+    if (current_length >= high_watermark_) {
+      // Always allow a read of at least some data. The API doesn't allow returning
+      // a zero-length reservation.
+      adjusted_length = OwnedSlice::default_slice_size_;
+    } else {
+      const uint64_t available_length = high_watermark_ - current_length;
+      adjusted_length = std::min(available_length, preferred_length);
+      adjusted_length =
+          IntUtil::roundUpToMultiple(adjusted_length, OwnedSlice::default_slice_size_);
+    }
+  }
+
+  return OwnedImpl::reserve(adjusted_length);
+}
+
 uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
   uint64_t bytes_reserved = OwnedImpl::reserve(length, iovecs, num_iovecs);
   checkHighAndOverflowWatermarks();
