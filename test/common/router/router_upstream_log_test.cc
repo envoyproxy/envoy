@@ -100,7 +100,7 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
-
+    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     ON_CALL(*context_.cluster_manager_.conn_pool_.host_, address())
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.conn_pool_.host_, locality())
@@ -138,13 +138,14 @@ public:
               EXPECT_CALL(encoder.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectResponseTimerCreate();
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_->decodeHeaders(headers, true);
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -176,7 +177,7 @@ public:
               EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder1, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectPerTryTimerCreate();
@@ -186,6 +187,7 @@ public:
                                            {"x-envoy-internal", "true"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(2);
     router_->decodeHeaders(headers, true);
 
     router_->retry_state_->expectResetRetry();
@@ -205,7 +207,7 @@ public:
               EXPECT_CALL(encoder2.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address2_));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectPerTryTimerCreate();

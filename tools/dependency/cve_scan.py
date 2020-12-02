@@ -34,6 +34,11 @@ IGNORES_CVES = set([
     'CVE-2020-8252',
     # Fixed via the nghttp2 1.41.0 bump in Envoy 8b6ea4.
     'CVE-2020-11080',
+    # Node.js issue rooted in a c-ares bug. Does not appear to affect
+    # http-parser or our use of c-ares, c-ares has been bumped regardless.
+    'CVE-2020-8277',
+    # gRPC issue that only affects Javascript bindings.
+    'CVE-2020-7768',
 ])
 
 # Subset of CVE fields that are useful below.

@@ -91,7 +91,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> par
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_) {
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
-  Upstream::ThreadLocalCluster* cluster = parent->cm_.get(cluster_name_);
+  Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
     auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), parent->api_);
     auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent->api_);
@@ -335,7 +335,7 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
         cluster_->info(), "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN)};
+        envoy::config::core::v3::UNKNOWN, dispatcher_.timeSource())};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);

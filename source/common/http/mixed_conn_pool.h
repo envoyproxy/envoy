@@ -17,12 +17,6 @@ public:
                              transport_socket_options, random_generator, state,
                              {Protocol::Http2, Protocol::Http11}) {}
 
-  Http::Protocol protocol() const override {
-    // This is a pure debug check to ensure call sites defer protocol() calls
-    // until ALPN has a chance to be negotiated.
-    ASSERT(connected_);
-    return protocol_;
-  }
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
 

@@ -144,7 +144,10 @@ class BuildGraph(object):
     Returns:
       Dictionary items from source/extensions/extensions_build_config.bzl.
     """
-    return extensions_build_config.EXTENSIONS.items()
+    all_extensions = {}
+    all_extensions.update(extensions_build_config.EXTENSIONS)
+    all_extensions.update(extensions_build_config.DISABLED_BY_DEFAULT_EXTENSIONS)
+    return all_extensions.items()
 
 
 class Validator(object):

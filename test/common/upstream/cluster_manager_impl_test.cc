@@ -562,7 +562,7 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
     create(parseBootstrapFromV3Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
-    Upstream::ThreadLocalCluster* tlc = cluster_manager_->get("cluster_1");
+    Upstream::ThreadLocalCluster* tlc = cluster_manager_->getThreadLocalCluster("cluster_1");
     EXPECT_NE(nullptr, tlc);
 
     if (tlc) {
@@ -767,15 +767,18 @@ public:
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
     create(parseBootstrapFromV3Json(json));
 
-    EXPECT_EQ(nullptr, cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(
+        nullptr,
+        cluster_manager_->getThreadLocalCluster("cluster_0")->loadBalancer().chooseHost(nullptr));
 
     cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
-        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
+        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
     cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
         cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
     cluster1->initialize_callback_();
-    EXPECT_EQ(cluster1->prioritySet().getMockHostSet(0)->hosts_[0],
-              cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(
+        cluster1->prioritySet().getMockHostSet(0)->hosts_[0],
+        cluster_manager_->getThreadLocalCluster("cluster_0")->loadBalancer().chooseHost(nullptr));
   }
 };
 
@@ -869,7 +872,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
                                         clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   create(parseBootstrapFromV3Json(json));
-  EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
                                                               Http::Protocol::Http2, nullptr));
   EXPECT_EQ(nullptr,
@@ -927,12 +930,15 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   create(parseBootstrapFromV3Json(json));
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
-  EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
+  EXPECT_EQ(cluster.info(), cluster_manager_->getThreadLocalCluster("cluster_1")->info());
+  EXPECT_EQ(1UL, cluster_manager_->getThreadLocalCluster("cluster_1")
+                     ->prioritySet()
+                     .hostSetsPerPriority()[0]
+                     ->hosts()
+                     .size());
   EXPECT_EQ(
-      1UL,
-      cluster_manager_->get("cluster_1")->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-            cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
+      cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+      cluster_manager_->getThreadLocalCluster("cluster_1")->loadBalancer().chooseHost(nullptr));
 
   // Local reference, primary reference, thread local reference, host reference, async client
   // reference.
@@ -1203,7 +1209,8 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
   // Fire a member callback on the local cluster, which should not call any update callbacks on
   // the deleted cluster.
-  foo->prioritySet().getMockHostSet(0)->hosts_ = {makeTestHost(foo->info_, "tcp://127.0.0.1:80")};
+  foo->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(foo->info_, "tcp://127.0.0.1:80", time_system_)};
   EXPECT_CALL(membership_updated, ready());
   foo->prioritySet().getMockHostSet(0)->runCallbacks(foo->prioritySet().getMockHostSet(0)->hosts_,
                                                      {});
@@ -1231,7 +1238,7 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version3"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   checkConfigDump(R"EOF(
 dynamic_warming_clusters:
   - version_info: "version3"
@@ -1377,7 +1384,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version3"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   checkConfigDump(R"EOF(
  dynamic_warming_clusters:
    - version_info: "version3"
@@ -1484,10 +1491,10 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   cluster1->initialize_callback_();
 
-  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
+  EXPECT_EQ(cluster1->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
   EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
 
@@ -1500,7 +1507,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
   cluster2->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster2->info_, "tcp://127.0.0.1:80", time_system_)};
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
@@ -1512,7 +1519,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
-  EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
+  EXPECT_EQ(cluster2->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(cp));
@@ -1542,7 +1549,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_CALL(*cp2, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb2));
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().active_clusters_.size());
 
   // Close the TCP connection. Success is no ASSERT or crash due to referencing
@@ -1611,11 +1618,11 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   cluster1->initialize_callback_();
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
   host1->healthFlagSet(HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  HostSharedPtr host2 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  HostSharedPtr host2 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
   host2->healthFlagSet(HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  HostSharedPtr host3 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  HostSharedPtr host3 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
 
   HostVector hosts{host1, host2, host3};
   auto hosts_ptr = std::make_shared<HostVector>(hosts);
@@ -1624,7 +1631,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
       100);
 
-  auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
+  auto* tls_cluster = cluster_manager_->getThreadLocalCluster(cluster1->info_->name());
 
   EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority().size());
   EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
@@ -1645,7 +1652,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
                                         clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "some_cluster";
-  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
   cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
 
@@ -1708,7 +1715,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
                                         clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "some_cluster";
-  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
   cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
 
@@ -1778,7 +1785,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   EXPECT_CALL(*cluster1->info_, features())
       .WillRepeatedly(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
   cluster1->info_->name_ = "some_cluster";
-  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
   cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
 
@@ -1855,7 +1862,7 @@ TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   EXPECT_CALL(*cluster1->info_, features()).WillRepeatedly(Return(0));
   cluster1->info_->name_ = "some_cluster";
-  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80");
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
   cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
 
@@ -1925,7 +1932,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
@@ -2069,7 +2076,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   NiceMock<MockLoadBalancerContext> example_com_context;
   ON_CALL(example_com_context, upstreamTransportSocketOptions())
@@ -2398,7 +2405,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
@@ -2479,7 +2486,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
@@ -2535,7 +2542,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
@@ -3859,7 +3866,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   ClusterUpdateCallbacksHandlePtr cb =
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   // Verify that we get no hosts when the HostSet is empty.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
@@ -3871,8 +3878,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
 
   // Set up the HostSet.
-  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80");
-  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81");
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80", time_system_);
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81", time_system_);
 
   HostVector hosts{host1, host2};
   auto hosts_ptr = std::make_shared<HostVector>(hosts);
@@ -3939,7 +3946,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   tcp1 = dynamic_cast<Tcp::ConnectionPool::MockInstance*>(
       cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr));
 
-  HostSharedPtr host3 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82");
+  HostSharedPtr host3 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82", time_system_);
 
   HostVector hosts_added;
   hosts_added.push_back(host3);
@@ -3980,7 +3987,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
 
   // Set up the HostSet.
-  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80");
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80", time_system_);
 
   HostVector hosts{host1};
   auto hosts_ptr = std::make_shared<HostVector>(hosts);
@@ -4006,7 +4013,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   Tcp::ConnectionPool::MockInstance* tcp1 = dynamic_cast<Tcp::ConnectionPool::MockInstance*>(
       cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr));
 
-  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82");
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82", time_system_);
   HostVector hosts_added;
   hosts_added.push_back(host2);
 
@@ -4094,7 +4101,7 @@ cluster_manager:
   // The priority for LOGICAL_DNS endpoints are written, so we just verify that there is only a
   // single priority even if the endpoint was configured to be priority 10.
   create(parseBootstrapFromV3Yaml(yaml));
-  const auto cluster = cluster_manager_->get("new_cluster");
+  const auto cluster = cluster_manager_->getThreadLocalCluster("new_cluster");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
 }
 
@@ -4179,8 +4186,8 @@ public:
     cluster_ = &cluster_manager_->activeClusters().begin()->second.get();
 
     // Set up the HostSet.
-    host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
-    host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
+    host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
 
     HostVector hosts{host1_, host2_};
     auto hosts_ptr = std::make_shared<HostVector>(hosts);

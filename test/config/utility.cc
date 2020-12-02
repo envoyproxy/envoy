@@ -635,10 +635,10 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn) {
     if (use_alpn) {
       ConfigHelper::HttpProtocolOptions new_protocol_options;
 
-      HttpProtocolOptions old_protocol_options = MessageUtil::anyConvert<
-          ConfigHelper::HttpProtocolOptions>(
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.filters.network.http_connection_manager"]);
+      HttpProtocolOptions old_protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
       protocol_options.MergeFrom(old_protocol_options);
 
       new_protocol_options = old_protocol_options;
@@ -652,9 +652,16 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn) {
             old_protocol_options.explicit_http_config().http2_protocol_options());
       }
       (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.filters.network.http_connection_manager"]
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
               .PackFrom(new_protocol_options);
     }
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    auto* validation_context =
+        tls_context.mutable_common_tls_context()->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+    cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
   });
 }
 
@@ -1121,25 +1128,17 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
 
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_filter = getFilterFromListener("http");
-  if (hcm_filter) {
-    auto* config = hcm_filter->mutable_typed_config();
-    hcm = MessageUtil::anyConvert<
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
-        *config);
-    return true;
-  }
-  return false;
+  return loadFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::storeHttpConnectionManager(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_config_any = getFilterFromListener("http")->mutable_typed_config();
-
-  hcm_config_any->PackFrom(hcm);
+  return storeFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {

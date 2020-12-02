@@ -66,6 +66,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     use_alpn_ = true;
   }
 }
+
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,

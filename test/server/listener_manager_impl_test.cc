@@ -576,7 +576,7 @@ TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
   const std::string yaml = R"EOF(
 address:
   envoy_internal_address:
-    server_listener_name: a_listener_name  
+    server_listener_name: a_listener_name
 filter_chains:
 - filters: []
   )EOF";
@@ -3668,6 +3668,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
             listener_factory_context = &context;
             return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
           }));
+  server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   ASSERT_NE(nullptr, listener_factory_context);
   EXPECT_EQ("test_value", Config::Metadata::metadataValue(
@@ -4219,6 +4220,8 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());
@@ -4300,6 +4303,8 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());

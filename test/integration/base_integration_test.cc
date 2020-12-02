@@ -137,7 +137,6 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     Network::TransportSocketFactoryPtr factory =
         upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
-
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
       ASSERT(!enable_half_close_);
