@@ -140,7 +140,7 @@ public:
 class Http1ConnPoolImplTest : public testing::Test {
 public:
   Http1ConnPoolImplTest()
-      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+      : upstream_ready_cb_(new Event::MockSchedulableCallback(&dispatcher_)),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
                                                          upstream_ready_cb_)) {}
 
@@ -151,7 +151,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  Event::MockSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -250,14 +250,17 @@ TEST_F(Http1ConnPoolImplTest, DrainConnections) {
   ActiveTestRequest r2(*this, 1, ActiveTestRequest::Type::CreateConnection);
   r2.startRequest();
 
+  conn_pool_->expectEnableUpstreamReady();
   r1.completeResponse(false);
 
   // This will destroy the ready client and set requests remaining to 1 on the busy client.
   conn_pool_->drainConnections();
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
+  conn_pool_->expectAndRunUpstreamReady();
 
   // This will destroy the busy client when the response finishes.
+  conn_pool_->expectEnableUpstreamReady();
   r2.completeResponse(false);
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -274,9 +277,11 @@ TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
   r1.completeResponse(false);
 
   EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
@@ -377,15 +382,18 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
   // Request 1 should kick off a new connection.
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
   r1.completeResponse(false);
 
   // Request 2 should not.
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Immediate);
   r2.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
   r2.completeResponse(true);
 
   // Cause the connection to go away.
   EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
@@ -953,6 +961,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  conn_pool_->expectEnableUpstreamReady();
   EXPECT_TRUE(
       callbacks.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1016,8 +1025,10 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 
+  conn_pool_->expectEnableUpstreamReady();
   EXPECT_CALL(drained, ready());
   r1.startRequest();
+
   r1.completeResponse(false);
 
   EXPECT_CALL(*conn_pool_, onClientDestroy());
@@ -1101,15 +1112,18 @@ TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
   EXPECT_TRUE(conn_pool_->hasActiveConnections());
 
   // cleanup
+  conn_pool_->expectEnableUpstreamReady();
   r1.completeResponse(false);
   conn_pool_->drainConnections();
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
+  conn_pool_->expectAndRunUpstreamReady();
 }
 
 TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
   r1.completeResponse(false);
 
   EXPECT_FALSE(conn_pool_->hasActiveConnections());
@@ -1117,6 +1131,7 @@ TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnection
   conn_pool_->drainConnections();
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
+  conn_pool_->expectAndRunUpstreamReady();
 }
 
 TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
