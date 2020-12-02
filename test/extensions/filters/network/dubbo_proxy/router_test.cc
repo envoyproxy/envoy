@@ -79,7 +79,9 @@ public:
           }
           return protocol_;
         }),
-        serializer_register_(serializer_factory_), protocol_register_(protocol_factory_) {}
+        serializer_register_(serializer_factory_), protocol_register_(protocol_factory_) {
+    context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  }
 
   void initializeRouter() {
     route_ = new NiceMock<MockRoute>();
@@ -322,6 +324,7 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
 }
 
 TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
+  context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   initializeRouter();
   initializeMetadata(MessageType::Oneway);
 
@@ -359,7 +362,8 @@ TEST_F(DubboRouterTest, NoCluster) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_, get(Eq(cluster_name_))).WillOnce(Return(nullptr));
+  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq(cluster_name_)))
+      .WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);

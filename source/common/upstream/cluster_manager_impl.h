@@ -251,7 +251,7 @@ public:
   }
 
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
-  ThreadLocalCluster* get(absl::string_view cluster) override;
+  ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
   using ClusterManager::httpConnPoolForCluster;
 

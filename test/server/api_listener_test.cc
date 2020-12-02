@@ -56,7 +56,8 @@ api_listener:
   )EOF";
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
-
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
@@ -116,7 +117,8 @@ api_listener:
   )EOF";
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
-
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());

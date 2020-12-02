@@ -150,7 +150,7 @@ void ActiveMessage::onQueryTopicRoute() {
   if (route) {
     cluster_name = route->routeEntry()->clusterName();
     Upstream::ClusterManager& cluster_manager = connection_manager_.config().clusterManager();
-    cluster = cluster_manager.get(cluster_name);
+    cluster = cluster_manager.getThreadLocalCluster(cluster_name);
   }
   if (cluster) {
     ENVOY_LOG(trace, "Envoy has an operating cluster {} for topic {}", cluster_name, topic_name);

@@ -50,6 +50,7 @@ public:
     message_->headers().setPath("/");
     ON_CALL(*cm_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
   virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {

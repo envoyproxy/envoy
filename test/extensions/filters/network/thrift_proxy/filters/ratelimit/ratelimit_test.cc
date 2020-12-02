@@ -48,6 +48,7 @@ public:
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.thrift_filter_enabled", 100))
         .WillByDefault(Return(true));
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
   void setupTest(const std::string& yaml) {
@@ -167,7 +168,7 @@ TEST_F(ThriftRateLimitFilterTest, NoRoute) {
 TEST_F(ThriftRateLimitFilterTest, NoCluster) {
   setupTest(filter_config_);
 
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(request_metadata_));
 }

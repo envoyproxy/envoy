@@ -33,7 +33,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
       tls_(tls.allocateSlot()), ip_allowlist_(config.ip_white_list()),
       stats_(generateStats(scope, config.stat_prefix())) {
 
-  if (!cm.get(remote_cluster_name_)) {
+  if (!cm.clusters().hasCluster(remote_cluster_name_)) {
     throw EnvoyException(
         fmt::format("unknown cluster '{}' in client ssl auth config", remote_cluster_name_));
   }

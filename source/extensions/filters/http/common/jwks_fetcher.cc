@@ -41,7 +41,7 @@ public:
 
     // Check if cluster is configured, fail the request if not.
     // Otherwise cm_.httpAsyncClientForCluster will throw exception.
-    if (cm_.get(uri.cluster()) == nullptr) {
+    if (cm_.getThreadLocalCluster(uri.cluster()) == nullptr) {
       ENVOY_LOG(error, "{}: fetch pubkey [uri = {}] failed: [cluster = {}] is not configured",
                 __func__, uri.uri(), uri.cluster());
       complete_ = true;

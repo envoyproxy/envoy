@@ -166,14 +166,33 @@ public:
   virtual void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
-  using ClusterInfoMap = absl::node_hash_map<std::string, std::reference_wrapper<const Cluster>>;
+  using ClusterInfoMap = absl::flat_hash_map<std::string, std::reference_wrapper<const Cluster>>;
   struct ClusterInfoMaps {
+    bool hasCluster(absl::string_view cluster) const {
+      return active_clusters_.find(cluster) != active_clusters_.end() ||
+             warming_clusters_.find(cluster) != warming_clusters_.end();
+    }
+
+    ClusterConstOptRef getCluster(absl::string_view cluster) {
+      auto active_cluster = active_clusters_.find(cluster);
+      if (active_cluster != active_clusters_.end()) {
+        return active_cluster->second;
+      }
+      auto warming_cluster = warming_clusters_.find(cluster);
+      if (warming_cluster != warming_clusters_.end()) {
+        return warming_cluster->second;
+      }
+      return absl::nullopt;
+    }
+
     ClusterInfoMap active_clusters_;
     ClusterInfoMap warming_clusters_;
   };
 
   /**
    * @return ClusterInfoMap all current clusters including active and warming.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
   virtual ClusterInfoMaps clusters() PURE;
 
@@ -195,8 +214,12 @@ public:
    * the case of dynamic clusters, subsequent event loop iterations may invalidate this pointer.
    * If information about the cluster needs to be kept, use the ThreadLocalCluster::info() method to
    * obtain cluster information that is safe to store.
+   *
+   * NOTE: This method may return nullptr even if the cluster exists (if it hasn't been warmed yet,
+   * propagated to workers, etc.). Use clusters() for general configuration checking on the main
+   * thread.
    */
-  virtual ThreadLocalCluster* get(absl::string_view cluster) PURE;
+  virtual ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) PURE;
 
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that

@@ -31,7 +31,8 @@ void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
   }
 
   const ThriftProxy::Router::RouteEntry* route_entry = route->routeEntry();
-  Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
+  Upstream::ThreadLocalCluster* cluster =
+      config_->cm().getThreadLocalCluster(route_entry->clusterName());
   if (!cluster) {
     return;
   }

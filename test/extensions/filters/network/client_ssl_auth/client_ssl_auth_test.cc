@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"
@@ -74,7 +75,8 @@ ip_white_list:
 
     envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
-    EXPECT_CALL(cm_, get(Eq("vpn")));
+    cm_.initializeClusters({"vpn"}, {});
+    EXPECT_CALL(cm_, clusters());
     setupRequest();
     config_ =
         ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
@@ -126,7 +128,7 @@ stat_prefix: bad_cluster
 
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
   TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_CALL(cm_, get(Eq("bad_cluster"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(Upstream::ClusterManager::ClusterInfoMaps()));
   EXPECT_THROW(
       ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
       EnvoyException);

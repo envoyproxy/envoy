@@ -100,7 +100,7 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
-
+    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     ON_CALL(*context_.cluster_manager_.conn_pool_.host_, address())
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.conn_pool_.host_, locality())

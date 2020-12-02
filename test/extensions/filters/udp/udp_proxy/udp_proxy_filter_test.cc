@@ -181,10 +181,9 @@ public:
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
     if (has_cluster) {
-      EXPECT_CALL(cluster_manager_, get(_));
-    } else {
-      EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
+      cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     }
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster("fake_cluster"));
     filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
   }
 

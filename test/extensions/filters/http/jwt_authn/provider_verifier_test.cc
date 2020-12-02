@@ -32,6 +32,10 @@ ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
 
 class ProviderVerifierTest : public testing::Test {
 public:
+  ProviderVerifierTest() {
+    mock_factory_ctx_.cluster_manager_.initializeThreadLocalClusters({"pubkey_cluster"});
+  }
+
   void createVerifier() {
     filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),

@@ -323,6 +323,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
   addStatsdFakeClusterConfig(sink);
+  server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);

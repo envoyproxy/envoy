@@ -49,6 +49,7 @@ class DatadogDriverTest : public testing::Test {
 public:
   void setup(envoy::config::trace::v3::DatadogConfig& datadog_config, bool init_timer) {
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -61,16 +62,13 @@ public:
   }
 
   void setupValidDriver() {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-        .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
+    cm_.initializeClusters({"fake_cluster"}, {});
     setup(datadog_config, true);
   }
 
@@ -101,8 +99,6 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -113,25 +109,20 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-        .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
     envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
+    cm_.initializeClusters({"fake_cluster"}, {});
     setup(datadog_config, true);
   }
 }
 
 TEST_F(DatadogDriverTest, AllowCollectorClusterToBeAddedViaApi) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, addedViaApi()).WillByDefault(Return(true));
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
