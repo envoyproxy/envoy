@@ -67,6 +67,11 @@ public:
   }
 
   /**
+   * Return if half-close semantics are enabled on the underlying connection.
+   */
+  bool isHalfCloseEnabled() { return connection_->isHalfCloseEnabled(); }
+
+  /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */
@@ -122,6 +127,7 @@ public:
 
   Type type() const { return type_; }
 
+  // Note this is the L4 stream info, not L7.
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
 protected:
@@ -176,8 +182,14 @@ private:
     CodecReadFilter(CodecClient& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
       parent_.onData(data);
+      if (end_stream && parent_.isHalfCloseEnabled()) {
+        // Note that this results in the connection closed as if it was closed
+        // locally, it would be more correct to convey the end stream to the
+        // response decoder, but it would require some refactoring.
+        parent_.close();
+      }
       return Network::FilterStatus::StopIteration;
     }
 
