@@ -35,7 +35,7 @@ public:
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
       metrics_service_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       metrics_service_cluster->set_name("metrics_service");
-      metrics_service_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*metrics_service_cluster);
       // metrics_service gRPC service definition.
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.stat_sinks.metrics_service");
