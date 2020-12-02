@@ -240,12 +240,12 @@ message CommonResponse {
   // stream. If responding to an HttpBody request, simply replace or clear
   // the body chunk that was sent with that request. If responding to an
   // HttpHeaders request, then a new body may be added to the request if this
-  // message is returned along with the CONTINUE_AND_DO_NOT_END_STREAM status.
+  // message is returned along with the CONTINUE_AND_REPLACE status.
   BodyMutation body_mutation = 3;
 
   // Add new trailers to the message. This may be used when responding to either a
   // HttpHeaders or HttpBody message, but only if this message is returned
-  // along with the CONTINUE_AND_DO_NOT_END_STREAM status.
+  // along with the CONTINUE_AND_REPLACE status.
   config.core.v3.HeaderMap trailers = 4;
 
   // Clear the route cache for the current request.
