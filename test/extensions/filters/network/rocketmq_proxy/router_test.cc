@@ -24,6 +24,7 @@ public:
   RocketmqRouterTestBase()
       : config_(rocketmq_proxy_config_, context_),
         cluster_info_(std::make_shared<Upstream::MockClusterInfo>()) {
+    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     conn_manager_ =
         std::make_unique<ConnectionManager>(config_, context_.dispatcher().timeSource());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -270,7 +271,7 @@ TEST_F(RocketmqRouterTest, NoCluster) {
   initSendMessageRequest();
 
   EXPECT_CALL(*active_message_, onReset());
-  EXPECT_CALL(context_.cluster_manager_, get(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_)).WillRepeatedly(Return(nullptr));
 
   startRequest();
 }

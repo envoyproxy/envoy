@@ -27,7 +27,7 @@ public:
 TEST_F(TcpConnPoolTest, TestNoMatchingClusterName) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config;
   config.set_hostname("host");
-  EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(cluster_name_, cluster_manager_, config,
                                                     nullptr, callbacks_));
 }

@@ -74,6 +74,7 @@ public:
     opts->component_name = "component";
 
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -89,8 +90,8 @@ public:
   void setupValidDriver(int min_flush_spans = LightStepDriver::DefaultMinFlushSpans,
                         Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                             Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+    cm_.initializeClusters({"fake_cluster"}, {});
+    ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
     EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
@@ -150,8 +151,6 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -163,9 +162,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
-
+    cm_.initializeClusters({"fake_cluster"}, {});
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -176,10 +173,8 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+    ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -191,10 +186,6 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 }
 
 TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
   const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -211,16 +202,19 @@ TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
   auto propagation_mode = Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
 
   tls_.defer_data = true;
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
                                               std::move(opts), propagation_mode, grpc_context_);
   tls_.call();
 }
 
 TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, addedViaApi()).WillByDefault(Return(true));
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
@@ -667,10 +661,6 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
   envoy::config::trace::v3::LightstepConfig lightstep_config;
   TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
       .Times(AtLeast(1))
       .WillRepeatedly(Return(1000));
@@ -680,6 +670,9 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
       .Times(AtLeast(1))
       .WillRepeatedly(Return(1));
 
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   setup(lightstep_config, true);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,

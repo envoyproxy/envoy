@@ -580,26 +580,22 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
 
 // Validates CheckCluster functionality.
 TEST(UtilityTest, CheckCluster) {
-  Upstream::MockClusterManager cm;
+  NiceMock<Upstream::MockClusterManager> cm;
 
   // Validate that proper error is thrown, when cluster is not available.
-  EXPECT_CALL(cm, get("foo")).WillOnce(Return(nullptr));
   EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
                             "prefix: unknown cluster 'foo'");
 
   // Validate that proper error is thrown, when dynamic cluster is passed when it is not expected.
-  NiceMock<Upstream::MockThreadLocalCluster> api_cluster;
-  EXPECT_CALL(cm, get("foo")).Times(2).WillRepeatedly(Return(&api_cluster));
-  EXPECT_CALL(api_cluster, info());
-  EXPECT_CALL(*api_cluster.cluster_.info_, addedViaApi()).WillOnce(Return(true));
+  cm.initializeClusters({"foo"}, {});
+  ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(true));
   EXPECT_THROW_WITH_MESSAGE(Utility::checkCluster("prefix", "foo", cm, false), EnvoyException,
                             "prefix: invalid cluster 'foo': currently only "
                             "static (non-CDS) clusters are supported");
   EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
 
   // Validate that bootstrap cluster does not throw any exceptions.
-  NiceMock<Upstream::MockThreadLocalCluster> bootstrap_cluster;
-  EXPECT_CALL(cm, get("foo")).Times(2).WillRepeatedly(Return(&bootstrap_cluster));
+  ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(false));
   EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
   EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, false));
 }
