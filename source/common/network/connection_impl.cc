@@ -375,6 +375,7 @@ void ConnectionImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::raiseEvent(ConnectionEvent event) {
+  ENVOY_CONN_LOG(trace, "raising connection event {}", *this, event);
   ConnectionImplBase::raiseConnectionEvent(event);
   // We may have pending data in the write buffer on transport handshake
   // completion, which may also have completed in the context of onReadReady(),

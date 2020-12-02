@@ -1014,7 +1014,7 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
   StreamImpl* stream = getStream(stream_id);
-  if (!stream) {
+  if (!stream || stream->remote_end_stream_) {
     return 0;
   }
 
@@ -1027,7 +1027,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
                  stream_id, end_metadata);
 
   StreamImpl* stream = getStream(stream_id);
-  if (stream == nullptr) {
+  if (!stream || stream->remote_end_stream_) {
     return 0;
   }
 

@@ -176,6 +176,17 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
   return **rpcs_.begin();
 }
 
+bool ConnectionManager::passthroughEnabled() const {
+  if (!config_.payloadPassthrough()) {
+    return false;
+  }
+
+  // This is called right after the metadata has been parsed, and the ActiveRpc being processed must
+  // be in the rpcs_ list.
+  ASSERT(!rpcs_.empty());
+  return (*rpcs_.begin())->passthroughSupported();
+}
+
 bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   upstream_buffer_.move(data);
 
@@ -272,6 +283,10 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   }
 
   return FilterStatus::Continue;
+}
+
+bool ConnectionManager::ResponseDecoder::passthroughEnabled() const {
+  return parent_.parent_.passthroughEnabled();
 }
 
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
@@ -396,6 +411,25 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   if (destroy_rpc) {
     parent_.doDeferredRpcDestroy(*this);
   }
+}
+
+bool ConnectionManager::ActiveRpc::passthroughSupported() const {
+  for (auto& entry : decoder_filters_) {
+    if (!entry->handle_->passthroughSupported()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
+  filter_context_ = &data;
+  filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
+    Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);
+    return filter->passthroughData(*data);
+  };
+
+  return applyDecoderFilters(nullptr);
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {

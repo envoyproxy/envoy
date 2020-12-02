@@ -55,7 +55,12 @@ def GetExtensionMetadata(target):
 if __name__ == '__main__':
   output_path = sys.argv[1]
   extension_db = {}
-  for extension, target in extensions_build_config.EXTENSIONS.items():
+  # Include all extensions from both EXTENSIONS and
+  # DISABLED_BY_DEFAULT_EXTENSIONS in source/extensions/extensions_build_config.bzl
+  all_extensions = {}
+  all_extensions.update(extensions_build_config.EXTENSIONS)
+  all_extensions.update(extensions_build_config.DISABLED_BY_DEFAULT_EXTENSIONS)
+  for extension, target in all_extensions.items():
     extension_db[extension] = GetExtensionMetadata(target)
   # The TLS and generic upstream extensions are hard-coded into the build, so
   # not in source/extensions/extensions_build_config.bzl
