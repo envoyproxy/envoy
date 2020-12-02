@@ -227,7 +227,17 @@ ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostShar
 }
 
 void ConnPoolBase::expectEnableUpstreamReady(bool run) {
-  dynamic_cast<OriginalConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
+  if (!test_new_connection_pool_) {
+    dynamic_cast<OriginalConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
+  } else {
+    if (run) {
+      mock_upstream_ready_cb_->invokeCallback();
+    } else {
+      EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
+          .Times(1)
+          .RetiresOnSaturation();
+    }
+  }
 }
 
 /**
