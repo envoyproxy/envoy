@@ -502,5 +502,68 @@ TEST_P(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_P(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
+  // Bump stream flow control window to allow request headers larger than 16K.
+  quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
+                                             32 * 1024);
+  quic_stream_->OnWindowUpdateFrame(window_update1);
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    spdy::SpdyHeaderBlock spdy_headers;
+    spdy_headers[":authority"] = host_;
+    spdy_headers[":method"] = "POST";
+    spdy_headers[":path"] = "/";
+    // This header exceeds max header size limit and should cause stream reset.
+    spdy_headers["long_header"] = std::string(16 * 1024 + 1, 'a');
+    std::string payload = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_headers),
+                                       bodyToStreamPayload(request_body_));
+    quic::QuicStreamFrame frame(stream_id_, false, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+  } else {
+    quic::QuicHeaderList request_headers;
+    request_headers.set_max_header_list_size(16 * 1024);
+    request_headers.OnHeaderBlockStart();
+    request_headers.OnHeader(":authority", host_);
+    request_headers.OnHeader(":method", "POST");
+    request_headers.OnHeader(":path", "/");
+    request_headers.OnHeader("long_header", std::string(16 * 1024 + 1, 'a'));
+    request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
+                                     /*compressed_header_bytes=*/0);
+    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers.uncompressed_header_bytes(),
+                                     request_headers);
+  }
+  EXPECT_TRUE(quic_stream_->rst_sent());
+}
+
+TEST_P(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
+  // Bump stream flow control window to allow request headers larger than 16K.
+  quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
+                                             20 * 1024);
+  size_t offset = receiveRequest(request_body_, false, request_body_.size() * 2);
+
+  quic_stream_->OnWindowUpdateFrame(window_update1);
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    spdy::SpdyHeaderBlock spdy_trailers;
+    // This header exceeds max header size limit and should cause stream reset.
+    spdy_trailers["long_header"] = std::string(16 * 1024 + 1, 'a');
+    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers);
+    quic::QuicStreamFrame frame(stream_id_, false, offset, payload);
+    quic_stream_->OnStreamFrame(frame);
+  } else {
+    quic::QuicHeaderList spdy_trailers;
+    spdy_trailers.set_max_header_list_size(16 * 1024);
+    spdy_trailers.OnHeaderBlockStart();
+    spdy_trailers.OnHeader("long_header", std::string(16 * 1024 + 1, 'a'));
+    spdy_trailers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
+                                   /*compressed_header_bytes=*/0);
+    quic_stream_->OnStreamHeaderList(/*fin=*/true, spdy_trailers.uncompressed_header_bytes(),
+                                     spdy_trailers);
+  }
+  EXPECT_TRUE(quic_stream_->rst_sent());
+}
+
 } // namespace Quic
 } // namespace Envoy

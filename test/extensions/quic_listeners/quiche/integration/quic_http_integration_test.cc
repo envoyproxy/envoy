@@ -537,5 +537,11 @@ TEST_P(QuicHttpIntegrationTest, RequestResponseWithTrailers) {
                /*response_trailers_present=*/true);
 }
 
+// Multiple 1xx before the request completes.
+TEST_P(QuicHttpIntegrationTest, EnvoyProxyingEarlyMultiple1xx) {
+  testEnvoyProxying1xx(/*continue_before_upstream_complete=*/true, /*with_encoder_filter=*/false,
+                       /*with_multiple_1xx_headers=*/true);
+}
+
 } // namespace Quic
 } // namespace Envoy

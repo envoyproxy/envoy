@@ -53,6 +53,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredHeaders(headers));
+
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   quic::QuicStream* writing_stream =
       quic::VersionUsesHttp3(transport_version())
@@ -132,13 +133,13 @@ void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
 
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
-  if (rst_sent()) {
+  if (read_side_closed()) {
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   ASSERT(headers_decompressed() && !header_list.empty());
 
-  ENVOY_STREAM_LOG(debug, "decodeHeaders: {}.", *this, header_list.DebugString());
+  ENVOY_STREAM_LOG(debug, "Receive headers: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
   }
@@ -166,7 +167,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   ASSERT(read_disable_counter_ == 0);
   ASSERT(!in_decode_data_callstack_);
-  if (rst_sent()) {
+  if (read_side_closed()) {
     return;
   }
   in_decode_data_callstack_ = true;
@@ -202,7 +203,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
     response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
   }
 
-  if (!sequencer()->IsClosed()) {
+  if (!sequencer()->IsClosed() || read_side_closed()) {
     in_decode_data_callstack_ = false;
     if (read_disable_counter_ > 0) {
       // If readDisable() was ever called during decodeData() and it meant to disable
@@ -222,9 +223,10 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
-  if (rst_sent()) {
+  if (read_side_closed()) {
     return;
   }
+  ENVOY_STREAM_LOG(debug, "Receive trailers: {}.", *this, header_list.DebugString());
   quic::QuicSpdyStream::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
@@ -237,7 +239,6 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
     ASSERT(!received_trailers().empty());
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
-    ENVOY_STREAM_LOG(debug, "decodeTrailers: {}.", *this, received_trailers().DebugString());
     response_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
