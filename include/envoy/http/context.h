@@ -6,6 +6,11 @@
 #include "envoy/http/codes.h"
 
 namespace Envoy {
+
+namespace Stats {
+class StatName;
+}
+
 namespace Http {
 
 struct UserAgentContext;
@@ -29,6 +34,7 @@ public:
 
   virtual CodeStats& codeStats() PURE;
   virtual const UserAgentContext& userAgentContext() const PURE;
+  virtual Stats::StatName asyncClientStatPrefix() const PURE;
 };
 
 using ContextPtr = std::unique_ptr<Context>;

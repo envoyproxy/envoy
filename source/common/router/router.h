@@ -160,7 +160,7 @@ public:
  */
 class FilterConfig {
 public:
-  FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
+  FilterConfig(Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
@@ -168,14 +168,12 @@ public:
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
+        stats_(cm.clusterManagerFactory().routerStatNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
         stat_name_pool_(scope_.symbolTable()),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
-        empty_stat_name_(stat_name_pool_.add("")),
-        stats_(cm.clusterManagerFactory().routerStatNames(), scope,
-               stat_name_pool_.add(stat_prefix)),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
@@ -185,7 +183,7 @@ public:
     }
   }
 
-  FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
+  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
@@ -209,6 +207,7 @@ public:
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
+  FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
@@ -217,10 +216,10 @@ public:
   HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
-  Stats::StatNamePool stat_name_pool_;
+  Stats::StatNamePool
+      stat_name_pool_; // TODO(#14242): use dynamic name for zone_name and drop pool.
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
-  FilterStats stats_;
 
 private:
   ShadowWriterPtr shadow_writer_;

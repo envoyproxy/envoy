@@ -128,7 +128,8 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 
 /**
  * Generates a struct with StatNames for a subsystem, based on the stats macro
- * with COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, and STAT_NAME calls.
+ * with COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, and STATNAME calls. The
+ * ALL_STATS macro must have all 5 parameters.
  */
 #define MAKE_STAT_NAMES_STRUCT(StatNamesStruct, ALL_STATS)                                         \
   struct StatNamesStruct {                                                                         \
@@ -142,11 +143,12 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
   }
 
 /**
- * Instantiates a structure of stats based on a new scope and optional prefix, using
- * a predefined structure of stat names. A reference to the stat_names is also stored
- * in the structure, for two reasons: (a) as a syntactic convenience for using macros
- * to generate the comma separators for the initializer and (b) as a convenience at
- * the call-site to access STATNAME-declared names from the stats structure.
+ * Instantiates a structure of stats based on a new scope and optional prefix,
+ * using a predefined structure of stat names. A reference to the stat_names is
+ * also stored in the structure, for two reasons: (a) as a syntactic convenience
+ * for using macros to generate the comma separators for the initializer and (b)
+ * as a convenience at the call-site to access STATNAME-declared names from the
+ * stats structure.
  */
 #define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
   struct StatsStruct {                                                                             \
