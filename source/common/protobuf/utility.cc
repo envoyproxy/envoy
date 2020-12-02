@@ -304,7 +304,8 @@ void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool rejec
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
     throw DeprecatedMajorVersionException(fmt::format(
         "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
-        "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by following "
+        "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
+        "following "
         "the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition. ({})",
         desc));
   }

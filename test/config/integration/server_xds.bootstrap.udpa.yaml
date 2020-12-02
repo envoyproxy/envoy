@@ -4,6 +4,7 @@ dynamic_resources:
     id: {{ lds_json_path }}
     resource_type: envoy.config.listener.v3.ListenerCollection
   cds_config:
+    resource_api_version: V3
     path: {{ cds_json_path }}
 admin:
   access_log_path: {{ null_device_path }}

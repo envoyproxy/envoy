@@ -159,6 +159,7 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
               domain: envoy_service_to_service
               rate_limit_service:
+                 transport_api_version: V3
                  grpc_service:
                     envoy_grpc:
                        cluster_name: ratelimit
@@ -182,6 +183,7 @@ static_resources:
           stat_prefix: egress_http
           rds:
             config_source:
+               resource_api_version: V3
                api_config_source:
                  api_type: GRPC
                  transport_api_version: V3
@@ -221,6 +223,7 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
               domain: envoy_service_to_service
               rate_limit_service:
+                 transport_api_version: V3
                  grpc_service:
                     envoy_grpc:
                        cluster_name: ratelimit
@@ -543,6 +546,7 @@ static_resources:
                 protocol: TCP
 dynamic_resources:
   cds_config:
+    resource_api_version: V3
     api_config_source:
       api_type: REST
       transport_api_version: V3

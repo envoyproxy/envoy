@@ -15,6 +15,7 @@
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: REST
         transport_api_version: V3

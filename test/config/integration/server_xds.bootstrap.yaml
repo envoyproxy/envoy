@@ -1,7 +1,9 @@
 dynamic_resources:
   lds_config:
+    resource_api_version: V3
     path: {{ lds_json_path }}
   cds_config:
+    resource_api_version: V3
     path: {{ cds_json_path }}
 admin:
   access_log_path: {{ null_device_path }}
