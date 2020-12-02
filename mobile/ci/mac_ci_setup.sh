@@ -54,4 +54,4 @@ bazel version
 
 pip3 install slackclient
 # https://github.com/actions/virtual-environments/blob/main/images/macos/macos-10.15-Readme.md#xcode
-sudo xcode-select --switch /Applications/Xcode_12.app
+sudo xcode-select --switch /Applications/Xcode_12.2.app
