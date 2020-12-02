@@ -238,7 +238,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
-                               nullptr);
+                               nullptr, "");
           })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -262,7 +262,7 @@ TEST_F(RateLimitFilterTest, ImmediateError) {
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
-                               nullptr);
+                               nullptr, "");
           })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
