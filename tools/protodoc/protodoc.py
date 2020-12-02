@@ -500,8 +500,7 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field, pro
     formatted_security_options = ''
   pretty_label_names = {
       field.LABEL_OPTIONAL: '',
-      field.LABEL_REQUIRED: 'required ',
-      field.LABEL_REPEATED: 'repeated ',
+      field.LABEL_REPEATED: '**repeated** ',
   }
   comment = '(%s) ' % ', '.join(
       [pretty_label_names[field.label] + FormatFieldType(type_context, field)] +
