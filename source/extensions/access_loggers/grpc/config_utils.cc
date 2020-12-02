@@ -12,7 +12,7 @@ SINGLETON_MANAGER_REGISTRATION(grpc_access_logger_cache);
 
 GrpcCommon::GrpcAccessLoggerCacheSharedPtr
 getGrpcAccessLoggerCacheSingleton(Server::Configuration::FactoryContext& context) {
-  return context.singletonManager().getTyped<GrpcCommon::GrpcAccessLoggerCache>(
+  return context.singletonManager().getTyped<GrpcCommon::GrpcAccessLoggerCacheImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_logger_cache), [&context] {
         return std::make_shared<GrpcCommon::GrpcAccessLoggerCacheImpl>(
             context.clusterManager().grpcAsyncClientManager(), context.scope(),
