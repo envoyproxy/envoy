@@ -33,6 +33,19 @@ static void appendSlice(Buffer::Instance& buffer, uint32_t size) {
   buffer.commit(&slice, 1);
 }
 
+static void addTenFullSizeSlices(Buffer::Instance& buffer) {
+  for (unsigned i = 0; i < 10; i++) {
+    auto start_size = buffer.length();
+    Buffer::RawSlice slices[2];
+    auto num_slices = buffer.reserve(16384, slices, 2);
+    for (unsigned i = 0; i < num_slices; i++) {
+      memset(slices[i].mem_, 'a', slices[i].len_);
+    }
+    buffer.commit(slices, num_slices);
+    RELEASE_ASSERT(buffer.length() - start_size == 16384, "correct reserve/commit");
+  }
+}
+
 static void testThroughput(benchmark::State& state) {
   std::string error;
   std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
@@ -89,40 +102,46 @@ static void testThroughput(benchmark::State& state) {
 
   unsigned short_slice_size = state.range(0);
   unsigned num_short_slices = state.range(1);
-  unsigned num_16kb_slices = state.range(2);
+  unsigned align_to_16kb = state.range(2);
+  unsigned move_slices = state.range(3);
 
   uint64_t bytes_written = 0;
   for (auto _ : state) {
     state.PauseTiming();
 
     // Empty out the read side to make space for the writes.
-    while (SSL_read(server_ssl, read_buf, sizeof(read_buf)) > 0)
-      ;
+    while (SSL_read(server_ssl, read_buf, sizeof(read_buf)) > 0) {
+    }
 
-    std::string send(short_slice_size, 'a');
     Buffer::OwnedImpl write_buf;
     for (unsigned i = 0; i < num_short_slices; i++) {
-      if (short_slice_size > 0) {
-        appendSlice(write_buf, short_slice_size);
-      }
+      appendSlice(write_buf, short_slice_size);
     }
-    appendSlice(write_buf, 16384 - (num_short_slices * short_slice_size));
-    RELEASE_ASSERT(write_buf.length() == 16384,
-                   fmt::format("expected length 16384, got {}", write_buf.length()));
-    RELEASE_ASSERT(write_buf.getRawSlices().size() == (num_short_slices + 1),
-                   fmt::format("buffer number of slices expected {}, got {}", num_short_slices + 1,
-                               write_buf.getRawSlices().size()));
+    if (align_to_16kb) {
+      appendSlice(write_buf, 16384 - (num_short_slices * short_slice_size));
+      RELEASE_ASSERT(write_buf.length() == 16384,
+                     fmt::format("expected length 16384, got {}", write_buf.length()));
+      RELEASE_ASSERT(write_buf.getRawSlices().size() == (num_short_slices + 1),
+                     fmt::format("buffer number of slices expected {}, got {}",
+                                 num_short_slices + 1, write_buf.getRawSlices().size()));
+    } else {
+      RELEASE_ASSERT(write_buf.length() == (num_short_slices * short_slice_size),
+                     fmt::format("expected length {}, got {}", num_short_slices * short_slice_size,
+                                 write_buf.length()));
+      RELEASE_ASSERT(write_buf.getRawSlices().size() == num_short_slices,
+                     fmt::format("buffer number of slices expected {}, got {}", num_short_slices,
+                                 write_buf.getRawSlices().size()));
+    }
 
-    // Append many full-sized slices, the same manner that an envoy socket read would.
-    for (unsigned i = 0; i < num_16kb_slices; i++) {
-      auto start_size = write_buf.length();
-      Buffer::RawSlice slices[2];
-      auto num_slices = write_buf.reserve(16384, slices, 2);
-      for (unsigned i = 0; i < num_slices; i++) {
-        memset(slices[i].mem_, 'a', slices[i].len_);
-      }
-      write_buf.commit(slices, 2);
-      RELEASE_ASSERT(write_buf.length() - start_size == 16384, "correct reserve/commit");
+    if (move_slices) {
+      // Append many full-sized slices, the same manner that HTTP codecs would move data from an
+      // input buffer to an output buffer.
+      Buffer::OwnedImpl tmp_buf;
+      addTenFullSizeSlices(tmp_buf);
+      write_buf.move(tmp_buf);
+    } else {
+      // Append many full-sized slices, the same manner that an envoy socket read would.
+      addTenFullSizeSlices(write_buf);
     }
 
     bytes_written += write_buf.length();
@@ -135,7 +154,7 @@ static void testThroughput(benchmark::State& state) {
       void* mem;
       size_t len = std::min<uint64_t>(write_buf.length(), 16384);
       mem = write_buf.linearize(len);
-      if (initial.mem_ != mem) {
+      if (write_buf.frontSlice() != initial) {
         ++num_times_linearize_did_something;
       }
 
@@ -147,7 +166,7 @@ static void testThroughput(benchmark::State& state) {
     }
 
     state.counters["writes_per_iteration"] = num_writes;
-    state.counters["num_times_linearize_did_something"] = num_times_linearize_did_something;
+    state.counters["num_linearized"] = num_times_linearize_did_something;
   }
   state.counters["throughput"] = benchmark::Counter(bytes_written, benchmark::Counter::kIsRate);
 
@@ -156,17 +175,17 @@ static void testThroughput(benchmark::State& state) {
 }
 
 static void TestParams(benchmark::internal::Benchmark* b) {
-  // Add a single case of no short slices; don't iterate over the sizes
-  // which duplicates test cases when count is zero.
-  b->Args({0, 0, 0});
-  b->Args({0, 0, 5});
-  b->Args({0, 0, 10});
+  for (auto move_slices : {false, true}) {
+    for (auto align_to_16kb : {false, true}) {
+      // Add a single case of no short slices; don't iterate over the sizes
+      // which duplicates test cases when count is zero.
+      b->Args({0, 0, align_to_16kb, move_slices});
 
-  for (auto num_short_slices : {1, 2, 3}) {
-    for (auto short_slice_size : {1, 128, 4096}) {
-      b->Args({short_slice_size, num_short_slices, 0});
-      b->Args({short_slice_size, num_short_slices, 5});
-      b->Args({short_slice_size, num_short_slices, 10});
+      for (auto short_slice_size : {1, 128, 4095, 4096, 4097}) {
+        for (auto num_short_slices : {1, 2, 3}) {
+          b->Args({short_slice_size, num_short_slices, align_to_16kb, move_slices});
+        }
+      }
     }
   }
 }
