@@ -94,6 +94,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/wasm @PiotrSikora @lizan
 # webassembly common extension
 /*/extensions/common/wasm @PiotrSikora @lizan
+# webassembly runtimes
+/*/extensions/wasm_runtime/ @PiotrSikora @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 # common crypto extension
@@ -154,3 +156,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Local Rate Limit
 /*/extensions/filters/http/local_ratelimit @rgs1 @mattklein123
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
+# HTTP Kill Request
+/*/extensions/filters/http/kill_request @qqustc @htuch

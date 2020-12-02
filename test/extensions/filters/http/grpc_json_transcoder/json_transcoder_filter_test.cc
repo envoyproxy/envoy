@@ -1270,6 +1270,78 @@ INSTANTIATE_TEST_SUITE_P(
     })",
             R"({"id":"101","gender":"MALE","last_name":"Shakespeare"})"}));
 
+struct GrpcJsonTranscoderFilterUnescapeTestParam {
+  std::string config_json_;
+  std::string expected_arg_;
+};
+
+class GrpcJsonTranscoderFilterUnescapeTest
+    : public testing::TestWithParam<GrpcJsonTranscoderFilterUnescapeTestParam>,
+      public GrpcJsonTranscoderFilterTestBase {
+protected:
+  GrpcJsonTranscoderFilterUnescapeTest() {
+    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
+    TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
+    config_ = std::make_unique<JsonTranscoderConfig>(proto_config, *api_);
+    filter_ = std::make_unique<JsonTranscoderFilter>(*config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  std::unique_ptr<JsonTranscoderConfig> config_;
+  std::unique_ptr<JsonTranscoderFilter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+};
+
+TEST_P(GrpcJsonTranscoderFilterUnescapeTest, UnescapeSpec) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "text/plain"}, {":method", "POST"}, {":path", "/wildcard/%2f%23/%20%2523"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, true));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  decoder.decode(request_data, frames);
+
+  EXPECT_EQ(1, frames.size());
+
+  bookstore::EchoBodyRequest expected_request;
+  expected_request.set_arg(GetParam().expected_arg_);
+
+  bookstore::EchoBodyRequest request;
+  request.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
+}
+
+INSTANTIATE_TEST_SUITE_P(GrpcJsonTranscoderFilterUnescapeOptions,
+                         GrpcJsonTranscoderFilterUnescapeTest,
+                         ::testing::Values(
+                             GrpcJsonTranscoderFilterUnescapeTestParam{
+                                 R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"]
+    })",
+                                 "%2f%23/ %23"},
+                             GrpcJsonTranscoderFilterUnescapeTestParam{
+                                 R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "url_unescape_spec": "ALL_CHARACTERS_EXCEPT_SLASH"
+    })",
+                                 "%2f#/ %23"},
+                             GrpcJsonTranscoderFilterUnescapeTestParam{
+                                 R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "url_unescape_spec": "ALL_CHARACTERS"
+    })",
+                                 "/#/ %23"}));
+
 } // namespace
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters
