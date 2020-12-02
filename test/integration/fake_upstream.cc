@@ -353,8 +353,8 @@ void FakeHttpConnection::encodeGoAway() {
 void FakeHttpConnection::encodeProtocolError() {
   ASSERT(type_ == Type::HTTP2);
 
-  Http::Legacy::Http2::ServerConnectionImpl* codec =
-      dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
+  Http::Http2::ServerConnectionImpl* codec =
+      dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
 
   ASSERT(codec != nullptr);
 
