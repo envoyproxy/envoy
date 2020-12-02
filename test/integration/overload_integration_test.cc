@@ -75,9 +75,9 @@ Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
 
 class OverloadIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
-  void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      const std::string overload_config = R"EOF(
+  void
+  initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action) {
+    const std::string overload_config = R"EOF(
         refresh_interval:
           seconds: 0
           nanos: 1000000
@@ -85,27 +85,16 @@ protected:
           - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
             typed_config:
               "@type": type.googleapis.com/google.protobuf.Empty
-        actions:
-          - name: "envoy.overload_actions.stop_accepting_requests"
-            triggers:
-              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-                threshold:
-                  value: 0.9
-          - name: "envoy.overload_actions.disable_http_keepalive"
-            triggers:
-              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-                threshold:
-                  value: 0.8
-          - name: "envoy.overload_actions.stop_accepting_connections"
-            triggers:
-              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-                threshold:
-                  value: 0.95
       )EOF";
-      *bootstrap.mutable_overload_manager() =
-          TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
-    });
-    HttpIntegrationTest::initialize();
+    envoy::config::overload::v3::OverloadManager overload_manager_config =
+        TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
+    *overload_manager_config.add_actions() = overload_action;
+
+    config_helper_.addConfigModifier(
+        [overload_manager_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          *bootstrap.mutable_overload_manager() = overload_manager_config;
+        });
+    initialize();
     updateResource(0);
   }
 
@@ -125,7 +114,14 @@ INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
-  initialize();
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
 
   // Put envoy in overloaded state and check that it drops new requests.
   // Test both header-only and header+body requests since the code paths are slightly different.
@@ -171,7 +167,14 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
     return; // only relevant for downstream HTTP1.x connections
   }
 
-  initialize();
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.disable_http_keepalive"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.8
+    )EOF"));
 
   // Put envoy in overloaded state and check that it disables keepalive
   updateResource(0.8);
@@ -200,7 +203,14 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
 }
 
 TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
-  initialize();
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_connections"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.95
+    )EOF"));
 
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
   updateResource(0.95);
@@ -213,16 +223,19 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
                                                          std::chrono::milliseconds(1000)));
 
-  // Reduce load a little to allow the connection to be accepted but then immediately reject the
-  // request.
+  // Reduce load a little to allow the connection to be accepted.
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                0);
+  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_EQ("envoy overloaded", response->body());
+  EXPECT_EQ("202", response->headers().getStatusValue());
   codec_client_->close();
 }
 
