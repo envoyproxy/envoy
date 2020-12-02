@@ -6,11 +6,6 @@
 #include "envoy/http/codes.h"
 
 namespace Envoy {
-
-namespace Stats {
-class StatName;
-}
-
 namespace Http {
 
 struct UserAgentContext;
