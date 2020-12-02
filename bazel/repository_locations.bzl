@@ -777,7 +777,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "upb-{version}",
         urls = ["https://github.com/protocolbuffers/upb/archive/{version}.tar.gz"],
         use_category = ["controlplane"],
-        release_date = "2020-06-05",
+        release_date = "2020-08-03",
         cpe = "N/A",
     ),
     kafka_source = dict(
