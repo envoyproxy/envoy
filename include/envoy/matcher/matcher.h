@@ -106,6 +106,13 @@ public:
   // Not enough data to complete the match: {false, {}}
   // Completed the match, no match: {true, {}}
   // Completed the match, match: {true, on_match}
+  // The result of a match:
+  // The result of a match. There are three possible results:
+  // - The match could not be completed (match_state_ == MatchState::UnableToMatch)
+  // - The match was completed, no match found (match_state_ == MatchState::MatchComplete, on_match_
+  // = {})
+  // - The match was complete, match found (match_state_ == MatchState::MatchComplete, on_match_ =
+  // something).
   struct MatchResult {
     const MatchState match_state_;
     const absl::optional<OnMatch<DataType>> on_match_;
@@ -143,6 +150,14 @@ public:
   std::string category() const override { return "envoy.matching.input_matcher"; }
 };
 
+// The result of retrieving data from a DataInput. As the data is generally made available
+// over time (e.g. as more of the stream reaches the proxy), data might become increasingly
+// available. This return type allows the DataInput to indicate this, as this might influence
+// the match decision.
+//
+// Conceptually the data availabilty will start at being NotAvailable, transition to
+// MoreDataMightBeAvailable (optional, this doesn't make sense for all data) and finally
+// AllDataAvailable as the data becomes available.
 struct DataInputGetResult {
   enum class DataAvailability {
     // The data is not yet available.
@@ -161,6 +176,7 @@ struct DataInputGetResult {
   // map, we return absl::nullopt with AllDataAvailable.
   absl::optional<absl::string_view> data_;
 
+  // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
     out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
     switch (result.data_availability_) {
