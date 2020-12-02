@@ -246,8 +246,7 @@ void Filter::populateResponseHeaders(Http::HeaderMap& response_headers, bool fro
     // We do this because sendLocalReply initially sets content-type to text/plain
     // whenever the response body is non-empty, but we want the content-type coming
     // from the ratelimit service to be authoritative in this case.
-    if (from_local_reply &&
-        !((*response_headers_to_add_).get(Http::Headers::get().ContentType).empty())) {
+    if (from_local_reply && !response_headers_to_add_->getContentTypeValue().empty()) {
       response_headers.remove(Http::Headers::get().ContentType);
     }
     Http::HeaderUtility::addHeaders(response_headers, *response_headers_to_add_);
