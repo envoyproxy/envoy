@@ -216,9 +216,7 @@ bool ConnPoolImplBase::maybePrefetch(float global_prefetch_ratio) {
 }
 
 void ConnPoolImplBase::scheduleOnUpstreamReady() {
-  if (hasPendingStreams()) {
-    upstream_ready_cb_->scheduleCallbackCurrentIteration();
-  }
+  upstream_ready_cb_->scheduleCallbackCurrentIteration();
 }
 
 void ConnPoolImplBase::onUpstreamReady() {

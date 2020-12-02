@@ -53,7 +53,7 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       Random::RandomGenerator& random_generator,
-                      NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb)
+                      Event::MockSchedulableCallback* upstream_ready_cb)
       : FixedHttpConnPoolImpl(
             Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource()),
             Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,
@@ -657,6 +657,7 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->expectEnableUpstreamReady();
   EXPECT_TRUE(
       callbacks2.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -726,6 +727,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   EXPECT_CALL(callbacks2.pool_ready_, ready());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
+  conn_pool_->expectEnableUpstreamReady();
   EXPECT_TRUE(
       callbacks2.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -987,7 +989,9 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   r3.startRequest();
   EXPECT_EQ(3U, cluster_->stats_.upstream_rq_total_.value());
 
+  conn_pool_->expectEnableUpstreamReady();
   r2.completeResponse(false);
+  conn_pool_->expectEnableUpstreamReady();
   r3.completeResponse(false);
 
   // Disconnect both clients.
@@ -1132,25 +1136,50 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_local_.value());
 }
 
+// Schedulable callback that can track it's destruction.
+class MockDestructSchedulableCallback : public Event::MockSchedulableCallback {
+public:
+  MockDestructSchedulableCallback(Event::MockDispatcher* dispatcher)
+      : Event::MockSchedulableCallback(dispatcher), destroyed_(false) {}
+  ~MockDestructSchedulableCallback() override { destroyed_ = true; }
+
+  bool destroyed_{false};
+};
+
+// Connection pool for test that destructs all connections when destroyed.
 class ConnPoolImplNoDestructForTest : public ConnPoolImplForTest {
 public:
   ConnPoolImplNoDestructForTest(Event::MockDispatcher& dispatcher,
                                 Upstream::ClusterInfoConstSharedPtr cluster,
                                 Random::RandomGenerator& random_generator,
-                                NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb)
+                                MockDestructSchedulableCallback* upstream_ready_cb)
       : ConnPoolImplForTest(dispatcher, cluster, random_generator, upstream_ready_cb) {}
 
   ~ConnPoolImplNoDestructForTest() override { destructAllConnections(); }
 };
 
+class Http1ConnPoolDestructImplTest : public testing::Test {
+public:
+  Http1ConnPoolDestructImplTest()
+      : upstream_ready_cb_(new MockDestructSchedulableCallback(&dispatcher_)),
+        conn_pool_(std::make_unique<ConnPoolImplNoDestructForTest>(dispatcher_, cluster_, random_,
+                                                                   upstream_ready_cb_)) {}
+
+  ~Http1ConnPoolDestructImplTest() override {
+    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
+  }
+
+  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  MockDestructSchedulableCallback* upstream_ready_cb_;
+  std::unique_ptr<ConnPoolImplForTest> conn_pool_;
+  NiceMock<Runtime::MockLoader> runtime_;
+};
+
 // Regression test for use after free when dispatcher executes onUpstreamReady after connection pool
 // is destroyed.
-TEST_F(Http1ConnPoolImplTest, CbAfterConnPoolDestroyed) {
-  // Recreate conn pool without destructor checks.
-  new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  conn_pool_ = std::make_unique<ConnPoolImplNoDestructForTest>(dispatcher_, cluster_, random_,
-                                                               upstream_ready_cb_);
-
+TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
   InSequence s;
 
   NiceMock<MockResponseDecoder> outer_decoder;
@@ -1172,14 +1201,16 @@ TEST_F(Http1ConnPoolImplTest, CbAfterConnPoolDestroyed) {
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
 
+  conn_pool_->expectEnableUpstreamReady();
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.deferredDelete(std::move(conn_pool_));
-
   inner_decoder->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
-  // Remove connection pool.
+  // Delete connection pool and check that scheduled callback onUpstreamReady was destroyed.
+  EXPECT_FALSE(upstream_ready_cb_->destroyed_);
   dispatcher_.clearDeferredDeleteList();
+  EXPECT_TRUE(upstream_ready_cb_->destroyed_);
 }
 
 } // namespace
