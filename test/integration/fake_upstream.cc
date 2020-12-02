@@ -355,10 +355,19 @@ void FakeHttpConnection::encodeProtocolError() {
 
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
+  if (codec != nullptr) {
+    shared_connection_.connection().dispatcher().post([codec]() { codec->protocolErrorForTest(); });
+    return;
+  }
 
-  ASSERT(codec != nullptr);
+  // Fall back to trying the Legacy ServerConnectionImpl which is used in certain test
+  // configurations, specifically the bazel.compile_time_options tests.
+  Http::Legacy::Http2::ServerConnectionImpl* legacy_codec =
+      dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
+  ASSERT(legacy_codec != nullptr);
 
-  shared_connection_.connection().dispatcher().post([codec]() { codec->protocolErrorForTest(); });
+  shared_connection_.connection().dispatcher().post(
+      [legacy_codec]() { legacy_codec->protocolErrorForTest(); });
 }
 
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
