@@ -1047,25 +1047,17 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
 
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_filter = getFilterFromListener("http");
-  if (hcm_filter) {
-    auto* config = hcm_filter->mutable_typed_config();
-    hcm = MessageUtil::anyConvert<
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
-        *config);
-    return true;
-  }
-  return false;
+  return loadFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::storeHttpConnectionManager(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_config_any = getFilterFromListener("http")->mutable_typed_config();
-
-  hcm_config_any->PackFrom(hcm);
+  return storeFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {

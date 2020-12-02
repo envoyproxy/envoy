@@ -39,7 +39,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class LogicalDnsClusterTest : public testing::Test {
+class LogicalDnsClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
   LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
 
