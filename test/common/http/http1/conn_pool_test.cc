@@ -305,9 +305,8 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
 
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
-  EXPECT_CALL(dispatcher_, createSchedulableCallback_(_))
-      .WillOnce(Return(upstream_ready_cb_))
-      .RetiresOnSaturation();
+  // Recreate this to refresh expectation that the callback is scheduled and saved.
+  new Event::MockSchedulableCallback(&dispatcher_);
   conn_pool_ =
       std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_, upstream_ready_cb_);
   NiceMock<MockResponseDecoder> outer_decoder;
