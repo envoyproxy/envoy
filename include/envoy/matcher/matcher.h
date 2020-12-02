@@ -102,11 +102,6 @@ template <class DataType> class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
-  // This encodes three states:
-  // Not enough data to complete the match: {false, {}}
-  // Completed the match, no match: {true, {}}
-  // Completed the match, match: {true, on_match}
-  // The result of a match:
   // The result of a match. There are three possible results:
   // - The match could not be completed (match_state_ == MatchState::UnableToMatch)
   // - The match was completed, no match found (match_state_ == MatchState::MatchComplete, on_match_
