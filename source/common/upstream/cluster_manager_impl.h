@@ -28,6 +28,7 @@
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
+#include "common/router/stat_names.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
 #include "common/upstream/stat_names.h"
@@ -56,7 +57,8 @@ public:
         runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), stat_names_(stats.symbolTable()) {}
+        singleton_manager_(singleton_manager), cluster_stat_names_(stats.symbolTable()),
+        router_stat_names_(stats.symbolTable()) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -76,7 +78,10 @@ public:
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const ClusterManagerStatNames& statNames() const override { return stat_names_; }
+  const ClusterManagerStatNames& clusterManagerStatNames() const override {
+    return cluster_stat_names_;
+  }
+  const Router::RouterStatNames& routerStatNames() const override { return router_stat_names_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
@@ -94,7 +99,8 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
-  ClusterManagerStatNames stat_names_;
+  ClusterManagerStatNames cluster_stat_names_;
+  Router::RouterStatNames router_stat_names_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.

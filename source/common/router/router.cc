@@ -1211,7 +1211,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
+        code_stats.chargeBasicResponseStat(cluster_->statsScope(),
+                                           config_.router_stat_names_.retry_,
                                            static_cast<Http::Code>(response_code));
 
         if (!end_stream || !upstream_request.encodeComplete()) {

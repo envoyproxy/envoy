@@ -438,7 +438,9 @@ void ClusterManagerImpl::initializeSecondaryClusters(
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope,
                                                       ClusterManagerFactory& factory) {
-  return ClusterManagerStats(factory.statNames(), scope, factory.statNames().cluster_manager_);
+  const ClusterManagerStatNames& cluster_manager_stat_names = factory.clusterManagerStatNames();
+  return ClusterManagerStats(cluster_manager_stat_names, scope,
+                             cluster_manager_stat_names.cluster_manager_);
 }
 
 void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {

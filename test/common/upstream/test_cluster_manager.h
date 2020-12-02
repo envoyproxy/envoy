@@ -64,7 +64,9 @@ namespace Upstream {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory()
-      : api_(Api::createApiForTest(stats_, random_)), stat_names_(stats_.symbolTable()) {
+      : api_(Api::createApiForTest(stats_, random_)),
+        cluster_manager_stat_names_(stats_.symbolTable()),
+        router_stat_names_(stats_.symbolTable()) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
             [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
@@ -112,7 +114,10 @@ public:
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const ClusterManagerStatNames& statNames() const override { return stat_names_; }
+  const ClusterManagerStatNames& clusterManagerStatNames() const override {
+    return cluster_manager_stat_names_;
+  }
+  const Router::RouterStatNames& routerStatNames() const override { return router_stat_names_; }
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -141,7 +146,8 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
-  ClusterManagerStatNames stat_names_;
+  ClusterManagerStatNames cluster_manager_stat_names_;
+  Router::RouterStatNames router_stat_names_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

@@ -29,6 +29,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
+#include "common/router/stat_names.h"
 #include "common/router/upstream_request.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
@@ -38,29 +39,9 @@ namespace Envoy {
 namespace Router {
 
 /**
- * All router filter stats. @see stats_macros.h
- */
-// clang-format off
-#define ALL_ROUTER_STATS(COUNTER)                                                                  \
-  COUNTER(passthrough_internal_redirect_bad_location)                                              \
-  COUNTER(passthrough_internal_redirect_unsafe_scheme)                                             \
-  COUNTER(passthrough_internal_redirect_too_many_redirects)                                        \
-  COUNTER(passthrough_internal_redirect_no_route)                                                  \
-  COUNTER(passthrough_internal_redirect_predicate)                                                 \
-  COUNTER(no_route)                                                                                \
-  COUNTER(no_cluster)                                                                              \
-  COUNTER(rq_redirect)                                                                             \
-  COUNTER(rq_direct_response)                                                                      \
-  COUNTER(rq_total)                                                                                \
-  COUNTER(rq_reset_after_downstream_response_started)
-// clang-format on
-
-/**
  * Struct definition for all router filter stats. @see stats_macros.h
  */
-struct FilterStats {
-  ALL_ROUTER_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STATS_STRUCT(FilterStats, RouterStatNames, ALL_ROUTER_STATS);
 
 /**
  * Router filter utilities split out for ease of testing.
@@ -186,15 +167,16 @@ public:
                bool respect_expected_rq_timeout,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context)
-      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
-        random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
+      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
-        stat_name_pool_(scope_.symbolTable()), retry_(stat_name_pool_.add("retry")),
+        stat_name_pool_(scope_.symbolTable()),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
-        empty_stat_name_(stat_name_pool_.add("")), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source) {
+        empty_stat_name_(stat_name_pool_.add("")),
+        router_stat_names_(cm.clusterManagerFactory().routerStatNames()),
+        stats_(router_stat_names_, scope, stat_name_pool_.add(stat_prefix)),
+        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
@@ -227,7 +209,6 @@ public:
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
-  FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
@@ -237,9 +218,10 @@ public:
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
   Stats::StatNamePool stat_name_pool_;
-  Stats::StatName retry_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
+  const RouterStatNames& router_stat_names_;
+  FilterStats stats_;
 
 private:
   ShadowWriterPtr shadow_writer_;

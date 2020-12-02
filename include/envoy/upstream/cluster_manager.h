@@ -36,6 +36,11 @@
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
+
+namespace Router {
+struct RouterStatNames;
+}
+
 namespace Upstream {
 
 /**
@@ -362,7 +367,17 @@ public:
    *
    * @return the stat names.
    */
-  virtual const ClusterManagerStatNames& statNames() const PURE;
+  virtual const ClusterManagerStatNames& clusterManagerStatNames() const PURE;
+
+  /**
+   * Returns a struct with all the Stats::StatName objects needed by
+   * the router. This Helps factor out some relatively heavy name
+   * construction which occur when there is a large CDS update during operation,
+   * relative to recreating all stats from strings on-the-fly.
+   *
+   * @return the stat names.
+   */
+  virtual const Router::RouterStatNames& routerStatNames() const PURE;
 };
 
 /**

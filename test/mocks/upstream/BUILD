@@ -222,6 +222,7 @@ envoy_cc_mock(
     hdrs = ["cluster_manager_factory.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/router:stat_names_lib",
         "//source/common/upstream:stat_names_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
