@@ -7,8 +7,8 @@
 
 **步骤 1：构建 Envoy**
 
-使用 ``envoyproxy/envoy-build`` 你将开始编译 Envoy。
-这个镜像包含所有构建 Envoy 所需的软件。从你的 Envoy 目录开始::
+使用 ``envoyproxy/envoy-build`` 镜像来编译 Envoy。
+这个镜像包含构建 Envoy 所需的软件。从你的 Envoy 目录开始::
 
   $ pwd
   src/envoy
@@ -26,6 +26,6 @@
   src/envoy/
   $ docker build -f ci/Dockerfile-envoy -t envoy .
 
-如果你在任何 Dockerfile 中改变了 ``FROM`` 行，那么现在你可以使用这个 ``envoy`` 镜像来构建任何沙盒环境。
+你可以在任意 Dockerfile 的 FROM 行中引用这个镜像，这样就可以基于这个 ``envoy`` 镜像构建出任意的沙盒环境。
 
 如果你对修改 Envoy 且测试你的修改感兴趣，这将是非常有用的。
