@@ -781,7 +781,7 @@ TEST_P(TcpConnPoolImplTest, MaxConnections) {
   // Finishing request 1 will immediately bind to request 2.
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
   conn_pool_.expectEnableUpstreamReady(false);
-  EXPECT_CALL(callbacks2.pool_ready_, ready()); // never gets triggered when reset.
+  EXPECT_CALL(callbacks2.pool_ready_, ready());
   callbacks.conn_data_.reset();
 
   conn_pool_.expectEnableUpstreamReady(true);
