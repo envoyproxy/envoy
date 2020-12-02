@@ -26,7 +26,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
 
   // This code is executed as part of a thread running under a Windows
   // context. For that reason we want to avoid allocating memory or
-  // taking locks. This is why we use dont want to just write to a socket
+  // taking locks. This is why we use do not want to just write to a socket
   // to wake up the signal handler.
   Buffer::OwnedImpl buffer;
   constexpr absl::string_view data{"a"};
