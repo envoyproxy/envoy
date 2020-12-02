@@ -780,7 +780,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
-  if (stashed_random_.size() + 1 > total_healthy_hosts_) {
+  if (stashed_random_.size() >= total_healthy_hosts_) {
     return nullptr;
   }
 
@@ -869,7 +869,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
-  if (stashed_random_.size() + 1 > total_healthy_hosts_) {
+  if (stashed_random_.size() >= total_healthy_hosts_) {
     return nullptr;
   }
   return peekOrChoose(context, true);

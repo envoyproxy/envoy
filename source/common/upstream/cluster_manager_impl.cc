@@ -865,13 +865,15 @@ void ClusterManagerImpl::maybePrefetch(
   // 3 here is arbitrary. Just as in ConnPoolImplBase::tryCreateNewConnections
   // we want to limit the work which can be done on any given prefetch attempt.
   for (int i = 0; i < 3; ++i) {
+    // Just as in ConnPoolImplBase::shouldCreateNewConnection, see if adding this one new connection
+    // would put the cluster over desired capacity. If so, stop prefetching.
     if ((state.pending_streams_ + 1 + state.active_streams_) * peekahead_ratio <=
         (state.connecting_stream_capacity_ + state.active_streams_)) {
       return;
     }
     ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
     if (prefetch_pool) {
-      if (!prefetch_pool->maybePrefetch(cluster_entry->cluster_info_->peekaheadRatio())) {
+      if (!prefetch_pool->maybePrefetch(peekahead_ratio)) {
         // Given that the next prefetch pick may be entirely different, we could
         // opt to try again even if the first prefetch fails. Err on the side of
         // caution and wait for the next attempt.

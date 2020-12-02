@@ -4227,7 +4227,7 @@ TEST_F(PrefetchTest, PrefetchHighHttp) {
       }));
   cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
                                            Http::Protocol::Http11, nullptr);
-  // Expect prefetch to be called 3 times across the two hosts.
+  // Expect prefetch to be called 3 times across the four hosts.
   EXPECT_EQ(3, http_prefetch);
 }
 
@@ -4246,7 +4246,7 @@ TEST_F(PrefetchTest, PrefetchHighTcp) {
         return ret;
       }));
   cluster_manager_->tcpConnPoolForCluster("cluster_1", ResourcePriority::Default, nullptr);
-  // Expect prefetch to be called 3 times across the two hosts.
+  // Expect prefetch to be called 3 times across the four hosts.
   EXPECT_EQ(3, tcp_prefetch);
 }
 
@@ -4266,7 +4266,7 @@ TEST_F(PrefetchTest, PrefetchCappedAt3) {
       }));
   cluster_manager_->httpConnPoolForCluster("cluster_1", ResourcePriority::Default,
                                            Http::Protocol::Http11, nullptr);
-  // Expect prefetch to be called 3 times across the two hosts.
+  // Expect prefetch to be called 3 times across the four hosts.
   EXPECT_EQ(3, http_prefetch);
 
   // A subsequent call to get a connection will consume one of the prefetched
