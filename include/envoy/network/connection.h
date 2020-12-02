@@ -80,8 +80,11 @@ public:
   /**
    * Callback function for when bytes have been sent by a connection.
    * @param bytes_sent supplies the number of bytes written to the connection.
+   * @return indicates if callback should be called in the future. If true is returned
+   * the callback will be called again in the future. If false is returned, the callback
+   * will be removed from callback list.
    */
-  using BytesSentCb = std::function<void(uint64_t bytes_sent)>;
+  using BytesSentCb = std::function<bool(uint64_t bytes_sent)>;
 
   struct ConnectionStats {
     Stats::Counter& read_total_;
