@@ -778,8 +778,7 @@ public:
    *         and contains extension-specific protocol options for upstream connections.
    */
   template <class Derived>
-  const std::shared_ptr<const Derived>
-  extensionProtocolOptionsTyped(const std::string& name) const {
+  std::shared_ptr<const Derived> extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
   }
 

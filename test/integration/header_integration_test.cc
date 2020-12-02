@@ -254,7 +254,11 @@ public:
                       name: eds-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
-                      http2_protocol_options: {{}}
+                      typed_extension_protocol_options:
+                        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+                          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+                          explicit_http_config:
+                            http2_protocol_options: {{}}
                       connect_timeout: 5s
                       load_assignment:
                         cluster_name: eds-cluster

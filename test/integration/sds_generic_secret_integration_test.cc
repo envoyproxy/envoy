@@ -96,7 +96,7 @@ public:
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       sds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       sds_cluster->set_name("sds_cluster");
-      sds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*sds_cluster);
     });
 
     config_helper_.addFilter("{ name: sds-generic-secret-test }");

@@ -30,6 +30,7 @@ AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion
   tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
   api_version_ = api_version;
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 }
 
 void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
@@ -127,7 +128,6 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
     ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   if (api_version_ == envoy::config::core::v3::ApiVersion::V2 && !fatal_by_default_v2_override_) {
     config_helper_.enableDeprecatedV2Api();
   }

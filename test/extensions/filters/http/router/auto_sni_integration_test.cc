@@ -23,7 +23,10 @@ public:
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
-      cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
 
       envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       auto* validation_context =

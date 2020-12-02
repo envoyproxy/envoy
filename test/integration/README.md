@@ -93,7 +93,7 @@ cluster:
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ratelimit_cluster->set_name("ratelimit");
-      ratelimit_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ratelimit_cluster);
     });
 ```
 

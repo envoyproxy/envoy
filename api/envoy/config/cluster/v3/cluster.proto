@@ -767,14 +767,37 @@ message Cluster {
 
   // HTTP protocol options that are applied only to upstream HTTP connections.
   // These options apply to all HTTP versions.
-  core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46;
+  // This has been deprecated in favor of
+  // :ref:`upstream_http_protocol_options <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // in the :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
+  // upstream_http_protocol_options can be set via the cluster's
+  // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
+  core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46 [deprecated = true];
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
-  core.v3.HttpProtocolOptions common_http_protocol_options = 29;
+  // This has been deprecated in favor of
+  // :ref:`common_http_protocol_options <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>`
+  // in the :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
+  // common_http_protocol_options can be set via the cluster's
+  // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
+  core.v3.HttpProtocolOptions common_http_protocol_options = 29 [deprecated = true];
 
   // Additional options when handling HTTP1 requests.
-  core.v3.Http1ProtocolOptions http_protocol_options = 13;
+  // This has been deprecated in favor of http_protocol_options fields in the in the
+  // :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
+  // http_protocol_options can be set via the cluster's
+  // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
+  core.v3.Http1ProtocolOptions http_protocol_options = 13 [deprecated = true];
 
   // Even if default HTTP2 protocol options are desired, this field must be
   // set so that Envoy will assume that the upstream supports HTTP/2 when
@@ -782,13 +805,21 @@ message Cluster {
   // supports prior knowledge for upstream connections. Even if TLS is used
   // with ALPN, `http2_protocol_options` must be specified. As an aside this allows HTTP/2
   // connections to happen over plain text.
+  // This has been deprecated in favor of http2_protocol_options fields in the in the
+  // :ref:`http_protocol_options <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`
+  // message. http2_protocol_options can be set via the cluster's
+  // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  // See ref:`upstream_http_protocol_options
+  // <envoy_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.upstream_http_protocol_options>`
+  // for example usage.
   core.v3.Http2ProtocolOptions http2_protocol_options = 14
-      [(udpa.annotations.security).configure_for_untrusted_upstream = true];
+      [deprecated = true, (udpa.annotations.security).configure_for_untrusted_upstream = true];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
+  // [#next-major-version: make this a list of typed extensions.]
   map<string, google.protobuf.Any> typed_extension_protocol_options = 36;
 
   // If the DNS refresh rate is specified and the cluster type is either
@@ -913,7 +944,12 @@ message Cluster {
   core.v3.Metadata metadata = 25;
 
   // Determines how Envoy selects the protocol used to speak to upstream hosts.
-  ClusterProtocolSelection protocol_selection = 26;
+  // This has been deprecated in favor of setting explicit protocol selection
+  // in the :ref:`http_protocol_options
+  // <envoy_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
+  // http_protocol_options can be set via the cluster's
+  // :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
+  ClusterProtocolSelection protocol_selection = 26 [deprecated = true];
 
   // Optional options for upstream connections.
   UpstreamConnectionOptions upstream_connection_options = 30;
