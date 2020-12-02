@@ -210,6 +210,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:utility_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
@@ -353,4 +354,10 @@ envoy_cc_test(
         "//source/common/common:statusor_lib",
         "//source/common/http:status_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "interval_value_test",
+    srcs = ["interval_value_test.cc"],
+    deps = ["//source/common/common:interval_value"],
 )

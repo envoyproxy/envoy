@@ -25,6 +25,8 @@ absl::string_view statusCodeToString(StatusCode code) {
     return "CodecClientError";
   case StatusCode::InboundFramesWithEmptyPayload:
     return "InboundFramesWithEmptyPayloadError";
+  case StatusCode::StreamAlreadyReset:
+    return "StreamAlreadyReset";
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
@@ -110,6 +112,13 @@ Status inboundFramesWithEmptyPayloadError() {
   absl::Status status(absl::StatusCode::kInternal,
                       "Too many consecutive frames with an empty payload");
   storePayload(status, EnvoyStatusPayload(StatusCode::InboundFramesWithEmptyPayload));
+  return status;
+}
+
+Status streamAlreadyReset() {
+  absl::Status status(absl::StatusCode::kInternal,
+                      "Attempted to proxy headers after stream has been reset.");
+  storePayload(status, EnvoyStatusPayload(StatusCode::StreamAlreadyReset));
   return status;
 }
 
