@@ -143,18 +143,21 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 
 /**
  * Instantiates a structure of stats based on a new scope and optional prefix, using
- * a predefined structure of stat names.
+ * a predefined structure of stat names. A reference to the stat_names is also stored
+ * in the structure, for two reasons: (a) as a syntactic convenience for using macros
+ * to generate the comma separators for the initializer and (b) as a convenience at
+ * the call-site to access STATNAME-declared names from the stats structure.
  */
 #define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
   struct StatsStruct {                                                                             \
     StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::Scope& scope,                     \
                 Envoy::Stats::StatName prefix = Envoy::Stats::StatName())                          \
-        : scope_(scope)                                                                            \
+        : stat_names_(stat_names)                                                                  \
               ALL_STATS(MAKE_STATS_STRUCT_COUNTER_HELPER_, MAKE_STATS_STRUCT_GAUGE_HELPER_,        \
                         MAKE_STATS_STRUCT_HISTOGRAM_HELPER_,                                       \
                         MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_,                                    \
                         MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
-    Envoy::Stats::Scope& scope_;                                                                   \
+    const StatNamesStruct& stat_names_;                                                            \
     ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,           \
               GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)                              \
   }

@@ -174,8 +174,8 @@ public:
         stat_name_pool_(scope_.symbolTable()),
         zone_name_(stat_name_pool_.add(local_info_.zoneName())),
         empty_stat_name_(stat_name_pool_.add("")),
-        router_stat_names_(cm.clusterManagerFactory().routerStatNames()),
-        stats_(router_stat_names_, scope, stat_name_pool_.add(stat_prefix)),
+        stats_(cm.clusterManagerFactory().routerStatNames(), scope,
+               stat_name_pool_.add(stat_prefix)),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
@@ -220,7 +220,6 @@ public:
   Stats::StatNamePool stat_name_pool_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
-  const RouterStatNames& router_stat_names_;
   FilterStats stats_;
 
 private:
