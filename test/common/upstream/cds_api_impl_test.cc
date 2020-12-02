@@ -91,6 +91,7 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response1 =
@@ -262,12 +263,14 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster2
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response1 =
@@ -291,12 +294,14 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster3
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response2 =
@@ -327,12 +332,14 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response1 =

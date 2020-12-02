@@ -109,6 +109,17 @@ public:
     return;                                                                                        \
   }
 
+// For VersionedGrpcClientIntegrationParamTest, skip when testing with
+// ENVOY_DISABLE_DEPRECATED_FEATURES.
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+#define XDS_DEPRECATED_FEATURE_TEST_SKIP                                                           \
+  if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {                                   \
+    return;                                                                                        \
+  }
+#else
+#define XDS_DEPRECATED_FEATURE_TEST_SKIP
+#endif // ENVOY_DISABLE_DEPRECATED_FEATURES
+
 #ifdef ENVOY_GOOGLE_GRPC
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \

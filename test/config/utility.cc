@@ -40,6 +40,7 @@ admin:
       port_value: 0
 dynamic_resources:
   lds_config:
+    resource_api_version: V3
     path: {}
 static_resources:
   secrets:

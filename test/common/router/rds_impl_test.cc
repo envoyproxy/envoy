@@ -298,8 +298,10 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
       ],
       "vhds": {
         "config_source": {
+          "resource_api_version": "V3",
           "api_config_source": {
             "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
             "grpc_services": {
               "envoy_grpc": {
                 "cluster_name": "xds_cluster"
@@ -344,8 +346,10 @@ TEST_F(RdsImplTest, VirtualHostUpdateWhenProviderHasBeenDeallocated) {
 rds:
   route_config_name: my_route
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -394,8 +398,10 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
   const std::string rds_config = R"EOF(
   route_config_name: my_route
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster

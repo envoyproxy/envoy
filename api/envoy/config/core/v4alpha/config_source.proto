@@ -24,13 +24,14 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // xDS API and non-xDS services version. This is used to describe both resource and transport
 // protocol versions (in distinct configuration fields).
 enum ApiVersion {
+  reserved 1;
+
+  reserved "V2";
+
   // When not specified, we assume v2, to ease migration to Envoy's stable API
   // versioning. If a client does not support v2 (e.g. due to deprecation), this
   // is an invalid value.
-  AUTO = 0;
-
-  // Use xDS v2 API.
-  V2 = 1;
+  DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
 
   // Use xDS v3 API.
   V3 = 2;

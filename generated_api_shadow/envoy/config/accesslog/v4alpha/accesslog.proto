@@ -47,9 +47,9 @@ message AccessLog {
   // #. "envoy.access_loggers.file": :ref:`FileAccessLog
   //    <envoy_api_msg_extensions.access_loggers.file.v4alpha.FileAccessLog>`
   // #. "envoy.access_loggers.http_grpc": :ref:`HttpGrpcAccessLogConfig
-  //    <envoy_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
+  //    <envoy_api_msg_extensions.access_loggers.grpc.v4alpha.HttpGrpcAccessLogConfig>`
   // #. "envoy.access_loggers.tcp_grpc": :ref:`TcpGrpcAccessLogConfig
-  //    <envoy_api_msg_extensions.access_loggers.grpc.v3.TcpGrpcAccessLogConfig>`
+  //    <envoy_api_msg_extensions.access_loggers.grpc.v4alpha.TcpGrpcAccessLogConfig>`
   oneof config_type {
     google.protobuf.Any typed_config = 4;
   }

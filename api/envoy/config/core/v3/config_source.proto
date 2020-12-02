@@ -27,10 +27,10 @@ enum ApiVersion {
   // When not specified, we assume v2, to ease migration to Envoy's stable API
   // versioning. If a client does not support v2 (e.g. due to deprecation), this
   // is an invalid value.
-  AUTO = 0;
+  AUTO = 0 [deprecated = true];
 
   // Use xDS v2 API.
-  V2 = 1;
+  V2 = 1 [deprecated = true];
 
   // Use xDS v3 API.
   V3 = 2;
