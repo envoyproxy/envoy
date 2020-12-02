@@ -16,6 +16,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: External Processing Filter]
 // External Processing Filter
 // [#extension: envoy.filters.http.ext_proc]
@@ -72,10 +73,12 @@ message ExternalProcessor {
   // or could not be opened, processing continues without error.
   bool failure_mode_allow = 2;
 
+  // [#not-implemented-hide:]
   // Specifies default options for how HTTP headers, trailers, and bodies are
   // sent. See ProcessingMode for details.
   ProcessingMode processing_mode = 3;
 
+  // [#not-implemented-hide:]
   // If true, send each part of the HTTP request or response specified by ProcessingMode
   // asynchronously -- in other words, send the message on the gRPC stream and then continue
   // filter processing. If false, which is the default, suspend filter execution after
@@ -83,6 +86,7 @@ message ExternalProcessor {
   // for a reply.
   bool async_mode = 4;
 
+  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the request_headers message.
@@ -90,6 +94,7 @@ message ExternalProcessor {
   // for the list of supported attributes and their types.
   repeated string request_attributes = 5;
 
+  // [#not-implemented-hide:]
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
   // matched against that list and populated in the response_headers message.
@@ -97,6 +102,7 @@ message ExternalProcessor {
   // for the list of supported attributes and their types.
   repeated string response_attributes = 6;
 
+  // [#not-implemented-hide:]
   // Specifies the timeout for each individual message sent on the stream and
   // when the filter is running in synchronous mode. Whenever
   // the proxy sends a message on the stream that requires a response, it will
@@ -105,11 +111,13 @@ message ExternalProcessor {
   // the filter is running in asynchronous mode. Default is 200 ms.
   google.protobuf.Duration message_timeout = 7;
 
+  // [#not-implemented-hide:]
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured *ext_proc* filters in an HTTP filter chain.
   string stat_prefix = 8;
 }
 
+// [#not-implemented-hide:]
 // Extra settings that may be added to per-route configuration for a
 // virtual host or cluster.
 message ExtProcPerRoute {
@@ -125,6 +133,7 @@ message ExtProcPerRoute {
   }
 }
 
+// [#not-implemented-hide:]
 // Overrides that may be set on a per-route basis
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
