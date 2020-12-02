@@ -19,15 +19,19 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   }
   shutdown_pending = true;
 
-  auto eventBridgeHandlers = Event::eventBridgeHandlersSingleton::get();
-  auto handler_it = eventBridgeHandlers.find(ENVOY_WIN32_SIGTERM);
-  if (handler_it == eventBridgeHandlers.end() || !handler_it->second) {
+  auto handler = Event::eventBridgeHandlersSingleton::get()[ENVOY_WIN32_SIGTERM];
+  if (!handler) {
     return 0;
   }
+
+  // This code is executed as part of a thread running under a Windows
+  // context. For that reason we want to avoid allocating memory or
+  // taking locks. This is why we use dont want to just write to a socket
+  // to wake up the signal handler.
   Buffer::OwnedImpl buffer;
   constexpr absl::string_view data{"a"};
   buffer.add(data);
-  auto result = handler_it->second->write(buffer);
+  auto result = handler->write(buffer);
   RELEASE_ASSERT(result.rc_ == 1,
                  fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
 

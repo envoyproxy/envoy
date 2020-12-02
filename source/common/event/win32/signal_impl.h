@@ -30,6 +30,6 @@ private:
 // Here we have a map from signal types to IoHandle. When we write to this handle we trigger an
 // event that notifies Envoy to act on the signal.
 using eventBridgeHandlersSingleton =
-    ThreadSafeSingleton<absl::flat_hash_map<signal_t, std::shared_ptr<Network::IoHandle>>>;
+    ThreadSafeSingleton<std::array<std::shared_ptr<Network::IoHandle>, ENVOY_WIN32_SIGNAL_COUNT>>;
 } // namespace Event
 } // namespace Envoy

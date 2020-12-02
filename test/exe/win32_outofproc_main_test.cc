@@ -64,7 +64,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(MainCommonTest, Envoy1) {
+TEST_P(MainCommonTest, EnvoyHandlesCtrlBreakEvent) {
   createEnvoyProcess();
   ENVOY_LOG_MISC(warn, "Envoy process with pid {}", piProcInfo_.dwProcessId);
   Sleep(2 * 1000);

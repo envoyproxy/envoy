@@ -9,11 +9,16 @@ namespace Event {
 
 SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num, SignalCb cb)
     : cb_(cb) {
-  auto handler_it = eventBridgeHandlersSingleton::get().find(signal_num);
-  if (handler_it != eventBridgeHandlersSingleton::get().end()) {
+
+  if (signal_num > eventBridgeHandlersSingleton::get().size()) {
+    ENVOY_BUG(false, "Attempting to create SignalEventImpl with a signal id that exceeds the "
+                     "number of supported signals.");
     return;
   }
 
+  if (eventBridgeHandlersSingleton::get()[signal_num]) {
+    return;
+  }
   os_fd_t socks[2];
   Api::SysCallIntResult result =
       Api::OsSysCallsSingleton::get().socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
@@ -33,7 +38,7 @@ SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num
         cb_();
       },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
-  eventBridgeHandlersSingleton::get().insert({signal_num, write_handle});
+  eventBridgeHandlersSingleton::get()[signal_num] = write_handle;
 }
 
 } // namespace Event
