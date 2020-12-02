@@ -24,6 +24,8 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource:
     return std::make_unique<FormatterImpl>(
         Config::DataSource::read(config.text_format_source(), true, api));
+  case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kEmptyFormat:
+    return std::make_unique<PlainStringFormatterImpl>("");
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
