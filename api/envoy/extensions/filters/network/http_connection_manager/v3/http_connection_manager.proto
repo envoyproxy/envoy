@@ -19,7 +19,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/resource_locator.proto";
+import "xds/core/v3/resource_locator.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
@@ -656,7 +656,7 @@ message Rds {
 
   // Resource locator for RDS. This is mutually exclusive to *route_config_name*.
   // [#not-implemented-hide:]
-  udpa.core.v1.ResourceLocator rds_resource_locator = 3
+  xds.core.v3.ResourceLocator rds_resource_locator = 3
       [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
 }
 

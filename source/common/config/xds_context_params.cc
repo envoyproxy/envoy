@@ -1,4 +1,4 @@
-#include "common/config/udpa_context_params.h"
+#include "common/config/xds_context_params.h"
 
 #include "common/common/macros.h"
 #include "common/protobuf/utility.h"
@@ -48,24 +48,24 @@ void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
 
 } // namespace
 
-udpa::core::v1::ContextParams UdpaContextParams::encode(
+xds::core::v3::ContextParams XdsContextParams::encode(
     const envoy::config::core::v3::Node& node, const std::vector<std::string>& node_context_params,
-    const udpa::core::v1::ContextParams& resource_context_params,
+    const xds::core::v3::ContextParams& resource_context_params,
     const std::vector<std::string>& client_features,
     const absl::flat_hash_map<std::string, std::string>& extra_resource_params) {
-  udpa::core::v1::ContextParams context_params;
+  xds::core::v3::ContextParams context_params;
   auto& mutable_params = *context_params.mutable_params();
   // 1. Establish base layer of per-node context parameters.
   for (const std::string& ncp : node_context_params) {
     // First attempt field accessors known ahead of time, if that fails we consider the cases of
     // metadata, either directly in the Node message, or nested in the user_agent_build_version.
     if (nodeParamCbs().count(ncp) > 0) {
-      mutable_params["udpa.node." + ncp] = nodeParamCbs().at(ncp)(node);
+      mutable_params["xds.node." + ncp] = nodeParamCbs().at(ncp)(node);
     } else if (ncp == "metadata") {
-      mergeMetadataJson(mutable_params, node.metadata(), "udpa.node.metadata.");
+      mergeMetadataJson(mutable_params, node.metadata(), "xds.node.metadata.");
     } else if (ncp == "user_agent_build_version.metadata") {
       mergeMetadataJson(mutable_params, node.user_agent_build_version().metadata(),
-                        "udpa.node.user_agent_build_version.metadata.");
+                        "xds.node.user_agent_build_version.metadata.");
     }
   }
 
@@ -76,12 +76,12 @@ udpa::core::v1::ContextParams UdpaContextParams::encode(
 
   // 3. Overlay with per-resource type context parameters.
   for (const std::string& cf : client_features) {
-    mutable_params["udpa.client_feature." + cf] = "true";
+    mutable_params["xds.client_feature." + cf] = "true";
   }
 
   // 4. Overlay with per-resource well-known attributes.
   for (const auto& it : extra_resource_params) {
-    mutable_params["udpa.resource." + it.first] = it.second;
+    mutable_params["xds.resource." + it.first] = it.second;
   }
 
   return context_params;
