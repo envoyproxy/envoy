@@ -387,9 +387,13 @@ stages:
           - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
             displayName: "Run Windows CI"
             env:
+              CI_TARGET: "windows"
               ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+              SLACK_TOKEN: $(SLACK_TOKEN)
+              REPO_URI: $(Build.Repository.Uri)
+              BUILD_URI: $(Build.BuildUri)
               ENVOY_RBE: "true"
-              BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
+              BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
