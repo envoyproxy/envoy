@@ -164,12 +164,14 @@ def envoy_cc_test(
         tags = [],
         args = [],
         copts = [],
+        condition = None,
         shard_count = None,
         coverage = True,
         local = False,
         size = "medium",
         flaky = False):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
+
     cc_test(
         name = name,
         srcs = srcs,

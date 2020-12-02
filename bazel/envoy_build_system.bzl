@@ -40,12 +40,23 @@ load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "EXTENSION_PACKAGE_VISIBILITY",
 )
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
-def envoy_extension_package():
+def envoy_extension_package(enabled_default = True):
     native.package(default_visibility = EXTENSION_PACKAGE_VISIBILITY)
+
+    bool_flag(
+        name = "enabled",
+        build_setting_default = enabled_default,
+    )
+
+    native.config_setting(
+        name = "is_enabled",
+        flag_values = {":enabled": "True"},
+    )
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
