@@ -154,3 +154,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Local Rate Limit
 /*/extensions/filters/http/local_ratelimit @rgs1 @mattklein123
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
+# HTTP Kill Request
+/*/extensions/filters/http/kill_request @qqustc @htuch
