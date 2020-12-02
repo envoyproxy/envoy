@@ -49,8 +49,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
           "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
           "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
-          "setting '--bootstrap-version 2' on the CLI for a v2 bootstrap file or by enabling "
-          "the runtime envoy.reloadable_features.enable_deprecated_v2_api flag.",
+          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
           config.DebugString());
       ENVOY_LOG(warn, warning);
       auto& runtime_snapshot = runtime_.snapshot();
