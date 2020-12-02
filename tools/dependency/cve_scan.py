@@ -37,6 +37,8 @@ IGNORES_CVES = set([
     # Node.js issue rooted in a c-ares bug. Does not appear to affect
     # http-parser or our use of c-ares, c-ares has been bumped regardless.
     'CVE-2020-8277',
+    # gRPC issue that only affects Javascript bindings.
+    'CVE-2020-7768',
 ])
 
 # Subset of CVE fields that are useful below.
