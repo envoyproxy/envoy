@@ -174,12 +174,12 @@ public:
 
 static void priorityAndLocalityWeighted(State& state) {
   Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
+  // if we've been instructed to skip tests, only run once no matter the argument:
+  const uint32_t num_endpoints = skipExpensiveBenchmarks() ? 1 : state.range(2);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     state.PauseTiming();
-    // if we've been instructed to skip tests, only run once no matter the argument:
-    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(2);
 
-    speed_test.priorityAndLocalityWeightedHelper(state.range(1), endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(state.range(1), num_endpoints, true);
     state.ResumeTiming();
   }
 }
@@ -190,12 +190,12 @@ BENCHMARK(priorityAndLocalityWeighted)
 
 static void duplicateUpdate(State& state) {
   Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+  const uint32_t num_endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     state.PauseTiming();
-    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(true, num_endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(true, num_endpoints, true);
     state.ResumeTiming();
   }
 }
@@ -204,12 +204,12 @@ BENCHMARK(duplicateUpdate)->Range(64, 100000)->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(State& state) {
   Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+  const uint32_t num_endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     state.PauseTiming();
-    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
-    speed_test.priorityAndLocalityWeightedHelper(true, endpoints, false);
+    speed_test.priorityAndLocalityWeightedHelper(true, num_endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(true, num_endpoints, false);
     state.ResumeTiming();
   }
 }

@@ -159,12 +159,12 @@ public:
 
 static void addClusters(State& state) {
   Envoy::Upstream::CdsSpeedTest speed_test(state, state.range(0));
+  // if we've been instructed to skip tests, only run once no matter the argument:
+  const uint32_t num_clusters = skipExpensiveBenchmarks() ? 1 : state.range(2);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     // timing is resumed within the helper:
     state.PauseTiming();
-    // if we've been instructed to skip tests, only run once no matter the argument:
-    uint32_t clusters = skipExpensiveBenchmarks() ? 1 : state.range(2);
-    speed_test.clusterHelper(state.range(1), clusters);
+    speed_test.clusterHelper(state.range(1), num_clusters);
     state.ResumeTiming();
   }
 }
@@ -177,12 +177,12 @@ BENCHMARK(addClusters)
 // Look for suboptimal behavior when receiving two identical updates
 static void duplicateUpdate(State& state) {
   Envoy::Upstream::CdsSpeedTest speed_test(state, false);
+  const uint32_t num_clusters = skipExpensiveBenchmarks() ? 1 : state.range(0);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     state.PauseTiming();
-    uint32_t clusters = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
-    speed_test.clusterHelper(true, clusters);
-    speed_test.clusterHelper(true, clusters);
+    speed_test.clusterHelper(true, num_clusters);
+    speed_test.clusterHelper(true, num_clusters);
     state.ResumeTiming();
   }
 }
