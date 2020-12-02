@@ -2671,7 +2671,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayErrorProbeInProgress) {
       .WillRepeatedly(Return(false));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   cluster_->info_->stats().upstream_cx_total_.inc();
   expectSessionCreate();
   expectStreamCreate(0);
@@ -2723,7 +2723,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(false));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   cluster_->info_->stats().upstream_cx_total_.inc();
 
   expectSessionCreate();
@@ -2758,7 +2758,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgress) {
 TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(false));
 
@@ -2796,7 +2796,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressTimeout) {
 TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(false));
 
@@ -2834,7 +2834,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamReset) {
 TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(false));
 
@@ -2872,7 +2872,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressConnectionClose) {
 TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(false));
 
@@ -2911,7 +2911,7 @@ TEST_F(HttpHealthCheckerImplTest, GoAwayBetweenChecks) {
 TEST_F(HttpHealthCheckerImplTest, GoAwayProbeInProgressStreamResetRuntimeDisabled) {
   setupHCHttp2();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(false));
 
