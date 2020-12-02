@@ -90,7 +90,6 @@ public:
   }
 
   void clusterHelper(bool ignore_unknown_dynamic_fields, size_t num_clusters) {
-    state_.PauseTiming();
 
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url_);
@@ -122,6 +121,7 @@ public:
     state_.SetComplexityN(num_clusters);
     state_.ResumeTiming();
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+    state_.PauseTiming();
   }
 
   TestDeprecatedV2Api _deprecated_v2_api_;
@@ -158,11 +158,14 @@ public:
 } // namespace Envoy
 
 static void addClusters(State& state) {
+  Envoy::Upstream::CdsSpeedTest speed_test(state, state.range(0));
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
-    Envoy::Upstream::CdsSpeedTest speed_test(state, state.range(0));
+    // timing is resumed within the helper:
+    state.PauseTiming();
     // if we've been instructed to skip tests, only run once no matter the argument:
     uint32_t clusters = skipExpensiveBenchmarks() ? 1 : state.range(2);
     speed_test.clusterHelper(state.range(1), clusters);
+    state.ResumeTiming();
   }
 }
 
@@ -173,12 +176,14 @@ BENCHMARK(addClusters)
 
 // Look for suboptimal behavior when receiving two identical updates
 static void duplicateUpdate(State& state) {
+  Envoy::Upstream::CdsSpeedTest speed_test(state, false);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
-    Envoy::Upstream::CdsSpeedTest speed_test(state, false);
+    state.PauseTiming();
     uint32_t clusters = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.clusterHelper(true, clusters);
     speed_test.clusterHelper(true, clusters);
+    state.ResumeTiming();
   }
 }
 

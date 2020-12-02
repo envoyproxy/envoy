@@ -92,8 +92,6 @@ public:
   // they are loaded as expected.
   void priorityAndLocalityWeightedHelper(bool ignore_unknown_dynamic_fields, size_t num_hosts,
                                          bool healthy) {
-    state_.PauseTiming();
-
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("fare");
 
@@ -136,6 +134,7 @@ public:
     }
     state_.ResumeTiming();
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
+    state_.PauseTiming();
     ASSERT(cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get()[0].size() ==
            num_hosts);
   }
@@ -174,39 +173,45 @@ public:
 } // namespace Envoy
 
 static void priorityAndLocalityWeighted(State& state) {
+  Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
-    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
+    state.PauseTiming();
     // if we've been instructed to skip tests, only run once no matter the argument:
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(2);
 
     speed_test.priorityAndLocalityWeightedHelper(state.range(1), endpoints, true);
+    state.ResumeTiming();
   }
 }
 
 BENCHMARK(priorityAndLocalityWeighted)
-    ->Ranges({{false, true}, {false, true}, {1, 100000}})
+    ->Ranges({{false, true}, {false, true}, {64, 100000}})
     ->Unit(benchmark::kMillisecond);
 
 static void duplicateUpdate(State& state) {
+  Envoy::Upstream::EdsSpeedTest speed_test(state, false);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
-    Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+    state.PauseTiming();
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
+    state.ResumeTiming();
   }
 }
 
-BENCHMARK(duplicateUpdate)->Range(1, 100000)->Unit(benchmark::kMillisecond);
+BENCHMARK(duplicateUpdate)->Range(64, 100000)->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(State& state) {
+  Envoy::Upstream::EdsSpeedTest speed_test(state, false);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
-    Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+    state.PauseTiming();
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, false);
+    state.ResumeTiming();
   }
 }
 
-BENCHMARK(healthOnlyUpdate)->Range(1, 100000)->Unit(benchmark::kMillisecond);
+BENCHMARK(healthOnlyUpdate)->Range(64, 100000)->Unit(benchmark::kMillisecond);
