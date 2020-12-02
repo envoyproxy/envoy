@@ -303,6 +303,23 @@ TEST_F(AuthenticatorTest, TestExpiredJWT) {
   expectVerifyStatus(Status::JwtExpired, headers);
 }
 
+// This test verifies when a JWT is expired but with a big clock skew.
+TEST_F(AuthenticatorTest, TestExpiredJWTWithABigClockSkew) {
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  // Token is expired at 1205005587, but add clock skew at another 1205005587.
+  provider.set_clock_skew_seconds(1205005587);
+  createAuthenticator();
+
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
+      .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
+  expectVerifyStatus(Status::Ok, headers);
+}
+
 // This test verifies when a JWT is not yet valid, JwtNotYetValid status is returned.
 TEST_F(AuthenticatorTest, TestNotYetValidJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);

@@ -50,7 +50,7 @@ inline std::string SpdyHexEncodeUInt32AndTrimImpl(uint32_t data) {
 inline std::string SpdyHexDumpImpl(absl::string_view data) { return quiche::HexDump(data); }
 
 struct SpdyStringPieceCaseHashImpl {
-  size_t operator()(quiche::QuicheStringPiece data) const {
+  size_t operator()(absl::string_view data) const {
     std::string lower = absl::AsciiStrToLower(data);
     return absl::Hash<std::string>()(lower);
   }

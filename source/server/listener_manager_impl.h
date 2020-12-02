@@ -68,7 +68,7 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                         const udpa::core::v1::ResourceLocator* lds_resources_locator) override {
+                         const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
         lds_config, lds_resources_locator, server_.clusterManager(), server_.initManager(),
         server_.stats(), server_.listenerManager(),
@@ -185,7 +185,7 @@ public:
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, bool added_via_api) override;
   void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                    const udpa::core::v1::ResourceLocator* lds_resources_locator) override {
+                    const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     ASSERT(lds_api_ == nullptr);
     lds_api_ = factory_.createLdsApi(lds_config, lds_resources_locator);
   }

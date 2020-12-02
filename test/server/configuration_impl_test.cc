@@ -161,10 +161,10 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  ASSERT_EQ(1U, config.clusterManager()->clusters().count("test_cluster"));
+  ASSERT_EQ(1U, config.clusterManager()->clusters().active_clusters_.count("test_cluster"));
   EXPECT_EQ(8192U, config.clusterManager()
                        ->clusters()
-                       .find("test_cluster")
+                       .active_clusters_.find("test_cluster")
                        ->second.get()
                        .info()
                        ->perConnectionBufferLimitBytes());

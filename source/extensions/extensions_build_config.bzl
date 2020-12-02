@@ -214,8 +214,22 @@ EXTENSIONS = {
     #
     # Watchdog actions
     #
+
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
 
+    #
+    # WebAssembly runtimes
+    #
+
+    "envoy.wasm.runtime.null":                          "//source/extensions/wasm_runtime/null:config",
+    "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
+    "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
+    "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
+}
+
+# These filters will not be built into Envoy by default. To build Envoy with any of these filter, please move it to EXTENSIONS.
+DISABLED_BY_DEFAULT_EXTENSIONS = {
+    "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
