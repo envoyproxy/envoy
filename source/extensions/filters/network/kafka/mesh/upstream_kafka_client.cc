@@ -6,23 +6,6 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class KafkaProducerWrapperImpl : public KafkaProducerWrapper {
-public:
-  KafkaProducerWrapperImpl(RdKafka::Producer* arg) : producer_{arg} {};
-
-  RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
-                             void* payload, size_t len, const void* key, size_t key_len,
-                             int64_t timestamp, void* msg_opaque) override {
-    return producer_->produce(topic_name, partition, msgflags, payload, len, key, key_len,
-                              timestamp, msg_opaque);
-  };
-
-  int poll(int timeout_ms) override { return producer_->poll(timeout_ms); }
-
-private:
-  std::unique_ptr<RdKafka::Producer> producer_;
-};
-
 class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
   RdKafka::Conf::ConfResult setConfProperty(RdKafka::Conf& conf, const std::string& name,
                                             const std::string& value,
@@ -36,9 +19,9 @@ class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
     return conf.set("dr_cb", dr_cb, errstr);
   }
 
-  std::unique_ptr<KafkaProducerWrapper> createProducer(RdKafka::Conf* conf,
-                                                       std::string& errstr) const override {
-    return std::make_unique<KafkaProducerWrapperImpl>(RdKafka::Producer::create(conf, errstr));
+  std::unique_ptr<RdKafka::Producer> createProducer(RdKafka::Conf* conf,
+                                                    std::string& errstr) const override {
+    return std::unique_ptr<RdKafka::Producer>(RdKafka::Producer::create(conf, errstr));
   }
 };
 

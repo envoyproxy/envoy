@@ -1,6 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
+)
+load(
+    "//bazel:envoy_internal.bzl",
+    "envoy_external_dep_path",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -61,6 +66,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.kafka_mesh",
     tags = ["skip_on_windows"],
     deps = [
+        ":kafka_mocks_lib",
         "//source/extensions/filters/network/kafka/mesh:upstream_kafka_client_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:thread_factory_for_test_lib",
@@ -84,5 +90,15 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/kafka/mesh:abstract_command_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "kafka_mocks_lib",
+    srcs = [],
+    hdrs = ["kafka_mocks.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        envoy_external_dep_path("librdkafka"),
     ],
 )

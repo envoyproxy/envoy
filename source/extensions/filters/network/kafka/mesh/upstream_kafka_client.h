@@ -45,18 +45,6 @@ using ProduceFinishCbSharedPtr = std::shared_ptr<ProduceFinishCb>;
 using RawKafkaProducerConfig = std::map<std::string, std::string>;
 
 /**
- * Helper class to wrap RdKafka::Producer so that in tests we do not need to mock the whole API.
- */
-class KafkaProducerWrapper {
-public:
-  virtual ~KafkaProducerWrapper() = default;
-  virtual RdKafka::ErrorCode produce(const std::string topic_name, int32_t partition, int msgflags,
-                                     void* payload, size_t len, const void* key, size_t key_len,
-                                     int64_t timestamp, void* msg_opaque) PURE;
-  virtual int poll(int timeout_ms) PURE;
-};
-
-/**
  * Helper class responsible for creating librdkafka entities, so we can have mocks in tests.
  */
 class LibRdKafkaUtils {
@@ -68,8 +56,8 @@ public:
   virtual RdKafka::Conf::ConfResult setConfDeliveryCallback(RdKafka::Conf& conf,
                                                             RdKafka::DeliveryReportCb* dr_cb,
                                                             std::string& errstr) const PURE;
-  virtual std::unique_ptr<KafkaProducerWrapper> createProducer(RdKafka::Conf* conf,
-                                                               std::string& errstr) const PURE;
+  virtual std::unique_ptr<RdKafka::Producer> createProducer(RdKafka::Conf* conf,
+                                                            std::string& errstr) const PURE;
 };
 
 /**
@@ -149,7 +137,7 @@ private:
   // Real Kafka producer (thread-safe).
   // Invoked by Envoy handler thread (to produce), and internal monitoring thread
   // (to poll for delivery events).
-  std::unique_ptr<KafkaProducerWrapper> producer_;
+  std::unique_ptr<RdKafka::Producer> producer_;
 
   // Flag controlling monitoring threads's execution.
   std::atomic<bool> poller_thread_active_;

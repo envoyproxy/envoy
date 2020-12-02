@@ -1,5 +1,6 @@
 #include "extensions/filters/network/kafka/mesh/upstream_kafka_client.h"
 
+#include "test/extensions/filters/network/kafka/mesh/kafka_mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -17,21 +18,13 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class MockKafkaProducerWrapper : public KafkaProducerWrapper {
-public:
-  MOCK_METHOD(RdKafka::ErrorCode, produce,
-              (const std::string, int32_t, int, void*, size_t, const void*, size_t, int64_t,
-               void*));
-  MOCK_METHOD(int, poll, (int));
-};
-
 class MockLibRdKafkaUtils : public LibRdKafkaUtils {
 public:
   MOCK_METHOD(RdKafka::Conf::ConfResult, setConfProperty,
               (RdKafka::Conf&, const std::string&, const std::string&, std::string&), (const));
   MOCK_METHOD(RdKafka::Conf::ConfResult, setConfDeliveryCallback,
               (RdKafka::Conf&, RdKafka::DeliveryReportCb*, std::string&), (const));
-  MOCK_METHOD((std::unique_ptr<KafkaProducerWrapper>), createProducer,
+  MOCK_METHOD((std::unique_ptr<RdKafka::Producer>), createProducer,
               (RdKafka::Conf*, std::string& errstr), (const));
 };
 
@@ -47,9 +40,8 @@ protected:
   MockLibRdKafkaUtils kafka_utils_;
   RawKafkaProducerConfig config_ = {{"key1", "value1"}, {"key2", "value2"}};
 
-  std::unique_ptr<MockKafkaProducerWrapper> producer_ptr =
-      std::make_unique<MockKafkaProducerWrapper>();
-  MockKafkaProducerWrapper& producer = *producer_ptr;
+  std::unique_ptr<MockKafkaProducer> producer_ptr = std::make_unique<MockKafkaProducer>();
+  MockKafkaProducer& producer = *producer_ptr;
 
   std::shared_ptr<MockProduceFinishCb> origin_ = std::make_shared<MockProduceFinishCb>();
 
@@ -139,29 +131,6 @@ TEST_F(UpstreamKafkaClientTest, ShouldHandleProduceFailures) {
   testee.send(origin_, "t1", 42, "KEY", "VALUE");
   EXPECT_EQ(testee.getUnfinishedRequestsForTest().size(), 0);
 }
-
-// Impl note: this isn't pretty, but we need it.
-class MockKafkaMessage : public RdKafka::Message {
-public:
-  MOCK_METHOD(std::string, errstr, (), (const));
-  MOCK_METHOD(RdKafka::ErrorCode, err, (), (const));
-  MOCK_METHOD(RdKafka::Topic*, topic, (), (const));
-  MOCK_METHOD(std::string, topic_name, (), (const));
-  MOCK_METHOD(int32_t, partition, (), (const));
-  MOCK_METHOD(void*, payload, (), (const));
-  MOCK_METHOD(size_t, len, (), (const));
-  MOCK_METHOD(const std::string*, key, (), (const));
-  MOCK_METHOD(const void*, key_pointer, (), (const));
-  MOCK_METHOD(size_t, key_len, (), (const));
-  MOCK_METHOD(int64_t, offset, (), (const));
-  MOCK_METHOD(RdKafka::MessageTimestamp, timestamp, (), (const));
-  MOCK_METHOD(void*, msg_opaque, (), (const));
-  MOCK_METHOD(int64_t, latency, (), (const));
-  MOCK_METHOD(struct rd_kafka_message_s*, c_ptr, ());
-  MOCK_METHOD(RdKafka::Message::Status, status, (), (const));
-  MOCK_METHOD(RdKafka::Headers*, headers, ());
-  MOCK_METHOD(RdKafka::Headers*, headers, (RdKafka::ErrorCode*));
-};
 
 TEST_F(UpstreamKafkaClientTest, ShouldHandleKafkaCallback) {
   // given
