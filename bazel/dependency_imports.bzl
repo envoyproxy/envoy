@@ -16,7 +16,7 @@ load("@thrift_pip3//:requirements.bzl", thrift_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 
 # go version for rules_go
-GO_VERSION = "1.14.7"
+GO_VERSION = "1.15.5"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     rules_foreign_cc_dependencies()
