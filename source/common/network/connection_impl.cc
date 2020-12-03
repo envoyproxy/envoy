@@ -57,7 +57,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       transport_wants_read_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
-  RELEASE_ASSERT(SOCKET_VALID(ioHandle().fd()), "");
+  RELEASE_ASSERT(SOCKET_VALID(socket_->ioHandle().fd()), "");
 
   if (!connected) {
     connecting_ = true;
