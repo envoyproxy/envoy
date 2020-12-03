@@ -9,7 +9,7 @@
 * :ref:`前置代理 <deployment_type_front_proxy>`
 * :ref:`双重代理 <deployment_type_double_proxy>`
 
-这套示例配置的目的是为了演示 Envoy 在复杂部署中的全部功能。所有特性并不适用于所有示例。有关完整文档内容请 :ref:`参考配置 <config>`.
+这套示例配置的目的是为了演示 Envoy 在复杂部署中的全部功能。所有特性并不适用于所有示例。有关完整文档内容请看 :ref:`参考配置 <config>`.
 
 配置生成器
 ----------
@@ -29,7 +29,7 @@ Envoy 配置会变得相对复杂。在 Lyft 我们使用 `jinja <http://jinja.p
   bazel build //configs:example_configs
   tar xvf $PWD/bazel-out/k8-fastbuild/bin/configs/example_configs.tar -C generated/configs
 
-先前的命令会使用在 `configgen.py` 内部定义的一些变量生成三种完全扩展的配置。关于不同的扩展是如何工作的详细信息，请参考 `configgen.py` 的内部注释。
+前面的命令会使用在 `configgen.py` 内部定义的一些变量生成三种完全扩展的配置。关于不同的扩展是如何工作的详细信息，请参考 `configgen.py` 的内部注释。
 
 关于示例配置的一些注意事项：
 
