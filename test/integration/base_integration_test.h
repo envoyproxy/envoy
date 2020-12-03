@@ -82,7 +82,7 @@ public:
   void setDeterministic() { deterministic_ = true; }
   void setNewCodecs() { config_helper_.setNewCodecs(); }
 
-  FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
+  FakeHttpConnection::Type upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
@@ -324,13 +324,18 @@ public:
                                                    FakeHttpConnection::Type type) {
     return std::make_unique<FakeUpstream>(uds_path, type, timeSystem());
   }
+  // TODO(alyssawilk) clean these up.
   // Creates a fake upstream bound to the specified |address|.
   std::unique_ptr<FakeUpstream>
   createFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                      FakeHttpConnection::Type type, bool enable_half_close = false,
                      bool udp_fake_upstream = false) {
-    return std::make_unique<FakeUpstream>(address, type, timeSystem(), enable_half_close,
-                                          udp_fake_upstream);
+    ASSERT(enable_half_close == upstream_config_.enable_half_close_);
+    ASSERT(udp_fake_upstream == upstream_config_.udp_fake_upstream_);
+
+    FakeUpstreamConfig config = upstream_config_;
+    config.upstream_protocol_ = type;
+    return std::make_unique<FakeUpstream>(address, config);
   }
   // Creates a fake upstream bound to INADDR_ANY and there is no specified port.
   std::unique_ptr<FakeUpstream> createFakeUpstream(FakeHttpConnection::Type type,
@@ -365,6 +370,7 @@ public:
   }
 
 protected:
+  void setUdpFakeUpstream(bool value) { upstream_config_.udp_fake_upstream_ = value; }
   bool initialized() const { return initialized_; }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
@@ -434,10 +440,8 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
+  // TODO(alyssawilk) make this private.
   bool enable_half_close_{false};
-
-  // Whether the default created fake upstreams are UDP listeners.
-  bool udp_fake_upstream_{false};
 
   // True if test will use a fixed RNG value.
   bool deterministic_{};
@@ -454,8 +458,8 @@ protected:
   bool v2_bootstrap_{false};
 
 private:
-  // The type for the Envoy-to-backend connection
-  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  // Configuration for the fake upstream.
+  FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.
   bool initialized_{};
 };

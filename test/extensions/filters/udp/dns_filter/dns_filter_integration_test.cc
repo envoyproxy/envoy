@@ -164,7 +164,7 @@ listener_filters:
   }
 
   void setup(uint32_t upstream_count) {
-    udp_fake_upstream_ = true;
+    setUdpFakeUpstream(true);
     if (upstream_count > 1) {
       setDeterministic();
       setUpstreamCount(upstream_count);

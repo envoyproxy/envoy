@@ -527,6 +527,15 @@ private:
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
+struct FakeUpstreamConfig {
+  FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {}
+
+  Event::TestTimeSystem& time_system_;
+  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  bool enable_half_close_{};
+  bool udp_fake_upstream_{};
+};
+
 /**
  * Provides a fake upstream server for integration testing.
  */
@@ -539,8 +548,7 @@ public:
                Event::TestTimeSystem& time_system);
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-               FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-               bool enable_half_close = false, bool udp_fake_upstream = false);
+               FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,

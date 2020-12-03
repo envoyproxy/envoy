@@ -411,14 +411,13 @@ makeUdpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 }
 
 FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                           FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-                           bool enable_half_close, bool udp_fake_upstream)
+                           FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   udp_fake_upstream ? makeUdpListenSocket(address) : makeTcpListenSocket(address),
-                   type, time_system, enable_half_close) {
+                   config.udp_fake_upstream_ ? makeUdpListenSocket(address) : makeTcpListenSocket(address),
+                   config.upstream_protocol_, config.time_system_, config.enable_half_close_) {
   ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
             address->ip()->addressAsString(), address->ip()->port(),
-            Network::Test::addressVersionAsString(address->ip()->version()), udp_fake_upstream);
+            Network::Test::addressVersionAsString(address->ip()->version()), config.udp_fake_upstream_);
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
