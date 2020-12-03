@@ -29,7 +29,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
-#include "common/router/stat_names.h"
+#include "common/router/context_impl.h"
 #include "common/router/upstream_request.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
@@ -41,7 +41,7 @@ namespace Router {
 /**
  * Struct definition for all router filter stats. @see stats_macros.h
  */
-MAKE_STATS_STRUCT(FilterStats, RouterStatNames, ALL_ROUTER_STATS);
+MAKE_STATS_STRUCT(FilterStats, StatNames, ALL_ROUTER_STATS);
 
 /**
  * Router filter utilities split out for ease of testing.
@@ -166,9 +166,10 @@ public:
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
                bool respect_expected_rq_timeout,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
-               TimeSource& time_source, Http::Context& http_context)
+               TimeSource& time_source, Http::Context& http_context,
+               Router::Context& router_context)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
-        stats_(cm.clusterManagerFactory().routerStatNames(), scope, stat_prefix),
+        stats_(router_context.statNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
@@ -191,7 +192,7 @@ public:
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
                      config.respect_expected_rq_timeout(), config.strict_check_headers(),
-                     context.api().timeSource(), context.httpContext()) {
+                     context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }

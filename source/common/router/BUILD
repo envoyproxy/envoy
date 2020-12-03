@@ -18,14 +18,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "stat_names_lib",
-    hdrs = ["stat_names.h"],
-    deps = [
-        "//include/envoy/stats:stats_macros",
-    ],
-)
-
-envoy_cc_library(
     name = "tls_context_match_criteria_lib",
     srcs = ["tls_context_match_criteria_impl.cc"],
     hdrs = ["tls_context_match_criteria_impl.h"],
@@ -96,6 +88,16 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "context_lib",
+    srcs = ["context_impl.cc"],
+    hdrs = ["context_impl.h"],
+    deps = [
+        "//include/envoy/router:context_interface",
+        "//include/envoy/stats:stats_macros",
     ],
 )
 
@@ -278,10 +280,10 @@ envoy_cc_library(
     ],
     deps = [
         ":config_lib",
+        ":context_lib",
         ":debug_config_lib",
         ":header_parser_lib",
         ":retry_state_lib",
-        ":stat_names_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/grpc:status",

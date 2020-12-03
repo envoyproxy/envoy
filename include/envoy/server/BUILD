@@ -182,6 +182,7 @@ envoy_cc_library(
         "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
+        "//include/envoy/router:context_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/singleton:manager_interface",

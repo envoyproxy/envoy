@@ -54,6 +54,7 @@ public:
   Event::Dispatcher& dispatcher() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
+  Router::Context& routerContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
@@ -132,6 +133,7 @@ public:
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
   Grpc::Context& grpcContext() override;
+  Router::Context& routerContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;

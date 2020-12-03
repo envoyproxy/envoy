@@ -39,6 +39,7 @@ envoy_cc_test(
     ],
     deps = [
         ":test_cluster_manager",
+        "//source/common/router:context_lib",
         "//test/mocks/upstream:cds_api_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:cluster_real_priority_set_mocks",

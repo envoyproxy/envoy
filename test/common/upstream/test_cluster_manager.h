@@ -65,8 +65,7 @@ class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory()
       : api_(Api::createApiForTest(stats_, random_)),
-        cluster_manager_stat_names_(stats_.symbolTable()),
-        router_stat_names_(stats_.symbolTable()) {
+        cluster_manager_stat_names_(stats_.symbolTable()) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
             [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
@@ -114,10 +113,9 @@ public:
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const UpstreamStatNames& clusterManagerStatNames() const override {
+  const UpstreamStatNames& upstreamStatNames() const override {
     return cluster_manager_stat_names_;
   }
-  const Router::RouterStatNames& routerStatNames() const override { return router_stat_names_; }
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -147,7 +145,6 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   UpstreamStatNames cluster_manager_stat_names_;
-  Router::RouterStatNames router_stat_names_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
@@ -175,10 +172,11 @@ public:
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                          ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context, Grpc::Context& grpc_context)
+                         Http::Context& http_context, Grpc::Context& grpc_context,
+                         Router::Context& router_context)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                            main_thread_dispatcher, admin, validation_context, api, http_context,
-                           grpc_context) {}
+                           grpc_context, router_context) {}
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
@@ -193,19 +191,17 @@ public:
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
-  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  ClusterManagerFactory& factory, Stats::Store& stats,
-                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                  const LocalInfo::LocalInfo& local_info,
-                                  AccessLog::AccessLogManager& log_manager,
-                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                  ProtobufMessage::ValidationContext& validation_context,
-                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-                                  MockLocalHostsRemoved& local_hosts_removed,
-                                  Http::Context& http_context, Grpc::Context& grpc_context)
+  MockedUpdatedClusterManagerImpl(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+      const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
+      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                                main_thread_dispatcher, admin, validation_context, api, http_context,
-                               grpc_context),
+                               grpc_context, router_context),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:

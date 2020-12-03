@@ -17,6 +17,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
@@ -28,7 +29,6 @@
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
-#include "common/router/stat_names.h"
 #include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/priority_conn_pool_map.h"
 #include "common/upstream/stat_names.h"
@@ -42,23 +42,20 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                            Http::Context& http_context, Grpc::Context& grpc_context,
-                            AccessLog::AccessLogManager& log_manager,
-                            Singleton::Manager& singleton_manager)
+  ProdClusterManagerFactory(
+      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
+      const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
+      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
-        api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
-        runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), local_info_(local_info),
-        secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), cluster_stat_names_(stats.symbolTable()),
-        router_stat_names_(stats.symbolTable()) {}
+        api_(api), http_context_(http_context), grpc_context_(grpc_context),
+        router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
+        dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
+        local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
+        singleton_manager_(singleton_manager), upstream_stat_names_(stats.symbolTable()) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -78,10 +75,7 @@ public:
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const UpstreamStatNames& clusterManagerStatNames() const override {
-    return cluster_stat_names_;
-  }
-  const Router::RouterStatNames& routerStatNames() const override { return router_stat_names_; }
+  const UpstreamStatNames& upstreamStatNames() const override { return upstream_stat_names_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
@@ -89,6 +83,7 @@ protected:
   Api::Api& api_;
   Http::Context& http_context_;
   Grpc::Context& grpc_context_;
+  Router::Context& router_context_;
   Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
@@ -99,8 +94,7 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
-  UpstreamStatNames cluster_stat_names_;
-  Router::RouterStatNames router_stat_names_;
+  UpstreamStatNames upstream_stat_names_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -213,7 +207,8 @@ public:
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context);
+                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Router::Context& router_context);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -570,6 +565,7 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
+  Router::Context& router_context_;
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
 };
