@@ -56,6 +56,7 @@ namespace Logger {
   FUNCTION(kafka)                                                                                  \
   FUNCTION(lua)                                                                                    \
   FUNCTION(main)                                                                                   \
+  FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
   FUNCTION(quic)                                                                                   \
