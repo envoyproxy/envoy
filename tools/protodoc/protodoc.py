@@ -498,9 +498,13 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field, pro
         manifest_description.edge_config)
   else:
     formatted_security_options = ''
-
-  comment = '(%s) ' % ', '.join([FormatFieldType(type_context, field)] +
-                                field_annotations) + formatted_leading_comment
+  pretty_label_names = {
+      field.LABEL_OPTIONAL: '',
+      field.LABEL_REPEATED: '**repeated** ',
+  }
+  comment = '(%s) ' % ', '.join(
+      [pretty_label_names[field.label] + FormatFieldType(type_context, field)] +
+      field_annotations) + formatted_leading_comment
   return anchor + field.name + '\n' + MapLines(functools.partial(
       Indent, 2), comment + formatted_oneof_comment) + formatted_security_options
 
