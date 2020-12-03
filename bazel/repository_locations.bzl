@@ -228,7 +228,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-12-02",
+        release_date = "2020-12-01",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
     com_github_luajit_luajit = dict(
