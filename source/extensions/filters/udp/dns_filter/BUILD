@@ -35,7 +35,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/common:matchers_lib",
-        "//source/common/common:safe_memcpy_lib",
         "//source/common/config:config_provider_lib",
         "//source/common/config:datasource_lib",
         "//source/common/network:address_lib",
