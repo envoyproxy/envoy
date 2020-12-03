@@ -282,13 +282,8 @@ void EnvoyQuicServerStream::clearWatermarkBuffer() {
 }
 
 void EnvoyQuicServerStream::OnCanWrite() {
-  const uint64_t buffered_data_old = BufferedDataBytes();
+  ScopedWatermarkBufferUpdater updater(this, this, filterManagerConnection());
   quic::QuicSpdyServerStreamBase::OnCanWrite();
-  const uint64_t buffered_data_new = BufferedDataBytes();
-  // As long as OnCanWriteNewData() is no-op, data to sent in buffer shouldn't
-  // increase.
-  ASSERT(buffered_data_new <= buffered_data_old);
-  maybeCheckWatermark(buffered_data_old, buffered_data_new, *filterManagerConnection());
 }
 
 uint32_t EnvoyQuicServerStream::streamId() { return id(); }

@@ -5,6 +5,18 @@
 
 #include "common/http/codec_helper.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/core/quic_stream.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 
@@ -165,7 +177,11 @@ public:
     } else {
       // Skip stream watermark buffer book keeping if this header is buffered on
       // the header stream.
-      filter_manager_connection_->adjustBytesToSend(new_buffered_bytes - old_buffered_bytes_);
+      if (!filter_manager_connection_->isUpdatingWatermarkByHeadersStream()) {
+        // Only udpate connection level watermark if it's not in the middle of
+        // another updating caused by header stream send buffer change.
+        filter_manager_connection_->adjustBytesToSend(new_buffered_bytes - old_buffered_bytes_);
+      }
     }
   }
 

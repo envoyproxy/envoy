@@ -48,9 +48,11 @@ void EnvoyQuicClientSession::Initialize() {
 void EnvoyQuicClientSession::OnCanWrite() {
   const uint64_t headers_to_send_old =
       quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
+  setUpdatingWatermarkByHeadersStream(true);
   quic::QuicSpdyClientSession::OnCanWrite();
   const uint64_t headers_to_send_new =
       quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
+  setUpdatingWatermarkByHeadersStream(false);
   adjustBytesToSend(headers_to_send_new - headers_to_send_old);
   maybeApplyDelayClosePolicy();
 }
