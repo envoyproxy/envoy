@@ -25,6 +25,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "unknown",
+    status = "alpha",
     deps = [
         ":ext_proc",
         "//source/extensions/filters/http:well_known_names",

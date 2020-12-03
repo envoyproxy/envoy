@@ -16,7 +16,6 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#not-implemented-hide:]
 // [#protodoc-title: External Processing Filter]
 // External Processing Filter
 // [#extension: envoy.filters.http.ext_proc]
@@ -64,6 +63,7 @@ message ExternalProcessor {
   // The filter supports both the "Envoy" and "Google" gRPC clients.
   config.core.v3.GrpcService grpc_service = 1;
 
+  // [#not-implemented-hide:]
   // By default, if the gRPC stream cannot be established, or if it is closed
   // prematurely with an error, the filter will fail. Specifically, if the
   // response headers have not yet been delivered, then it will return a 500
