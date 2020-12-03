@@ -18,6 +18,20 @@ static void drainErrorQueue() {
   }
 }
 
+static void handleSslError(SSL* ssl, int err, bool is_server) {
+  int error = SSL_get_error(ssl, err);
+  switch (error) {
+  case SSL_ERROR_NONE:
+  case SSL_ERROR_WANT_READ:
+  case SSL_ERROR_WANT_WRITE:
+    return;
+  default:
+    drainErrorQueue();
+    ENVOY_LOG_MISC(error, "is_server {} handshake err {} SSL_get_error {}", is_server, err, error);
+    PANIC("Unexpected error during handshake");
+  }
+}
+
 static void appendSlice(Buffer::Instance& buffer, uint32_t size) {
   Buffer::RawSlice slice;
   std::string data(size, 'a');
@@ -83,16 +97,8 @@ static void testThroughput(benchmark::State& state) {
       handshake_success = true;
       break;
     }
-    int err = SSL_get_error(server_ssl.get(), server_err);
-    switch (err) {
-    case SSL_ERROR_WANT_READ:
-    case SSL_ERROR_WANT_WRITE:
-      continue;
-    default:
-      drainErrorQueue();
-      ENVOY_LOG_MISC(error, "err {} client_err {} server_err {}", err, client_err, server_err);
-      PANIC("Unexpected error during handshake");
-    }
+    handleSslError(client_ssl.get(), client_err, false);
+    handleSslError(server_ssl.get(), server_err, true);
   }
 
   RELEASE_ASSERT(handshake_success, "handshake completed successfully");
@@ -174,7 +180,7 @@ static void testThroughput(benchmark::State& state) {
   ::close(sockets[1]);
 }
 
-static void TestParams(benchmark::internal::Benchmark* b) {
+static void testParams(benchmark::internal::Benchmark* b) {
   for (auto move_slices : {false, true}) {
     for (auto align_to_16kb : {false, true}) {
       // Add a single case of no short slices; don't iterate over the sizes
@@ -190,7 +196,7 @@ static void TestParams(benchmark::internal::Benchmark* b) {
   }
 }
 
-BENCHMARK(testThroughput)->Unit(::benchmark::kMicrosecond)->Apply(TestParams);
+BENCHMARK(testThroughput)->Unit(::benchmark::kMicrosecond)->Apply(testParams);
 
 } // namespace Extensions::TransportSockets::Tls
 } // namespace Envoy
