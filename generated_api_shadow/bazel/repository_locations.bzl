@@ -55,7 +55,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-12-02",
         use_category = ["api"],
     ),
-
     opencensus_proto = dict(
         project_name = "OpenCensus Proto",
         project_desc = "Language Independent Interface Types For OpenCensus",
