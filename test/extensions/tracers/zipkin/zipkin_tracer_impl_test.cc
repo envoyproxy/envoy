@@ -49,6 +49,7 @@ public:
 
   void setup(envoy::config::trace::v3::ZipkinConfig& zipkin_config, bool init_timer) {
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -62,7 +63,7 @@ public:
   }
 
   void setupValidDriver(const std::string& version) {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    cm_.initializeClusters({"fake_cluster"}, {});
 
     const std::string yaml_string = fmt::format(R"EOF(
     collector_cluster: fake_cluster
@@ -163,7 +164,6 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
   {
     // Valid config but collector cluster doesn't exists.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
@@ -176,9 +176,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
   {
     // valid config
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
-
+    cm_.initializeClusters({"fake_cluster"}, {});
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
@@ -191,9 +189,8 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 }
 
 TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, addedViaApi()).WillByDefault(Return(true));
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster

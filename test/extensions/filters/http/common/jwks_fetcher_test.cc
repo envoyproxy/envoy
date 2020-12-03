@@ -53,7 +53,11 @@ timeout:
 
 class JwksFetcherTest : public testing::Test {
 public:
-  void SetUp() override { TestUtility::loadFromYaml(JwksUri, uri_); }
+  void SetUp() override {
+    TestUtility::loadFromYaml(JwksUri, uri_);
+    mock_factory_ctx_.cluster_manager_.initializeThreadLocalClusters({"pubkey_cluster"});
+  }
+
   HttpUri uri_;
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   NiceMock<Tracing::MockSpan> parent_span_;

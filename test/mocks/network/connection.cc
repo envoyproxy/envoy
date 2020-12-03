@@ -25,7 +25,9 @@ void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   }
 
   for (Network::ConnectionCallbacks* callbacks : callbacks_) {
-    callbacks->onEvent(event);
+    if (callbacks) {
+      callbacks->onEvent(event);
+    }
   }
 }
 
@@ -37,13 +39,17 @@ void MockConnectionBase::raiseBytesSentCallbacks(uint64_t num_bytes) {
 
 void MockConnectionBase::runHighWatermarkCallbacks() {
   for (auto* callback : callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
+    if (callback) {
+      callback->onAboveWriteBufferHighWatermark();
+    }
   }
 }
 
 void MockConnectionBase::runLowWatermarkCallbacks() {
   for (auto* callback : callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
+    if (callback) {
+      callback->onBelowWriteBufferLowWatermark();
+    }
   }
 }
 
@@ -53,6 +59,15 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, addConnectionCallbacks(_))
       .WillByDefault(Invoke([&connection](Network::ConnectionCallbacks& callbacks) -> void {
         connection.callbacks_.push_back(&callbacks);
+      }));
+  ON_CALL(connection, removeConnectionCallbacks(_))
+      .WillByDefault(Invoke([&connection](Network::ConnectionCallbacks& callbacks) -> void {
+        for (auto& callback : connection.callbacks_) {
+          if (callback == &callbacks) {
+            callback = nullptr;
+            return;
+          }
+        }
       }));
   ON_CALL(connection, addBytesSentCallback(_))
       .WillByDefault(Invoke([&connection](Network::Connection::BytesSentCb cb) {

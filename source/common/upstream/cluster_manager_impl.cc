@@ -842,7 +842,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }
 
-ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
+ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view cluster) {
   ThreadLocalClusterManagerImpl& cluster_manager = *tls_;
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
