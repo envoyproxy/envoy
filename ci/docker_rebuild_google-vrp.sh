@@ -43,6 +43,11 @@ fi
 
 cat "${DOCKER_BUILD_FILE}"
 
+echo "DEBUG VRP"
+echo $BASE_DOCKER_IMAGE
+docker images
+echo
+
 docker build -t "envoy-google-vrp:local" --build-arg "ENVOY_VRP_BASE_IMAGE=${BASE_DOCKER_IMAGE}" -f "${DOCKER_BUILD_FILE}" .
 
 if [[ -n "$1" ]]; then
