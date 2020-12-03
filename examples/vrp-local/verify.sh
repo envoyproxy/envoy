@@ -9,11 +9,18 @@ docker cp "${CONTAINER_ID}":/usr/local/bin/envoy /tmp/envoy
 docker rm "${CONTAINER_ID}"
 
 pushd "$(dirname "${BASH_SOURCE[0]}")"/../..
+
+echo "BUILD VRP IN TEST"
+docker images
+
 # Follow instructions from
 # https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/google_vrp#rebuilding-the-docker-image,
 # but rather than do a full build (slow), use an Envoy we built earlier.
 ./ci/docker_rebuild_google-vrp.sh /tmp/envoy
 popd
+
+echo "AFTER BUILD VRP IN TEST"
+docker images
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
