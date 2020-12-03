@@ -134,14 +134,13 @@ common_tls_context:
 }
 
 void BaseIntegrationTest::createUpstreams() {
-  upstream_config_.enable_half_close_ = enable_half_close_;
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(new AutonomousUpstream(
-          endpoint, upstream_config_, autonomous_allow_incomplete_streams_));
+      fake_upstreams_.emplace_back(
+          new AutonomousUpstream(endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_config_));
+      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstreamConfig()));
     }
   }
 }
