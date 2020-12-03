@@ -60,15 +60,18 @@ public:
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
-  Http::ConnectionPool::InstancePtr allocateConnPool(
-      Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-      Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
-      const Network::TransportSocketOptionsSharedPtr& transport_socket_options) override;
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                   ResourcePriority priority, Http::Protocol protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   ClusterConnectivityState& state) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
+                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      ClusterConnectivityState& state) override;
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
@@ -236,7 +239,7 @@ public:
   }
 
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
-  ThreadLocalCluster* get(absl::string_view cluster) override;
+  ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
   using ClusterManager::httpConnPoolForCluster;
 
@@ -419,6 +422,8 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
 
+    ClusterConnectivityState cluster_manager_state_;
+
     // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
     // to prevent lifetime/ownership issues when a cluster is dynamically removed.
     absl::node_hash_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
@@ -533,8 +538,8 @@ private:
                                               ThreadLocalClusterUpdateParams&& params);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
-  void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
-                     std::function<ConnectionPool::Instance*()> prefetch_pool);
+  static void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+                            std::function<ConnectionPool::Instance*()> prefetch_pool);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

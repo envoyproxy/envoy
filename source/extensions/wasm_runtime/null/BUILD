@@ -15,7 +15,7 @@ envoy_cc_extension(
     status = "alpha",
     deps = [
         "//include/envoy/registry",
-        "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
+        "@proxy_wasm_cpp_host//:null_lib",
     ],
 )

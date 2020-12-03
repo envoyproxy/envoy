@@ -1209,6 +1209,7 @@ http_filters:
 - name: envoy.filters.http.router
   )EOF";
 
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"cluster"}, {});
   auto proto_config = parseHttpConnectionManagerFromYaml(yaml_string);
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
@@ -1708,6 +1709,8 @@ http_filters:
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   EXPECT_CALL(context_.runtime_loader_.snapshot_, runtimeFeatureEnabled(_)).WillOnce(Return(false));
+  context_.cluster_manager_.initializeClusters({"cluster"}, {});
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"cluster"}, {});
   auto http_connection_manager_factory =
       HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
           proto_config, context_, filter_callbacks);
@@ -1738,6 +1741,8 @@ http_filters:
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   EXPECT_CALL(context_.runtime_loader_.snapshot_, runtimeFeatureEnabled(_)).WillOnce(Return(false));
+  context_.cluster_manager_.initializeClusters({"cluster"}, {});
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"cluster"}, {});
   auto http_connection_manager_factory =
       HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
           proto_config, context_, filter_callbacks);

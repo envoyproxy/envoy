@@ -1,13 +1,16 @@
 #pragma once
 
-#include <string_view>
+#include "envoy/common/pure.h"
 
-#include "extensions/common/wasm/wasm_vm.h"
+#include "absl/strings/string_view.h"
+#include "include/proxy-wasm/wasm_vm.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Wasm {
+
+using WasmVmPtr = std::unique_ptr<proxy_wasm::WasmVm>;
 
 class WasmRuntimeFactory {
 public:

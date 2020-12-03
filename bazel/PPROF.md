@@ -1,7 +1,8 @@
 # CPU or memory consumption testing with `pprof`
 
 To use `pprof` to analyze performance and memory consumption in Envoy, you can
-use the built-in statically linked profiler, or dynamically link it in to a
+use the built-in statically linked profiler provided by
+[gperftools](https://github.com/gperftools/gperftools), or dynamically link it in to a
 specific place yourself.
 
 ## Collecting CPU or heap profile for a full execution of envoy
@@ -14,7 +15,7 @@ inside
 
 Build the static binary using bazel:
 
-    $ bazel build //source/exe:envoy-static
+    $ bazel build --define tcmalloc=gperftools //source/exe:envoy-static
 
 ### Collecting the profile
 
@@ -41,15 +42,15 @@ The profiler library is automatically linked into envoy_cc_test targets.
 
 Run a test with heap profiling enabled, like so:
 
-    $ bazel test --test_env=HEAPPROFILE=/tmp/heapprof <test target>
+    $ bazel test --test_env=HEAPPROFILE=/tmp/heapprof --define tcmalloc=gperftools <test target>
 
 Run a test with CPU profiling enabled, like so:
 
-    $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof <test target>
+    $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof --define tcmalloc=gperftools <test target>
 
 Note that heap checks and heap profile collection in tests have noticiable performance implications. Use the following command to collect a CPU profile from a test target with heap check and heap profile collection disabled:
 
-    $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof --test_env=HEAPPROFILE= --test_env=HEAPCHECK= <test target>
+    $ bazel test --test_env=CPUPROFILE=/tmp/cpuprof --test_env=HEAPPROFILE= --test_env=HEAPCHECK= --define tcmalloc=gperftools <test target>
 
 ## Starting and stopping profile programmatically
 

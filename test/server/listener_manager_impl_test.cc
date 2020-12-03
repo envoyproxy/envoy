@@ -167,6 +167,7 @@ filter_chains:
   EXPECT_CALL(server_.api_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(&manager_->httpContext(), &server_.httpContext());
   EXPECT_EQ(1U, manager_->listeners().size());
   EXPECT_EQ(std::chrono::milliseconds(15000),
             manager_->listeners().front().get().listenerFiltersTimeout());
@@ -333,6 +334,7 @@ filter_chains:
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_));
+  EXPECT_FALSE(manager_->isWorkerStarted());
   manager_->startWorkers(guard_dog_);
   // Validate that there are no active listeners and workers are started.
   EXPECT_EQ(0, server_.stats_store_
@@ -369,6 +371,20 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, AllowOnlyDefaultFilterChain) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+default_filter_chain:
+  filters: []
+  )EOF";
+
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
@@ -560,7 +576,7 @@ TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
   const std::string yaml = R"EOF(
 address:
   envoy_internal_address:
-    server_listener_name: a_listener_name  
+    server_listener_name: a_listener_name
 filter_chains:
 - filters: []
   )EOF";
@@ -3652,6 +3668,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
             listener_factory_context = &context;
             return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
           }));
+  server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   ASSERT_NE(nullptr, listener_factory_context);
   EXPECT_EQ("test_value", Config::Metadata::metadataValue(
@@ -4203,6 +4220,8 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());
@@ -4284,6 +4303,8 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());

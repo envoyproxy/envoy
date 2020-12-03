@@ -32,7 +32,6 @@ const Http::HeaderMap& lengthZeroHeader() {
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            ErrorKind::Other,
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
@@ -176,11 +175,10 @@ void RawHttpClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   request_->cancel();
   callbacks_ = nullptr;
-  timeout_timer_.reset();
 }
 
 // Client
-void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
+void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
                               Tracing::Span& parent_span,
                               const StreamInfo::StreamInfo& stream_info) {
@@ -224,22 +222,16 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
 
   // It's possible that the cluster specified in the filter configuration no longer exists due to a
   // CDS removal.
-  if (cm_.get(cluster) == nullptr) {
+  if (cm_.getThreadLocalCluster(cluster) == nullptr) {
     // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
     callbacks_ = nullptr;
   } else {
     auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName());
-
-    if (timeoutStartsAtCheckCreation()) {
-      timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
-      timeout_timer_->enableTimer(config_->timeout());
-    } else {
-      options.setTimeout(config_->timeout());
-    }
 
     request_ = cm_.httpAsyncClientForCluster(cluster).send(std::move(message), *this, options);
   }
@@ -247,7 +239,6 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
 
 void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& message) {
-  timeout_timer_.reset();
   callbacks_->onComplete(toResponse(std::move(message)));
   callbacks_ = nullptr;
 }
@@ -255,7 +246,6 @@ void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
                                   Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  timeout_timer_.reset();
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   callbacks_ = nullptr;
 }
@@ -270,18 +260,6 @@ void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(
                                                          ? TracingConstants::get().TraceOk
                                                          : TracingConstants::get().TraceUnauthz);
   }
-}
-
-void RawHttpClientImpl::onTimeout() {
-  ENVOY_LOG(trace, "CheckRequest timed-out");
-  ASSERT(request_ != nullptr);
-  request_->cancel();
-  // let the client know of failure:
-  ASSERT(callbacks_ != nullptr);
-  Response response = errorResponse();
-  response.error_kind = ErrorKind::Timedout;
-  callbacks_->onComplete(std::make_unique<Response>(response));
-  callbacks_ = nullptr;
 }
 
 ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
@@ -323,10 +301,9 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   if (status_code == enumToInt(Http::Code::OK)) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
                        config_->upstreamHeaderToAppendMatchers(),
-                       Response{CheckStatus::OK, ErrorKind::Other, Http::HeaderVector{},
-                                Http::HeaderVector{}, Http::HeaderVector{},
-                                std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
+                       Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
+                                Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING,
+                                Http::Code::OK, ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
@@ -334,7 +311,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
                          Response{CheckStatus::Denied,
-                                  ErrorKind::Other,
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
