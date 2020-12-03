@@ -370,7 +370,8 @@ public:
       uint32_t port, RawConnectionDriver::DoWriteCallback write_request_cb,
       std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
       Network::TransportSocketPtr transport_socket) {
-    return std::make_unique<RawConnectionDriver>(port, write_request_cb, data_callback, version_, std::move(transport_socket));
+    return std::make_unique<RawConnectionDriver>(port, write_request_cb, data_callback, version_,
+                                                 std::move(transport_socket));
   }
 
 protected:
