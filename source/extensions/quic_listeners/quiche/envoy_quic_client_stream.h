@@ -52,10 +52,14 @@ public:
   // quic::Stream
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
+  void clearWatermarkBuffer();
+
+  // EnvoyQuicStream
+  uint32_t streamId() override;
+
 protected:
   // EnvoyQuicStream
   void switchStreamBlockState(bool should_block) override;
-  uint32_t streamId() override;
   Network::Connection* connection() override;
 
   // quic::QuicSpdyStream

@@ -621,7 +621,6 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_))
       .Times(testing::AtMost(1))
       .WillOnce(Invoke([](const quic::QuicFrame&) { return false; }));

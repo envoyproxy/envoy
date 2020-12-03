@@ -72,13 +72,11 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
       quic::VersionUsesHttp3(transport_version())
           ? static_cast<quic::QuicStream*>(this)
           : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
-  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
-
-  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
-  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
-  ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  {
+    ScopedWatermarkBufferUpdater updater(writing_stream, this, filterManagerConnection());
+    WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  }
 }
 
 void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -89,19 +87,16 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   }
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
-  // This is counting not serialized bytes in the send buffer.
-  const uint64_t bytes_to_send_old = BufferedDataBytes();
-  // QUIC stream must take all.
-  WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
+  {
+    ScopedWatermarkBufferUpdater updater(this, this, filterManagerConnection());
+    // QUIC stream must take all.
+    WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
+  }
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
   }
-
-  const uint64_t bytes_to_send_new = BufferedDataBytes();
-  ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
@@ -112,11 +107,10 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
       quic::VersionUsesHttp3(transport_version())
           ? static_cast<quic::QuicStream*>(this)
           : (dynamic_cast<quic::QuicSpdySession*>(session())->headers_stream());
-  const uint64_t bytes_to_send_old = writing_stream->BufferedDataBytes();
-  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
-  const uint64_t bytes_to_send_new = writing_stream->BufferedDataBytes();
-  ASSERT(bytes_to_send_old <= bytes_to_send_new);
-  maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
+  {
+    ScopedWatermarkBufferUpdater updater(writing_stream, this, filterManagerConnection());
+    WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+  }
 }
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
@@ -264,16 +258,26 @@ void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
 
 void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
+  if (!local_end_stream_) {
+    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+  }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
-  runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
 }
 
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
+  if (isDoingWatermarkAccounting()) {
+    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
+    return;
+  }
+  clearWatermarkBuffer();
+}
+
+void EnvoyQuicServerStream::clearWatermarkBuffer() {
   if (BufferedDataBytes() > 0) {
     // If the stream is closed without sending out all buffered data, regard
     // them as sent now and adjust connection buffer book keeping.
-    filterManagerConnection()->adjustBytesToSend(0 - BufferedDataBytes());
+    maybeCheckWatermark(BufferedDataBytes(), 0, *filterManagerConnection());
   }
 }
 

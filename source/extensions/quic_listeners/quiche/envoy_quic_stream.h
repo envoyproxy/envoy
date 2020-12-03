@@ -70,6 +70,8 @@ public:
     }
   }
 
+  absl::string_view responseDetails() override { return details_; }
+
   void addCallbacks(Http::StreamCallbacks& callbacks) override {
     ASSERT(!local_end_stream_);
     addCallbacksHelper(callbacks);
@@ -97,12 +99,20 @@ public:
     connection.adjustBytesToSend(buffered_data_new - buffered_data_old);
   }
 
+  void setDoingWatermarkAccouting(bool doing_watermark_accounting) {
+    doing_watermark_accounting_ = doing_watermark_accounting;
+  }
+  bool isDoingWatermarkAccounting() const { return doing_watermark_accounting_; }
+
+  virtual uint32_t streamId() PURE;
+
 protected:
   virtual void switchStreamBlockState(bool should_block) PURE;
 
   // Needed for ENVOY_STREAM_LOG.
-  virtual uint32_t streamId() PURE;
   virtual Network::Connection* connection() PURE;
+
+  void setDetails(absl::string_view details) { details_ = details; }
 
   // True once end of stream is propagated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
@@ -131,6 +141,39 @@ private:
   // executed, the stream might be unblocked and blocked several times. Only the
   // latest desired state should be considered by the callback.
   bool should_block_{false};
+
+  absl::string_view details_;
+
+  bool doing_watermark_accounting_{false};
+};
+
+class ScopedWatermarkBufferUpdater {
+public:
+  ScopedWatermarkBufferUpdater(quic::QuicStream* quic_stream, EnvoyQuicStream* count_to_stream,
+                               QuicFilterManagerConnectionImpl* filter_manager_connection)
+      : quic_stream_(quic_stream), old_buffered_bytes_(quic_stream_->BufferedDataBytes()),
+        count_to_stream_(count_to_stream), filter_manager_connection_(filter_manager_connection) {
+    ASSERT(!count_to_stream->isDoingWatermarkAccounting());
+    count_to_stream->setDoingWatermarkAccouting(true);
+  }
+  ~ScopedWatermarkBufferUpdater() {
+    uint64_t new_buffered_bytes = quic_stream_->BufferedDataBytes();
+    count_to_stream_->setDoingWatermarkAccouting(false);
+    if (quic_stream_->id() == count_to_stream_->streamId()) {
+      count_to_stream_->maybeCheckWatermark(old_buffered_bytes_, new_buffered_bytes,
+                                            *filter_manager_connection_);
+    } else {
+      // Skip stream watermark buffer book keeping if this header is buffered on
+      // the header stream.
+      filter_manager_connection_->adjustBytesToSend(new_buffered_bytes - old_buffered_bytes_);
+    }
+  }
+
+private:
+  quic::QuicStream* quic_stream_;
+  uint64_t old_buffered_bytes_{0};
+  EnvoyQuicStream* count_to_stream_{nullptr};
+  QuicFilterManagerConnectionImpl* filter_manager_connection_{nullptr};
 };
 
 } // namespace Quic
