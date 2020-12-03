@@ -120,7 +120,7 @@ public:
  * @param availability the data availability to use for the input.
  */
 SingleFieldMatcherPtr<TestData>
-createSingleMatcher(absl::optional<std::string> input,
+createSingleMatcher(absl::optional<absl::string_view> input,
                     std::function<bool(absl::optional<absl::string_view>)> predicate,
                     DataInputGetResult::DataAvailability availability =
                         DataInputGetResult::DataAvailability::AllDataAvailable) {
