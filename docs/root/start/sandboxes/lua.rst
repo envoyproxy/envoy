@@ -1,21 +1,17 @@
 .. _install_sandboxes_lua:
 
-Lua Filter
+Lua 过滤器
 ==========
 
-In this example, we show how a Lua filter can be used with the Envoy
-proxy. The Envoy proxy configuration includes a Lua
-filter that contains two functions namely
-``envoy_on_request(request_handle)`` and
-``envoy_on_response(response_handle)`` as documented :ref:`here <config_http_filters_lua>`.
+在这个例子中，我们会展示 Lua 过滤器在 Envoy 代理中是如何使用的。 Envoy 代理配置包括一个 Lua 过滤器，此过滤器包含了在 :ref:`这个 <config_http_filters_lua>` 文档中记录的两个函数，即 ``envoy_on_request(request_handle)`` 和 ``envoy_on_response(response_handle)`` 。
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+运行沙盒
+~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Build the sandbox
-*************************
+步骤 3：构建沙盒
+****************
 
 .. code-block:: console
 
@@ -30,12 +26,13 @@ Step 3: Build the sandbox
   lua_proxy_1         /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
   lua_web_service_1   node ./index.js                  Up      0.0.0.0:8080->80/tcp
 
-Step 4: Send a request to the service
-*************************************
+Step 4: 给服务发送请求
+**********************
 
-The output from the ``curl`` command below should include the headers ``foo``.
 
-Terminal 1
+下面 ``curl`` 命令的输出结果应该包含头部 ``foo`` 。
+
+终端 1
 
 .. code-block:: console
 
