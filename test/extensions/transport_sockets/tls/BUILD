@@ -192,6 +192,8 @@ envoy_cc_benchmark_binary(
         "benchmark",
         "ssl",
     ],
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
     ],
@@ -200,4 +202,6 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "tls_throughput_benchmark_test",
     benchmark_binary = "tls_throughput_benchmark",
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
 )
