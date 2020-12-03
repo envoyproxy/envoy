@@ -668,8 +668,9 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithBodyAndContentType) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
-  const std::string response_body = "{ \"message\": \"this is a custom over limit response body as "
-                                    "json.\", \"retry-after\": \"33\" }";
+  const std::string response_body = R"EOF(
+  { "message": "this is a custom over limit response body as json.", "retry-after": "33" }
+  )EOF";
   const std::string content_length = std::to_string(response_body.length());
   Http::HeaderMapPtr rl_headers{
       new Http::TestResponseHeaderMapImpl{{"content-type", "application/json"},
