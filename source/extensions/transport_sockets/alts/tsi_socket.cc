@@ -149,7 +149,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
   }
 
   if (raw_read_buffer_.length() > 0) {
-    callbacks_->setReadBufferReady();
+    callbacks_->setTransportSocketIsReadable();
   }
 
   // Try to write raw buffer when next call is done, even this is not in do[Read|Write] stack.

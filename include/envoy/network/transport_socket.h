@@ -65,10 +65,10 @@ public:
   virtual bool shouldDrainReadBuffer() PURE;
 
   /**
-   * Mark read buffer ready to read in the event loop. This is used when yielding following
-   * shouldDrainReadBuffer().
+   * Mark the transport socket as readable in order to force a read in a future iteration of the
+   * event loop. This is used when yielding following shouldDrainReadBuffer().
    */
-  virtual void setReadBufferReady() PURE;
+  virtual void setTransportSocketIsReadable() PURE;
 
   /**
    * Raise a connection event to the connection. This can be used by a secure socket (e.g. TLS)
