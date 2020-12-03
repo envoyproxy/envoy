@@ -139,44 +139,88 @@ TEST_F(PostgresFilterTest, BackendMsgsStats) {
   filter_->onWrite(data_, false);
   ASSERT_THAT(filter_->getStats().messages_unknown_.value(), 1);
 
-  filter_->getDecoder()->getSession().setInTransaction(true);
-  createPostgresMsg(data_, "C", "COMMIT");
-  filter_->onWrite(data_, false);
-  ASSERT_THAT(filter_->getStats().statements_.value(), 1);
-  ASSERT_THAT(filter_->getStats().transactions_.value(), 0);
-  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 1);
-
-  createPostgresMsg(data_, "C", "ROLLBACK 234");
-  filter_->onWrite(data_, false);
-  ASSERT_THAT(filter_->getStats().transactions_.value(), 0);
-  ASSERT_THAT(filter_->getStats().statements_.value(), 2);
-  ASSERT_THAT(filter_->getStats().statements_other_.value(), 0);
-  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 1);
-
+  // implicit transactions
   createPostgresMsg(data_, "C", "SELECT blah");
   filter_->onWrite(data_, false);
-  ASSERT_THAT(filter_->getStats().statements_.value(), 3);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 1);
   ASSERT_THAT(filter_->getStats().statements_select_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
 
   createPostgresMsg(data_, "C", "INSERT 123");
   filter_->onWrite(data_, false);
-  ASSERT_THAT(filter_->getStats().statements_.value(), 4);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 2);
   ASSERT_THAT(filter_->getStats().statements_insert_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 2);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 2);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
 
   createPostgresMsg(data_, "C", "DELETE 123");
   filter_->onWrite(data_, false);
-  ASSERT_THAT(filter_->getStats().statements_.value(), 5);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 3);
   ASSERT_THAT(filter_->getStats().statements_delete_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 3);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 3);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
 
   createPostgresMsg(data_, "C", "UPDATE 123");
   filter_->onWrite(data_, false);
-  ASSERT_THAT(filter_->getStats().statements_.value(), 6);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 4);
   ASSERT_THAT(filter_->getStats().statements_update_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 4);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 4);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
 
+  // explicit transactions (commit)
   createPostgresMsg(data_, "C", "BEGIN 123");
   filter_->onWrite(data_, false);
-  ASSERT_THAT(filter_->getStats().statements_.value(), 7);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 5);
   ASSERT_THAT(filter_->getStats().statements_other_.value(), 1);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 5);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 4);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
+
+  createPostgresMsg(data_, "C", "INSERT 123");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 6);
+  ASSERT_THAT(filter_->getStats().statements_insert_.value(), 2);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 5);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 4);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
+
+  createPostgresMsg(data_, "C", "COMMIT");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 7);
+  ASSERT_THAT(filter_->getStats().statements_other_.value(), 2);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 5);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 5);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
+
+  // explicit transactions (rollback)
+  createPostgresMsg(data_, "C", "BEGIN 123");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 8);
+  ASSERT_THAT(filter_->getStats().statements_other_.value(), 3);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 6);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 5);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
+
+  createPostgresMsg(data_, "C", "INSERT 123");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 9);
+  ASSERT_THAT(filter_->getStats().statements_insert_.value(), 3);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 6);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 5);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
+
+  createPostgresMsg(data_, "C", "ROLLBACK");
+  filter_->onWrite(data_, false);
+  ASSERT_THAT(filter_->getStats().statements_.value(), 10);
+  ASSERT_THAT(filter_->getStats().statements_other_.value(), 4);
+  ASSERT_THAT(filter_->getStats().transactions_.value(), 6);
+  ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 5);
+  ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 1);
 }
 
 // Test sends series of E type error messages to the filter and

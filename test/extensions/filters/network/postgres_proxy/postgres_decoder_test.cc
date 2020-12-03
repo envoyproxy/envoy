@@ -363,7 +363,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "COMMIT");
   decoder_->onData(data_, false);
@@ -375,7 +375,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "C", "ROLLBACK");
   decoder_->onData(data_, false);

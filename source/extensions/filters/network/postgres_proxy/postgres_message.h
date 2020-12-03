@@ -11,7 +11,7 @@ namespace PostgresProxy {
 
 /**
  * Postgres messages are described in official Postgres documentation:
- * https://www.postgresql.org/docs/12/protocol-message-formats.html
+ * https://www.postgresql.org/docs/current/protocol-message-formats.html
  *
  * Most of messages start with 1-byte message identifier followed by 4-bytes length field. Few
  * messages are defined without starting 1-byte character and are used during well-defined initial
