@@ -12,7 +12,7 @@ namespace Event {
 
 FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
-    : cb_(cb), fd_(fd), trigger_(trigger), enabled_events_(events),
+    : cb_(cb), fd_(fd), trigger_(trigger), enabled_events_(0),
       activation_cb_(dispatcher.createSchedulableCallback([this]() {
         ASSERT(injected_activation_events_ != 0);
         mergeInjectedEventsAndRunCb(0);
@@ -80,7 +80,7 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
       this);
 }
 
-void FileEventImpl::updateEvents(uint32_t events) {
+void FileEventImpl::setEnabled(uint32_t events) {
   if (events == enabled_events_) {
     return;
   }
@@ -90,25 +90,13 @@ void FileEventImpl::updateEvents(uint32_t events) {
   event_add(&raw_event_, nullptr);
 }
 
-void FileEventImpl::setEnabled(uint32_t events) {
-  if (injected_activation_events_ != 0) {
-    // Clear pending events on updates to the fd event mask to avoid delivering events that are no
-    // longer relevant. Updating the event mask will reset the fd edge trigger state so the proxy
-    // will be able to determine the fd read/write state without need for the injected activation
-    // events.
-    injected_activation_events_ = 0;
-    activation_cb_->cancel();
-  }
-  updateEvents(events);
-}
-
 void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
   // This constexpr if allows the compiler to optimize away the function on POSIX
   if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
     ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
     if (trigger_ == FileTriggerType::EmulatedEdge) {
       auto new_event_mask = enabled_events_ & ~event;
-      updateEvents(new_event_mask);
+      setEnabled(new_event_mask);
     }
   }
 }
@@ -119,27 +107,13 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
     ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
     if (trigger_ == FileTriggerType::EmulatedEdge) {
       auto new_event_mask = enabled_events_ | event;
-      if (event & FileReadyType::Read && (enabled_events_ & FileReadyType::Closed)) {
-        // We never ask for both early close and read at the same time.
-        new_event_mask = new_event_mask & ~FileReadyType::Read;
-      }
-      updateEvents(new_event_mask);
+      setEnabled(new_event_mask);
     }
   }
 }
 
 void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
   if (injected_activation_events_ != 0) {
-    // TODO(antoniovicente) remove this adjustment to activation events once ConnectionImpl can
-    // handle Read and Close events delivered together.
-    if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
-      if (events & FileReadyType::Closed && injected_activation_events_ & FileReadyType::Read) {
-        // We never ask for both early close and read at the same time. If close is requested
-        // keep that instead.
-        injected_activation_events_ = injected_activation_events_ & ~FileReadyType::Read;
-      }
-    }
-
     events |= injected_activation_events_;
     injected_activation_events_ = 0;
     activation_cb_->cancel();

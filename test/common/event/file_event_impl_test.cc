@@ -169,7 +169,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   os_sys_calls_.close(fd);
 }
 
-TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
+TEST_P(FileEventImplActivateTest, SetEnablePreservesActivate) {
   os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).rc_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
@@ -214,11 +214,12 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
   EXPECT_CALL(fd_event, ready());
   EXPECT_CALL(read_event, ready());
   EXPECT_CALL(write_event, ready());
-  // Second loop iteration: handle real write event after resetting event mask via setEnabled. Close
-  // injected event is discarded by the setEnable call.
+  // Second loop iteration: handle real write event after resetting event mask via setEnabled and
+  // Close event injected before the setEnable call.
   EXPECT_CALL(prepare_watcher, ready());
   EXPECT_CALL(fd_event, ready());
   EXPECT_CALL(write_event, ready());
+  EXPECT_CALL(closed_event, ready());
   // Third loop iteration: poll returned no new real events.
   EXPECT_CALL(prepare_watcher, ready());
 

@@ -28,7 +28,6 @@ public:
 private:
   void assignEvents(uint32_t events, event_base* base);
   void mergeInjectedEventsAndRunCb(uint32_t events);
-  void updateEvents(uint32_t events);
 
   FileReadyCb cb_;
   os_fd_t fd_;
