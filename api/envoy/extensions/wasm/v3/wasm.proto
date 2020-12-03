@@ -18,14 +18,21 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Wasm]
 // [#extension: envoy.bootstrap.wasm]
 
-// Configuration for sanitization of an allowed capability.
-message SanitizationConfig {
-}
-
 // Configuration for restricting proxy-wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
-  // The proxy-wasm capabilities which will be exposed to the module.
+  // The proxy-wasm capabilities which will be exposed to the module. The capability names are
+  // given in the `proxy-wasm ABI <https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT>`.
+  // Additionally, the following WASI capabilities are implemented and can also be allowed:
+  // `fd_write` `fd_read`, `fd_seek`, `fd_close`, `fd_fdstat_get`, `environ_get`, `environ_sizes_get`,
+  // `args_get`, `args_sizes_get`, `proc_exit`, `clock_time_get`, `random_get`.
+  // 
+  // [#comment:TODO(ryanapilado): update once sanitization is implemented]
+  // Note: The value of each capability in the map is ignored and should be left empty.
   map<string, SanitizationConfig> allowed_capabilities = 1;
+}
+
+// Configuration for sanitization of inputs to an allowed capability. This is currently unimplemented.
+message SanitizationConfig {
 }
 
 // Configuration for a Wasm VM.
