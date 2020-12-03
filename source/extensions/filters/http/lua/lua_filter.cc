@@ -120,7 +120,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
     luaL_error(state, "http call timeout must be >= 0");
   }
 
-  if (filter.clusterManager().get(cluster) == nullptr) {
+  if (filter.clusterManager().getThreadLocalCluster(cluster) == nullptr) {
     luaL_error(state, "http call cluster invalid. Must be configured");
   }
 

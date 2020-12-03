@@ -19,6 +19,7 @@ HTTP filters
   dynamic_forward_proxy_filter
   dynamodb_filter
   ext_authz_filter
+  ext_proc_filter
   fault_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter
@@ -48,6 +49,9 @@ HTTP filters
   :hidden:
 
   ../../../api-v3/extensions/filters/http/admission_control/v3alpha/admission_control.proto
+  ../../../api-v3/extensions/filters/http/ext_proc/v3alpha/ext_proc.proto
+  ../../../api-v3/extensions/filters/http/ext_proc/v3alpha/processing_mode.proto
+  ../../../api-v3/service/ext_proc/v3alpha/external_processor.proto
   ../../../api-v3/extensions/filters/http/oauth2/v3alpha/oauth.proto
   ../../../api-v3/extensions/filters/http/cache/v3alpha/cache.proto
   ../../../api-v3/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.proto

@@ -19,7 +19,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
-class IpWhiteListConfigTest : public testing::TestWithParam<std::string> {};
+class IpAllowListConfigTest : public testing::TestWithParam<std::string> {};
 
 const std::string ipv4_cidr_yaml = R"EOF(
 - address_prefix: "192.168.3.0"
@@ -31,10 +31,10 @@ const std::string ipv6_cidr_yaml = R"EOF(
   prefix_len: 64
 )EOF";
 
-INSTANTIATE_TEST_SUITE_P(IpList, IpWhiteListConfigTest,
+INSTANTIATE_TEST_SUITE_P(IpList, IpAllowListConfigTest,
                          ::testing::Values(ipv4_cidr_yaml, ipv6_cidr_yaml));
 
-TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectJson) {
+TEST_P(IpAllowListConfigTest, ClientSslAuthCorrectJson) {
   const std::string yaml = R"EOF(
 stat_prefix: my_stat_prefix
 auth_api_cluster: fake_cluster
@@ -44,6 +44,7 @@ ip_white_list:
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   ClientSslAuthConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
@@ -51,7 +52,7 @@ ip_white_list:
   cb(connection);
 }
 
-TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectProto) {
+TEST_P(IpAllowListConfigTest, ClientSslAuthCorrectProto) {
   const std::string yaml = R"EOF(
 stat_prefix: my_stat_prefix
 auth_api_cluster: fake_cluster
@@ -61,6 +62,7 @@ ip_white_list:
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   ClientSslAuthConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
@@ -68,7 +70,7 @@ ip_white_list:
   cb(connection);
 }
 
-TEST_P(IpWhiteListConfigTest, ClientSslAuthEmptyProto) {
+TEST_P(IpAllowListConfigTest, ClientSslAuthEmptyProto) {
   const std::string yaml = R"EOF(
 stat_prefix: my_stat_prefix
 auth_api_cluster: fake_cluster
@@ -76,6 +78,7 @@ ip_white_list:
 )EOF" + GetParam();
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   ClientSslAuthConfigFactory factory;
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config =
       *dynamic_cast<envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth*>(

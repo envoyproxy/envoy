@@ -111,10 +111,11 @@ public:
     lb_factory_ = thread_aware_lb_->factory();
     lb_ = lb_factory_->create();
 
-    EXPECT_CALL(cm_, get(Eq("aggregate_cluster"))).WillRepeatedly(Return(&aggregate_cluster_));
-    EXPECT_CALL(cm_, get(Eq("primary"))).WillRepeatedly(Return(&primary_));
-    EXPECT_CALL(cm_, get(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
-    EXPECT_CALL(cm_, get(Eq("tertiary"))).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("aggregate_cluster")))
+        .WillRepeatedly(Return(&aggregate_cluster_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("primary"))).WillRepeatedly(Return(&primary_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("tertiary"))).WillRepeatedly(Return(nullptr));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
     ON_CALL(aggregate_cluster_, loadBalancer()).WillByDefault(ReturnRef(*lb_));

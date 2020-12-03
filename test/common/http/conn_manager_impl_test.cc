@@ -541,7 +541,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> foo_bar_cluster =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-  EXPECT_CALL(cluster_manager_, get(absl::string_view{foo_bar_cluster_name}))
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{foo_bar_cluster_name}))
       .WillOnce(Return(foo_bar_cluster.get()));
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> foo_cluster =
@@ -549,7 +549,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> default_cluster =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-  EXPECT_CALL(cluster_manager_, get(absl::string_view{default_cluster_name}))
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{default_cluster_name}))
       .Times(2)
       .WillRepeatedly(Return(default_cluster.get()));
 
