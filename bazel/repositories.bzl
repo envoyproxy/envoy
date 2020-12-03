@@ -760,6 +760,16 @@ def _com_github_grpc_grpc():
         actual = "@com_googlesource_code_re2//:re2",
     )
 
+    native.bind(
+        name = "upb_lib_descriptor",
+        actual = "@upb//:descriptor_upb_proto",
+    )
+
+    native.bind(
+        name = "upb_textformat_lib",
+        actual = "@upb//:textformat",
+    )
+
 def _upb():
     external_http_archive(name = "upb")
 
