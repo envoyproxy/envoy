@@ -221,8 +221,6 @@ message DeltaDiscoveryResponse {
 
   // Type URL for resources. Identifies the xDS API when muxing over ADS.
   // Must be consistent with the type_url in the Any within 'resources' if 'resources' is non-empty.
-  // This does not need to be set if *udpa_removed_resources* is used instead of
-  // *removed_resources*.
   string type_url = 4;
 
   // Resources names of resources that have be deleted and to be removed from the xDS Client.
