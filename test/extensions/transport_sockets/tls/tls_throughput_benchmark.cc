@@ -106,6 +106,7 @@ static void testThroughput(benchmark::State& state) {
 
   uint64_t bytes_written = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     state.PauseTiming();
 
     // Empty out the read side to make space for the writes.
