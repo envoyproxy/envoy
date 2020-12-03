@@ -55,45 +55,44 @@ static void testThroughput(benchmark::State& state) {
   int sockets[2];
   socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sockets);
 
-  auto* server_ctx = SSL_CTX_new(TLS_method());
-  auto* client_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<SSL_CTX> server_ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_method()));
   std::string cert_path = TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem");
   std::string key_path = TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem");
-  auto err = SSL_CTX_use_certificate_file(server_ctx, cert_path.c_str(), SSL_FILETYPE_PEM);
+  auto err = SSL_CTX_use_certificate_file(server_ctx.get(), cert_path.c_str(), SSL_FILETYPE_PEM);
   drainErrorQueue();
   RELEASE_ASSERT(err > 0, "SSL_CTX_use_certificate_file");
-  err = SSL_CTX_use_PrivateKey_file(server_ctx, key_path.c_str(), SSL_FILETYPE_PEM);
+  err = SSL_CTX_use_PrivateKey_file(server_ctx.get(), key_path.c_str(), SSL_FILETYPE_PEM);
   RELEASE_ASSERT(err > 0, "SSL_CTX_use_PrivateKey_file");
 
-  SSL* server_ssl = SSL_new(server_ctx);
-  SSL_set_fd(server_ssl, sockets[0]);
-  SSL_set_accept_state(server_ssl);
+  bssl::UniquePtr<SSL> server_ssl(SSL_new(server_ctx.get()));
+  SSL_set_fd(server_ssl.get(), sockets[0]);
+  SSL_set_accept_state(server_ssl.get());
 
-  SSL* client_ssl = SSL_new(client_ctx);
-  SSL_set_fd(client_ssl, sockets[1]);
-  SSL_set_connect_state(client_ssl);
+  bssl::UniquePtr<SSL> client_ssl(SSL_new(client_ctx.get()));
+  SSL_set_fd(client_ssl.get(), sockets[1]);
+  SSL_set_connect_state(client_ssl.get());
 
   bool handshake_success = false;
   for (int i = 0; i < 50; i++) {
-    int client_err = SSL_do_handshake(client_ssl);
-    int server_err = SSL_do_handshake(server_ssl);
+    int client_err = SSL_do_handshake(client_ssl.get());
+    int server_err = SSL_do_handshake(server_ssl.get());
     if (client_err == 1 && server_err == 1) {
       handshake_success = true;
       break;
     }
-    int err = SSL_get_error(server_ssl, server_err);
+    int err = SSL_get_error(server_ssl.get(), server_err);
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
       continue;
     default:
       drainErrorQueue();
+      ENVOY_LOG_MISC(error, "err {} client_err {} server_err {}", err, client_err, server_err);
       PANIC("Unexpected error during handshake");
     }
-
-    ENVOY_LOG_MISC(error, "client_err {} server_err {}", client_err, server_err);
   }
 
   RELEASE_ASSERT(handshake_success, "handshake completed successfully");
@@ -110,7 +109,7 @@ static void testThroughput(benchmark::State& state) {
     state.PauseTiming();
 
     // Empty out the read side to make space for the writes.
-    while (SSL_read(server_ssl, read_buf, sizeof(read_buf)) > 0) {
+    while (SSL_read(server_ssl.get(), read_buf, sizeof(read_buf)) > 0) {
     }
 
     Buffer::OwnedImpl write_buf;
@@ -158,7 +157,7 @@ static void testThroughput(benchmark::State& state) {
         ++num_times_linearize_did_something;
       }
 
-      err = SSL_write(client_ssl, mem, len);
+      err = SSL_write(client_ssl.get(), mem, len);
       RELEASE_ASSERT(err == static_cast<int>(len),
                      absl::StrCat("SSL_write got: ", err, " expected: ", len));
       write_buf.drain(len);
