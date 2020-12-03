@@ -4,8 +4,6 @@ package envoy.extensions.common.tap.v4alpha;
 
 import "envoy/config/tap/v4alpha/common.proto";
 
-import "xds/core/v3/resource_locator.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";

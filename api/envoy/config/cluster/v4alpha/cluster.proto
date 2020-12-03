@@ -19,7 +19,6 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
-import "xds/core/v3/resource_locator.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
@@ -186,16 +185,10 @@ message Cluster {
     // Configuration for the source of EDS updates for this Cluster.
     core.v4alpha.ConfigSource eds_config = 1;
 
-    oneof name_specifier {
-      // Optional alternative to cluster name to present to EDS. This does not
-      // have the same restrictions as cluster name, i.e. it may be arbitrary
-      // length.
-      string service_name = 2;
-
-      // Resource locator for EDS. This is mutually exclusive to *service_name*.
-      // [#not-implemented-hide:]
-      xds.core.v3.ResourceLocator eds_resource_locator = 3;
-    }
+    // Optional alternative to cluster name to present to EDS. This does not
+    // have the same restrictions as cluster name, i.e. it may be arbitrary
+    // length. This may be a xdstp:// URL.
+    string service_name = 2;
   }
 
   // Optionally divide the endpoints in this cluster into subsets defined by
