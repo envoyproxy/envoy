@@ -52,7 +52,8 @@ public:
 class ConnPoolImplBaseTest : public testing::Test {
 public:
   ConnPoolImplBaseTest()
-      : pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_) {
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -80,6 +81,7 @@ public:
       new NiceMock<Upstream::MockHostDescription>()};
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   Upstream::HostSharedPtr host_{
       Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_.timeSource())};
   TestConnPoolImplBase pool_;

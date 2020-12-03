@@ -1154,10 +1154,10 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
 class MockDestructSchedulableCallback : public Event::MockSchedulableCallback {
 public:
   MockDestructSchedulableCallback(Event::MockDispatcher* dispatcher)
-      : Event::MockSchedulableCallback(dispatcher), destroyed_(false) {}
-  ~MockDestructSchedulableCallback() override { destroyed_ = true; }
+      : Event::MockSchedulableCallback(dispatcher) {}
+  MOCK_METHOD0(Die, void());
 
-  bool destroyed_{false};
+  ~MockDestructSchedulableCallback() override { Die(); }
 };
 
 // Connection pool for test that destructs all connections when destroyed.
@@ -1222,9 +1222,8 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   // Delete connection pool and check that scheduled callback onUpstreamReady was destroyed.
-  EXPECT_FALSE(upstream_ready_cb_->destroyed_);
+  EXPECT_CALL(*upstream_ready_cb_, Die());
   dispatcher_.clearDeferredDeleteList();
-  EXPECT_TRUE(upstream_ready_cb_->destroyed_);
 }
 
 } // namespace
