@@ -42,7 +42,7 @@ public:
   MOCK_METHOD(CdsApiPtr, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm));
 
-  const ClusterManagerStatNames& clusterManagerStatNames() const override {
+  const UpstreamStatNames& clusterManagerStatNames() const override {
     return cluster_stat_names_;
   }
   const Router::RouterStatNames& routerStatNames() const override { return router_stat_names_; }
@@ -50,7 +50,7 @@ public:
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   Stats::TestSymbolTable symbol_table_;
-  ClusterManagerStatNames cluster_stat_names_;
+  UpstreamStatNames cluster_stat_names_;
   Router::RouterStatNames router_stat_names_;
 };
 

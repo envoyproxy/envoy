@@ -78,7 +78,7 @@ public:
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const ClusterManagerStatNames& clusterManagerStatNames() const override {
+  const UpstreamStatNames& clusterManagerStatNames() const override {
     return cluster_stat_names_;
   }
   const Router::RouterStatNames& routerStatNames() const override { return router_stat_names_; }
@@ -99,7 +99,7 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
-  ClusterManagerStatNames cluster_stat_names_;
+  UpstreamStatNames cluster_stat_names_;
   Router::RouterStatNames router_stat_names_;
 };
 
@@ -198,7 +198,7 @@ private:
 /**
  * Struct definition for all cluster manager stats. @see stats_macros.h
  */
-MAKE_STATS_STRUCT(ClusterManagerStats, ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
+MAKE_STATS_STRUCT(UpstreamStats, UpstreamStatNames, ALL_CLUSTER_MANAGER_STATS);
 
 /**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
@@ -523,7 +523,7 @@ private:
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
-  static ClusterManagerStats generateStats(Stats::Scope& scope, ClusterManagerFactory& factory);
+  static UpstreamStats generateStats(Stats::Scope& scope, ClusterManagerFactory& factory);
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
@@ -556,7 +556,7 @@ private:
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
-  ClusterManagerStats cm_stats_;
+  UpstreamStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
   // Temporarily saved resume cds callback from updateClusterCounts invocation.

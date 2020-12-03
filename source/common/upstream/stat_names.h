@@ -20,7 +20,7 @@ namespace Upstream {
   GAUGE(warming_clusters, NeverImport)                                                             \
   STATNAME(cluster_manager)
 
-MAKE_STAT_NAMES_STRUCT(ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
+MAKE_STAT_NAMES_STRUCT(UpstreamStatNames, ALL_CLUSTER_MANAGER_STATS);
 
 } // namespace Upstream
 } // namespace Envoy
