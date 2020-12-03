@@ -29,7 +29,7 @@ public:
 
   virtual CodeStats& codeStats() PURE;
   virtual const UserAgentContext& userAgentContext() const PURE;
-  virtual Stats::StatName asyncClientStatPrefix() const PURE;
+  virtual const Stats::StatName& asyncClientStatPrefix() const PURE;
 };
 
 using ContextPtr = std::unique_ptr<Context>;

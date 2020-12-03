@@ -192,7 +192,7 @@ private:
 /**
  * Struct definition for all cluster manager stats. @see stats_macros.h
  */
-MAKE_STATS_STRUCT(UpstreamStats, UpstreamStatNames, ALL_CLUSTER_MANAGER_STATS);
+MAKE_STATS_STRUCT(UpstreamStats, UpstreamStatNames, ALL_UPSTREAM_STATS);
 
 /**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central

@@ -8,7 +8,7 @@ namespace Upstream {
 /**
  * All cluster manager stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_MANAGER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
+#define ALL_UPSTREAM_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                      \
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
   COUNTER(cluster_removed)                                                                         \
@@ -20,7 +20,7 @@ namespace Upstream {
   GAUGE(warming_clusters, NeverImport)                                                             \
   STATNAME(cluster_manager)
 
-MAKE_STAT_NAMES_STRUCT(UpstreamStatNames, ALL_CLUSTER_MANAGER_STATS);
+MAKE_STAT_NAMES_STRUCT(UpstreamStatNames, ALL_UPSTREAM_STATS);
 
 } // namespace Upstream
 } // namespace Envoy
