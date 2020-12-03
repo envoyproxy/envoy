@@ -5,7 +5,6 @@ Version history
 ================
 Changes
 -------
-* listener: fix crash when disabling or re-enabling listeners due to overload while processing LDS updates.
 * tls: fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the SSL connection's internal buffers.
 * udp: fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.
 
