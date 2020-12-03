@@ -146,34 +146,29 @@ protected:
     EXPECT_EQ("", std::string(response_headers.getContentLengthValue()));
   }
 
-  void TestMatch(const std::string& yaml,
-                 const std::string& original_body,
+  void TestMatch(const std::string& yaml, const std::string& original_body,
                  const std::string& expected_body) {
     TestMatchBase(yaml, original_body, expected_body, "500", "500", "", "text/plain");
   }
 
-  void TestMatchWithStatus(const std::string& yaml,
-                           const std::string& original_body,
-                           const std::string& expected_body,
-                           const std::string& original_status,
+  void TestMatchWithStatus(const std::string& yaml, const std::string& original_body,
+                           const std::string& expected_body, const std::string& original_status,
                            const std::string& expected_status) {
-    TestMatchBase(yaml, original_body, expected_body, original_status, expected_status, "", "text/plain");
+    TestMatchBase(yaml, original_body, expected_body, original_status, expected_status, "",
+                  "text/plain");
   }
 
-  void TestMatchWithContentType(const std::string& yaml,
-                                const std::string& original_body,
+  void TestMatchWithContentType(const std::string& yaml, const std::string& original_body,
                                 const std::string& expected_body,
                                 const std::string& original_content_type,
                                 const std::string& expected_content_type) {
-    TestMatchBase(yaml, original_body, expected_body, "500", "500", original_content_type, expected_content_type);
+    TestMatchBase(yaml, original_body, expected_body, "500", "500", original_content_type,
+                  expected_content_type);
   }
 
-  void TestMatchBase(const std::string& yaml,
-                     const std::string& original_body,
-                     const std::string& expected_body,
-                     const std::string& original_status,
-                     const std::string& expected_status,
-                     const std::string& original_content_type,
+  void TestMatchBase(const std::string& yaml, const std::string& original_body,
+                     const std::string& expected_body, const std::string& original_status,
+                     const std::string& expected_status, const std::string& original_content_type,
                      const std::string& expected_content_type) {
     SetUpTest(yaml);
 
@@ -286,14 +281,14 @@ TEST_F(ResponseMapFilterTest, MatchWithOriginalBodyReplaceEmpty) {
 // no original body upstream nor original content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlNoOriginalBodyNoContentType) {
   TestMatchWithContentType(response_map_500_html_yaml, "", "<html>response map: 500</html>", "",
-                       "text/html");
+                           "text/html");
 }
 
 // We should replace the original body and add a content-type if the matcher
 // matches and there is an original body upstream but no original content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlWithOriginalBodyNoContentType) {
   TestMatchWithContentType(response_map_500_html_yaml, "non-html 500 response generated upstream",
-                       "<html>response map: 500</html>", "", "text/html");
+                           "<html>response map: 500</html>", "", "text/html");
 }
 
 // We should replace the original body and the original content type if the
@@ -301,14 +296,14 @@ TEST_F(ResponseMapFilterTest, MatchHtmlWithOriginalBodyNoContentType) {
 // content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlNoOriginalBodyAndContentType) {
   TestMatchWithContentType(response_map_500_html_yaml, "", "<html>response map: 500</html>",
-                       "text/plain", "text/html");
+                           "text/plain", "text/html");
 }
 
 // We should replace the original body and the original content type if the
 // matcher matches and there is an original body and an original content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlWithOriginalBodyAndContentType) {
   TestMatchWithContentType(response_map_500_html_yaml, "non-html 500 response generated upstream",
-                       "<html>response map: 500</html>", "text/plain", "text/html");
+                           "<html>response map: 500</html>", "text/plain", "text/html");
 }
 
 // We should replace the original status if the matcher matches.

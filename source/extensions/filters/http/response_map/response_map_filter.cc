@@ -185,7 +185,7 @@ void ResponseMapFilter::doRewrite(void) {
   // We should either see no encoding buffer or an empty encoding buffer.
   //
   // We'll see no encoding buffer if the upstream response was never observed
-  // (ie: due to error) or if the upstream response was headers-only. Otherwise,
+  // (i.e.: due to error) or if the upstream response was headers-only. Otherwise,
   // if we did see a response, we should have drained any data we saw.
   ASSERT(encoding_buffer == nullptr || encoding_buffer->length() == 0);
 
@@ -219,7 +219,7 @@ void ResponseMapFilter::doRewrite(void) {
     // upstream responses (or responses never received by the upstream) can only be transformed
     // into responses with a body using this method. See `include/envoy/http/filter.h`.
     //
-    // We're not streaming back this rewritten body (ie: it's already formed in memory) so
+    // We're not streaming back this rewritten body (i.e.: it's already formed in memory) so
     // we pass streaming_filter = false.
     Buffer::OwnedImpl body{new_body};
     const bool streaming_filter = false;

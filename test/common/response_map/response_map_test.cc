@@ -134,7 +134,8 @@ TEST_F(ResponseMapTest, TestDefaultJsonFormatter) {
   TestUtility::loadFromYaml(yaml, config_);
   auto response_map = Factory::create(config_, context_, context_.messageValidationVisitor());
 
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(response_headers_.Status()->value().getStringView(),
@@ -194,7 +195,8 @@ TEST_F(ResponseMapTest, TestMapperRewrite) {
 
   // code=400 matches the first filter; rewrite code and body
   resetData(400);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
   EXPECT_EQ(stream_info_.response_code_, 401U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "401");
@@ -203,7 +205,8 @@ TEST_F(ResponseMapTest, TestMapperRewrite) {
 
   // code=410 matches the second filter; rewrite body only
   resetData(410);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(410));
   EXPECT_EQ(stream_info_.response_code_, 410U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "410");
@@ -212,7 +215,8 @@ TEST_F(ResponseMapTest, TestMapperRewrite) {
 
   // code=420 matches the third filter; rewrite code only
   resetData(420);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
   EXPECT_EQ(stream_info_.response_code_, 421U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "421");
@@ -221,7 +225,8 @@ TEST_F(ResponseMapTest, TestMapperRewrite) {
 
   // code=430 matches the fourth filter; rewrite nothing
   resetData(430);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(430));
   EXPECT_EQ(stream_info_.response_code_, 430U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "430");
@@ -268,7 +273,8 @@ TEST_F(ResponseMapTest, TestMapperFormat) {
   // code=400 matches the first filter; rewrite code and body
   // has its own formatter
   resetData(400);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
   EXPECT_EQ(stream_info_.response_code_, 401U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "401");
@@ -285,7 +291,8 @@ TEST_F(ResponseMapTest, TestMapperFormat) {
   // code=410 matches the second filter; rewrite code and body
   // but using default formatter
   resetData(410);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
   EXPECT_EQ(stream_info_.response_code_, 411U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "411");
@@ -386,7 +393,8 @@ TEST_F(ResponseMapTest, TestMapperWithContentType) {
   // has its own formatter.
   // content-type is explicitly set to text/html; charset=UTF-8.
   resetData(400);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
   EXPECT_EQ(stream_info_.response_code_, 401U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "401");
@@ -397,7 +405,8 @@ TEST_F(ResponseMapTest, TestMapperWithContentType) {
   // but using default formatter.
   // content-type is explicitly set to text/html; charset=UTF-8.
   resetData(410);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
   EXPECT_EQ(stream_info_.response_code_, 411U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "411");
@@ -408,7 +417,8 @@ TEST_F(ResponseMapTest, TestMapperWithContentType) {
   // has its own formatter.
   // default content-type is set based on reply format type.
   resetData(420);
-  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  response_map->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_,
+                        content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
   EXPECT_EQ(stream_info_.response_code_, 421U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "421");
