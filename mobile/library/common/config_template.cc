@@ -17,6 +17,7 @@ static_resources:
         protocol: TCP
         address: 0.0.0.0
         port_value: 10000
+    per_connection_buffer_limit_bytes: 10485760 # 10MB
     api_listener:
       api_listener:
         "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
