@@ -40,6 +40,7 @@ build_args() {
   printf ' -f ci/Dockerfile-envoy%s' "${FILE_SUFFIX}"
   if [[ "${TYPE}" == *-debug ]]; then
       printf ' --build-arg ENVOY_BINARY_SUFFIX='
+      printf ' --build-arg BUILD_TYPE=debug'
   elif [[ "${TYPE}" == "-google-vrp" ]]; then
       printf ' --build-arg ENVOY_VRP_BASE_IMAGE=%s' "${VRP_BASE_IMAGE}"
   fi
@@ -118,9 +119,8 @@ fi
 # This prefix is altered for the private security images on setec builds.
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
-
 if is_windows; then
-  BUILD_TYPES=("-windows")
+  BUILD_TYPES=("-windows" "-windows-debug")
   # BuildKit is not available for Windows images, use standard build command
   BUILD_COMMAND=("build")
 else

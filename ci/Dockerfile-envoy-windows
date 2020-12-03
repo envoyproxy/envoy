@@ -3,9 +3,12 @@ ARG BUILD_TAG=ltsc2019
 
 FROM $BUILD_OS:$BUILD_TAG
 
+ARG BUILD_TYPE=release
+
 RUN mkdir "C:\\Program\ Files\\envoy"
 RUN setx path "%path%;c:\Program Files\envoy"
-ADD ["windows/amd64/envoy.exe", "C:/Program Files/envoy/"]
+ADD ["windows/amd64/envoy.*", "C:/Program Files/envoy/"]
+RUN if "%BUILD_TYPE%" == "release" del "C:\Program Files\envoy\envoy.pdb"
 
 RUN mkdir "C:\\ProgramData\\envoy"
 ADD ["configs/envoyproxy_io_proxy.yaml", "C:/ProgramData/envoy/envoy.yaml"]
