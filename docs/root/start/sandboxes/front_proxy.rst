@@ -1,37 +1,27 @@
 .. _install_sandboxes_front_proxy:
 
-Front Proxy
+前端代理
 ===========
 
-To get a flavor of what Envoy has to offer as a front proxy, we are releasing a `docker compose <https://docs.docker.com/compose/>`_
-sandbox that deploys a front Envoy and a couple of services (simple Flask apps) colocated with a
-running service Envoy. The three containers will be deployed inside a virtual network called
-``envoymesh``.
+为了帮助大家了解如何使用 Envoy 作为前端代理，我们发布了一个 `docker compose <https://docs.docker.com/compose/>`_ 沙盒，该沙盒中部署了一个前端 Envoy 和几个后端服务，每个后端由 Envoy 和应用（简单的 Flask 应用）合并部署在一起组成。这三个容器将被部署在名为 ``envoymesh`` 的虚拟网络中。
 
-Below you can see a graphic showing the docker compose deployment:
+下面是使用 docker compose 部署的架构图：
 
 .. image:: /_static/docker_compose_front_proxy.svg
   :width: 100%
 
-All incoming requests are routed via the front Envoy, which is acting as a reverse proxy sitting on
-the edge of the ``envoymesh`` network. Port ``8080``, ``8443``, and ``8001`` are exposed by docker
-compose (see :repo:`/examples/front-proxy/docker-compose.yaml`) to handle ``HTTP``, ``HTTPS`` calls
-to the services and requests to ``/admin`` respectively.
+所有的入向请求都通过前端 Envoy 进行路由，该 Envoy 相当于 ``envoymesh`` 网络边缘的反向代理。docker compose（参阅：:repo:`/examples/front-proxy/docker-compose.yaml`）暴露了 ``8080``，``8443`` 端口来接受 ``HTTP``，``HTTPS`` 请求，并根据路径分别将它们路由到对应的服务上，以及通过 ``8001`` 端口来接受 Envoy 自带的 ``admin`` 服务。
 
-Moreover, notice that all traffic routed by the front Envoy to the service containers is actually
-routed to the service Envoys (routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`).
+此外请注意，所有流量实际上从前端 Envoy 路由到服务容器的 Envoy 上（参阅 :repo:`/examples/front-proxy/front-envoy.yaml` 中的路由设置）。
 
-In turn the service Envoys route the request to the Flask app via the loopback
-address (routes setup in :repo:`/examples/front-proxy/service-envoy.yaml`). This
-setup illustrates the advantage of running service Envoys collocated with your services: all
-requests are handled by the service Envoy, and efficiently routed to your services.
+然后，Envoy 通过 loopback 地址（参阅 :repo:`/examples/front-proxy/service-envoy.yaml` 中的路由设置）将请求路由到 Flask 应用程序。这种设置演示了将 Envoy 与你的服务合并部署的优势：所有请求都由 Envoy 处理，并有效地路由到你的服务。
 
-Running the Sandbox
+运行沙盒
 ~~~~~~~~~~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Start all of our containers
+步骤 3：启动所有容器
 ***********************************
 
 .. code-block:: console
@@ -48,12 +38,12 @@ Step 3: Start all of our containers
     front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
-Step 4: Test Envoy's routing capabilities
+步骤 4：测试 Envoy 的路由能力
 *****************************************
 
-You can now send a request to both services via the ``front-envoy``.
+你现在可以通过 ``front-envoy`` 向两个服务发送请求。
 
-For ``service1``:
+向 ``service1`` 发请求：
 
 .. code-block:: console
 
@@ -75,7 +65,7 @@ For ``service1``:
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-For ``service2``:
+向 ``service2`` 发请求：
 
 .. code-block:: console
 
@@ -97,10 +87,9 @@ For ``service2``:
     <
     Hello from behind Envoy (service 2)! hostname: ea6165ee4fee resolvedhostname: 192.168.160.2
 
-Notice that each request, while sent to the front Envoy, was correctly routed to the respective
-application.
+能看到，每个请求在发送给前端 Envoy 后被正确路由到相应的应用程序。
 
-We can also use ``HTTPS`` to call services behind the front Envoy. For example, calling ``service1``:
+我们也可以通过 ``HTTPS`` 请求前端 Envoy 后的服务。例如，向 ``service1``：
 
 .. code-block:: console
 
@@ -145,10 +134,10 @@ We can also use ``HTTPS`` to call services behind the front Envoy. For example, 
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-Step 5: Test Envoy's load balancing capabilities
+步骤 5：测试 Envoy 的负载均衡能力
 ************************************************
 
-Now let's scale up our ``service1`` nodes to demonstrate the load balancing abilities of Envoy:
+现在增加 ``service1`` 的节点数量来演示 Envoy 的负载均衡能力：
 
 .. code-block:: console
 
@@ -156,8 +145,7 @@ Now let's scale up our ``service1`` nodes to demonstrate the load balancing abil
     Creating and starting example_service1_2 ... done
     Creating and starting example_service1_3 ... done
 
-Now if we send a request to ``service1`` multiple times, the front Envoy will load balance the
-requests by doing a round robin of the three ``service1`` machines:
+现在，如果我们多次向 ``service1`` 发送请求，前端 Envoy 将通过 round-robin 轮询三台 ``service1`` 机器来实现负载均衡：
 
 .. code-block:: console
 
@@ -214,13 +202,10 @@ requests by doing a round robin of the three ``service1`` machines:
     <
     Hello from behind Envoy (service 1)! hostname: 36418bc3c824 resolvedhostname: 192.168.160.4
 
-Step 6: enter containers and curl services
+步骤 6：进入容器并 curl 服务
 ******************************************
 
-In addition of using ``curl`` from your host machine, you can also enter the
-containers themselves and ``curl`` from inside them. To enter a container you
-can use ``docker-compose exec <container_name> /bin/bash``. For example we can
-enter the ``front-envoy`` container, and ``curl`` for services locally:
+除了使用主机上的 ``curl`` 外，你还可以进入容器并从容器里面 ``curl``。要进入容器，可以使用 ``docker-compose exec <container_name> /bin/bash`` 命令。例如，我们可以进入 ``front-envoy`` 容器，并在本地 ``curl`` 服务：
 
 .. code-block:: console
 
@@ -234,19 +219,19 @@ enter the ``front-envoy`` container, and ``curl`` for services locally:
     root@81288499f9d7:/# curl localhost:8080/service/2
     Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
 
-Step 7: enter container and curl admin
+步骤7：进入容器并 curl admin
 **************************************
 
-When Envoy runs it also attaches an ``admin`` to your desired port.
+当 Envoy 启动时，也会同时启动一个 ``admin`` 服务并绑定指定的端口。
 
-In the example configs the admin is bound to port ``8001``.
+在示例配置中 ``admin`` 绑定到了 ``8001`` 端口。
 
-We can ``curl`` it to gain useful information:
+我们可以通过 ``curl`` 它获得有用的信息：
 
-- ``/server_info`` provides information about the Envoy version you are running.
-- ``/stats`` provides statistics about the  Envoy server.
+- ``/server_info`` 提供正在运行的 Envoy 版本的信息。
+- ``/stats`` 提供 Envoy 服务相关的统计数据。
 
-In the example we can we can enter the ``front-envoy`` container to query admin:
+在下面的例子里，我们进入 ``front-envoy`` 容器并查询 ``admin`` 服务：
 
 .. code-block:: console
 
@@ -319,5 +304,4 @@ In the example we can we can enter the ``front-envoy`` container to query admin:
     cluster.service2.upstream_rq_total: 2
     ...
 
-Notice that we can get the number of members of upstream clusters, number of requests fulfilled by
-them, information about http ingress, and a plethora of other useful stats.
+能看到，我们可以获取上游集群的成员数量，它们完成的请求数量，有关 http 入口的信息以及大量其他有用的统计数据。
