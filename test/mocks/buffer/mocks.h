@@ -79,7 +79,7 @@ public:
                              std::function<void()> above_overflow) override {
     // Only create mock output buffers. Creation of other buffer types via this factory is too
     // disruptive to tests.
-    if (buffer_type == Buffer::BufferType::Output) {
+    if (buffer_type == Buffer::BufferType::ConnectionOutput) {
       auto buffer = Buffer::InstancePtr{createOutputBuffer_(below_low, above_high, above_overflow)};
       ASSERT(buffer != nullptr);
       return buffer;

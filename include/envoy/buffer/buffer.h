@@ -416,17 +416,19 @@ public:
 
 using InstancePtr = std::unique_ptr<Instance>;
 
-// Informational enum that hints at the buffer's intended use.
+// Informational enum that hints at the buffer's intended use. The first use case for this
+// information is to track the size of each buffer type in tests. Future uses may include stats to
+// monitor buffer usage by type or new overload manager hooks.
 enum class BufferType {
   // Per-connection input buffer used to read directly from an IoHandle.
-  Read,
+  ConnectionInput,
   // Per-connection output buffer used to write directly to an IoHandle.
-  Output,
+  ConnectionOutput,
   // Per-stream HTTP output buffer. In the case of HTTP2 and HTTP3/QUIC, this buffer participates in
   // per-stream flow control.
   HttpStreamOutput,
-  // Internal buffers used for internally by filters or other components of the IO pipeline.
-  Internal,
+  // Other buffers, including those used internally by filters and components of the IO pipeline.
+  Other,
 };
 
 /**
@@ -438,6 +440,7 @@ public:
 
   /**
    * Creates and returns a unique pointer to a new buffer.
+   * @param buffer_type supplies a hint about the intended use of the buffer.
    * @param below_low_watermark supplies a function to call if the buffer goes under a configured
    *   low watermark.
    * @param above_high_watermark supplies a function to call if the buffer goes over a configured

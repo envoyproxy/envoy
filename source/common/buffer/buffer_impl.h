@@ -592,6 +592,8 @@ public:
   virtual void appendSliceForTest(absl::string_view data);
 
   // Does not implement watermarking.
+  // TODO(antoniovicente) Implement watermarks by merging the OwnedImpl and WatermarkBuffer
+  // implementations. Also, make high-watermark config a constructor argument.
   void setWatermarks(uint32_t) override { ASSERT(false, "watermarks not implemented."); }
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
