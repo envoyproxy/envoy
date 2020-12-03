@@ -66,8 +66,8 @@ public:
                       ReadCallback response_data_callback, Network::Address::IpVersion version,
                       Network::TransportSocketPtr transport_socket);
   // Similar to the constructor above but accepts the request as a constructor argument.
-  RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
-                      ReadCallback data_callback, Network::Address::IpVersion version);
+  RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
+                      Network::Address::IpVersion version);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
   bool connecting() { return callbacks_->connecting_; }

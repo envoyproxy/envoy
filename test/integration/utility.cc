@@ -118,7 +118,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
   dispatcher_ = api_->allocateDispatcher();
-  callbacks_ = std::make_unique<ConnectionCallbacks>([](){});
+  callbacks_ = std::make_unique<ConnectionCallbacks>([]() {});
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
@@ -148,7 +148,8 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_->setBufferLimits(1);
 
   client_->addConnectionCallbacks(*callbacks_);
-  client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, response_data_callback)});
+  client_->addReadFilter(
+      Network::ReadFilterSharedPtr{new ForwardingFilter(*this, response_data_callback)});
   client_->connect();
 }
 
