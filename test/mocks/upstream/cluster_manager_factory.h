@@ -42,12 +42,14 @@ public:
   MOCK_METHOD(CdsApiPtr, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm));
 
-  const UpstreamStatNames& upstreamStatNames() const override { return upstream_stat_names_; }
+  const ClusterManagerStatNames& clusterManagerStatNames() const override {
+    return cluster_manager_stat_names;
+  }
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   Stats::TestSymbolTable symbol_table_;
-  UpstreamStatNames upstream_stat_names_;
+  ClusterManagerStatNames cluster_manager_stat_names;
 };
 
 } // namespace Upstream

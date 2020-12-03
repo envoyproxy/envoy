@@ -436,11 +436,11 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   }
 }
 
-UpstreamStats ClusterManagerImpl::generateStats(Stats::Scope& scope,
-                                                ClusterManagerFactory& factory) {
-  const UpstreamStatNames& cluster_manager_stat_names = factory.upstreamStatNames();
-  return UpstreamStats(cluster_manager_stat_names, scope,
-                       cluster_manager_stat_names.cluster_manager_);
+ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope,
+                                                      ClusterManagerFactory& factory) {
+  const ClusterManagerStatNames& cluster_manager_stat_names = factory.clusterManagerStatNames();
+  return ClusterManagerStats(cluster_manager_stat_names, scope,
+                             cluster_manager_stat_names.cluster_manager_);
 }
 
 void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {

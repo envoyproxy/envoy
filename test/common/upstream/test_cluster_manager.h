@@ -115,7 +115,7 @@ public:
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const UpstreamStatNames& upstreamStatNames() const override {
+  const ClusterManagerStatNames& clusterManagerStatNames() const override {
     return cluster_manager_stat_names_;
   }
 
@@ -146,7 +146,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
-  UpstreamStatNames cluster_manager_stat_names_;
+  ClusterManagerStatNames cluster_manager_stat_names_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

@@ -55,7 +55,7 @@ public:
         router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
         dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), upstream_stat_names_(stats.symbolTable()) {}
+        singleton_manager_(singleton_manager), cluster_manager_stat_names(stats.symbolTable()) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -78,7 +78,9 @@ public:
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const UpstreamStatNames& upstreamStatNames() const override { return upstream_stat_names_; }
+  const ClusterManagerStatNames& clusterManagerStatNames() const override {
+    return cluster_manager_stat_names;
+  }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
@@ -97,7 +99,7 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
-  UpstreamStatNames upstream_stat_names_;
+  ClusterManagerStatNames cluster_manager_stat_names;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -195,7 +197,7 @@ private:
 /**
  * Struct definition for all cluster manager stats. @see stats_macros.h
  */
-MAKE_STATS_STRUCT(UpstreamStats, UpstreamStatNames, ALL_UPSTREAM_STATS);
+MAKE_STATS_STRUCT(ClusterManagerStats, ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
 
 /**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
@@ -523,7 +525,7 @@ private:
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
-  static UpstreamStats generateStats(Stats::Scope& scope, ClusterManagerFactory& factory);
+  static ClusterManagerStats generateStats(Stats::Scope& scope, ClusterManagerFactory& factory);
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
@@ -556,7 +558,7 @@ private:
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
-  UpstreamStats cm_stats_;
+  ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
   // Temporarily saved resume cds callback from updateClusterCounts invocation.

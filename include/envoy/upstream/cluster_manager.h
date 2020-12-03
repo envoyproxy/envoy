@@ -365,7 +365,7 @@ public:
 
 using CdsApiPtr = std::unique_ptr<CdsApi>;
 
-struct UpstreamStatNames;
+struct ClusterManagerStatNames;
 
 /**
  * Factory for objects needed during cluster manager operation.
@@ -428,7 +428,7 @@ public:
    *
    * @return the stat names.
    */
-  virtual const UpstreamStatNames& upstreamStatNames() const PURE;
+  virtual const ClusterManagerStatNames& clusterManagerStatNames() const PURE;
 };
 
 /**
