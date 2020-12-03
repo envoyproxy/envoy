@@ -134,6 +134,8 @@ if __name__ == "__main__":
       ssl_context = ssl.create_default_context()
       ssl_context.check_hostname = False
       ssl_context.verify_mode = ssl.CERT_NONE
+      # Due to a weird interaction between `websocket-client` and Slack client
+      # we need to set the ssl context. See `slackapi/python-slack-sdk/issues/334`
       client = slack.WebClient(token=SLACKTOKEN, ssl=ssl_context)
       client.chat_postMessage(channel='test-flaky', text=output_msg, as_user="true")
     else:
