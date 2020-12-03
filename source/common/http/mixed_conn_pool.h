@@ -21,6 +21,7 @@ public:
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
 
   void onConnected(Envoy::ConnectionPool::ActiveClient& client) override;
+  Http::Protocol protocol() { return protocol_; }
 
 private:
   bool connected_{};

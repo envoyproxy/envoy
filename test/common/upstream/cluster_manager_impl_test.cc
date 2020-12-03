@@ -187,8 +187,12 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
     - name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
-      http_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          alpn_config:
+            http2_protocol_options: {}
+            http_protocol_options: {}
       transport_socket:
         name: envoy.transport_sockets.alpn
   )EOF";
