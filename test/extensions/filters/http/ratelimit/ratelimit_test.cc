@@ -585,8 +585,6 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
 }
 
-// New tests!
-
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithBody) {
   SetUpTest(filter_config_);
   InSequence s;
@@ -717,8 +715,6 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithBodyAndContentType) {
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
 }
-
-// End of new tests
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithFilterHeaders) {
   SetUpTest(enable_x_ratelimit_headers_config_);
