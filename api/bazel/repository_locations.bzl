@@ -48,13 +48,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Google APIs",
         project_desc = "Public interface definitions of Google APIs",
         project_url = "https://github.com/googleapis/googleapis",
-        version = "ebdbe9ab534486cf900700add1e129dff780b481",
-        sha256 = "f6061447efa0811e45b4de925f70093180f7cb47c22cb02900b8d91cd1d01493",
+        version = "82944da21578a53b74e547774cf62ed31a05b841",
+        sha256 = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405",
         strip_prefix = "googleapis-{version}",
         urls = ["https://github.com/googleapis/googleapis/archive/{version}.tar.gz"],
-        release_date = "2020-11-24",
+        release_date = "2019-12-02",
         use_category = ["api"],
     ),
+
     opencensus_proto = dict(
         project_name = "OpenCensus Proto",
         project_desc = "Language Independent Interface Types For OpenCensus",
