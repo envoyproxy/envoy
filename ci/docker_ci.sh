@@ -69,6 +69,10 @@ build_images() {
   read -ra args <<< "$_args"
   PLATFORM="$(build_platforms "${TYPE}")"
 
+  echo "BUILD IMAGE"
+  echo "docker ${BUILD_COMMAND[@]} --platform ${PLATFORM} ${args[@]} -t ${BUILD_TAG}" .
+  docker images
+  echo
   docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" .
 
   PLATFORM="$(build_platforms "${TYPE}" | tr ',' ' ')"
