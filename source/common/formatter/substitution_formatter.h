@@ -112,17 +112,17 @@ private:
  * can be converted easily into multiple formats.
  */
 class StructFormatter {
-  public:
+public:
   StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                    bool omit_empty_values)
+                  bool omit_empty_values)
       : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
         struct_output_format_(toFormatMap(format_mapping)) {}
 
   ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info,
-                     absl::string_view local_reply_body) const;
+                             const Http::ResponseHeaderMap& response_headers,
+                             const Http::ResponseTrailerMap& response_trailers,
+                             const StreamInfo::StreamInfo& stream_info,
+                             absl::string_view local_reply_body) const;
 
 private:
   struct StructFormatMapWrapper;
@@ -146,7 +146,7 @@ class JsonFormatterImpl : public Formatter {
 public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                     bool omit_empty_values)
-      : struct_formatter_(StructFormatter(format_mapping, preserve_types, omit_empty_values)) {}
+      : struct_formatter_(format_mapping, preserve_types, omit_empty_values) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,

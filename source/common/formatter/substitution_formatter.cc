@@ -135,8 +135,8 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       absl::string_view local_reply_body) const {
-  const auto output_struct =
-      struct_formatter_.format(request_headers, response_headers, response_trailers, stream_info, local_reply_body);
+  const auto output_struct = struct_formatter_.format(
+      request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
   const std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
@@ -154,18 +154,18 @@ StructFormatter::toFormatMap(const ProtobufWkt::Struct& struct_format) const {
       output->emplace(pair.first, toFormatMap(pair.second.struct_value()));
       break;
     default:
-      throw EnvoyException(
-          "Only string values or nested structs are supported in the Struct/JSON access log format.");
+      throw EnvoyException("Only string values or nested structs are supported in the Struct/JSON "
+                           "access log format.");
     }
   }
   return {std::move(output)};
 };
 
 ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& request_headers,
-                                                const Http::ResponseHeaderMap& response_headers,
-                                                const Http::ResponseTrailerMap& response_trailers,
-                                                const StreamInfo::StreamInfo& stream_info,
-                                                absl::string_view local_reply_body) const {
+                                            const Http::ResponseHeaderMap& response_headers,
+                                            const Http::ResponseTrailerMap& response_trailers,
+                                            const StreamInfo::StreamInfo& stream_info,
+                                            absl::string_view local_reply_body) const {
   const std::string& empty_value =
       omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
   const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
