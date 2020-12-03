@@ -226,7 +226,7 @@ TEST_F(RdsImplTest, Basic) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
   // Make sure we don't lookup/verify clusters.
-  EXPECT_CALL(server_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
+  EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
   rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -487,6 +487,7 @@ virtual_hosts:
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   // Only static route.
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_,

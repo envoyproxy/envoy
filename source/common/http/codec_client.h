@@ -127,6 +127,7 @@ public:
 
   Type type() const { return type_; }
 
+  // Note this is the L4 stream info, not L7.
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
 protected:

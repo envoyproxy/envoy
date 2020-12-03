@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "extensions/filters/network/thrift_proxy/config.h"
 #include "extensions/filters/network/thrift_proxy/router/config.h"
 #include "extensions/filters/network/thrift_proxy/router/router_impl.h"
 
@@ -22,6 +23,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
+using testing::Combine;
 using testing::ContainsRegex;
 using testing::Eq;
 using testing::Invoke;
@@ -29,6 +32,7 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -79,7 +83,9 @@ public:
           }
           return protocol_;
         }),
-        transport_register_(transport_factory_), protocol_register_(protocol_factory_) {}
+        transport_register_(transport_factory_), protocol_register_(protocol_factory_) {
+    context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  }
 
   void initializeRouter() {
     route_ = new NiceMock<MockRoute>();
@@ -102,7 +108,9 @@ public:
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
-                    const bool strip_service_name = false) {
+                    const bool strip_service_name = false,
+                    const TransportType transport_type = TransportType::Framed,
+                    const ProtocolType protocol_type = ProtocolType::Binary) {
     EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
@@ -115,8 +123,12 @@ public:
 
     initializeMetadata(msg_type, method);
 
-    EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
-    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
+    EXPECT_CALL(callbacks_, downstreamTransportType())
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(transport_type));
+    EXPECT_CALL(callbacks_, downstreamProtocolType())
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(protocol_type));
     EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
@@ -184,8 +196,12 @@ public:
     EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
     EXPECT_EQ(nullptr, router_->downstreamHeaders());
 
-    EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
-    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
+    EXPECT_CALL(callbacks_, downstreamTransportType())
+        .Times(2)
+        .WillRepeatedly(Return(TransportType::Framed));
+    EXPECT_CALL(callbacks_, downstreamProtocolType())
+        .Times(2)
+        .WillRepeatedly(Return(ProtocolType::Binary));
 
     mock_protocol_cb_ = [&](MockProtocol* protocol) -> void {
       ON_CALL(*protocol, type()).WillByDefault(Return(ProtocolType::Binary));
@@ -355,6 +371,37 @@ INSTANTIATE_TEST_SUITE_P(ContainerFieldTypes, ThriftRouterContainerTest,
                          Values(FieldType::Map, FieldType::List, FieldType::Set),
                          fieldTypeParamToString);
 
+class ThriftRouterPassthroughTest
+    : public testing::TestWithParam<
+          std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>>,
+      public ThriftRouterTestBase {
+public:
+};
+
+static std::string downstreamUpstreamTypesToString(
+    const TestParamInfo<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>>&
+        params) {
+  TransportType downstream_transport_type;
+  ProtocolType downstream_protocol_type;
+  TransportType upstream_transport_type;
+  ProtocolType upstream_protocol_type;
+
+  std::tie(downstream_transport_type, downstream_protocol_type, upstream_transport_type,
+           upstream_protocol_type) = params.param;
+
+  return fmt::format("{}{}{}{}", TransportNames::get().fromType(downstream_transport_type),
+                     ProtocolNames::get().fromType(downstream_protocol_type),
+                     TransportNames::get().fromType(upstream_transport_type),
+                     ProtocolNames::get().fromType(upstream_protocol_type));
+}
+
+INSTANTIATE_TEST_SUITE_P(DownstreamUpstreamTypes, ThriftRouterPassthroughTest,
+                         Combine(Values(TransportType::Framed, TransportType::Unframed),
+                                 Values(ProtocolType::Binary, ProtocolType::Twitter),
+                                 Values(TransportType::Framed, TransportType::Unframed),
+                                 Values(ProtocolType::Binary, ProtocolType::Twitter)),
+                         downstreamUpstreamTypesToString);
+
 TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
   initializeRouter();
 
@@ -446,7 +493,8 @@ TEST_F(ThriftRouterTest, NoCluster) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_, get(Eq(cluster_name_))).WillOnce(Return(nullptr));
+  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq(cluster_name_)))
+      .WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
@@ -947,6 +995,55 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
 
   completeRequest();
   destroyRouter();
+}
+
+TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
+  TransportType downstream_transport_type;
+  ProtocolType downstream_protocol_type;
+  TransportType upstream_transport_type;
+  ProtocolType upstream_protocol_type;
+
+  std::tie(downstream_transport_type, downstream_protocol_type, upstream_transport_type,
+           upstream_protocol_type) = GetParam();
+
+  const std::string yaml_string = R"EOF(
+  transport: {}
+  protocol: {}
+  )EOF";
+
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions configuration;
+  TestUtility::loadFromYaml(fmt::format(yaml_string,
+                                        TransportNames::get().fromType(upstream_transport_type),
+                                        ProtocolNames::get().fromType(upstream_protocol_type)),
+                            configuration);
+
+  const auto protocol_option = std::make_shared<ProtocolOptionsConfigImpl>(configuration);
+  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+              extensionProtocolOptions(_))
+      .WillRepeatedly(Return(protocol_option));
+
+  initializeRouter();
+  startRequest(MessageType::Call, "method", false, downstream_transport_type,
+               downstream_protocol_type);
+
+  bool passthroughSupported = false;
+  if (downstream_transport_type == upstream_transport_type &&
+      downstream_transport_type == TransportType::Framed &&
+      downstream_protocol_type == upstream_protocol_type &&
+      downstream_protocol_type != ProtocolType::Twitter) {
+    passthroughSupported = true;
+  }
+  ASSERT_EQ(passthroughSupported, router_->passthroughSupported());
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
+      }));
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 } // namespace Router

@@ -41,7 +41,7 @@ SquashFilterConfig::SquashFilterConfig(
           PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_poll_period, 1000)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, request_timeout, 1000)) {
 
-  if (!cluster_manager.get(cluster_name_)) {
+  if (!cluster_manager.clusters().hasCluster(cluster_name_)) {
     throw EnvoyException(
         fmt::format("squash filter: unknown cluster '{}' in squash config", cluster_name_));
   }
