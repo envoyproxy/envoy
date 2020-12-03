@@ -64,6 +64,26 @@ response_map:
       text_format: ''
 )EOF";
 
+const std::string& response_map_404_to_403_yaml = R"EOF(
+response_map:
+  mappers:
+  - filter:
+      status_code_filter:
+        comparison:
+          op: EQ
+          value:
+            default_value: 404
+            runtime_key: _ignored
+    status_code: 403
+    headers_to_add:
+      - header:
+          key: x-denied
+          value: '1'
+        append: false
+    body_format_override:
+      text_format: 'denied'
+)EOF";
+
 class ResponseMapFilterTest : public testing::Test {
 public:
   ResponseMapFilterTest() {}
@@ -126,15 +146,35 @@ protected:
     EXPECT_EQ("", std::string(response_headers.getContentLengthValue()));
   }
 
-  void TestMatch(const std::string& yaml, const std::string& original_body,
+  void TestMatch(const std::string& yaml,
+                 const std::string& original_body,
                  const std::string& expected_body) {
-    TestMatchContentType(yaml, original_body, expected_body, "", "text/plain");
+    TestMatchBase(yaml, original_body, expected_body, "500", "500", "", "text/plain");
   }
 
-  void TestMatchContentType(const std::string& yaml, const std::string& original_body,
-                            const std::string& expected_body,
-                            const std::string& original_content_type,
-                            const std::string& expected_content_type) {
+  void TestMatchWithStatus(const std::string& yaml,
+                           const std::string& original_body,
+                           const std::string& expected_body,
+                           const std::string& original_status,
+                           const std::string& expected_status) {
+    TestMatchBase(yaml, original_body, expected_body, original_status, expected_status, "", "text/plain");
+  }
+
+  void TestMatchWithContentType(const std::string& yaml,
+                                const std::string& original_body,
+                                const std::string& expected_body,
+                                const std::string& original_content_type,
+                                const std::string& expected_content_type) {
+    TestMatchBase(yaml, original_body, expected_body, "500", "500", original_content_type, expected_content_type);
+  }
+
+  void TestMatchBase(const std::string& yaml,
+                     const std::string& original_body,
+                     const std::string& expected_body,
+                     const std::string& original_status,
+                     const std::string& expected_status,
+                     const std::string& original_content_type,
+                     const std::string& expected_content_type) {
     SetUpTest(yaml);
 
     // Decode headers with end_stream=true. We always continue iteration during decoding.
@@ -164,7 +204,7 @@ protected:
     }
 
     // Encode response headers with a status that matches the mapper.
-    Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", original_status}};
     if (!original_content_type.empty()) {
       response_headers.addCopy("content-type", original_content_type);
     }
@@ -201,6 +241,7 @@ protected:
     EXPECT_EQ(true, DoRewrite());
     EXPECT_EQ(expected_body, buffer_->toString());
     EXPECT_EQ(expected_content_type, std::string(response_headers.getContentTypeValue()));
+    EXPECT_EQ(expected_status, std::string(response_headers.getStatusValue()));
     EXPECT_EQ(std::to_string(buffer_->length()),
               std::string(response_headers.getContentLengthValue()));
   }
@@ -244,14 +285,14 @@ TEST_F(ResponseMapFilterTest, MatchWithOriginalBodyReplaceEmpty) {
 // We should add a new body and content-type if the matcher matches and there is
 // no original body upstream nor original content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlNoOriginalBodyNoContentType) {
-  TestMatchContentType(response_map_500_html_yaml, "", "<html>response map: 500</html>", "",
+  TestMatchWithContentType(response_map_500_html_yaml, "", "<html>response map: 500</html>", "",
                        "text/html");
 }
 
 // We should replace the original body and add a content-type if the matcher
 // matches and there is an original body upstream but no original content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlWithOriginalBodyNoContentType) {
-  TestMatchContentType(response_map_500_html_yaml, "non-html 500 response generated upstream",
+  TestMatchWithContentType(response_map_500_html_yaml, "non-html 500 response generated upstream",
                        "<html>response map: 500</html>", "", "text/html");
 }
 
@@ -259,15 +300,21 @@ TEST_F(ResponseMapFilterTest, MatchHtmlWithOriginalBodyNoContentType) {
 // matcher matches and there is no original body but there is an original
 // content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlNoOriginalBodyAndContentType) {
-  TestMatchContentType(response_map_500_html_yaml, "", "<html>response map: 500</html>",
+  TestMatchWithContentType(response_map_500_html_yaml, "", "<html>response map: 500</html>",
                        "text/plain", "text/html");
 }
 
 // We should replace the original body and the original content type if the
 // matcher matches and there is an original body and an original content type.
 TEST_F(ResponseMapFilterTest, MatchHtmlWithOriginalBodyAndContentType) {
-  TestMatchContentType(response_map_500_html_yaml, "non-html 500 response generated upstream",
+  TestMatchWithContentType(response_map_500_html_yaml, "non-html 500 response generated upstream",
                        "<html>response map: 500</html>", "text/plain", "text/html");
+}
+
+// We should replace the original status if the matcher matches.
+TEST_F(ResponseMapFilterTest, MatchRewriteStatus) {
+  TestMatchWithStatus(response_map_404_to_403_yaml, "file not found, so says the upstream",
+                      "denied", "404", "403");
 }
 
 } // namespace ResponseMapFilter
