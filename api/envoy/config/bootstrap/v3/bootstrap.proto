@@ -20,8 +20,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/core/v3/resource_locator.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
@@ -77,18 +75,18 @@ message Bootstrap {
     // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     core.v3.ConfigSource lds_config = 1;
 
-    // Resource locator for listener collection.
+    // xdstp:// resource locator for listener collection.
     // [#not-implemented-hide:]
-    xds.core.v3.ResourceLocator lds_resources_locator = 5;
+    string lds_resources_locator = 5;
 
     // All post-bootstrap :ref:`Cluster <envoy_api_msg_config.cluster.v3.Cluster>` definitions are
     // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
     // configuration source.
     core.v3.ConfigSource cds_config = 2;
 
-    // Resource locator for cluster collection.
+    // xdstp:// resource locator for cluster collection.
     // [#not-implemented-hide:]
-    xds.core.v3.ResourceLocator cds_resources_locator = 6;
+    string cds_resources_locator = 6;
 
     // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
@@ -110,7 +108,7 @@ message Bootstrap {
 
   // A list of :ref:`Node <envoy_v3_api_msg_config.core.v3.Node>` field names
   // that will be included in the context parameters of the effective
-  // *XdsResourceLocator* that is sent in a discovery request when resource
+  // xdstp:// URL that is sent in a discovery request when resource
   // locators are used for LDS/CDS. Any non-string field will have its JSON
   // encoding set as the context parameter value, with the exception of
   // metadata, which will be flattened (see example below). The supported field
@@ -248,9 +246,9 @@ message Bootstrap {
   repeated FatalAction fatal_actions = 28;
 
   // Configuration sources that will participate in
-  // *xds.core.v3.ResourceLocator* authority resolution. The algorithm is as
+  // xdstp:// URL authority resolution. The algorithm is as
   // follows:
-  // 1. The authority field is taken from the *xds.core.v3.ResourceLocator*, call
+  // 1. The authority field is taken from the xdstp:// URL, call
   //    this *resource_authority*.
   // 2. *resource_authority* is compared against the authorities in any peer
   //    *ConfigSource*. The peer *ConfigSource* is the configuration source
@@ -266,7 +264,7 @@ message Bootstrap {
   // [#not-implemented-hide:]
   repeated core.v3.ConfigSource config_sources = 22;
 
-  // Default configuration source for *xds.core.v3.ResourceLocator* if all
+  // Default configuration source for xdstp:// URLs if all
   // other resolution fails.
   // [#not-implemented-hide:]
   core.v3.ConfigSource default_config_source = 23;
@@ -511,12 +509,7 @@ message RuntimeLayer {
         "envoy.config.bootstrap.v2.RuntimeLayer.RtdsLayer";
 
     // Resource to subscribe to at *rtds_config* for the RTDS layer.
-    string name = 1 [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
-
-    // Resource locator for RTDS layer. This is mutually exclusive to *name*.
-    // [#not-implemented-hide:]
-    xds.core.v3.ResourceLocator rtds_resource_locator = 3
-        [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
+    string name = 1;
 
     // RTDS configuration source.
     core.v3.ConfigSource rtds_config = 2;

@@ -51,6 +51,7 @@ envoy_cc_library(
     hdrs = ["subscription_factory.h"],
     deps = [
         ":subscription_interface",
+        "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
