@@ -98,9 +98,25 @@ def find_address_offset(pid):
     return 0
 
 
+# When setting the logging level to trace, it's possible that we'll bump
+# into chars not accepted by the default encoding. It's fine to
+# ignore these and keep going (instead of giving up and exiting
+# while possibly bringing Envoy down).
+def ignore_decoding_errors(io_wrapper):
+  # Only avail since 3.7.
+  # https://docs.python.org/3/library/io.html#io.TextIOWrapper.reconfigure
+  if hasattr(io_wrapper, 'reconfigure'):
+    try:
+      io_wrapper.reconfigure('replace')
+    except:
+      pass
+
+  return io_wrapper
+
+
 if __name__ == "__main__":
   if len(sys.argv) > 2 and sys.argv[1] == '-s':
-    decode_stacktrace_log(sys.argv[2], sys.stdin)
+    decode_stacktrace_log(sys.argv[2], ignore_decoding_errors(sys.stdin))
     sys.exit(0)
   elif len(sys.argv) > 1:
     rununder = subprocess.Popen(sys.argv[1:],
@@ -108,7 +124,7 @@ if __name__ == "__main__":
                                 stderr=subprocess.STDOUT,
                                 universal_newlines=True)
     offset = find_address_offset(rununder.pid)
-    decode_stacktrace_log(sys.argv[1], rununder.stdout, offset)
+    decode_stacktrace_log(sys.argv[1], ignore_decoding_errors(rununder.stdout), offset)
     rununder.wait()
     sys.exit(rununder.returncode)  # Pass back test pass/fail result
   else:
