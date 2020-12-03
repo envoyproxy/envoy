@@ -19,6 +19,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
@@ -139,16 +140,15 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   ASSERT(headers_decompressed() && !header_list.empty());
 
-  ENVOY_STREAM_LOG(debug, "Receive headers: {}.", *this, header_list.DebugString());
+  ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list);
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
-  if (status >= 100 && status < 200) {
+  if (Http::CodeUtility::is1xx(status)) {
     // These are Informational 1xx headers, not the actual response headers.
-    ENVOY_STREAM_LOG(debug, "Received informational response code: {}", *this, status);
     set_headers_decompressed(false);
     if (status == 100 && !decoded_100_continue_) {
       // This is 100 Continue, only decode it once to support Expect:100-Continue header.
@@ -226,7 +226,7 @@ void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
   if (read_side_closed()) {
     return;
   }
-  ENVOY_STREAM_LOG(debug, "Receive trailers: {}.", *this, header_list.DebugString());
+  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, header_list.DebugString());
   quic::QuicSpdyStream::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {

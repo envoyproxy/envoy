@@ -155,7 +155,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
   ASSERT(headers_decompressed() && !header_list.empty());
-  ENVOY_STREAM_LOG(debug, "Receive headers: {}.", *this, header_list.DebugString());
+  ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
   }
@@ -227,7 +227,7 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
   if (read_side_closed()) {
     return;
   }
-  ENVOY_STREAM_LOG(debug, "Receive trailers: {}.", *this, received_trailers().DebugString());
+  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, received_trailers().DebugString());
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
