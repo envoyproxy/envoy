@@ -30,9 +30,13 @@ def _envoy_cc_test_infrastructure_library(
         include_prefix = None,
         copts = [],
         alwayslink = 1,
+        exclude_pch_dep = False,
         **kargs):
     # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
     deps += tcmalloc_external_deps(repository)
+    pch_deps = []
+    if not exclude_pch_dep:
+        pch_deps = [repository + "//test:test_pch"]
     cc_library(
         name = name,
         srcs = srcs,
@@ -40,9 +44,7 @@ def _envoy_cc_test_infrastructure_library(
         data = data,
         copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         testonly = 1,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//test:test_pch",
-        ],
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + pch_deps,
         tags = tags,
         include_prefix = include_prefix,
         alwayslink = alwayslink,
@@ -285,7 +287,7 @@ def envoy_py_test(
 
 # Envoy C++ mock targets should be specified with this function.
 def envoy_cc_mock(name, **kargs):
-    envoy_cc_test_library(name = name, **kargs)
+    envoy_cc_test_library(name = name, exclude_pch_dep = True, **kargs)
 
 # Envoy shell tests that need to be included in coverage run should be specified with this function.
 def envoy_sh_test(
