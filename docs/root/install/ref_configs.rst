@@ -1,34 +1,27 @@
 .. _install_ref_configs:
 
-Reference configurations
-========================
+参考配置
+=========
 
-The source distribution includes a set of example configuration templates for each of the three
-major Envoy deployment types:
+发行版源代码为三种主要的 Envoy 部署类型分别提供了一组示例配置模板：
 
-* :ref:`Service to service <deployment_type_service_to_service>`
-* :ref:`Front proxy <deployment_type_front_proxy>`
-* :ref:`Double proxy <deployment_type_double_proxy>`
+* :ref:`服务到服务 <deployment_type_service_to_service>`
+* :ref:`前置代理 <deployment_type_front_proxy>`
+* :ref:`双重代理 <deployment_type_double_proxy>`
 
-The goal of this set of example configurations is to demonstrate the full capabilities of Envoy in
-a complex deployment. All features will not be applicable to all use cases. For full documentation
-see the :ref:`configuration reference <config>`.
+这套示例配置的目的是为了演示 Envoy 在复杂部署中的全部功能。所有特性并不适用于所有示例。有关完整文档内容请看 :ref:`参考配置 <config>`.
 
-Configuration generator
------------------------
+配置生成器
+----------
 
-Envoy configurations can become relatively complicated. At Lyft we use `jinja
-<http://jinja.pocoo.org/>`_ templating to make the configurations easier to create and manage. The
-source distribution includes a version of the configuration generator that loosely approximates what
-we use at Lyft. We have also included three example configuration templates for each of the above
-three scenarios.
+Envoy 配置会变得相对复杂。在 Lyft 我们使用 `jinja <http://jinja.pocoo.org/>`_ 模板使配置变得更加易于创建和管理。发行版源代码包含一个配置生成器的版本，它与我们在 Lyft 中使用的配置生成器近似一致。我们也为上述的三个场景中的每一个都包含了示例配置模板。
 
-* Generator script: :repo:`configs/configgen.py`
-* Service to service template: :repo:`configs/envoy_service_to_service_v2.template.yaml`
-* Front proxy template: :repo:`configs/envoy_front_proxy_v2.template.yaml`
-* Double proxy template: :repo:`configs/envoy_double_proxy_v2.template.yaml`
+* 生成器脚本： :repo:`configs/configgen.py`
+* 服务对服务模板： :repo:`configs/envoy_service_to_service_v2.template.yaml`
+* 前置代理模板： :repo:`configs/envoy_front_proxy_v2.template.yaml`
+* 双重代理模板： :repo:`configs/envoy_double_proxy_v2.template.yaml`
 
-To generate the example configurations run the following from the root of the repo:
+从仓库的根目录运行以下命令生成示例配置：
 
 .. code-block:: console
 
@@ -36,23 +29,14 @@ To generate the example configurations run the following from the root of the re
   bazel build //configs:example_configs
   tar xvf $PWD/bazel-out/k8-fastbuild/bin/configs/example_configs.tar -C generated/configs
 
-The previous command will produce three fully expanded configurations using some variables
-defined inside of `configgen.py`. See the comments inside of `configgen.py` for detailed
-information on how the different expansions work.
+前面的命令会使用在 `configgen.py` 内部定义的一些变量生成三种完全扩展的配置。关于不同的扩展是如何工作的详细信息，请参考 `configgen.py` 的内部注释。
 
-A few notes about the example configurations:
+关于示例配置的一些注意事项：
 
-* An instance of :ref:`endpoint discovery service <arch_overview_service_discovery_types_eds>` is assumed
-  to be running at `discovery.yourcompany.net`.
-* DNS for `yourcompany.net` is assumed to be setup for various things. Search the configuration
-  templates for different instances of this.
-* Tracing is configured for `LightStep <https://lightstep.com/>`_. To
-  disable this or enable `Zipkin <https://zipkin.io>`_ or `Datadog <https://datadoghq.com>`_ tracing, delete or
-  change the :ref:`tracing configuration <envoy_api_file_envoy/config/trace/v2/trace.proto>` accordingly.
-* The configuration demonstrates the use of a :ref:`global rate limiting service
-  <arch_overview_global_rate_limit>`. To disable this delete the :ref:`rate limit configuration
-  <config_rate_limit_service>`.
-* :ref:`Route discovery service <config_http_conn_man_rds>` is configured for the service to service
-  reference configuration and it is assumed to be running at `rds.yourcompany.net`.
-* :ref:`Cluster discovery service <config_cluster_manager_cds>` is configured for the service to
-  service reference configuration and it is assumed that be running at `cds.yourcompany.net`.
+* 假设一个 :ref:`端点发现服务（EDS） <arch_overview_service_discovery_types_eds>` 的实例运行在 `discovery.yourcompany.net` 上。
+* 假设为 `yourcompany.net` 设置了 DNS。在配置模板中查找不同的实例。
+* 为 `LightStep <https://lightstep.com/>`_ 配置了跟踪。要禁用此功能请开启 `Zipkin <https://zipkin.io>`_ 或者 `Datadog <https://datadoghq.com>`_ 跟踪，
+  相应的请删除或者修改 :ref:`tracing configuration <envoy_api_file_envoy/config/trace/v2/trace.proto>`。
+* 该配置演示了 :ref:`global rate limiting service <arch_overview_global_rate_limit>`。要禁用此功能请删除 :ref:`rate limit configuration <config_rate_limit_service>`。
+* 为服务到服务的参考配置配置了 :ref:`路由发现服务（RDS） <config_http_conn_man_rds>`，并假设它运行在 `rds.yourcompany.net` 上。
+* 为服务到服务的参考配置配置了 :ref:`集群发现服务（CDS） <config_cluster_manager_cds>`，并假设它运行在 `cds.yourcompany.net` 上。
