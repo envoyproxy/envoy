@@ -1,20 +1,19 @@
 .. _install_sandboxes_redis_filter:
 
-Redis Filter
-============
+Redis 过滤器
+==============
 
-In this example, we show how a :ref:`Redis filter <config_network_filters_redis_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a Redis filter that routes egress requests to redis server.
+在这个示例中，我们会展示如何将 :ref:`Redis 过滤器 <config_network_filters_redis_proxy>` 和 Envoy 代理一起使用。Envoy 代理配置包含一个 Redis 过滤器，它会将出口请求路由到 Redis 服务器。
 
-
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+运行沙盒
+~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Build the sandbox
-*************************
+步骤 3： 构建沙盒
+*******************
 
-Terminal 1
+终端 1
 
 .. code-block:: console
 
@@ -29,12 +28,12 @@ Terminal 1
   redis_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
   redis_redis_1   docker-entrypoint.sh redis       Up      0.0.0.0:6379->6379/tcp
 
-Step 4: Issue Redis commands
-****************************
+步骤 4： 发出 Redis 命令
+**************************
 
-Issue Redis commands using your favourite Redis client, such as ``redis-cli``, and verify they are routed via Envoy.
+使用你喜欢的 Redis 客户端发出 Redis 命令，比如 ``redis-cli``，接着验证命令是否是通过 Envoy 路由。
 
-Terminal 1
+终端 1
 
 .. code-block:: console
 
@@ -47,10 +46,10 @@ Terminal 1
   $ redis-cli -h localhost -p 1999 get bar
   "bar"
 
-Step 5: Verify egress stats
-***************************
+步骤 5： 验证出口统计
+***********************
 
-Go to ``http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command`` and verify the following stats:
+跳转到 ``http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command`` 并验证一下统计信息：
 
 .. code-block:: none
 
