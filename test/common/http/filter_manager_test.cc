@@ -1,9 +1,12 @@
+#include "envoy/http/header_map.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "common/http/filter_manager.h"
 #include "common/stream_info/filter_state_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
+#include "include/envoy/matcher/_virtual_includes/matcher_interface/envoy/matcher/matcher.h"
+#include "source/common/matcher/_virtual_includes/exact_map_matcher_lib/common/matcher/exact_map_matcher.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_reply/mocks.h"
@@ -136,6 +139,46 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
       }));
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
+  filter_manager_->decodeHeaders(*grpc_headers, true);
+  filter_manager_->destroyFilters();
+}
+
+Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestTreeMatchingTree() {
+  auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
+      std::make_unique<HttpRequestHeadersDataInput>("match-header"),
+      absl::nullopt);
+
+  tree->addChild("match", Matcher::OnMatch<HttpMatchingData>{
+                             []() { return std::make_unique<SkipAction>(); }, nullptr});
+
+  return tree;
+}
+
+TEST_F(FilterManagerTest, MatchTreeSkipAction) {
+  initialize();
+
+  // The filter is added, but since we match on the request header we skip the filter.
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new MockStreamDecoderFilter());
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, onDestroy());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter, createRequestTreeMatchingTree());
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"match-header", "match"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*grpc_headers, true);
   filter_manager_->destroyFilters();
 }

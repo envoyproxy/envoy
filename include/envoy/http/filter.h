@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/matcher/matcher.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
@@ -864,6 +865,14 @@ class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEn
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
+class HttpMatchingData {
+public:
+  virtual ~HttpMatchingData() = default;
+
+  virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;
+  virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
+};
+
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
@@ -877,6 +886,14 @@ public:
    * @param filter supplies the filter to add.
    */
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a decoder filter that is used when reading stream data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void
+  addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
 
   /**
    * Add an encoder filter that is used when writing stream data.

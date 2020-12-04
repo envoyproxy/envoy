@@ -9,6 +9,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
+#include "include/envoy/matcher/_virtual_includes/matcher_interface/envoy/matcher/matcher.h"
 
 namespace Envoy {
 namespace Http {
@@ -385,8 +386,8 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
 }
 
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                                 bool dual_filter) {
-  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
+                                                 Matcher::MatchTreeSharedPtr<HttpMatchingData> matcher, bool dual_filter) {
+  ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, matcher, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
   // This means that if filters are configured in the following order (assume all three filters are
@@ -439,6 +440,17 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
+    if ((*entry)->matcher_) {
+      (*entry)->matching_data_.onRequestHeaders(headers);
+      const auto match_result = Matcher::evaluateMatch<HttpMatchingData>(*(*entry)->matcher_, (*entry)->matching_data_);
+      if (match_result.match_state_ == Matcher::MatchState::MatchComplete && match_result.result_) {
+        if (dynamic_cast<SkipAction*>(match_result.result_.get())) {
+          (*entry)->skip_ = true;
+          continue;
+        }
+      }
+    }
+
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());

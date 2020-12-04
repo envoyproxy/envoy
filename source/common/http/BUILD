@@ -170,6 +170,8 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:linked_object",
+        "//include/envoy/matcher:matcher_interface",
+        "//source/common/matcher:matcher_lib",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
         "//source/common/local_reply:local_reply_lib",

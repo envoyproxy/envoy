@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/http/filter_manager.h"
+#include "common/http/header_utility.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
@@ -9,12 +11,83 @@
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
+#include "common/matcher/matcher.h"
 #include "common/local_reply/local_reply.h"
+
+#include "envoy/config/common/matcher/v3/action.pb.h"
+#include "envoy/matcher/matcher.h"
 
 namespace Envoy {
 namespace Http {
 
 class FilterManager;
+
+class HttpMatchingDataImpl : public HttpMatchingData {
+public:
+  static absl::string_view name() { return "http"; }
+
+  void onRequestHeaders(const Http::RequestHeaderMap& request_headers) {
+    request_headers_ = &request_headers;
+  }
+
+  void onResponseHeaders(const Http::ResponseHeaderMap& response_headers) {
+    response_headers_ = &response_headers;
+  }
+
+  Http::RequestHeaderMapOptConstRef requestHeaders() const {
+    if (request_headers_) {
+      return absl::make_optional(std::cref(*request_headers_));
+    }
+
+    return absl::nullopt;
+  }
+
+  Http::ResponseHeaderMapOptConstRef responseHeaders() const {
+    if (response_headers_) {
+      return absl::make_optional(std::cref(*response_headers_));
+    }
+
+    return absl::nullopt;
+  }
+
+private:
+  const Http::RequestHeaderMap* request_headers_{};
+  const Http::ResponseHeaderMap* response_headers_{};
+};
+
+class HttpRequestHeadersDataInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  explicit HttpRequestHeadersDataInput(const std::string& name) : name_(name) {}
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) override {
+    const auto maybe_headers = data.requestHeaders();
+
+    if (!maybe_headers) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+    }
+
+    auto header = maybe_headers->get().get(name_);
+    if (header.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+
+    if (header_as_string_result_) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              header_as_string_result_->result()};
+    }
+
+    header_as_string_result_ = HeaderUtility::getAllOfHeaderAsString(header, ",");
+
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            header_as_string_result_->result()};
+  }
+
+private:
+  const LowerCaseString name_;
+  absl::optional<HeaderUtility::GetAllOfHeaderAsStringResult> header_as_string_result_;
+};
+
+class SkipAction : public Matcher::ActionBase<envoy::config::common::matcher::v3::SkipAction> {};
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
@@ -25,7 +98,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
       : parent_(parent), iteration_state_(IterationState::Continue),
         iterate_from_current_filter_(false), headers_continued_(false),
         continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
-        decode_headers_called_(false), encode_headers_called_(false) {}
+        decode_headers_called_(false), encode_headers_called_(false), skip_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -124,6 +197,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const bool dual_filter_ : 1;
   bool decode_headers_called_ : 1;
   bool encode_headers_called_ : 1;
+  bool skip_ : 1;
 };
 
 /**
@@ -133,8 +207,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+                            Matcher::MatchTreeSharedPtr<HttpMatchingData> matcher, bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter), matcher_(matcher) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -207,6 +281,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
   StreamDecoderFilterSharedPtr handle_;
+  Matcher::MatchTreeSharedPtr<HttpMatchingData> matcher_;
+  HttpMatchingDataImpl matching_data_;
   bool is_grpc_request_{};
 };
 
@@ -517,13 +593,17 @@ public:
 
   // Http::FilterChainFactoryCallbacks
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, false);
+    addStreamDecoderFilterWorker(filter, nullptr, false);
+  }
+  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
+                              Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
+    addStreamDecoderFilterWorker(filter, match_tree, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
     addStreamEncoderFilterWorker(filter, false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, true);
+    addStreamDecoderFilterWorker(filter, nullptr, true);
     addStreamEncoderFilterWorker(filter, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
@@ -606,7 +686,9 @@ public:
   void decodeMetadata(MetadataMap& metadata_map) { decodeMetadata(nullptr, metadata_map); }
 
   // TODO(snowp): Make private as filter chain construction is moved into FM.
-  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
+  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
+                                    Matcher::MatchTreeSharedPtr<HttpMatchingData> matcher,
+                                    bool dual_filter);
   void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
 
   void disarmRequestTimeout();
