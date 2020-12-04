@@ -1,16 +1,18 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.bandwidth_limit.v3;
+package envoy.extensions.filters.http.bandwidth_limit.v3alpha;
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3alpha";
 option java_outer_classname = "BandwidthLimitProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Bandwidth limit]
@@ -20,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 6]
 message BandwidthLimit {
   // Defines the mode for the bandwidth limit filter.
-  // Values represent bitmasks.
+  // Values represent bitmask.
   enum EnableMode {
     // Filter is disabled.
     Disabled = 0;
