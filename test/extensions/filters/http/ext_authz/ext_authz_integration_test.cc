@@ -40,7 +40,7 @@ public:
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ext_authz_cluster->set_name("ext_authz");
-      ext_authz_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ext_authz_cluster);
 
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz",

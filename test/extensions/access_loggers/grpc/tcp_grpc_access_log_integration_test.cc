@@ -43,7 +43,7 @@ public:
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
-      accesslog_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*accesslog_cluster);
     });
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

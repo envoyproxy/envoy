@@ -199,7 +199,8 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
                                 cm_, /* allow_added_via_api */ true);
   cluster_ = lightstep_config.collector_cluster();
 
-  if (!(cm_.get(cluster_)->info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
+  if (!(cm_.clusters().getCluster(cluster_)->get().info()->features() &
+        Upstream::ClusterInfo::Features::HTTP2)) {
     throw EnvoyException(
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_));
   }

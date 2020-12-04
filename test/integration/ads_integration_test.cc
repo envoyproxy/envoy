@@ -1191,7 +1191,7 @@ public:
       // Define ADS cluster
       auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ads_cluster->set_name("ads_cluster");
-      ads_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ads_cluster);
       ads_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
       auto* ads_cluster_config = ads_cluster->mutable_eds_cluster_config();
       auto* ads_cluster_eds_config = ads_cluster_config->mutable_eds_config();
@@ -1369,6 +1369,14 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
 class AdsClusterV2Test : public AdsIntegrationTest {
 public:
   AdsClusterV2Test() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster0->mutable_typed_extension_protocol_options()->clear();
+      cluster0->mutable_http2_protocol_options();
+    });
+    AdsIntegrationTest::initialize();
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV2Test,
