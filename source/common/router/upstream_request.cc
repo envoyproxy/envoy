@@ -34,7 +34,6 @@
 #include "common/router/router.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
-#include "common/upstream/stat_names.h"
 
 #include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "extensions/filters/http/well_known_names.h"

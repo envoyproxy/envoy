@@ -22,7 +22,5 @@ namespace Upstream {
 
 MAKE_STAT_NAMES_STRUCT(ClusterManagerStatNames, ALL_CLUSTER_MANAGER_STATS);
 
-
-
 } // namespace Upstream
 } // namespace Envoy

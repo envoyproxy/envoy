@@ -14,7 +14,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
-#include "common/upstream/stat_names.h"
 
 namespace Envoy {
 namespace Router {

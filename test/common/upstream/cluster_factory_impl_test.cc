@@ -25,8 +25,8 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stats/mocks.h"
 
 using testing::NiceMock;
 

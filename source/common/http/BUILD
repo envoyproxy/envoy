@@ -73,7 +73,6 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/upstream:stat_names_lib",
     ],
 )
 

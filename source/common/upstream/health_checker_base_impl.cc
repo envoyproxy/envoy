@@ -7,7 +7,6 @@
 
 #include "common/network/utility.h"
 #include "common/router/router.h"
-#include "common/upstream/stat_names.h"
 
 namespace Envoy {
 namespace Upstream {

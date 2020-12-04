@@ -145,7 +145,6 @@ envoy_cc_library(
     srcs = ["health_checker_base_impl.cc"],
     hdrs = ["health_checker_base_impl.h"],
     deps = [
-        ":stat_names_lib",
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/router:router_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -187,7 +186,6 @@ envoy_cc_library(
     hdrs = ["load_balancer_impl.h"],
     deps = [
         ":edf_scheduler_lib",
-        ":stat_names_lib",
         "//include/envoy/common:random_generator_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
@@ -263,7 +261,6 @@ envoy_cc_library(
     srcs = ["logical_host.cc"],
     hdrs = ["logical_host.h"],
     deps = [
-        ":stat_names_lib",
         ":upstream_includes",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -350,7 +347,6 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
-        ":stat_names_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -444,7 +440,6 @@ envoy_cc_library(
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":logical_dns_cluster_lib",
         ":original_dst_cluster_lib",
-        ":stat_names_lib",
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",

@@ -17,7 +17,6 @@
 #include "common/common/logger.h"
 #include "common/http/codec_wrappers.h"
 #include "common/network/filter_impl.h"
-#include "common/upstream/stat_names.h"
 
 namespace Envoy {
 namespace Http {

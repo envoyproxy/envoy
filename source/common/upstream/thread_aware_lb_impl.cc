@@ -1,7 +1,5 @@
 #include "common/upstream/thread_aware_lb_impl.h"
 
-#include "common/upstream/stat_names.h"
-
 #include <memory>
 #include <random>
 
