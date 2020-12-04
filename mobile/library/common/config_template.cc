@@ -8,6 +8,11 @@ const char* platform_filter_template = R"(
               platform_filter_name: {{ platform_filter_name }}
 )";
 
+const char* native_filter_template = R"(
+          - name: {{ native_filter_name }}
+            typed_config: {{ native_filter_typed_config }}
+)";
+
 const char* config_template = R"(
 static_resources:
   listeners:
@@ -41,6 +46,7 @@ static_resources:
                         max_interval: 60s
         http_filters:
 {{ platform_filter_chain }}
+{{ native_filter_chain }}
           - name: envoy.filters.http.dynamic_forward_proxy
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig

@@ -24,6 +24,11 @@ extern const char* config_template;
 extern const char* platform_filter_template;
 
 /**
+ * Template configuration used for dynamic creation of the native filter chain.
+ */
+extern const char* native_filter_template;
+
+/**
  * Initialize an underlying HTTP stream.
  * @param engine, handle to the engine that will manage this stream.
  * @return envoy_stream_t, handle to the underlying stream.

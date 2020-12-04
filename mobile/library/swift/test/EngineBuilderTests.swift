@@ -18,6 +18,8 @@ mock_template:
   app_version: {{ app_version }}
   app_id: {{ app_id }}
   virtual_clusters: {{ virtual_clusters }}
+  native_filter_chain:
+{{ native_filter_chain }}
 """
 
 private struct TestFilter: Filter {}
@@ -101,13 +103,13 @@ final class EngineBuilderTests: XCTestCase {
   func testAddingPlatformFiltersToConfigurationWhenRunningEnvoy() throws {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertEqual(1, config.httpFilterFactories.count)
+      XCTAssertEqual(1, config.httpPlatformFilterFactories.count)
       expectation.fulfill()
     }
 
     _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addFilter(factory: TestFilter.init)
+      .addPlatformFilter(factory: TestFilter.init)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
@@ -183,6 +185,20 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingNativeFiltersToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual(1, config.nativeFilterChain.count)
+      expectation.fulfill()
+    }
+
+    _ = try EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addNativeFilter(name: "test_name", typedConfig: "config")
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testResolvesYAMLWithIndividuallySetValues() throws {
     let filterFactory = EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init)
     let config = EnvoyConfiguration(statsDomain: "stats.envoyproxy.io",
@@ -190,11 +206,15 @@ final class EngineBuilderTests: XCTestCase {
                                     dnsRefreshSeconds: 300,
                                     dnsFailureRefreshSecondsBase: 400,
                                     dnsFailureRefreshSecondsMax: 500,
-                                    filterChain: [filterFactory],
                                     statsFlushSeconds: 600,
                                     appVersion: "v1.2.3",
                                     appId: "com.envoymobile.ios",
-                                    virtualClusters: "[test]")
+                                    virtualClusters: "[test]",
+                                    nativeFilterChain:
+                                      [EnvoyNativeFilterConfig(name: "filter_name",
+                                                               typedConfig: "test_config"),
+                                      ],
+                                    platformFilterChain: [filterFactory])
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.envoyproxy.io"))
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
@@ -207,6 +227,8 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
     XCTAssertTrue(resolvedYAML.contains("app_id: com.envoymobile.ios"))
     XCTAssertTrue(resolvedYAML.contains("virtual_clusters: [test]"))
+    XCTAssertTrue(resolvedYAML.contains("name: filter_name"))
+    XCTAssertTrue(resolvedYAML.contains("typed_config: test_config"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -215,11 +237,12 @@ final class EngineBuilderTests: XCTestCase {
                                     dnsRefreshSeconds: 300,
                                     dnsFailureRefreshSecondsBase: 400,
                                     dnsFailureRefreshSecondsMax: 500,
-                                    filterChain: [],
                                     statsFlushSeconds: 600,
                                     appVersion: "v1.2.3",
                                     appId: "com.envoymobile.ios",
-                                    virtualClusters: "[test]")
+                                    virtualClusters: "[test]",
+                                    nativeFilterChain: [],
+                                    platformFilterChain: [])
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }
 }
