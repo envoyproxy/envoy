@@ -120,12 +120,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   uint64_t bytes_read = 0;
   while (keep_reading) {
     uint64_t bytes_read_this_iteration = 0;
-    // We use 2 slices here so that we can use the remainder of an existing buffer chain element
-    // if there is extra space. 16K read is arbitrary and can be tuned later.
     Buffer::Reservation reservation = read_buffer.reserve(16384);
-    // Buffer::RawSlice slices[2];
-    // uint64_t slices_to_commit = 0;
-    // uint64_t num_slices = read_buffer.reserve(16384, slices, 2);
     for (uint64_t i = 0; i < reservation.numSlices(); i++) {
       auto result = sslReadIntoSlice(reservation.slices()[i]);
       bytes_read_this_iteration += result.bytes_read_;
