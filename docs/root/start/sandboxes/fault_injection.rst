@@ -1,19 +1,19 @@
 .. _install_sandboxes_fault_injection:
 
-Fault Injection Filter
-======================
+故障注入过滤器
+===============
 
-This simple example demonstrates Envoy's :ref:`fault injection <config_http_filters_fault_injection>` capability using Envoy's :ref:`runtime support <config_runtime>` to control the feature.
+这个简单的样例演示了 Envoy 的 :ref:`故障注入 <config_http_filters_fault_injection>` 特性，这个特性是使用 Envoy 的 :ref:`运行时支持 <config_runtime>` 来控制的。
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+运行沙盒
+~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Start all of our containers
-***********************************
+步骤 3：启动所有容器
+********************
 
-Terminal 1
+终端 1
 
 .. code-block:: console
 
@@ -28,10 +28,10 @@ Terminal 1
   fault-injection_backend_1   gunicorn -b 0.0.0.0:80 htt       Up      0.0.0.0:8080->80/tcp
   fault-injection_envoy_1     /docker-entrypoint.sh /usr       Up      10000/tcp, 0.0.0.0:9211->9211/tcp, 0.0.0.0:9901->9901/tcp
 
-Step 4: Start sending continuous stream of HTTP requests
-********************************************************
+步骤 4：开始发送连续的 HTTP 请求流
+***********************************
 
-Terminal 2
+终端 2
 
 .. code-block:: console
 
@@ -40,59 +40,58 @@ Terminal 2
   $ docker-compose exec envoy bash
   $ bash send_request.sh
 
-The script above (``send_request.sh``) sends a continuous stream of HTTP requests to Envoy, which in turn forwards the requests to the backend container. Fauilt injection is configured in Envoy but turned off (i.e. affects 0% of requests). Consequently, you should see a continuous sequence of HTTP 200 response codes.
+上面的脚本（``send_request.sh``）向 Envoy 发送连续的 HTTP 请求，随后，请求会被转发到后端容器。在 Envoy 中配置了故障注入，但是处于关闭状态（也就是说，请求不受任何影响）。因此，你应该看到连续的 HTTP 200 返回码。
 
-Step 5: Test Envoy's abort fault injection
-******************************************
+步骤 5：测试 Envoy 的中止故障注入
+**********************************
 
-Turn on *abort* fault injection via the runtime using the commands below.
+使用下面的命令，在运行时启用 *中止* 故障注入。 
 
-Terminal 3
+终端 3
 
 .. code-block:: console
 
   $ docker-compose exec envoy bash
   $ bash enable_abort_fault_injection.sh
 
-The script above enables HTTP aborts for 100% of requests. So, you should now see a continuous sequence of HTTP 503
-responses for all requests.
+上面的脚本对于所有的请求启用了 HTTP 中止。所以，现在你可以看到所有的请求都连续返回了 HTTP 503。
 
-To disable the abort injection:
+禁用中止注入：
 
-Terminal 3
+终端 3
 
 .. code-block:: console
 
   $ bash disable_abort_fault_injection.sh
 
-Step 6: Test Envoy's delay fault injection
-******************************************
+步骤 6：测试 Envoy 的延迟故障注入
+*********************************
 
-Turn on *delay* fault injection via the runtime using the commands below.
+使用以下命令在运行时启用 *延迟* 故障注入。
 
-Terminal 3
+终端 3
 
 .. code-block:: console
 
   $ docker-compose exec envoy bash
   $ bash enable_delay_fault_injection.sh
 
-The script above will add a 3-second delay to 50% of HTTP requests. You should now see a continuous sequence of HTTP 200 responses for all requests, but half of the requests will take 3 seconds to complete.
+上面的脚本将会对 50% 的 HTTP 请求添加一个 3s 的延时。现在，你可以看到，对于所有的请求都连续的返回了 HTTP 200，但是一半请求都是延迟 3s 来完成的。
 
-To disable the delay injection:
+禁用延迟故障注入：
 
-Terminal 3
+终端 3
 
 .. code-block:: console
 
   $ bash disable_delay_fault_injection.sh
 
-Step 7: Check the current runtime filesystem
-********************************************
+步骤 7：检查当前的运行时文件系统
+**********************************
 
-To see the current runtime filesystem overview:
+可以看到当前运行时文件系统的整体情况：
 
-Terminal 3
+终端 3
 
 .. code-block:: console
 
