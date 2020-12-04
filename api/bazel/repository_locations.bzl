@@ -21,7 +21,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-11-29",
         use_category = ["api"],
         implied_untracked_deps = [
+            "com_github_iancoleman_strcase",
+            "com_github_lyft_protoc_gen_star",
             "com_github_spf13_afero",
+            "org_golang_google_genproto",
+            "org_golang_x_text",
         ],
     ),
     com_github_cncf_udpa = dict(
