@@ -930,7 +930,7 @@ public:
         R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               "proto_descriptor": ""
             )EOF";
     config_helper_.addFilter(filter);
