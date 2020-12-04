@@ -27,7 +27,7 @@ Envoy 是为面向大型现代服务架构而设计的 L7 代理和通信总线�
 
 **健康检查**：:ref:`推荐 <arch_overview_service_discovery_eventually_consistent>` 使用将服务发现视为最终一致的过程的方式来建立 Envoy 网格。Envoy 包含了一个 :ref:`健康检查 <arch_overview_health_checking>`，可以选择对上游服务集群执行主动健康检查。然后，Envoy 联合使用服务发现和健康检查信息来确定健康的负载均衡目标。Envoy 还通过 :ref:`异常检查 <arch_overview_outlier_detection>` 子系统支持被动健康检查。
 
-**高级负载均衡**：`负载均衡 <arch_overview_load_balancing>`是分布式系统中不同组件之间的一个复杂问题。由于 Envoy 是一个独立代理而不是软件库，因此可以独立实现高级负载均衡以供任何应用程序访问。目前，Envoy 支持 :ref:`自动重试 <arch_overview_http_routing_retry>`、:ref:`熔断 <arch_overview_circuit_break>`、通过外部速率限制服务的 :ref:`全局限速 <arch_overview_global_rate_limit>`、:ref:`请求映射 <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`
+**高级负载均衡**：`负载均衡 <arch_overview_load_balancing>` 是分布式系统中不同组件之间的一个复杂问题。由于 Envoy 是一个独立代理而不是软件库，因此可以独立实现高级负载均衡以供任何应用程序访问。目前，Envoy 支持 :ref:`自动重试 <arch_overview_http_routing_retry>`、:ref:`熔断 <arch_overview_circuit_break>`、通过外部速率限制服务的 :ref:`全局限速 <arch_overview_global_rate_limit>`、:ref:`请求映射 <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`
 和 :ref:`异常检测 <arch_overview_outlier_detection>`。未来还计划支持请求竞争。
 
 **前端/边缘代理支持**：在边缘使用相同的软件大有好处（可观察性、管理、相同的服务发现和负载均衡算法等）。Envoy 包含足够多的功能，可作为大多数现代 Web 应用程序的边缘代理。包括 :ref:`TLS <arch_overview_ssl>` 终止、HTTP/1.1 和 HTTP/2 :ref:`支持 <arch_overview_http_protocols>`，以及 HTTP L7 :ref:`路由 <arch_overview_http_routing>`。
