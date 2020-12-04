@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.bandwidth_limit.v3;
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -12,6 +13,7 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_lim
 option java_outer_classname = "BandwidthLimitProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).work_in_progress  = true;
 
 // [#protodoc-title: Bandwidth limit]
 // Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
