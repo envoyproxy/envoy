@@ -253,7 +253,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
-      cm_stats_(generateStats(stats, factory)),
+      cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
@@ -437,11 +437,10 @@ void ClusterManagerImpl::initializeSecondaryClusters(
   }
 }
 
-ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope,
-                                                      ClusterManagerFactory& factory) {
-  const ClusterManagerStatNames& cluster_manager_stat_names = factory.clusterManagerStatNames();
-  return ClusterManagerStats(cluster_manager_stat_names, scope,
-                             cluster_manager_stat_names.cluster_manager_);
+ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
+  const std::string final_prefix = "cluster_manager.";
+  return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                    POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {

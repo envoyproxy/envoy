@@ -38,7 +38,6 @@ envoy_cc_library(
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",
-        ":stat_names_lib",
         ":subset_lb_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -102,14 +101,6 @@ envoy_cc_library(
     hdrs = ["conn_pool_map_impl.h"],
     deps = [
         ":conn_pool_map",
-    ],
-)
-
-envoy_cc_library(
-    name = "stat_names_lib",
-    hdrs = ["stat_names.h"],
-    deps = [
-        "//include/envoy/stats:stats_macros",
     ],
 )
 

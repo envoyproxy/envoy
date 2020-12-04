@@ -39,7 +39,6 @@ envoy_cc_mock(
         ":cluster_info_mocks",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
         "//test/mocks/network:transport_socket_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
@@ -222,7 +221,6 @@ envoy_cc_mock(
     hdrs = ["cluster_manager_factory.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/upstream:stat_names_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
     ],

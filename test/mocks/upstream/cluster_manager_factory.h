@@ -2,8 +2,6 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/upstream/stat_names.h"
-
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
@@ -42,14 +40,8 @@ public:
   MOCK_METHOD(CdsApiPtr, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm));
 
-  const ClusterManagerStatNames& clusterManagerStatNames() const override {
-    return cluster_manager_stat_names;
-  }
-
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
-  Stats::TestSymbolTable symbol_table_;
-  ClusterManagerStatNames cluster_manager_stat_names;
 };
 
 } // namespace Upstream

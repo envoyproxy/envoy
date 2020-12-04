@@ -21,7 +21,6 @@
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
-#include "common/upstream/stat_names.h"
 #include "common/upstream/subset_lb.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -63,9 +62,7 @@ namespace Upstream {
 // the expectations when needed.
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
-  TestClusterManagerFactory()
-      : api_(Api::createApiForTest(stats_, random_)),
-        cluster_manager_stat_names_(stats_.symbolTable()) {
+  TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
             [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
@@ -115,9 +112,6 @@ public:
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  const ClusterManagerStatNames& clusterManagerStatNames() const override {
-    return cluster_manager_stat_names_;
-  }
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -146,7 +140,6 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
-  ClusterManagerStatNames cluster_manager_stat_names_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

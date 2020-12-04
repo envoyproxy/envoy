@@ -375,8 +375,6 @@ public:
 
 using CdsApiPtr = std::unique_ptr<CdsApi>;
 
-struct ClusterManagerStatNames;
-
 /**
  * Factory for objects needed during cluster manager operation.
  */
@@ -429,16 +427,6 @@ public:
    * Returns the secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;
-
-  /**
-   * Returns a struct with all the Stats::StatName objects needed by
-   * ClusterManager. This helps factor out some relatively heavy name
-   * construction which occur when there is a large CDS update during operation,
-   * relative to recreating all stats from strings on-the-fly.
-   *
-   * @return the stat names.
-   */
-  virtual const ClusterManagerStatNames& clusterManagerStatNames() const PURE;
 };
 
 /**
