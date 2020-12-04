@@ -160,7 +160,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
     reservation.commit(bytes_read_this_iteration);
     if (bytes_read_this_iteration > 0 && callbacks_->shouldDrainReadBuffer()) {
-      callbacks_->setReadBufferReady();
+      callbacks_->setTransportSocketIsReadable();
       keep_reading = false;
     }
 
