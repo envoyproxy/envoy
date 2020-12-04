@@ -1,5 +1,5 @@
-#include "extensions/filters/http/local_ratelimit/config.h"
-#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+#include "extensions/filters/http/bandwidth_limit/config.h"
+#include "extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -9,14 +9,17 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace LocalRateLimitFilter {
+namespace BandwidthLimitFilter {
+
+using EnableMode = envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
 
 TEST(Factory, GlobalEmptyConfig) {
   const std::string yaml = R"(
 stat_prefix: test
+enforce_threshold_kbps = 1024
   )";
 
-  LocalRateLimitFilterConfig factory;
+  BandwidthLimitFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 
@@ -32,50 +35,38 @@ stat_prefix: test
 TEST(Factory, RouteSpecificFilterConfig) {
   const std::string config_yaml = R"(
 stat_prefix: test
-token_bucket:
-  max_tokens: 1
-  tokens_per_fill: 1
-  fill_interval: 1000s
-filter_enabled:
-  runtime_key: test_enabled
-  default_value:
-    numerator: 100
-    denominator: HUNDRED
-filter_enforced:
-  runtime_key: test_enforced
-  default_value:
-    numerator: 100
-    denominator: HUNDRED
-response_headers_to_add:
-  - append: false
-    header:
-      key: x-test-rate-limit
-      value: 'true'
+enable_mode: IngressAndEgress
+limit_kbps = 10
+fill_rate = 16
   )";
 
-  LocalRateLimitFilterConfig factory;
+  BandwidthLimitFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_TRUE(config->requestAllowed());
+  EXPECT_EQ(config->limit(), 10);
+  EXPECT_EQ(config->fill_rate(), 16);
+  EXPECT_EQ(config->enforce_threshold(), absl::nullopt);
+  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_IngressAndEgress);
+  EXPECT_FALSE(config->tokenBucket() == nullptr);
 }
 
-TEST(Factory, EnabledEnforcedDisabledByDefault) {
+TEST(Factory, RouteSpecificEnforcedThresholdIgnored) {
   const std::string config_yaml = R"(
 stat_prefix: test
-token_bucket:
-  max_tokens: 1
-  tokens_per_fill: 1
-  fill_interval: 1000s
+enable_mode: IngressAndEgress
+limit_kbps = 10
+fill_rate = 16
+enforce_threshold_kbps = 100
   )";
 
-  LocalRateLimitFilterConfig factory;
+  BandwidthLimitFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
@@ -85,8 +76,8 @@ token_bucket:
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_FALSE(config->enabled());
-  EXPECT_FALSE(config->enforced());
+  EXPECT_EQ(config->enforce_threshold(), absl::nullopt);
+  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_IngressAndEgress);
 }
 
 TEST(Factory, PerRouteConfigNoTokenBucket) {
@@ -94,7 +85,7 @@ TEST(Factory, PerRouteConfigNoTokenBucket) {
 stat_prefix: test
   )";
 
-  LocalRateLimitFilterConfig factory;
+  BandwidthLimitFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
@@ -107,13 +98,13 @@ stat_prefix: test
 TEST(Factory, FillTimerTooLow) {
   const std::string config_yaml = R"(
 stat_prefix: test
-token_bucket:
-  max_tokens: 1
-  tokens_per_fill: 1
-  fill_interval: 0.040s
+enable_mode: IngressAndEgress
+limit_kbps = 10
+fill_rate = 16
+enforce_threshold_kbps = 100
   )";
 
-  LocalRateLimitFilterConfig factory;
+  BandwidthLimitFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
@@ -125,7 +116,7 @@ token_bucket:
                EnvoyException);
 }
 
-} // namespace LocalRateLimitFilter
+} // namespace BandwidthLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -45,19 +45,21 @@ message BandwidthLimit {
   // The limit supplied in KiB/s.
   //
   // .. note::
-  //   It's fine for limit_kbps to be unset for the global configuration since the bandwidth limit
-  //   can be applied at a the virtual host or route level. Thus, the limit_kbps must be set for the
+  //   It's fine for the limit to be unset for the global configuration since the bandwidth limit
+  //   can be applied at a the virtual host or route level. Thus, the limit must be set for the
   //   per route configuration otherwise the config will be rejected.
   //
   // .. note::
   //   When using per route configuration, the limit becomes unique to that route.
   //
-  uint64 limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
   // Optional fill_rate for the token buckets (per second). Defaults to 64.
-  google.protobuf.UInt64Value fill_rate = 4 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt32Value fill_rate = 4 [(validate.rules).uint32 = {gte: 1}];
 
   // If set, the bandwidth limit will be enforced only when total dataplane bandwidth usage
   // crosses this value. Defaults to 0 meaning limits are always applied.
+  // This config should be set at global/listener level.
+  // It has no effect if specified at route level.
   google.protobuf.UInt64Value enforce_threshold_kbps = 5 [(validate.rules).uint64 = {gte: 1}];
 }

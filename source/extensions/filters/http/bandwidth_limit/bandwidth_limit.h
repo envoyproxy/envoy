@@ -50,7 +50,8 @@ class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 
 public:
   FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source);
+               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
+               bool per_route = false);
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
   BandwidthLimitStats& stats() const { return stats_; }
@@ -60,7 +61,9 @@ public:
   uint64_t limit() const { return limit_kbps_; }
   EnableMode enable_mode() const { return enable_mode_; };
   std::shared_ptr<TokenBucketImpl> tokenBucket() { return token_bucket_; }
+  const std::shared_ptr<TokenBucketImpl> tokenBucket() const { return token_bucket_; }
   uint64_t fill_rate() const { return fill_rate_; }
+  absl::optional<uint64_t> enforce_threshold() const { return enforce_threshold_Kbps_; }
 
 private:
   friend class FilterTest;
@@ -85,9 +88,9 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  * HTTP bandwidth limit filter. Depending on the route configuration, this filter calls consults
  * with local token bucket before allowing further filter iteration.
  */
-class BandwidthFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
+class BandwidthLimiter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  BandwidthFilter(FilterConfigSharedPtr config) : config_(config) {}
+  BandwidthLimiter(FilterConfigSharedPtr config) : config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;

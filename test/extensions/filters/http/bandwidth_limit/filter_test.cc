@@ -1,6 +1,6 @@
-#include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
+#include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.h"
 
-#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+#include "extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 #include "test/mocks/http/mocks.h"
 
@@ -10,29 +10,13 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace LocalRateLimitFilter {
+namespace BandwidthLimitFilter {
 
 static const std::string config_yaml = R"(
 stat_prefix: test
-token_bucket:
-  max_tokens: {}
-  tokens_per_fill: 1
-  fill_interval: 1000s
-filter_enabled:
-  runtime_key: test_enabled
-  default_value:
-    numerator: 100
-    denominator: HUNDRED
-filter_enforced:
-  runtime_key: test_enforced
-  default_value:
-    numerator: 100
-    denominator: HUNDRED
-response_headers_to_add:
-  - append: false
-    header:
-      key: x-test-rate-limit
-      value: 'true'
+enable_mode: IngressAndEgress
+limit_kbps = 10
+fill_rate = 16
   )";
 
 class FilterTest : public testing::Test {
@@ -40,22 +24,23 @@ public:
   FilterTest() = default;
 
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
-    EXPECT_CALL(
-        runtime_.snapshot_,
-        featureEnabled(absl::string_view("test_enabled"),
-                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
-        .WillRepeatedly(testing::Return(enabled));
-    EXPECT_CALL(
-        runtime_.snapshot_,
-        featureEnabled(absl::string_view("test_enforced"),
-                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
-        .WillRepeatedly(testing::Return(enforced));
+    // EXPECT_CALL(
+    //     runtime_.snapshot_,
+    //     featureEnabled(absl::string_view("test_enabled"),
+    //                    testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+    //     .WillRepeatedly(testing::Return(enabled));
+    // EXPECT_CALL(
+    //     runtime_.snapshot_,
+    //     featureEnabled(absl::string_view("test_enforced"),
+    //                    testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+    //     .WillRepeatedly(testing::Return(enforced));
 
-    envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
+    envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit config;
     TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_shared<FilterConfig>(config, dispatcher_, stats_, runtime_);
-    filter_ = std::make_shared<Filter>(config_);
+    filter_ = std::make_shared<BandwidthLimiter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   uint64_t findCounter(const std::string& name) {
@@ -63,24 +48,18 @@ public:
     return counter != nullptr ? counter->value() : 0;
   }
 
-  Http::Code toErrorCode(const uint64_t code) { return config_->toErrorCode(code); }
-
   Stats::IsolatedStoreImpl stats_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<FilterConfig> config_;
-  std::shared_ptr<Filter> filter_;
+  std::shared_ptr<BandwidthLimiter> filter_;
 };
 
 TEST_F(FilterTest, Runtime) {
   setup(fmt::format(config_yaml, "1"), false, false);
   EXPECT_EQ(&runtime_, &(config_->runtime()));
-}
-
-TEST_F(FilterTest, ToErrorCode) {
-  setup(fmt::format(config_yaml, "1"), false, false);
-  EXPECT_EQ(Http::Code::BadRequest, toErrorCode(400));
 }
 
 TEST_F(FilterTest, Disabled) {
@@ -100,7 +79,7 @@ TEST_F(FilterTest, RequestOk) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
 }
 
-TEST_F(FilterTest, RequestRateLimited) {
+TEST_F(FilterTest, BandwidthLimited) {
   setup(fmt::format(config_yaml, "0"));
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
@@ -128,6 +107,7 @@ TEST_F(FilterTest, RequestRateLimited) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
 
+/*
 TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
   setup(fmt::format(config_yaml, "0"), true, false);
 
@@ -139,8 +119,9 @@ TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
 }
+*/
 
-} // namespace LocalRateLimitFilter
+} // namespace BandwidthLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

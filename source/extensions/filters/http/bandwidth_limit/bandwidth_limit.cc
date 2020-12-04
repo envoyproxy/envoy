@@ -6,8 +6,8 @@
 
 #include "common/http/utility.h"
 
-using Envoy::Extensions::HttpFilters::Common::StreamRateLimiter;
 using envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit;
+using Envoy::Extensions::HttpFilters::Common::StreamRateLimiter;
 
 namespace Envoy {
 namespace Extensions {
@@ -16,14 +16,19 @@ namespace BandwidthLimitFilter {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-    Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source)
+    Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
     : stats_(generateStats(config.stat_prefix(), scope)), runtime_(runtime), scope_(scope),
-      time_source_(time_source), limit_kbps_(config.limit_kbps()),
+      time_source_(time_source), limit_kbps_(config.has_limit_kbps() ? config.limit_kbps() : 0),
       enable_mode_(config.enable_mode()),
       enforce_threshold_Kbps_(
-          config.has_enforce_threshold_kbps() ? config.enforce_threshold_kbps().value() : 0),
+          config.has_enforce_threshold_kbps() && !per_route
+              ? absl::optional<uint64_t>(config.enforce_threshold_kbps().value())
+              : absl::nullopt),
       fill_rate_(config.has_fill_rate() ? config.fill_rate().value()
                                         : StreamRateLimiter::DefaultFillRate) {
+  if (per_route && !config.has_limit_kbps()) {
+    throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
+  }
   // The token bucket is configured with a max token count of the number of ticks per second,
   // and refills at the same rate, so that we have a per second limit which refills gradually in
   // 1/fill_rate intervals.
@@ -35,9 +40,9 @@ BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
   return {ALL_BANDWIDTH_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-// BandwidthFilter members
+// BandwidthLimiter members
 
-Http::FilterHeadersStatus BandwidthFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   const auto* config = getConfig();
 
   auto mode = config->enable_mode();
@@ -76,7 +81,7 @@ Http::FilterHeadersStatus BandwidthFilter::decodeHeaders(Http::RequestHeaderMap&
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus BandwidthFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (ingress_limiter_ != nullptr) {
     ingress_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -84,7 +89,7 @@ Http::FilterDataStatus BandwidthFilter::decodeData(Buffer::Instance& data, bool 
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus BandwidthFilter::decodeTrailers(Http::RequestTrailerMap&) {
+Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailerMap&) {
   if (ingress_limiter_ != nullptr) {
     return ingress_limiter_->onTrailers() ? Http::FilterTrailersStatus::StopIteration
                                           : Http::FilterTrailersStatus::Continue;
@@ -92,7 +97,7 @@ Http::FilterTrailersStatus BandwidthFilter::decodeTrailers(Http::RequestTrailerM
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterDataStatus BandwidthFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (egress_limiter_ != nullptr) {
     egress_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -100,7 +105,7 @@ Http::FilterDataStatus BandwidthFilter::encodeData(Buffer::Instance& data, bool 
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus BandwidthFilter::encodeTrailers(Http::ResponseTrailerMap&) {
+Http::FilterTrailersStatus BandwidthLimiter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (egress_limiter_ != nullptr) {
     return egress_limiter_->onTrailers() ? Http::FilterTrailersStatus::StopIteration
                                          : Http::FilterTrailersStatus::Continue;
@@ -108,7 +113,7 @@ Http::FilterTrailersStatus BandwidthFilter::encodeTrailers(Http::ResponseTrailer
   return Http::FilterTrailersStatus::Continue;
 }
 
-const FilterConfig* BandwidthFilter::getConfig() const {
+const FilterConfig* BandwidthLimiter::getConfig() const {
   const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
       "envoy.filters.http.bandwidth_limit", decoder_callbacks_->route());
   if (config) {
@@ -118,7 +123,7 @@ const FilterConfig* BandwidthFilter::getConfig() const {
   return config_.get();
 }
 
-void BandwidthFilter::onDestroy() {
+void BandwidthLimiter::onDestroy() {
   if (ingress_limiter_ != nullptr) {
     ingress_limiter_->destroy();
   }
