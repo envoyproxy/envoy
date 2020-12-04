@@ -47,16 +47,26 @@ static void appendSlice(Buffer::Instance& buffer, uint32_t size) {
   buffer.commit(&slice, 1);
 }
 
-static void addTenFullSizeSlices(Buffer::Instance& buffer) {
-  for (unsigned i = 0; i < 10; i++) {
-    auto start_size = buffer.length();
+// If move_slices is true, add full-sized slices using move similar to how HTTP codecs move data
+// from the filter chain buffer to the output buffer. Else, append full-sized slices directly to the
+// output buffer like socket read would do.
+static void addFullSlices(Buffer::Instance& output_buffer, int num_slices, bool move_slices) {
+  Buffer::OwnedImpl tmp_buf;
+  Buffer::Instance* buffer = move_slices ? &tmp_buf : &output_buffer;
+
+  for (int i = 0; i < num_slices; i++) {
+    auto start_size = buffer->length();
     Buffer::RawSlice slices[2];
-    auto num_slices = buffer.reserve(16384, slices, 2);
+    auto num_slices = buffer->reserve(16384, slices, 2);
     for (unsigned i = 0; i < num_slices; i++) {
       memset(slices[i].mem_, 'a', slices[i].len_);
     }
-    buffer.commit(slices, num_slices);
-    RELEASE_ASSERT(buffer.length() - start_size == 16384, "correct reserve/commit");
+    buffer->commit(slices, num_slices);
+    RELEASE_ASSERT(buffer->length() - start_size == 16384, "correct reserve/commit");
+  }
+
+  if (move_slices) {
+    output_buffer.move(tmp_buf);
   }
 }
 
@@ -139,17 +149,7 @@ static void testThroughput(benchmark::State& state) {
                                  write_buf.getRawSlices().size()));
     }
 
-    if (move_slices) {
-      // Append many full-sized slices, the same manner that HTTP codecs would move data from an
-      // input buffer to an output buffer.
-      Buffer::OwnedImpl tmp_buf;
-      addTenFullSizeSlices(tmp_buf);
-      write_buf.move(tmp_buf);
-    } else {
-      // Append many full-sized slices, the same manner that an envoy socket read would.
-      addTenFullSizeSlices(write_buf);
-    }
-
+    addFullSlices(write_buf, 10, move_slices);
     bytes_written += write_buf.length();
 
     state.ResumeTiming();
