@@ -63,7 +63,9 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
   // version_info. This way, both types of versions can be tracked and exposed for debugging by
   // the configuration update targets.
+  uint64_t start_time = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
   callbacks_.onConfigUpdate(resources, version_info);
+  uint64_t update_duration_ms = DateUtil::nowToMilliseconds(dispatcher_.timeSource()) - start_time;
   stats_.update_success_.inc();
   stats_.update_attempt_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
@@ -71,6 +73,12 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
   stats_.version_text_.set(version_info);
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
+
+  // TODO(adamsjob): make the threshold configurable, either through runtime or bootstrap
+  if (update_duration_ms > 50) {
+    ENVOY_LOG(debug, "Config update for gRPC config for {} with {} resources took {} ms", type_url_,
+              resources.size(), update_duration_ms);
+  }
 }
 
 void GrpcSubscriptionImpl::onConfigUpdate(
@@ -79,11 +87,19 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const std::string& system_version_info) {
   disableInitFetchTimeoutTimer();
   stats_.update_attempt_.inc();
+  uint64_t start_time = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  uint64_t update_duration_ms = DateUtil::nowToMilliseconds(dispatcher_.timeSource()) - start_time;
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
   stats_.version_text_.set(system_version_info);
+
+  // TODO(adamsjob): make the threshold configurable, either through runtime or bootstrap
+  if (update_duration_ms > 50) {
+    ENVOY_LOG(debug, "Config update for gRPC config for {} with {} resources took {} ms", type_url_,
+              added_resources.size(), update_duration_ms);
+  }
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
