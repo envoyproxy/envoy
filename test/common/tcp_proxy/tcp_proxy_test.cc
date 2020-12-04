@@ -849,6 +849,7 @@ public:
             [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
         .WillByDefault(ReturnPointee(&upstream_host_));
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
   ~TcpProxyTest() override {
@@ -866,7 +867,6 @@ public:
     config.set_stat_prefix("name");
     auto* route = config.mutable_hidden_envoy_deprecated_deprecated_v1()->mutable_routes()->Add();
     route->set_cluster("fake_cluster");
-
     return config;
   }
 
@@ -1389,6 +1389,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         k0: v0
 )EOF";
 
+  factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1", "cluster2"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -1500,6 +1501,7 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
             k1: from_config
 )EOF";
 
+  factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -1937,6 +1939,8 @@ public:
         cluster: fake_cluster
     )EOF";
 
+    factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fallback_cluster", "fake_cluster"});
     config_ =
         std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_, avoid_boosting));
   }
@@ -2007,6 +2011,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
   setup(false);
   initializeFilter();
 
+  factory_context_.cluster_manager_.initializeThreadLocalClusters({"filter_state_cluster"});
   connection_.streamInfo().filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
@@ -2094,6 +2099,7 @@ public:
     cluster: fake_cluster
     )EOF";
 
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 };
@@ -2135,6 +2141,7 @@ public:
     - source_ip: {}
     )EOF";
 
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 

@@ -4,8 +4,6 @@ package envoy.extensions.common.tap.v3;
 
 import "envoy/config/tap/v3/common.proto";
 
-import "xds/core/v3/resource_locator.proto";
-
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";

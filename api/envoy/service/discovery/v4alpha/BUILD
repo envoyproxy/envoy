@@ -10,6 +10,5 @@ api_proto_package(
         "//envoy/config/core/v4alpha:pkg",
         "//envoy/service/discovery/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
-        "@com_github_cncf_udpa//xds/core/v3:pkg",
     ],
 )

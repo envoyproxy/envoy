@@ -34,6 +34,7 @@ public:
     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
 
     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
+    cm_.initializeThreadLocalClusters({"test_cluster"});
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
@@ -247,7 +248,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
 // status UNAVAILABLE and error message "Cluster not available"
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available"));
   auto grpc_stream =

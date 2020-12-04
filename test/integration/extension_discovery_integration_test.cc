@@ -68,7 +68,7 @@ public:
       auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ecds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ecds_cluster->set_name("ecds_cluster");
-      ecds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ecds_cluster);
     });
     // Make HCM do a direct response to avoid timing issues with the upstream.
     config_helper_.addConfigModifier(
