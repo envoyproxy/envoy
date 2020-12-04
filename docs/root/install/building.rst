@@ -30,10 +30,10 @@ Envoy 最初实在 Ubuntu 14.04 LTS 上开发和部署的。它可以在任何�
 
 当我们发布官方版本时，我们会用版本号来构建镜像并给它打标签。可以在下面的仓库中找到这些镜像：
 
-* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_：在 Ubuntu Bionic 基础之上发布消除符号的二进制包。
-* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_: 在 Ubuntu Bionic 基础之上发布带有调试符号的二进制包。
-* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: 在 **glibc** alpine 基础之上发布消除符号的二进制包。
-* `envoyproxy/envoy-alpine-debug <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug/tags/>`_: *为了支持 envoyproxy/envoy-debug，此仓库已被弃用*。 在 **glibc** alpine 基础之上发布带有调试符号的二进制包。
+* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_：在 Ubuntu Bionic 基础之上发布消除符号的二进制文件。
+* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_: 在 Ubuntu Bionic 基础之上发布带有调试符号的二进制文件。
+* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: 在 **glibc** alpine 基础之上发布消除符号的二进制文件。
+* `envoyproxy/envoy-alpine-debug <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug/tags/>`_: *为了支持 envoyproxy/envoy-debug，此仓库已被弃用*。 在 **glibc** alpine 基础之上发布带有调试符号的二进制文件。
 
 .. note::
 
@@ -42,10 +42,10 @@ Envoy 最初实在 Ubuntu 14.04 LTS 上开发和部署的。它可以在任何�
 
 针对每一个主分支提交，我们额外地创建了一套开发 Docker 镜像。在下面的仓库中可以找到这些镜像：
 
-* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: 在 Ubuntu Bionic 基础之上发布消除符号的二进制>包。
-* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_: 在 Ubuntu Bionic 基础之上发布带有>调试符号的二进制包。
-* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: 在 **glibc** alpine 基础之上发布消除符号的二进制包。
-* `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_: *为了支持 envoyproxy/envoy-debug-dev，此仓库已被弃用*。在 **glibc** alpine 基础之上发布带有调试符号的二进制包。
+* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: 在 Ubuntu Bionic 基础之上发布消除符号的二进制文件。
+* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_: 在 Ubuntu Bionic 基础之上发布带有调试符号的二进制文件。
+* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: 在 **glibc** alpine 基础之上发布消除符号的二进制文件。
+* `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_: *为了支持 envoyproxy/envoy-debug-dev，此仓库已被弃用*。在 **glibc** alpine 基础之上发布带有调试符号的二进制文件。
 
 在上述的 *dev* 仓库中，*latest* 标签指向主分支中通过测试的最近的 Envoy SHA。
 
@@ -53,9 +53,9 @@ Envoy 最初实在 Ubuntu 14.04 LTS 上开发和部署的。它可以在任何�
 
   Envoy 项目始终视主分支（master）为版本发布的候选分支，很多组织使用主分支在生产中进行追踪和部署。我们鼓励大家做同样的   事情，以便在开发流程中能够尽早的报告遇到的问题。
 
-可以在 `GetEnvoy.io <https://www.getenvoy.io/>`_ 找到为不同平台打包的 Envoy 预制二进制包。
+可以在 `GetEnvoy.io <https://www.getenvoy.io/>`_ 找到为不同平台打包的 Envoy 预制二进制文件。
 
-我们将会根据社区对 CI、打包方面的兴趣来生成额外的二进制包类型。针对不同平台的预制二进制包，请开一个 `GetEnvoy issue <https://github.com/tetratelabs/getenvoy/issues>`_ 。
+我们将会根据社区对 CI、打包方面的兴趣来生成额外的二进制文件类型。针对不同平台的预制二进制文件，请开一个 `GetEnvoy issue <https://github.com/tetratelabs/getenvoy/issues>`_ 。
 
 .. _arm_binaries:
 
@@ -72,7 +72,7 @@ ARM64 二进制
 修改 Envoy
 -----------
 
-如果你对于修改 Envoy 和测试你的改变感兴趣，一种方式就是使用 Docker。这个指导将讲述如何构建你自己的 Envoy 二进制包，并且把包放在一个 Ubuntu 容器中。
+如果你对于修改 Envoy 和测试你的改变感兴趣，一种方式就是使用 Docker。这个指导将讲述如何构建你自己的 Envoy 二进制文件，并且把包放在一个 Ubuntu 容器中。
 
 .. toctree::
     :maxdepth: 2
