@@ -1929,7 +1929,8 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
       EnvoyException,
       "Protobuf message (type envoy.config.cluster.v3.Cluster reason "
       "INVALID_ARGUMENT:(lb_policy): invalid "
-      "value \"fakelbtype\" for type TYPE_ENUM) has unknown fields");
+      "value \"fakelbtype\" for type type.googleapis.com/envoy.config.cluster.v3.Cluster.LbPolicy) "
+      "has unknown fields");
 }
 
 TEST_F(StaticClusterImplTest, MalformedHostIP) {
