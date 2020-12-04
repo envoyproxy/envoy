@@ -13,6 +13,33 @@
 
 namespace Envoy {
 namespace Stats {
+
+class TestSymbolTableHelper {
+public:
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return symbol_table_; }
+
+private:
+  SymbolTableImpl symbol_table_;
+};
+
+// Symbol table wrapper that instantiates a shared, reference-counted, global
+// symbol table. This is needed by the mocking infrastructure, as Envoy mocks
+// are constructed without any context, but StatNames that are symbolized from
+// one mock may need to be entered into stat storage in another one. Thus they
+// must be connected by global state.
+//
+// TODO(jmarantz): rename this as Stats::TestUtil::GlobalSymbolTable to clarify
+// the motivation, and rename the 10 call-sites for it.
+class TestSymbolTable {
+public:
+  SymbolTable& operator*() { return global_.get().symbolTable(); }
+  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
+  SymbolTable* operator->() { return &global_.get().symbolTable(); }
+  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
+  Envoy::Test::Global<TestSymbolTableHelper> global_;
+};
+
 namespace TestUtil {
 
 /**
@@ -76,27 +103,9 @@ private:
   const size_t memory_at_construction_;
 };
 
-class TestSymbolTableHelper {
-public:
-  SymbolTable& symbolTable() { return symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return symbol_table_; }
-
-private:
-  SymbolTableImpl symbol_table_;
-};
-
-class TestSymbolTableImpl {
-public:
-  SymbolTable& operator*() { return global_.get().symbolTable(); }
-  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
-  SymbolTable* operator->() { return &global_.get().symbolTable(); }
-  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
-  Envoy::Test::Global<TestSymbolTableHelper> global_;
-};
-
 class SymbolTableProvider {
 public:
-  TestSymbolTableImpl global_symbol_table_;
+  TestSymbolTable global_symbol_table_;
 };
 
 // Helper class to use in lieu of an actual Stats::Store for doing lookups by
@@ -197,8 +206,5 @@ std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);
 void serializeDeserializeString(absl::string_view in);
 
 } // namespace TestUtil
-
-using TestSymbolTable = TestUtil::TestSymbolTableImpl;
-
 } // namespace Stats
 } // namespace Envoy

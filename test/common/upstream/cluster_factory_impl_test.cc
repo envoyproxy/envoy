@@ -26,7 +26,6 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/stats/mocks.h"
 
 using testing::NiceMock;
 
@@ -65,7 +64,7 @@ protected:
   const NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Stats::MockIsolatedStatsStore stats_;
+  Stats::TestUtil::TestStore stats_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

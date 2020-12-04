@@ -3,7 +3,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -11,7 +10,6 @@
 namespace Envoy {
 namespace Upstream {
 using ::testing::NiceMock;
-
 class MockClusterManagerFactory : public ClusterManagerFactory {
 public:
   MockClusterManagerFactory();
@@ -43,6 +41,5 @@ public:
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
 };
-
 } // namespace Upstream
 } // namespace Envoy

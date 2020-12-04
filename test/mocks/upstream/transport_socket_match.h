@@ -5,7 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "test/mocks/stats/mocks.h"
+#include "test/common/stats/stat_test_utility.h"
 
 #include "gmock/gmock.h"
 
@@ -22,7 +22,7 @@ public:
 
 private:
   Network::TransportSocketFactoryPtr socket_factory_;
-  Stats::MockIsolatedStatsStore stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   TransportSocketMatchStats stats_;
 };
 
