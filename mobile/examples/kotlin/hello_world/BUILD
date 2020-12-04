@@ -21,6 +21,7 @@ kt_android_library(
         "AsyncDemoFilter.kt",
         "BufferDemoFilter.kt",
         "DemoFilter.kt",
+        "DemoStringAccessor.kt",
         "MainActivity.kt",
     ],
     custom_package = "io.envoyproxy.envoymobile.helloenvoykotlin",

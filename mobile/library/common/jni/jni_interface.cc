@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "library/common/api/c_types.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/jni/jni_utility.h"
 #include "library/common/jni/jni_version.h"
@@ -610,6 +611,24 @@ static const void* jvm_http_filter_init(const void* context) {
   return retained_filter;
 }
 
+// EnvoyStringAccessor
+
+static envoy_data jvm_get_string(void* context) {
+  JNIEnv* env = get_env();
+  jobject j_context = static_cast<jobject>(context);
+  jclass jcls_JvmStringAccessorContext = env->GetObjectClass(j_context);
+  jmethodID jmid_getString =
+      env->GetMethodID(jcls_JvmStringAccessorContext, "getString", "()Ljava/nio/ByteBuffer;");
+  // Passed as a java.nio.ByteBuffer.
+  jobject j_data = env->CallObjectMethod(j_context, jmid_getString);
+  envoy_data native_data = buffer_to_native_data(env, j_data);
+
+  env->DeleteLocalRef(jcls_JvmStringAccessorContext);
+  env->DeleteLocalRef(j_data);
+
+  return native_data;
+}
+
 // EnvoyHTTPStream
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initStream(
@@ -672,9 +691,9 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
   api->static_context = retained_context;
   api->instance_context = NULL;
 
-  register_platform_api(env->GetStringUTFChars(filter_name, nullptr), api);
+  envoy_status_t result = register_platform_api(env->GetStringUTFChars(filter_name, nullptr), api);
   env->DeleteLocalRef(jcls_JvmFilterFactoryContext);
-  return ENVOY_SUCCESS;
+  return result;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -741,4 +760,27 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     JNIEnv* env, jclass, jlong stream_handle) {
 
   return reset_stream(static_cast<envoy_stream_t>(stream_handle));
+}
+
+// EnvoyStringAccessor
+
+extern "C" JNIEXPORT jint JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* env, jclass,
+                                                                        jstring accessor_name,
+                                                                        jobject j_context) {
+
+  // TODO(goaway): The retained_context leaks, but it's tied to the life of the engine.
+  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332.
+  jclass jcls_JvmStringAccessorContext = env->GetObjectClass(j_context);
+  jobject retained_context = env->NewGlobalRef(j_context);
+
+  envoy_string_accessor* string_accessor =
+      (envoy_string_accessor*)safe_malloc(sizeof(envoy_string_accessor));
+  string_accessor->get_string = jvm_get_string;
+  string_accessor->context = retained_context;
+
+  envoy_status_t result =
+      register_platform_api(env->GetStringUTFChars(accessor_name, nullptr), string_accessor);
+  env->DeleteLocalRef(jcls_JvmStringAccessorContext);
+  return result;
 }

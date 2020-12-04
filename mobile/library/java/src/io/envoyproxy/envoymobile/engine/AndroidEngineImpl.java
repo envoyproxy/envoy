@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import android.app.Application;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 /* Android-specific implementation of the `EnvoyEngine` interface. */
 public class AndroidEngineImpl implements EnvoyEngine {
@@ -57,5 +58,10 @@ public class AndroidEngineImpl implements EnvoyEngine {
   @Override
   public int recordGaugeSub(String elements, int amount) {
     return envoyEngine.recordGaugeSub(elements, amount);
+  }
+
+  @Override
+  public int registerStringAccessor(String accessorName, EnvoyStringAccessor accessor) {
+    return envoyEngine.registerStringAccessor(accessorName, accessor);
   }
 }

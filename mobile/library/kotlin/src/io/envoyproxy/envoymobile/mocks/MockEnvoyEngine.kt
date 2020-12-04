@@ -5,6 +5,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyHTTPStream
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning
+import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 
 /**
  * Mock implementation of `EnvoyEngine`. Used internally for testing the bridging layer & mocking.
@@ -23,4 +24,6 @@ internal class MockEnvoyEngine : EnvoyEngine {
   override fun recordGaugeAdd(elements: String, amount: Int): Int = 0
 
   override fun recordGaugeSub(elements: String, amount: Int): Int = 0
+
+  override fun registerStringAccessor(accessorName: String, accessor: EnvoyStringAccessor): Int = 0
 }

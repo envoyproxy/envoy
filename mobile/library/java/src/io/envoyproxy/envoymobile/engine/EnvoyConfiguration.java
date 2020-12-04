@@ -1,10 +1,12 @@
 package io.envoyproxy.envoymobile.engine;
 
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
@@ -18,6 +20,7 @@ public class EnvoyConfiguration {
   public final String appVersion;
   public final String appId;
   public final String virtualClusters;
+  public final Map<String, EnvoyStringAccessor> stringAccessors;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
@@ -34,11 +37,13 @@ public class EnvoyConfiguration {
    * @param appVersion                   the App Version of the App using this Envoy Client.
    * @param appId                        the App ID of the App using this Envoy Client.
    * @param virtualClusters              the JSON list of virtual cluster configs.
+   * @param stringAccesssors             platform string accessors to register.
    */
   public EnvoyConfiguration(String statsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
                             List<EnvoyHTTPFilterFactory> httpFilterFactories, int statsFlushSeconds,
-                            String appVersion, String appId, String virtualClusters) {
+                            String appVersion, String appId, String virtualClusters,
+                            Map<String, EnvoyStringAccessor> stringAccessors) {
     this.statsDomain = statsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -49,6 +54,7 @@ public class EnvoyConfiguration {
     this.appVersion = appVersion;
     this.appId = appId;
     this.virtualClusters = virtualClusters;
+    this.stringAccessors = stringAccessors;
   }
 
   /**

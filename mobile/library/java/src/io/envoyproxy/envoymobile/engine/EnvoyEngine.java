@@ -2,6 +2,7 @@ package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 /* Wrapper layer for calling into Envoy's C/++ API. */
 public interface EnvoyEngine {
@@ -70,4 +71,6 @@ public interface EnvoyEngine {
    * @return A status indicating if the action was successful.
    */
   int recordGaugeSub(String elements, int amount);
+
+  int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
 }

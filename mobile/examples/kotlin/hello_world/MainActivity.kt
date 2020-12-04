@@ -47,6 +47,7 @@ class MainActivity : Activity() {
       .addFilter { DemoFilter() }
       .addFilter { BufferDemoFilter() }
       .addFilter { AsyncDemoFilter() }
+      .addStringAccessor("demo-accessor", DemoStringAccessor())
       .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
       .build()
 
