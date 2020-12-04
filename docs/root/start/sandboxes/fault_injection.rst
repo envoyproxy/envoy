@@ -10,7 +10,7 @@
 
 .. include:: _include/docker-env-setup.rst
 
-步骤 3：启动容器
+步骤 3：启动所有容器
 ****************
 
 终端 1
@@ -40,7 +40,7 @@
   $ docker-compose exec envoy bash
   $ bash send_request.sh
 
-上述的脚本（``send_request.sh``）向 Envoy 发送连续的 HTTP 请求，随后，请求会被转发到后端容器。在 Envoy 中配置了故障注入，但是处于关闭状态（也就是说，请求不受任何影响）。因此，你应该看到连续的 HTTP 200 返回码。
+上面的脚本（``send_request.sh``）向 Envoy 发送连续的 HTTP 请求，随后，请求会被转发到后端容器。在 Envoy 中配置了故障注入，但是处于关闭状态（也就是说，请求不受任何影响）。因此，你应该看到连续的 HTTP 200 返回码。
 
 步骤 5：测试 Envoy 的中止故障注入
 **********************************
@@ -54,7 +54,7 @@
   $ docker-compose exec envoy bash
   $ bash enable_abort_fault_injection.sh
 
-上述的脚本对于所有的请求启用了 HTTP 中止。所以，现在你可以看到，对于所有的请求都连续的返回了 HTTP 503。
+上面的脚本对于所有的请求启用了 HTTP 中止。所以，现在你可以看到所有的请求都连续返回了 HTTP 503。
 
 禁用中止注入：
 
@@ -76,7 +76,7 @@
   $ docker-compose exec envoy bash
   $ bash enable_delay_fault_injection.sh
 
-上述脚本将会对 50% 的 HTTP 请求添加一个 3s 的延时。现在，你可以看到，对于所有的请求都连续的返回了 HTTP 200，但是一半请求都是延迟 3s 来完成的。
+上面的脚本将会对 50% 的 HTTP 请求添加一个 3s 的延时。现在，你可以看到，对于所有的请求都连续的返回了 HTTP 200，但是一半请求都是延迟 3s 来完成的。
 
 禁用延迟故障注入：
 
