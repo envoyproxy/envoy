@@ -16,7 +16,12 @@ struct FieldMatchResult {
   // The result, if matching was completed.
   absl::optional<bool> result_;
 
-  bool result() const { return *result_; }
+  // The unwrapped result. Should only be called if match_state_ == MatchComplete.
+  bool result() const {
+    ASSERT(match_state_ == MatchState::MatchComplete);
+    ASSERT(result_.has_value());
+    return *result_;
+  }
 };
 
 /**
@@ -87,6 +92,7 @@ public:
 
       if (result.match_state_ == MatchState::UnableToMatch) {
         unable_to_match_some_matchers = true;
+        continue;
       }
 
       if (result.result()) {
