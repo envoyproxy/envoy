@@ -13,19 +13,6 @@ namespace {
 // Converts stream ID to the network byte order. Supports all values in the range [0, 2^30).
 uint32_t makeNetworkOrderStreamId(uint32_t stream_id) { return htonl(stream_id); }
 
-// All this templatized stuff is for the typesafe constexpr bitwise ORing of the "enum class" values
-template <typename First, typename... Rest> struct FirstArgType {
-  using type = First; // NOLINT(readability-identifier-naming)
-};
-
-template <typename Flag> constexpr uint8_t orFlags(Flag flag) { return static_cast<uint8_t>(flag); }
-
-template <typename Flag, typename... Flags> constexpr uint8_t orFlags(Flag first, Flags... rest) {
-  static_assert(std::is_same<Flag, typename FirstArgType<Flags...>::type>::value,
-                "All flag types must be the same!");
-  return static_cast<uint8_t>(first) | orFlags(rest...);
-}
-
 } // namespace
 
 namespace Envoy {
@@ -148,6 +135,40 @@ Http2Frame Http2Frame::makeEmptyHeadersFrame(uint32_t stream_index, HeadersFlags
   Http2Frame frame;
   frame.buildHeader(Type::Headers, 0, static_cast<uint8_t>(flags),
                     makeNetworkOrderStreamId(stream_index));
+  return frame;
+}
+
+Http2Frame Http2Frame::makeHeadersFrameNoStatus(uint32_t stream_index) {
+  Http2Frame frame;
+  frame.buildHeader(
+      Type::Headers, 0,
+      static_cast<uint8_t>(orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders)),
+      makeNetworkOrderStreamId(stream_index));
+  return frame;
+}
+
+Http2Frame Http2Frame::makeHeadersFrameWithStatus(std::string status, uint32_t stream_index,
+                                                  HeadersFlags flags) {
+  Http2Frame frame;
+  frame.buildHeader(Type::Headers, 0, static_cast<uint8_t>(flags),
+                    makeNetworkOrderStreamId(stream_index));
+  if (status == "200") {
+    frame.appendStaticHeader(StaticHeaderIndex::Status200);
+  } else if (status == "204") {
+    frame.appendStaticHeader(StaticHeaderIndex::Status204);
+  } else if (status == "206") {
+    frame.appendStaticHeader(StaticHeaderIndex::Status206);
+  } else if (status == "304") {
+    frame.appendStaticHeader(StaticHeaderIndex::Status304);
+  } else if (status == "400") {
+    frame.appendStaticHeader(StaticHeaderIndex::Status400);
+  } else if (status == "500") {
+    frame.appendStaticHeader(StaticHeaderIndex::Status500);
+  } else { // Not a static header
+    Header statusHeader = Header(":status", status);
+    frame.appendHeaderWithoutIndexing(statusHeader);
+  }
+  frame.adjustPayloadSize();
   return frame;
 }
 
@@ -287,6 +308,16 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
   return frame;
 }
 
+Http2Frame Http2Frame::makeMalformedResponseWithZerolenHeader(uint32_t stream_index) {
+  Http2Frame frame;
+  frame.buildHeader(Type::Headers, 0, orFlags(HeadersFlags::EndStream, HeadersFlags::EndHeaders),
+                    makeNetworkOrderStreamId(stream_index));
+  frame.appendStaticHeader(StaticHeaderIndex::Status200);
+  frame.appendEmptyHeader();
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host,
                                    absl::string_view path) {
   Http2Frame frame;
@@ -324,6 +355,18 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
   return frame;
 }
 
+Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view host,
+                                       absl::string_view path,
+                                       const std::vector<Header> extra_headers) {
+
+  auto frame = makePostRequest(stream_index, host, path);
+  for (const auto& header : extra_headers) {
+    frame.appendHeaderWithoutIndexing(header);
+  }
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
   Http2Frame frame;
   frame.appendData(contents);
@@ -333,6 +376,16 @@ Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
 Http2Frame Http2Frame::makeGenericFrameFromHexDump(absl::string_view contents) {
   Http2Frame frame;
   frame.appendData(Hex::decode(std::string(contents)));
+  return frame;
+}
+
+Http2Frame Http2Frame::makeDataFrame(uint32_t stream_index, absl::string_view data,
+                                     DataFlags flags) {
+  Http2Frame frame;
+  frame.buildHeader(Type::Data, 0, static_cast<uint8_t>(flags),
+                    makeNetworkOrderStreamId(stream_index));
+  frame.appendData(data);
+  frame.adjustPayloadSize();
   return frame;
 }
 

@@ -59,6 +59,7 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString CdnLoop{"cdn-loop"};
@@ -103,7 +104,7 @@ public:
   } CORSValues;
 
   struct {
-    const std::string Default{"identity,deflate,gzip"};
+    const std::string Default{"identity"};
   } GrpcAcceptEncodingValues;
 
   struct {

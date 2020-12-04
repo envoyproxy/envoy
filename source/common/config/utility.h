@@ -118,9 +118,12 @@ public:
    * @param cm supplies the cluster manager.
    * @param allow_added_via_api indicates whether a cluster is allowed to be added via api
    *                            rather than be a static resource from the bootstrap config.
+   * @return the main thread cluster if it exists.
    */
-  static void checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm, bool allow_added_via_api = false);
+  static Upstream::ClusterConstOptRef checkCluster(absl::string_view error_prefix,
+                                                   absl::string_view cluster_name,
+                                                   Upstream::ClusterManager& cm,
+                                                   bool allow_added_via_api = false);
 
   /**
    * Check cluster/local info for API config sanity. Throws on error.
@@ -128,10 +131,11 @@ public:
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
    * @param local_info supplies the local info.
+   * @return the main thread cluster if it exists.
    */
-  static void checkClusterAndLocalInfo(absl::string_view error_prefix,
-                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
-                                       const LocalInfo::LocalInfo& local_info);
+  static Upstream::ClusterConstOptRef
+  checkClusterAndLocalInfo(absl::string_view error_prefix, absl::string_view cluster_name,
+                           Upstream::ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
 
   /**
    * Check local info for API config sanity. Throws on error.
@@ -212,8 +216,8 @@ public:
   /**
    * Get a Factory from the registry with a particular name (and templated type) with error checking
    * to ensure the name and factory are valid.
-   * @param name string identifier for the particular implementation. Note: this is a proto string
-   * because it is assumed that this value will be pulled directly from the configuration proto.
+   * @param name string identifier for the particular implementation.
+   * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
@@ -228,6 +232,32 @@ public:
     }
 
     return *factory;
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name or return nullptr.
+   * @param name string identifier for the particular implementation.
+   */
+  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+    if (name.empty()) {
+      return nullptr;
+    }
+
+    return Registry::FactoryRegistry<Factory>::getFactory(name);
+  }
+
+  /**
+   * Get a Factory from the registry or return nullptr.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory* getFactory(const ProtoMessage& message) {
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return factory;
+    }
+
+    return Utility::getFactoryByName<Factory>(message.name());
   }
 
   /**

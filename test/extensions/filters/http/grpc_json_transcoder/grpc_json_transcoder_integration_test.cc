@@ -39,7 +39,7 @@ public:
         R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
             )EOF";
@@ -124,23 +124,23 @@ protected:
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());
 
-    if (response->headers().get(Http::LowerCaseString("transfer-encoding")) == nullptr ||
+    if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
         !absl::StartsWith(response->headers()
-                              .get(Http::LowerCaseString("transfer-encoding"))
+                              .get(Http::LowerCaseString("transfer-encoding"))[0]
                               ->value()
                               .getStringView(),
                           "chunked")) {
-      EXPECT_EQ(response->headers().get(Http::LowerCaseString("trailer")), nullptr);
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("trailer")).empty());
     }
 
     response_headers.iterate(
         [response = response.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
           Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
           if (entry.value() == UnexpectedHeaderValue) {
-            EXPECT_FALSE(response->headers().get(lower_key));
+            EXPECT_TRUE(response->headers().get(lower_key).empty());
           } else {
             EXPECT_EQ(entry.value().getStringView(),
-                      response->headers().get(lower_key)->value().getStringView());
+                      response->headers().get(lower_key)[0]->value().getStringView());
           }
           return Http::HeaderMap::Iterate::Continue;
         });
@@ -451,7 +451,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
   EXPECT_EQ(response->body(), http_body.data());
   // As well as content-type header
   auto content_type = response->headers().get(Http::LowerCaseString("content-type"));
-  EXPECT_EQ("text/plain", content_type->value().getStringView());
+  EXPECT_EQ("text/plain", content_type[0]->value().getStringView());
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {
@@ -486,7 +486,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
               ignore_unknown_query_parameters : true
@@ -510,7 +510,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
@@ -535,7 +535,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true
@@ -560,7 +560,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor: "{}"
               services: "bookstore.Bookstore"
               convert_grpc_status: true

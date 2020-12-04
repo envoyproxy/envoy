@@ -131,7 +131,7 @@ public:
   void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 
   MOCK_METHOD(void, onAccept_, (ConnectionSocketPtr & socket));
-  MOCK_METHOD(void, onReject, ());
+  MOCK_METHOD(void, onReject, (RejectCause), (override));
 };
 
 class MockUdpListenerCallbacks : public UdpListenerCallbacks {
@@ -187,6 +187,7 @@ public:
 
   // Network::DrainableFilterChain
   MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, transportSocketConnectTimeout, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
 };
@@ -224,6 +225,7 @@ public:
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&));
   MOCK_METHOD(IoHandle&, ioHandle, ());
+  MOCK_METHOD(SocketPtr, duplicate, ());
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
@@ -285,6 +287,7 @@ public:
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr&));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr&));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, options, (), (const));
+  MOCK_METHOD(SocketPtr, duplicate, ());
   MOCK_METHOD(IoHandle&, ioHandle, ());
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
@@ -391,6 +394,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, setRejectFraction, (float));
 };
 
 class MockConnectionHandler : public ConnectionHandler {
@@ -412,6 +416,7 @@ public:
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
+  MOCK_METHOD(void, setListenerRejectFraction, (float), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
 };
 
@@ -469,7 +474,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Connection&, connection, ());
   MOCK_METHOD(bool, shouldDrainReadBuffer, ());
-  MOCK_METHOD(void, setReadBufferReady, ());
+  MOCK_METHOD(void, setTransportSocketIsReadable, ());
   MOCK_METHOD(void, raiseEvent, (ConnectionEvent));
   MOCK_METHOD(void, flushWriteBuffer, ());
 
@@ -501,6 +506,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, setRejectFraction, (float), (override));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));

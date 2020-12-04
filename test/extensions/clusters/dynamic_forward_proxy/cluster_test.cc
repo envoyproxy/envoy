@@ -16,6 +16,7 @@
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
 using testing::DoAll;
@@ -43,7 +44,7 @@ public:
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
     if (uses_tls) {
-      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
+      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _, _));
     }
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     // Below we return a nullptr handle which has no effect on the code under test but isn't
@@ -137,7 +138,7 @@ connect_timeout: 0.25s
 cluster_type:
   name: dynamic_forward_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
     dns_cache_config:
       name: foo
       dns_lookup_family: AUTO
@@ -232,6 +233,7 @@ private:
 
 // Verify that using 'sni' causes a failure.
 TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -256,6 +258,7 @@ tls_context:
 
 // Verify that using 'verify_subject_alt_name' causes a failure.
 TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -285,7 +288,7 @@ connect_timeout: 0.25s
 cluster_type:
   name: dynamic_forward_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
     dns_cache_config:
       name: foo
 upstream_http_protocol_options: {}

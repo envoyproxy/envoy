@@ -145,7 +145,8 @@ exact_match: value
   EXPECT_EQ("value", header_data.value_);
 }
 
-TEST(HeaderDataConstructorTest, RegexMatchSpecifier) {
+TEST(HeaderDataConstructorTest, DEPRECATED_FEATURE_TEST(RegexMatchSpecifier)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 name: test-header
 regex_match: value
@@ -249,28 +250,8 @@ invert_match: true
   EXPECT_EQ(true, header_data.invert_match_);
 }
 
-TEST(HeaderDataConstructorTest, GetAllOfHeader) {
-  TestRequestHeaderMapImpl headers{
-      {"foo", "val1"}, {"bar", "bar2"}, {"foo", "eep, bar"}, {"foo", ""}};
-
-  std::vector<absl::string_view> foo_out;
-  Http::HeaderUtility::getAllOfHeader(headers, "foo", foo_out);
-  ASSERT_EQ(foo_out.size(), 3);
-  ASSERT_EQ(foo_out[0], "val1");
-  ASSERT_EQ(foo_out[1], "eep, bar");
-  ASSERT_EQ(foo_out[2], "");
-
-  std::vector<absl::string_view> bar_out;
-  Http::HeaderUtility::getAllOfHeader(headers, "bar", bar_out);
-  ASSERT_EQ(bar_out.size(), 1);
-  ASSERT_EQ(bar_out[0], "bar2");
-
-  std::vector<absl::string_view> eep_out;
-  Http::HeaderUtility::getAllOfHeader(headers, "eep", eep_out);
-  ASSERT_EQ(eep_out.size(), 0);
-}
-
-TEST(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
+TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(MayMatchOneOrMoreRequestHeader)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   TestRequestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
 
   const std::string yaml = R"EOF(
@@ -298,7 +279,6 @@ exact_match: a,b
   // Make sure that an exact match on "a,b" does in fact work.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
 
-  TestScopedRuntime runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http_match_on_all_headers", "false"}});
   // Flipping runtime to false should make "a,b" no longer match because we will match on the first
@@ -391,7 +371,8 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, HeaderRegexMatch) {
+TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(HeaderRegexMatch)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
                                               {"match-header", "123.456"}};
@@ -425,7 +406,8 @@ safe_regex_match:
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, HeaderRegexInverseMatch) {
+TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(HeaderRegexInverseMatch)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   TestRequestHeaderMapImpl matching_headers{{"match-header", "1234"}, {"match-header", "123.456"}};
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
 
@@ -668,7 +650,7 @@ TEST(HeaderAddTest, HeaderAdd) {
 
   headers_to_add.iterate([&headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
     Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-    EXPECT_EQ(entry.value().getStringView(), headers.get(lower_key)->value().getStringView());
+    EXPECT_EQ(entry.value().getStringView(), headers.get(lower_key)[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
 }

@@ -52,10 +52,10 @@ static_resources:
                   path: "/foo"
                 route:
                   cluster: some_service
-      # CustomFilter and the HTTP router filter are the HTTP filter chain.
-      http_filters:
-          - name: some.customer.filter
-          - name: envoy.filters.http.router
+          # CustomFilter and the HTTP router filter are the HTTP filter chain.
+          http_filters:
+            # - name: some.customer.filter
+            - name: envoy.filters.http.router
   clusters:
   - name: some_service
     connect_timeout: 5s
@@ -79,14 +79,18 @@ static_resources:
               socket_address:
                 address: 10.1.2.11
                 port_value: 10002
-    http2_protocol_options:
-      max_concurrent_streams: 100
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            max_concurrent_streams: 100
   - name: some_statsd_sink
     connect_timeout: 5s
     # The rest of the configuration for statsd sink cluster.
 # statsd sink.
 stats_sinks:
-   - name: envoy.stat_sinks.statsd
-     typed_config:
-       "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
-       tcp_cluster_name: some_statsd_cluster
+  - name: envoy.stat_sinks.statsd
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
+      tcp_cluster_name: some_statsd_sink

@@ -46,7 +46,7 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
   }
 }
 
-TapConfigBaseImpl::TapConfigBaseImpl(envoy::config::tap::v3::TapConfig&& proto_config,
+TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),

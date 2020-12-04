@@ -71,7 +71,10 @@ the upgrade value to the special keyword "CONNECT".
 
 While for HTTP/2, CONNECT request may have a path, in general and for HTTP/1.1 CONNECT requests do
 not have a path, and can only be matched using a
-:ref:`connect_matcher <envoy_v3_api_msg_config.route.v3.RouteMatch.ConnectMatcher>`
+:ref:`connect_matcher <envoy_v3_api_msg_config.route.v3.RouteMatch.ConnectMatcher>`. Please also note
+that when doing non-wildcard domain matching for CONNECT requests, the CONNECT target is  matched
+rather than the Host/Authority header. You may need to include the port (e.g. "hostname:port") to
+successfully match.
 
 Envoy can handle CONNECT in one of two ways, either proxying the CONNECT headers through as if they
 were any other request, and letting the upstream terminate the CONNECT request, or by terminating the
@@ -88,17 +91,35 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
   This mode of CONNECT support can create major security holes if not configured correctly, as the upstream
   will be forwarded *unsanitized* headers if they are in the body payload. Please use with caution
 
-Tunneling TCP over HTTP/2
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Envoy also has support for transforming raw TCP into HTTP/2 CONNECT requests. This can be used to
-proxy multiplexed TCP over pre-warmed secure connections and amortize the cost of any TLS handshake.
-An example set up proxying SMTP would look something like this
+For an example of proxying connect, please see :repo:`configs/proxy_connect.yaml <configs/proxy_connect.yaml>`
+For an example of terminating connect, please see :repo:`configs/terminate_connect.yaml <configs/terminate_connect.yaml>`
+
+Tunneling TCP over HTTP
+^^^^^^^^^^^^^^^^^^^^^^^
+Envoy also has support for tunneling raw TCP over HTTP CONNECT requests. Find
+below some usage scenarios.
+
+HTTP/2 CONNECT can be used to proxy multiplexed TCP over pre-warmed secure connections and amortize the cost of any TLS
+handshake.
+An example set up proxying SMTP would look something like this:
 
 [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2  --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
+HTTP/1.1 CONNECT can be used to have TCP client connecting to its own
+destination passing through an HTTP proxy server (e.g. corporate proxy not
+supporting HTTP/2):
+
+[HTTP Server] --- raw HTTP --- [L2 Envoy]  --- HTTP tunneled over HTTP/1.1  --- [L1 Envoy]  --- raw HTTP  --- [HTTP Client]
+
+Note that when using HTTP/1 CONNECT you will end up having a TCP connection
+between L1 and L2 Envoy for each TCP client connection, it is preferable to use
+HTTP/2 when you have the choice.
+
 Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
-If you run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_connect.v3.yaml --base-id 1`
-and `bazel-bin/source/exe/envoy-static --config-path  configs/terminate_connect.v3.yaml`
-you will be running two Envoys, the first listening for TCP traffic on port 10000 and encapsulating it in an HTTP/2
-CONNECT request, and the second listening for HTTP/2 on 10001, stripping the CONNECT headers, and forwarding the
+For HTTP/1.1 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
+and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http1_connect.yaml`.
+For HTTP/2 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
+and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_connect.yaml`.
+In both cases you will be running a first Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP
+CONNECT request, and a second one listening on 10001, stripping the CONNECT headers, and forwarding the 
 original TCP upstream, in this case to google.com.

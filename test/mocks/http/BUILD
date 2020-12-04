@@ -85,6 +85,7 @@ envoy_cc_mock(
     deps = [
         ":stream_mock",
         "//include/envoy/http:codec_interface",
+        "//source/common/http:header_utility_lib",
     ],
 )
 

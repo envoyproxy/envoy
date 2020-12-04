@@ -181,10 +181,9 @@ public:
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
     if (has_cluster) {
-      EXPECT_CALL(cluster_manager_, get(_));
-    } else {
-      EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(nullptr));
+      cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     }
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster("fake_cluster"));
     filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
   }
 
@@ -207,7 +206,7 @@ public:
     EXPECT_CALL(
         *new_session.socket_->io_handle_,
         createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
-        .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
+        .WillOnce(SaveArg<1>(&new_session.file_event_cb_));
     // Internal Buffer is Empty, flush will be a no-op
     ON_CALL(callbacks_.udp_listener_, flush())
         .WillByDefault(

@@ -13,7 +13,7 @@ namespace StatusHelpers {
 // StatusOr<int> status(3);
 // EXPECT_THAT(status, IsOkAndHolds(3));
 MATCHER_P(IsOkAndHolds, expected, "") {
-  if (!arg) {
+  if (!arg.ok()) {
     *result_listener << "which has unexpected status: " << arg.status();
     return false;
   }

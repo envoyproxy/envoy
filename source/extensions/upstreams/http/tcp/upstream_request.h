@@ -40,7 +40,6 @@ public:
     }
     return false;
   }
-  absl::optional<Envoy::Http::Protocol> protocol() const override { return absl::nullopt; }
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   bool valid() { return conn_pool_ != nullptr; }
@@ -70,7 +69,7 @@ public:
   // GenericUpstream
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
-  void encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
+  Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
   void readDisable(bool disable) override;
   void resetStream() override;

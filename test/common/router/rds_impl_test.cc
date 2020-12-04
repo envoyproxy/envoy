@@ -100,7 +100,7 @@ codec_type: auto
 stat_prefix: foo
 http_filters:
 - name: http_dynamo_filter
-  config: {}
+  typed_config: {}
     )EOF";
 
     EXPECT_CALL(outer_init_manager_, add(_));
@@ -166,7 +166,7 @@ TEST_F(RdsImplTest, Basic) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": null
     }
@@ -196,7 +196,7 @@ TEST_F(RdsImplTest, Basic) {
   "version_info": "2",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": [
         {
@@ -226,7 +226,7 @@ TEST_F(RdsImplTest, Basic) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
   // Make sure we don't lookup/verify clusters.
-  EXPECT_CALL(server_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
+  EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
   rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -248,7 +248,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "INVALID_NAME_FOR_route_config",
       "virtual_hosts": null
     }
@@ -487,6 +487,7 @@ virtual_hosts:
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   // Only static route.
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_,
@@ -730,7 +731,7 @@ dynamic_route_configs:
   const std::string response1_yaml = R"EOF(
 version_info: '1'
 resources:
-- "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+- "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
   name: foo_route_config
   virtual_hosts:
   - name: integration

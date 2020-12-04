@@ -43,7 +43,7 @@ public:
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
-      accesslog_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*accesslog_cluster);
     });
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -147,15 +147,14 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
 
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(waitForAccessLogRequest(
-      fmt::format(R"EOF(
+  ASSERT_TRUE(
+      waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
     cluster: cluster_name
     locality:
       zone: zone_name
-    build_version: {}
     user_agent_name: "envoy"
   log_name: foo
 tcp_logs:
@@ -181,11 +180,11 @@ tcp_logs:
       received_bytes: 3
       sent_bytes: 5
 )EOF",
-                  VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()))));
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
 }

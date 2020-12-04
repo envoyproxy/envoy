@@ -61,8 +61,33 @@ function exclude_third_party() {
   grep -v third_party/
 }
 
+# Exclude files which are part of the Wasm emscripten environment
+function exclude_wasm_emscripten() {
+  grep -v source/extensions/common/wasm/ext
+}
+
+# Exclude files which are part of the Wasm SDK
+function exclude_wasm_sdk() {
+  grep -v proxy_wasm_cpp_sdk
+}
+
+# Exclude files which are part of the Wasm Host environment
+function exclude_wasm_host() {
+  grep -v proxy_wasm_cpp_host
+}
+
+# Exclude proxy-wasm test_data.
+function exclude_wasm_test_data() {
+  grep -v wasm/test_data
+}
+
+# Exclude files which are part of the Wasm examples
+function exclude_wasm_examples() {
+  grep -v examples/wasm
+}
+
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party
+  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {
@@ -88,9 +113,7 @@ elif [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   run_clang_tidy
 else
   if [[ -z "${DIFF_REF}" ]]; then
-    if [[ "${BUILD_REASON}" == "PullRequest" ]]; then
-      DIFF_REF="remotes/origin/${SYSTEM_PULLREQUEST_TARGETBRANCH}"
-    elif [[ "${BUILD_REASON}" == *CI ]]; then
+    if [[ "${BUILD_REASON}" == *CI ]]; then
       DIFF_REF="HEAD^"
     else
       DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)

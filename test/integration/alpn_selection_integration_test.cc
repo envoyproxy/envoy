@@ -31,13 +31,13 @@ public:
       auto* cluster = static_resources->mutable_clusters(0);
 
       if (use_h2_) {
-        cluster->mutable_http2_protocol_options();
+        ConfigHelper::setHttp2(*cluster);
       }
       const std::string transport_socket_yaml = absl::StrFormat(
           R"EOF(
 name: tls
 typed_config:
-  "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
   common_tls_context:
     alpn_protocols: [ %s ]
     tls_certificates:

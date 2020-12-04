@@ -67,16 +67,17 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               const Http::HeaderMap& headers,
                                               const Network::Address::Instance&,
                                               const envoy::config::core::v3::Metadata*) const {
-  const Http::HeaderEntry* header_value = headers.get(header_name_);
+  const auto header_value = headers.get(header_name_);
 
   // If header is not present in the request and if skip_if_absent is true skip this descriptor,
   // while calling rate limiting service. If skip_if_absent is false, do not call rate limiting
   // service.
-  if (!header_value) {
+  if (header_value.empty()) {
     return skip_if_absent_;
   }
+  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
   descriptor.entries_.push_back(
-      {descriptor_key_, std::string(header_value->value().getStringView())});
+      {descriptor_key_, std::string(header_value[0]->value().getStringView())});
   return true;
 }
 
@@ -101,22 +102,40 @@ bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
   return true;
 }
 
-DynamicMetaDataAction::DynamicMetaDataAction(
+MetaDataAction::MetaDataAction(const envoy::config::route::v3::RateLimit::Action::MetaData& action)
+    : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
+      default_value_(action.default_value()), source_(action.source()) {}
+
+MetaDataAction::MetaDataAction(
     const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action)
     : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
-      default_value_(action.default_value()) {}
+      default_value_(action.default_value()),
+      source_(envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC) {}
 
-bool DynamicMetaDataAction::populateDescriptor(
-    const Router::RouteEntry&, RateLimit::Descriptor& descriptor, const std::string&,
+bool MetaDataAction::populateDescriptor(
+    const Router::RouteEntry& route, RateLimit::Descriptor& descriptor, const std::string&,
     const Http::HeaderMap&, const Network::Address::Instance&,
     const envoy::config::core::v3::Metadata* dynamic_metadata) const {
-  const ProtobufWkt::Value& metadata_value =
-      Envoy::Config::Metadata::metadataValue(dynamic_metadata, metadata_key_);
+  const envoy::config::core::v3::Metadata* metadata_source;
 
-  if (!metadata_value.string_value().empty()) {
-    descriptor.entries_.push_back({descriptor_key_, metadata_value.string_value()});
+  switch (source_) {
+  case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
+    metadata_source = dynamic_metadata;
+    break;
+  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
+    metadata_source = &route.metadata();
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  const std::string metadata_string_value =
+      Envoy::Config::Metadata::metadataValue(metadata_source, metadata_key_).string_value();
+
+  if (!metadata_string_value.empty()) {
+    descriptor.entries_.push_back({descriptor_key_, metadata_string_value});
     return true;
-  } else if (metadata_value.string_value().empty() && !default_value_.empty()) {
+  } else if (metadata_string_value.empty() && !default_value_.empty()) {
     descriptor.entries_.push_back({descriptor_key_, default_value_});
     return true;
   }
@@ -165,7 +184,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new GenericKeyAction(action.generic_key()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDynamicMetadata:
-      actions_.emplace_back(new DynamicMetaDataAction(action.dynamic_metadata()));
+      actions_.emplace_back(new MetaDataAction(action.dynamic_metadata()));
+      break;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMetadata:
+      actions_.emplace_back(new MetaDataAction(action.metadata()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
       actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));

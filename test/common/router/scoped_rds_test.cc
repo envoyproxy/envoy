@@ -697,7 +697,7 @@ codec_type: auto
 stat_prefix: foo
 http_filters:
   - name: http_dynamo_filter
-    config:
+    typed_config:
 scoped_routes:
   name: $0
   scope_key_builder:

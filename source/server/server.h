@@ -113,7 +113,8 @@ public:
    * @param sinks supplies the list of sinks.
    * @param store provides the store being flushed.
    */
-  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
+  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                  TimeSource& time_source);
 
   /**
    * Load a bootstrap config and perform validation.
@@ -250,7 +251,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  ProcessContextOptRef processContext() override { return *process_context_; }
+  ProcessContextOptRef processContext() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
@@ -383,7 +384,7 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
-  explicit MetricSnapshotImpl(Stats::Store& store);
+  explicit MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }
@@ -396,6 +397,7 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
+  SystemTime snapshotTime() const override { return snapshot_time_; }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
@@ -406,6 +408,7 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
+  SystemTime snapshot_time_;
 };
 
 } // namespace Server

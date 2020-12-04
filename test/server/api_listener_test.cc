@@ -40,7 +40,7 @@ address:
     port_value: 1234
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     stat_prefix: hcm
     route_config:
       name: api_router
@@ -56,7 +56,8 @@ api_listener:
   )EOF";
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
-
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
@@ -100,7 +101,7 @@ address:
     port_value: 1234
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     stat_prefix: hcm
     route_config:
       name: api_router
@@ -116,7 +117,8 @@ api_listener:
   )EOF";
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
-
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());

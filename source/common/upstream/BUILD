@@ -203,11 +203,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "locality_endpoint_lib",
+    hdrs = ["locality_endpoint.h"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "health_discovery_service_lib",
     srcs = ["health_discovery_service.cc"],
     hdrs = ["health_discovery_service.h"],
     deps = [
         ":health_checker_lib",
+        ":locality_endpoint_lib",
         ":upstream_includes",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -525,6 +536,7 @@ envoy_cc_library(
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/upstreams/http:config",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

@@ -35,7 +35,7 @@ public:
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
       metrics_service_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       metrics_service_cluster->set_name("metrics_service");
-      metrics_service_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*metrics_service_cluster);
       // metrics_service gRPC service definition.
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.stat_sinks.metrics_service");
@@ -87,6 +87,7 @@ public:
       const Protobuf::RepeatedPtrField<::io::prometheus::client::MetricFamily>& envoy_metrics =
           request_msg.envoy_metrics();
 
+      int64_t previous_time_stamp = 0;
       for (const ::io::prometheus::client::MetricFamily& metrics_family : envoy_metrics) {
         if (metrics_family.name() == "cluster.cluster_0.membership_change" &&
             metrics_family.type() == ::io::prometheus::client::MetricType::COUNTER) {
@@ -112,6 +113,11 @@ public:
                     Stats::HistogramSettingsImpl::defaultBuckets().size());
         }
         ASSERT(metrics_family.metric(0).has_timestamp_ms());
+        // Validate that all metrics have the same timestamp.
+        if (previous_time_stamp > 0) {
+          EXPECT_EQ(previous_time_stamp, metrics_family.metric(0).timestamp_ms());
+        }
+        previous_time_stamp = metrics_family.metric(0).timestamp_ms();
         if (known_counter_exists && known_gauge_exists && known_histogram_exists) {
           break;
         }

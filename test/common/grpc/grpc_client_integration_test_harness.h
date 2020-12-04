@@ -291,15 +291,16 @@ public:
     ON_CALL(*mock_cluster_info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
-    EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
     Upstream::MockHost::MockCreateConnectionData connection_data{client_connection_.release(),
                                                                  host_description_ptr_};
     EXPECT_CALL(*mock_host_, createConnection_(_, _)).WillRepeatedly(Return(connection_data));
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = std::make_unique<Http::Http2::ProdConnPoolImpl>(
-        *dispatcher_, random_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr);
+    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, random_, host_ptr_,
+                                                    Upstream::ResourcePriority::Default, nullptr,
+                                                    nullptr, state_);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
@@ -307,7 +308,8 @@ public:
         std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq(fake_cluster_name_)))
+        .WillRepeatedly(Return(&thread_local_cluster_));
     envoy::config::core::v3::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
@@ -456,6 +458,7 @@ public:
   const TestMetadata empty_metadata_;
 
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
+  Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
   const std::string fake_cluster_name_{"fake_cluster"};
   Upstream::MockClusterManager cm_;

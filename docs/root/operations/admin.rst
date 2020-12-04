@@ -324,6 +324,8 @@ modify different aspects of the server:
    traffic direction are stopped, listener additions and modifications in that direction
    are not allowed.
 
+.. _operations_admin_interface_server_info:
+
 .. http:get:: /server_info
 
   Outputs a JSON message containing information about the running server.
@@ -508,9 +510,6 @@ modify different aspects of the server:
   take a global symbol table lock. During startup this is acceptable,
   but in response to user requests on high core-count machines, this
   can cause performance issues due to mutex contention.
-
-  This admin endpoint requires Envoy to be started with option
-  `--use-fake-symbol-table 0`.
 
   See :repo:`source/docs/stats.md` for more details.
 

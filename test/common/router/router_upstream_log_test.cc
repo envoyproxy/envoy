@@ -40,8 +40,9 @@ absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-  format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
     %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
     %UPSTREAM_LOCAL_ADDRESS% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
   path: "/dev/null"
@@ -99,7 +100,7 @@ public:
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
-
+    context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     ON_CALL(*context_.cluster_manager_.conn_pool_.host_, address())
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.conn_pool_.host_, locality())
@@ -137,13 +138,14 @@ public:
               EXPECT_CALL(encoder.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectResponseTimerCreate();
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_->decodeHeaders(headers, true);
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -175,7 +177,7 @@ public:
               EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder1, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectPerTryTimerCreate();
@@ -185,6 +187,7 @@ public:
                                            {"x-envoy-internal", "true"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(2);
     router_->decodeHeaders(headers, true);
 
     router_->retry_state_->expectResetRetry();
@@ -204,7 +207,7 @@ public:
               EXPECT_CALL(encoder2.stream_, connectionLocalAddress())
                   .WillRepeatedly(ReturnRef(upstream_local_address2_));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_,
-                                    stream_info_);
+                                    stream_info_, Http::Protocol::Http10);
               return nullptr;
             }));
     expectPerTryTimerCreate();
@@ -286,8 +289,9 @@ TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   const std::string yaml = R"EOF(
 name: accesslog
 typed_config:
-  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-  format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%
     %DURATION% %RESPONSE_DURATION% %REQUEST_DURATION%"
   path: "/dev/null"
   )EOF";

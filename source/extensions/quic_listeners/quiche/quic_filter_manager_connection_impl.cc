@@ -30,12 +30,21 @@ void QuicFilterManagerConnectionImpl::addReadFilter(Network::ReadFilterSharedPtr
   filter_manager_.addReadFilter(filter);
 }
 
+void QuicFilterManagerConnectionImpl::removeReadFilter(Network::ReadFilterSharedPtr filter) {
+  filter_manager_.removeReadFilter(filter);
+}
+
 bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_.initializeReadFilters();
 }
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
+}
+
+bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() {
+  // Quic doesn't support half close.
+  return false;
 }
 
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {

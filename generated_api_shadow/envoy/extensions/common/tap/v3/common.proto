@@ -2,10 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.common.tap.v3;
 
-import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/tap/v3/common.proto";
-
-import "udpa/core/v1/resource_locator.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -24,23 +21,6 @@ message CommonExtensionConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.tap.v2alpha.CommonExtensionConfig";
 
-  // [#not-implemented-hide:]
-  message TapDSConfig {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.common.tap.v2alpha.CommonExtensionConfig.TapDSConfig";
-
-    // Configuration for the source of TapDS updates for this Cluster.
-    config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
-
-    // Tap config to request from XDS server.
-    string name = 2 [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
-
-    // Resource locator for TAP. This is mutually exclusive to *name*.
-    // [#not-implemented-hide:]
-    udpa.core.v1.ResourceLocator tap_resource_locator = 3
-        [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
-  }
-
   oneof config_type {
     option (validate.required) = true;
 
@@ -50,9 +30,6 @@ message CommonExtensionConfig {
     // If specified, the tap filter will be configured via a static configuration that cannot be
     // changed.
     config.tap.v3.TapConfig static_config = 2;
-
-    // [#not-implemented-hide:] Configuration to use for TapDS updates for the filter.
-    TapDSConfig tapds_config = 3;
   }
 }
 

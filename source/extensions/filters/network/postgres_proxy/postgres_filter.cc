@@ -92,7 +92,7 @@ void PostgresFilter::incTransactionsCommit() {
 }
 
 void PostgresFilter::incTransactionsRollback() {
-  if (!decoder_->getSession().inTransaction()) {
+  if (decoder_->getSession().inTransaction()) {
     config_->stats_.transactions_rollback_.inc();
   }
 }

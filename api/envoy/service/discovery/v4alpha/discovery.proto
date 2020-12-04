@@ -5,10 +5,8 @@ package envoy.service.discovery.v4alpha;
 import "envoy/config/core/v4alpha/base.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
-
-import "udpa/core/v1/resource_locator.proto";
-import "udpa/core/v1/resource_name.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -145,7 +143,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
-// [#next-free-field: 10]
+// [#next-free-field: 8]
 message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.DeltaDiscoveryRequest";
@@ -155,8 +153,8 @@ message DeltaDiscoveryRequest {
 
   // Type of the resource that is being requested, e.g.
   // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This does not need to be set if
-  // resources are only referenced via *udpa_resource_subscribe* and
-  // *udpa_resources_unsubscribe*.
+  // resources are only referenced via *xds_resource_subscribe* and
+  // *xds_resources_unsubscribe*.
   string type_url = 2;
 
   // DeltaDiscoveryRequests allow the client to add or remove individual
@@ -182,21 +180,8 @@ message DeltaDiscoveryRequest {
   // A list of Resource names to add to the list of tracked resources.
   repeated string resource_names_subscribe = 3;
 
-  // As with *resource_names_subscribe* but used when subscribing to resources indicated
-  // by a *udpa.core.v1.ResourceLocator*. The directives in the resource locator
-  // are ignored and the context parameters are matched with
-  // *context_param_specifier* specific semantics.
-  // [#not-implemented-hide:]
-  repeated udpa.core.v1.ResourceLocator udpa_resources_subscribe = 8;
-
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
-
-  // As with *resource_names_unsubscribe* but used when unsubscribing to resources indicated by a
-  // *udpa.core.v1.ResourceLocator*. This must match a previously subscribed
-  // resource locator provided in *udpa_resources_subscribe*.
-  // [#not-implemented-hide:]
-  repeated udpa.core.v1.ResourceLocator udpa_resources_unsubscribe = 9;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
@@ -220,7 +205,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.DeltaDiscoveryResponse";
@@ -236,36 +221,36 @@ message DeltaDiscoveryResponse {
 
   // Type URL for resources. Identifies the xDS API when muxing over ADS.
   // Must be consistent with the type_url in the Any within 'resources' if 'resources' is non-empty.
-  // This does not need to be set if *udpa_removed_resources* is used instead of
-  // *removed_resources*.
   string type_url = 4;
 
   // Resources names of resources that have be deleted and to be removed from the xDS Client.
   // Removed resources for missing resources can be ignored.
   repeated string removed_resources = 6;
 
-  // As with *removed_resources* but used when a removed resource was named in
-  // its *Resource*s with a *udpa.core.v1.ResourceName*.
-  // [#not-implemented-hide:]
-  repeated udpa.core.v1.ResourceName udpa_removed_resources = 7;
-
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
   // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message Resource {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.Resource";
 
-  oneof name_specifier {
-    // The resource's name, to distinguish it from others of the same type of resource.
-    string name = 3;
+  // Cache control properties for the resource.
+  // [#not-implemented-hide:]
+  message CacheControl {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.service.discovery.v3.Resource.CacheControl";
 
-    // Used instead of *name* when a resource with a *udpa.core.v1.ResourceName* is delivered.
-    udpa.core.v1.ResourceName udpa_resource_name = 5;
+    // If true, xDS proxies may not cache this resource.
+    // Note that this does not apply to clients other than xDS proxies, which must cache resources
+    // for their own use, regardless of the value of this field.
+    bool do_not_cache = 1;
   }
+
+  // The resource's name, to distinguish it from others of the same type of resource.
+  string name = 3;
 
   // The aliases are a list of other names that this resource can go by.
   repeated string aliases = 4;
@@ -276,4 +261,23 @@ message Resource {
 
   // The resource being tracked.
   google.protobuf.Any resource = 2;
+
+  // Time-to-live value for the resource. For each resource, a timer is started. The timer is
+  // reset each time the resource is received with a new TTL. If the resource is received with
+  // no TTL set, the timer is removed for the resource. Upon expiration of the timer, the
+  // configuration for the resource will be removed.
+  //
+  // The TTL can be refreshed or changed by sending a response that doesn't change the resource
+  // version. In this case the resource field does not need to be populated, which allows for
+  // light-weight "heartbeat" updates to keep a resource with a TTL alive.
+  //
+  // The TTL feature is meant to support configurations that should be removed in the event of
+  // a management server failure. For example, the feature may be used for fault injection
+  // testing where the fault injection should be terminated in the event that Envoy loses contact
+  // with the management server.
+  google.protobuf.Duration ttl = 6;
+
+  // Cache control properties for the resource.
+  // [#not-implemented-hide:]
+  CacheControl cache_control = 7;
 }

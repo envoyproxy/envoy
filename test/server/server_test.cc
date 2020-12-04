@@ -1,8 +1,10 @@
 #include <memory>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/fatal_action_config.h"
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
@@ -19,6 +21,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
+#include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
@@ -52,6 +55,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
   Stats::TestUtil::TestStore store;
+  Event::SimulatedTimeSystem time_system;
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
@@ -59,7 +63,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   store.textReadout("text").set("is important");
 
   std::list<Stats::SinkPtr> sinks;
-  InstanceUtil::flushMetricsToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
   // Make sure that counters have been latched even if there are no sinks.
   EXPECT_EQ(1UL, c.value());
   EXPECT_EQ(0, c.latch());
@@ -80,7 +84,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
   }));
   c.inc();
-  InstanceUtil::flushMetricsToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
 
   // Histograms don't currently work with the isolated store so test those with a mock store.
   NiceMock<Stats::MockStore> mock_store;
@@ -93,7 +97,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.histograms().size(), 1);
     EXPECT_TRUE(snapshot.textReadouts().empty());
   }));
-  InstanceUtil::flushMetricsToSinks(sinks, mock_store);
+  InstanceUtil::flushMetricsToSinks(sinks, mock_store, time_system);
 }
 
 class RunHelperTest : public testing::Test {
@@ -661,20 +665,48 @@ TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
   EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
 }
 
-// Validate that bootstrap v2 pb_text with deprecated fields loads.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromPbText)) {
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"));
+// Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      DeprecatedMajorVersionException,
+      "Support for v2 will be removed from Envoy at the start of Q1 2021. You may make use of v2 "
+      "in Q3 2020 by setting");
+}
+
+// Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromPbText)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
 }
 
-// Validate that bootstrap v2 YAML with deprecated fields loads.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2BootstrapFromYaml)) {
+// Validate that bootstrap v2 pb_text with deprecated fields fails to load when
+// --bootstrap-version is not set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapFromPbText)) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
+      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
+}
+
+// Validate that bootstrap v2 YAML with deprecated fields loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(LoadsV2BootstrapWithExplicitVersionFromYaml)) {
+  options_.bootstrap_version_ = 2;
   EXPECT_LOG_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
   EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
+}
+
+// Validate that bootstrap v2 YAML with deprecated fields fails to load when
+// --bootstrap-version is not set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailsToLoadV2BootstrapFromYaml)) {
+  EXPECT_THROW_WITH_REGEX(
+      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
+      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
 }
 
 // Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
@@ -848,6 +880,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
 }
 
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
+  options_.bootstrap_version_ = 2;
   EXPECT_THROW_WITH_MESSAGE(
       initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"),
       EnvoyException, "Invalid runtime entry value for foo");
@@ -1108,6 +1141,7 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
+  options_.bootstrap_version_ = 2;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
   EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }
@@ -1180,6 +1214,72 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
       initialize("test/server/test_data/server/bootstrap_extensions.yaml"), EnvoyException,
       "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
 }
+
+// Insufficient support on Windows.
+#ifndef WIN32
+class SafeFatalAction : public Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override {
+    std::cerr << "Called SafeFatalAction" << std::endl;
+  }
+
+  bool isAsyncSignalSafe() const override { return true; }
+};
+
+class UnsafeFatalAction : public Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override {
+    std::cerr << "Called UnsafeFatalAction" << std::endl;
+  }
+
+  bool isAsyncSignalSafe() const override { return false; }
+};
+
+TEST_P(ServerInstanceImplTest, WithFatalActions) {
+  // Inject Safe Factory.
+  NiceMock<Configuration::MockFatalActionFactory> mock_safe_factory;
+  EXPECT_CALL(mock_safe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+  }));
+  EXPECT_CALL(mock_safe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.safe"));
+
+  Registry::InjectFactory<Configuration::FatalActionFactory> registered_safe_factory(
+      mock_safe_factory);
+
+  // Inject Unsafe Factory
+  NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
+  EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+  }));
+  EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
+
+  Registry::InjectFactory<Configuration::FatalActionFactory> registered_unsafe_factory(
+      mock_unsafe_factory);
+
+  EXPECT_DEATH(
+      {
+        EXPECT_CALL(mock_safe_factory, createFatalActionFromProto(_, _))
+            .WillOnce(
+                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                          Instance* /*server*/) { return std::make_unique<SafeFatalAction>(); }));
+        EXPECT_CALL(mock_unsafe_factory, createFatalActionFromProto(_, _))
+            .WillOnce(
+                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                          Instance* /*server*/) { return std::make_unique<UnsafeFatalAction>(); }));
+        absl::Notification abort_called;
+        auto server_thread =
+            startTestServer("test/server/test_data/server/fatal_actions.yaml", false);
+        // Trigger SIGABRT, wait for the ABORT
+        server_->dispatcher().post([&] {
+          abort();
+          abort_called.Notify();
+        });
+
+        abort_called.WaitForNotification();
+      },
+      "");
+}
+#endif
 
 // Static configuration validation. We test with both allow/reject settings various aspects of
 // configuration from YAML.
@@ -1309,6 +1409,16 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
     }
   }
   ASSERT_TRUE(disabled_filter_found);
+}
+
+TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
+  // These are already the defaults. Repeated here for clarity.
+  process_object_ = nullptr;
+  process_context_ = nullptr;
+
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  ProcessContextOptRef context = server_->processContext();
+  EXPECT_FALSE(context.has_value());
 }
 
 } // namespace

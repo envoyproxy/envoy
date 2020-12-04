@@ -550,9 +550,11 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   if (!host_rewrite_.empty()) {
     headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
-    const Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
-    if (header != nullptr) {
-      absl::string_view header_value = header->value().getStringView();
+    const auto header = headers.get(*auto_host_rewrite_header_);
+    if (!header.empty()) {
+      // This is an implicitly untrusted header, so per the API documentation only the first
+      // value is used.
+      const absl::string_view header_value = header[0]->value().getStringView();
       if (!header_value.empty()) {
         headers.setHost(header_value);
       }
@@ -881,10 +883,12 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
-      const Http::HeaderEntry* entry = headers.get(cluster_header_name_);
+      const auto entry = headers.get(cluster_header_name_);
       std::string final_cluster_name;
-      if (entry) {
-        final_cluster_name = std::string(entry->value().getStringView());
+      if (!entry.empty()) {
+        // This is an implicitly untrusted header, so per the API documentation only the first
+        // value is used.
+        final_cluster_name = std::string(entry[0]->value().getStringView());
       }
 
       // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
@@ -898,7 +902,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
                                           true);
 }
 
-void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
+void RouteEntryImplBase::validateClusters(
+    const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const {
   if (isDirectResponse()) {
     return;
   }
@@ -910,12 +915,12 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   // In the future we might decide to also have a config option that turns off checks for static
   // route tables. This would enable the all CDS with static route table case.
   if (!cluster_name_.empty()) {
-    if (!cm.get(cluster_name_)) {
+    if (!cluster_info_maps.hasCluster(cluster_name_)) {
       throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-      if (!cm.get(cluster->clusterName())) {
+      if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
         throw EnvoyException(
             fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
       }
@@ -1071,11 +1076,12 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
   return nullptr;
 }
 
-VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
-                                 const ConfigImpl& global_route_config,
-                                 Server::Configuration::ServerFactoryContext& factory_context,
-                                 Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
-                                 bool validate_clusters)
+VirtualHostImpl::VirtualHostImpl(
+    const envoy::config::route::v3::VirtualHost& virtual_host,
+    const ConfigImpl& global_route_config,
+    Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+    ProtobufMessage::ValidationVisitor& validator,
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
     : stat_name_pool_(factory_context.scope().symbolTable()),
       stat_name_(stat_name_pool_.add(virtual_host.name())),
       vcluster_scope_(scope.createScope(virtual_host.name() + ".vcluster")),
@@ -1138,11 +1144,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
-    if (validate_clusters) {
-      routes_.back()->validateClusters(factory_context.clusterManager());
+    if (validation_clusters.has_value()) {
+      routes_.back()->validateClusters(*validation_clusters);
       for (const auto& shadow_policy : routes_.back()->shadowPolicies()) {
         ASSERT(!shadow_policy->cluster().empty());
-        if (!factory_context.clusterManager().get(shadow_policy->cluster())) {
+        if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
           throw EnvoyException(
               fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
         }
@@ -1224,10 +1230,14 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
     : vhost_scope_(factory_context.scope().createScope("vhost")) {
+  absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
+  if (validate_clusters) {
+    validation_clusters = factory_context.clusterManager().clusters();
+  }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
                                                           factory_context, *vhost_scope_, validator,
-                                                          validate_clusters));
+                                                          validation_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       bool duplicate_found = false;

@@ -29,7 +29,7 @@ static_resources:
           - name: envoy.filters.http.grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
-              proto_descriptor: "/tmp/envoy/proto.pb"
+              proto_descriptor: "protos/helloworld.pb"
               services: ["helloworld.Greeter"]
               print_options:
                 add_whitespace: true
@@ -44,7 +44,11 @@ static_resources:
     type: logical_dns
     lb_policy: round_robin
     dns_lookup_family: V4_ONLY
-    http2_protocol_options: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
     load_assignment:
       cluster_name: grpc
       endpoints:

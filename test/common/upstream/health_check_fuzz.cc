@@ -102,8 +102,12 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   allocHttpHealthCheckerFromProto(input.health_check_config());
   ON_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillByDefault(testing::Return(input.http_verify_cluster()));
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
+  if (input.upstream_cx_success()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   expectStreamCreate(0);
   // This sets up the possibility of testing hosts that never become healthy
@@ -210,8 +214,12 @@ void TcpHealthCheckFuzz::allocTcpHealthCheckerFromProto(
 
 void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
   allocTcpHealthCheckerFromProto(input.health_check_config());
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
+  if (input.upstream_cx_success()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
   expectClientCreate();
   health_checker_->start();
@@ -306,24 +314,47 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
 
 void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
-  health_checker_ = std::make_shared<TestGrpcHealthCheckerImpl>(
+  health_checker_ = std::make_shared<NiceMock<TestGrpcHealthCheckerImpl>>(
       *cluster_, config, dispatcher_, runtime_, random_,
       HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");
 }
 
 void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase input) {
+  test_session_ = std::make_unique<TestSession>();
   allocGrpcHealthCheckerFromProto(input.health_check_config());
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
+  if (input.upstream_cx_success()) {
+    cluster_->info_->stats().upstream_cx_total_.inc();
+  }
   expectSessionCreate();
-  expectStreamCreate(0);
+  ON_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillByDefault(testing::InvokeWithoutArgs(
+          [&]() -> Network::ClientConnection* { return test_session_->client_connection_; }));
+
+  ON_CALL(*health_checker_, createCodecClient_(_))
+      .WillByDefault(
+          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+            TestSession& test_session = *test_session_;
+            std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                new NiceMock<Upstream::MockClusterInfo>()};
+            Event::MockDispatcher dispatcher_;
+            auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
+            test_session.codec_client_ = new CodecClientForTest(
+                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
+                test_session.codec_, nullptr,
+                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source), dispatcher_);
+            return test_session.codec_client_;
+          }));
+  expectStreamCreate();
   health_checker_->start();
   ON_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillByDefault(testing::Return(45000));
 
   if (DurationUtil::durationToMilliseconds(input.health_check_config().initial_jitter()) != 0) {
-    test_sessions_[0]->interval_timer_->invokeCallback();
+    test_session_->interval_timer_->invokeCallback();
   }
 
   reuse_connection_ =
@@ -333,7 +364,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
 // Logic from respondResponseSpec() in unit tests
 void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool last_action) {
   const test::common::upstream::GrpcRespond& grpc_respond = respond.grpc_respond();
-  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+  if (!test_session_->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping response.");
     return;
   }
@@ -359,32 +390,31 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   response_headers->setStatus(grpc_respond.grpc_respond_headers().status());
 
   ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
-  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
-                                                               end_stream_on_headers);
+  test_session_->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                           end_stream_on_headers);
 
   // If the interval timer is enabled, that means that the rpc is complete, as decodeHeaders hit a
   // certain branch that called onRpcComplete(), logically representing a completed rpc call. Thus,
   // skip the next responses until explicitly invoking interval timer as cleanup.
-  if (has_data && !test_sessions_[0]->interval_timer_->enabled_) {
+  if (has_data && !test_session_->interval_timer_->enabled_) {
     std::vector<std::vector<uint8_t>> bufferList =
         makeBufferListToRespondWith(grpc_respond.grpc_respond_bytes());
     // If the interval timer is enabled, that means that the rpc is complete, as decodeData hit a
     // certain branch that called onRpcComplete(), logically representing a completed rpc call.
     // Thus, skip the next responses until explicitly invoking interval timer as cleanup.
-    for (size_t i = 0; i < bufferList.size() && !test_sessions_[0]->interval_timer_->enabled_;
-         ++i) {
+    for (size_t i = 0; i < bufferList.size() && !test_session_->interval_timer_->enabled_; ++i) {
       const bool end_stream_on_data = !has_trailers && i == bufferList.size() - 1;
       const auto data =
           std::make_unique<Buffer::OwnedImpl>(bufferList[i].data(), bufferList[i].size());
       ENVOY_LOG_MISC(trace, "Responded with data");
-      test_sessions_[0]->stream_response_callbacks_->decodeData(*data, end_stream_on_data);
+      test_session_->stream_response_callbacks_->decodeData(*data, end_stream_on_data);
     }
   }
 
   // If the interval timer is enabled, that means that the rpc is complete, as decodeData hit a
   // certain branch that called onRpcComplete(), logically representing a completed rpc call. Thus,
   // skip responding with trailers until explicitly invoking interval timer as cleanup.
-  if (has_trailers && !test_sessions_[0]->interval_timer_->enabled_) {
+  if (has_trailers && !test_session_->interval_timer_->enabled_) {
     std::unique_ptr<Http::TestResponseTrailerMapImpl> response_trailers =
         std::make_unique<Http::TestResponseTrailerMapImpl>(
             Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(
@@ -392,11 +422,11 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
 
     ENVOY_LOG_MISC(trace, "Responded trailers {}", *response_trailers.get());
 
-    test_sessions_[0]->stream_response_callbacks_->decodeTrailers(std::move(response_trailers));
+    test_session_->stream_response_callbacks_->decodeTrailers(std::move(response_trailers));
   }
 
   // This means that the response did not represent a full rpc response.
-  if (!test_sessions_[0]->interval_timer_->enabled_) {
+  if (!test_session_->interval_timer_->enabled_) {
     return;
   }
 
@@ -411,27 +441,27 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
 }
 
 void GrpcHealthCheckFuzz::triggerIntervalTimer(bool expect_client_create) {
-  if (!test_sessions_[0]->interval_timer_->enabled_) {
+  if (!test_session_->interval_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Interval timer is disabled. Skipping trigger interval timer.");
     return;
   }
   if (expect_client_create) {
-    expectClientCreate(0);
+    expectClientCreate();
     ENVOY_LOG_MISC(trace, "Created client");
   }
-  expectStreamCreate(0);
+  expectStreamCreate();
   ENVOY_LOG_MISC(trace, "Created stream");
-  test_sessions_[0]->interval_timer_->invokeCallback();
+  test_session_->interval_timer_->invokeCallback();
 }
 
 void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
-  if (!test_sessions_[0]->timeout_timer_->enabled_) {
+  if (!test_session_->timeout_timer_->enabled_) {
     ENVOY_LOG_MISC(trace, "Timeout timer is disabled. Skipping trigger timeout timer.");
     return;
   }
   ENVOY_LOG_MISC(trace, "Triggered timeout timer");
-  test_sessions_[0]->timeout_timer_->invokeCallback(); // This closes the client, turns off
-                                                       // timeout and enables interval
+  test_session_->timeout_timer_->invokeCallback(); // This closes the client, turns off
+                                                   // timeout and enables interval
 
   if ((!reuse_connection_ || received_no_error_goaway_) && !last_action) {
     ENVOY_LOG_MISC(trace, "Triggering interval timer after timeout.");
@@ -442,8 +472,9 @@ void GrpcHealthCheckFuzz::triggerTimeoutTimer(bool last_action) {
 }
 
 void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, bool last_action) {
-  test_sessions_[0]->client_connection_->raiseEvent(event_type);
+  test_session_->client_connection_->raiseEvent(event_type);
   if (!last_action && event_type != Network::ConnectionEvent::Connected) {
+    received_no_error_goaway_ = false; // from resetState()
     // Close events will always blow away the client
     ENVOY_LOG_MISC(trace, "Triggering interval timer after close event");
     // Interval timer is guaranteed to be enabled from a close event - calls
@@ -454,14 +485,35 @@ void GrpcHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type,
 
 void GrpcHealthCheckFuzz::raiseGoAway(bool no_error) {
   if (no_error) {
-    test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
+    test_session_->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
     // Will cause other events to blow away client, because this is a "graceful" go away
     received_no_error_goaway_ = true;
+    triggerIntervalTimer(true);
   } else {
     // go away events without no error flag explicitly blow away client
-    test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
+    test_session_->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
     triggerIntervalTimer(true);
   }
+}
+
+void GrpcHealthCheckFuzz::expectSessionCreate() {
+  test_session_->timeout_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  test_session_->interval_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  test_session_->request_encoder_.stream_.callbacks_.clear();
+  expectClientCreate();
+}
+
+void GrpcHealthCheckFuzz::expectClientCreate() {
+  TestSession& test_session = *test_session_;
+  test_session.codec_ = new NiceMock<Http::MockClientConnection>();
+  test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
+}
+
+void GrpcHealthCheckFuzz::expectStreamCreate() {
+  test_session_->request_encoder_.stream_.callbacks_.clear();
+  EXPECT_CALL(*test_session_->codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&test_session_->stream_response_callbacks_),
+                      ReturnRef(test_session_->request_encoder_)));
 }
 
 Network::ConnectionEvent
@@ -514,6 +566,10 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
     }
     case test::common::upstream::Action::kRaiseEvent: {
       raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+      break;
+    }
+    case test::common::upstream::Action::kRaiseGoAway: {
+      raiseGoAway(event.raise_go_away() == test::common::upstream::RaiseGoAway::NO_ERROR);
       break;
     }
     default:

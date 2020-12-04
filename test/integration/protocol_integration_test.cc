@@ -24,6 +24,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -154,7 +155,7 @@ TEST_P(ProtocolIntegrationTest, RouterRedirect) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("301", response->headers().getStatusValue());
   EXPECT_EQ("https://www.redirect.com/foo",
-            response->headers().get(Http::Headers::get().Location)->value().getStringView());
+            response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
@@ -174,7 +175,7 @@ TEST_P(ProtocolIntegrationTest, ComputedHealthCheck) {
   config_helper_.addFilter(R"EOF(
 name: health_check
 typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
@@ -195,7 +196,7 @@ TEST_P(ProtocolIntegrationTest, ModifyBuffer) {
   config_helper_.addFilter(R"EOF(
 name: health_check
 typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
@@ -303,7 +304,7 @@ typed_config:
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     EXPECT_EQ("decode", upstream_request_->trailers()
-                            ->get(Http::LowerCaseString("grpc-message"))
+                            ->get(Http::LowerCaseString("grpc-message"))[0]
                             ->value()
                             .getStringView());
   }
@@ -330,7 +331,94 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("host",
-            response->headers().get(Http::LowerCaseString("host"))->value().getStringView());
+            response->headers().get(Http::LowerCaseString("host"))[0]->value().getStringView());
+}
+
+// Tests missing headers needed for H/1 codec first line.
+TEST_P(ProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Missing method
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"remove-method", "yes"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+
+  // Missing path for non-CONNECT
+  response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"remove-path", "yes"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+}
+
+TEST_P(ProtocolIntegrationTest, FaultyFilterWithConnect) {
+  // Faulty filter that removed host in a CONNECT request.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // Clone the whole listener.
+    auto static_resources = bootstrap.mutable_static_resources();
+    auto* old_listener = static_resources->mutable_listeners(0);
+    auto* cloned_listener = static_resources->add_listeners();
+    cloned_listener->CopyFrom(*old_listener);
+    old_listener->set_name("http_forward");
+  });
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Missing host for CONNECT
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
+
+  auto response = (downstream_protocol_ == Http::CodecClient::Type::HTTP1)
+                      ? std::move((codec_client_->startRequest(headers)).second)
+                      : codec_client_->makeHeaderOnlyRequest(headers);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+}
+
+TEST_P(ProtocolIntegrationTest, MissingHeadersLocalReply) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Missing method
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"remove-method", "yes"},
+                                     {"send-reply", "yes"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
@@ -351,7 +439,7 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
                                      {"longrequestvalue", long_header_value_with_inner_lws}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(long_header_value_with_inner_lws, upstream_request_->headers()
-                                                  .get(Http::LowerCaseString("longrequestvalue"))
+                                                  .get(Http::LowerCaseString("longrequestvalue"))[0]
                                                   ->value()
                                                   .getStringView());
   upstream_request_->encodeHeaders(
@@ -363,10 +451,12 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("host",
-            response->headers().get(Http::LowerCaseString("host"))->value().getStringView());
-  EXPECT_EQ(
-      long_header_value_with_inner_lws,
-      response->headers().get(Http::LowerCaseString("longresponsevalue"))->value().getStringView());
+            response->headers().get(Http::LowerCaseString("host"))[0]->value().getStringView());
+  EXPECT_EQ(long_header_value_with_inner_lws,
+            response->headers()
+                .get(Http::LowerCaseString("longresponsevalue"))[0]
+                ->value()
+                .getStringView());
 }
 
 TEST_P(ProtocolIntegrationTest, Retry) {
@@ -898,8 +988,8 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   EXPECT_EQ("500", response->headers().getStatusValue());
   // Regression test all sendLocalReply paths add route-requested headers.
   auto foo = Http::LowerCaseString("foo");
-  ASSERT_TRUE(response->headers().get(foo) != nullptr);
-  EXPECT_EQ("bar", response->headers().get(foo)->value().getStringView());
+  ASSERT_FALSE(response->headers().get(foo).empty());
+  EXPECT_EQ("bar", response->headers().get(foo)[0]->value().getStringView());
 
   // Regression test https://github.com/envoyproxy/envoy/issues/9881 by making
   // sure this path does standard HCM header transformations.
@@ -907,6 +997,14 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("500"));
   test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
 }
+
+// The downstream connection is closed when it is read disabled, and on OSX the
+// connection error is not detected under these circumstances.
+#if !defined(__APPLE__)
+TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
+  testEnvoyHandling100Continue(false, "", true);
+}
+#endif
 
 TEST_P(ProtocolIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
@@ -1089,6 +1187,73 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
       upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     response->waitForReset();
   }
+}
+
+TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
+  initialize();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection->write(
+        "HTTP/1.1 11111111111111111111111111111111111111111111111111111111111111111 OK\r\n",
+        false));
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  } else {
+    Http::Http2::Http2Frame::SettingsFlags settings_flags =
+        static_cast<Http::Http2::Http2Frame::SettingsFlags>(0);
+    Http2Frame setting_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    // Ack settings
+    settings_flags = static_cast<Http::Http2::Http2Frame::SettingsFlags>(1); // ack
+    Http2Frame ack_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
+    ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
+    Http::Http2::Http2Frame overflowed_status = Http::Http2::Http2Frame::makeHeadersFrameWithStatus(
+        "11111111111111111111111111111111111111111111111111111111111111111", 0);
+    ASSERT_TRUE(fake_upstream_connection->write(std::string(overflowed_status)));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(ProtocolIntegrationTest, MissingStatus) {
+  initialize();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 OK\r\n", false));
+    ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  } else {
+    Http::Http2::Http2Frame::SettingsFlags settings_flags =
+        static_cast<Http::Http2::Http2Frame::SettingsFlags>(0);
+    Http2Frame setting_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    // Ack settings
+    settings_flags = static_cast<Http::Http2::Http2Frame::SettingsFlags>(1); // ack
+    Http2Frame ack_frame = Http::Http2::Http2Frame::makeEmptySettingsFrame(settings_flags);
+    ASSERT(fake_upstream_connection->write(std::string(setting_frame))); // empty settings
+    ASSERT(fake_upstream_connection->write(std::string(ack_frame)));     // ack setting
+    Http::Http2::Http2Frame missing_status = Http::Http2::Http2Frame::makeHeadersFrameNoStatus(0);
+    ASSERT_TRUE(fake_upstream_connection->write(std::string(missing_status)));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Validate that lots of tiny cookies doesn't cause a DoS (single cookie header).
@@ -1722,11 +1887,10 @@ TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(response->headers(), "set-cookie", out);
+  const auto out = response->headers().get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  ASSERT_EQ(out[0]->value().getStringView(), "foo");
+  ASSERT_EQ(out[1]->value().getStringView(), "bar");
 }
 
 // Resets the downstream stream immediately and verifies that we clean up everything.
@@ -1918,8 +2082,10 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
 TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
+  auto encoder_decoder = codec_client_->startRequest(
       Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host.com:80"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
 
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     // Because CONNECT requests for HTTP/1 do not include a path, they will fail

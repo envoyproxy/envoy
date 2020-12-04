@@ -21,6 +21,5 @@ ordinarily would not be trustable (such as the x-forwarded-for HTTP header).
 Configuration template
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The source distribution includes an example double proxy configuration that is very similar to
-the version that Lyft runs in production. See :ref:`here <install_ref_configs>` for more
-information.
+The source distribution includes an example double proxy configuration. See
+:ref:`here <intro_deployment_types>` for more information.

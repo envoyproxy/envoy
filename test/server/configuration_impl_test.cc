@@ -20,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
@@ -160,10 +161,10 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  ASSERT_EQ(1U, config.clusterManager()->clusters().count("test_cluster"));
+  ASSERT_EQ(1U, config.clusterManager()->clusters().active_clusters_.count("test_cluster"));
   EXPECT_EQ(8192U, config.clusterManager()
                        ->clusters()
-                       .find("test_cluster")
+                       .active_clusters_.find("test_cluster")
                        ->second.get()
                        .info()
                        ->perConnectionBufferLimitBytes());
@@ -322,6 +323,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
   addStatsdFakeClusterConfig(sink);
+  server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -480,6 +482,7 @@ TEST(InitialImplTest, EmptyDeprecatedRuntime) {
 
 // A deprecated Runtime is transformed to the equivalent LayeredRuntime.
 TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string bootstrap_yaml = R"EOF(
   runtime:
     symlink_root: /srv/runtime/current
@@ -754,8 +757,8 @@ TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.workerWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(1000), config.mainThreadWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(1000));
 }
 
 TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
@@ -793,8 +796,8 @@ TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(0), config.mainThreadWatchdogConfig().killTimeout());
-  EXPECT_EQ(std::chrono::milliseconds(0), config.workerWatchdogConfig().killTimeout());
+  EXPECT_EQ(config.mainThreadWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
+  EXPECT_EQ(config.workerWatchdogConfig().killTimeout(), std::chrono::milliseconds(0));
 }
 
 TEST_F(ConfigurationImplTest, ShouldErrorIfBothWatchdogsAndWatchdogSet) {
