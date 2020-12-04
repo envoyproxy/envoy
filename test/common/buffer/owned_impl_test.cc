@@ -1166,7 +1166,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).rc_, 0);
   ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length, 0));
   EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
-  expectSlices({{5, 0, 4096}, {1953, 2143, 4096}}, buf);
+  expectSlices({{5, 0, 4096}, {1953, 14431, 16384}}, buf);
 }
 
 TEST_F(OwnedImplTest, ReadReserveAndCommit) {
