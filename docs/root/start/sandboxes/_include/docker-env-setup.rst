@@ -1,16 +1,17 @@
-The following documentation runs through the setup of Envoy described above.
+以下文档说明了上述对于 Envoy 容器编译环境进行设置的过程。
 
-Step 1: Install Docker
-**********************
+步骤 1：安装 Docker
+********************
 
-Ensure that you have a recent versions of ``docker`` and ``docker-compose`` installed.
+确保你已安装较新版本的 ``docker`` 和 ``docker-compose`` 。
 
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
+一个最简单的方法来完成此事就是使用 `Docker Desktop <https://www.docker.com/products/docker-desktop>`_ 。
 
-Step 2: Clone the Envoy repo
-****************************
+步骤 2：克隆 Envoy 仓库
+*************************
 
-If you have not cloned the Envoy repo, clone it with:
+
+如果你还没有克隆 Envoy 仓库，用如下方式进行克隆：
 
 .. tabs::
 
