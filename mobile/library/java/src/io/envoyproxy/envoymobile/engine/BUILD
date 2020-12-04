@@ -28,6 +28,7 @@ java_library(
         "EnvoyEngineImpl.java",
         "EnvoyHTTPFilterCallbacksImpl.java",
         "EnvoyHTTPStream.java",
+        "EnvoyNativeFilterConfig.java",
         "EnvoyNativeResourceRegistry.java",
         "EnvoyNativeResourceReleaser.java",
         "EnvoyNativeResourceWrapper.java",

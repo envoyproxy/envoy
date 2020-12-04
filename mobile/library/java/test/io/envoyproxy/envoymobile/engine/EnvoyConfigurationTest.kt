@@ -16,6 +16,8 @@ mock_template:
     max_interval: {{ dns_failure_refresh_rate_seconds_max }}s
   platform_filter_chain:
 {{ platform_filter_chain }}
+  native_filter_chain:
+{{ native_filter_chain }}
   stats_flush_interval: {{ stats_flush_interval_seconds }}s
   os: {{ device_os }}
   app_version: {{ app_version }}
@@ -23,18 +25,28 @@ mock_template:
   virtual_clusters: {{ virtual_clusters }}
 """
 
-private const val FILTER_CONFIG =
-  """
+private const val PLATFORM_FILTER_CONFIG =
+"""
     - platform_filter_name: {{ platform_filter_name }}
+"""
+
+private const val NATIVE_FILTER_CONFIG =
+"""
+    - name: {{ native_filter_name }}
+      typed_config: {{ native_filter_typed_config }}
 """
 
 class EnvoyConfigurationTest {
 
   @Test
   fun `resolving with default configuration resolves with values`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, emptyList(), 567, "v1.2.3", "com.mydomain.myapp", "[test]", emptyMap())
+    val envoyConfiguration = EnvoyConfiguration(
+      "stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]",
+      listOf<EnvoyNativeFilterConfig>(EnvoyNativeFilterConfig("filter_name", "test_config")),
+      emptyList(), emptyMap()
+    )
 
-    val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG, FILTER_CONFIG)
+    val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG)
     assertThat(resolvedTemplate).contains("stats_domain: stats.foo.com")
     assertThat(resolvedTemplate).contains("connect_timeout: 123s")
     assertThat(resolvedTemplate).contains("dns_refresh_rate: 234s")
@@ -45,14 +57,19 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("app_version: v1.2.3")
     assertThat(resolvedTemplate).contains("app_id: com.mydomain.myapp")
     assertThat(resolvedTemplate).contains("virtual_clusters: [test]")
+    assertThat(resolvedTemplate).contains("filter_name")
+    assertThat(resolvedTemplate).contains("test_config")
   }
 
   @Test
   fun `resolve templates with invalid templates will throw on build`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, emptyList(), 567, "v1.2.3", "com.mydomain.myapp", "[test]", emptyMap())
+    val envoyConfiguration = EnvoyConfiguration(
+      "stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp", "[test]",
+      emptyList(), emptyList(), emptyMap()
+    )
 
     try {
-      envoyConfiguration.resolveTemplate("{{ missing }}", "")
+      envoyConfiguration.resolveTemplate("{{ missing }}", "", "")
       fail("Unresolved configuration keys should trigger exception.")
     } catch (e: EnvoyConfiguration.ConfigurationException) {
       assertThat(e.message).contains("missing")

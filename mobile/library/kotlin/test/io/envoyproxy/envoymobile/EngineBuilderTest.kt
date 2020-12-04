@@ -99,4 +99,14 @@ class EngineBuilderTest {
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration!!.virtualClusters).isEqualTo("[test]")
   }
+
+  @Test
+  fun `specifying native filters overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addNativeFilter("name", "config")
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.nativeFilterChain.size).isEqualTo(1)
+  }
 }

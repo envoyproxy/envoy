@@ -15,11 +15,12 @@ public class EnvoyConfiguration {
   public final Integer dnsRefreshSeconds;
   public final Integer dnsFailureRefreshSecondsBase;
   public final Integer dnsFailureRefreshSecondsMax;
-  public final List<EnvoyHTTPFilterFactory> httpFilterFactories;
+  public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
   public final Integer statsFlushSeconds;
   public final String appVersion;
   public final String appId;
   public final String virtualClusters;
+  public final List<EnvoyNativeFilterConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
@@ -37,23 +38,27 @@ public class EnvoyConfiguration {
    * @param appVersion                   the App Version of the App using this Envoy Client.
    * @param appId                        the App ID of the App using this Envoy Client.
    * @param virtualClusters              the JSON list of virtual cluster configs.
+   * @param nativeFilterChain            the configuration for native filters.
+   * @param httpPlatformFilterFactories          the configuration for platform filters.
    * @param stringAccesssors             platform string accessors to register.
    */
   public EnvoyConfiguration(String statsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
-                            List<EnvoyHTTPFilterFactory> httpFilterFactories, int statsFlushSeconds,
-                            String appVersion, String appId, String virtualClusters,
+                            int statsFlushSeconds, String appVersion, String appId,
+                            String virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
+                            List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
                             Map<String, EnvoyStringAccessor> stringAccessors) {
     this.statsDomain = statsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
     this.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
-    this.httpFilterFactories = httpFilterFactories;
     this.statsFlushSeconds = statsFlushSeconds;
     this.appVersion = appVersion;
     this.appId = appId;
     this.virtualClusters = virtualClusters;
+    this.nativeFilterChain = nativeFilterChain;
+    this.httpPlatformFilterFactories = httpPlatformFilterFactories;
     this.stringAccessors = stringAccessors;
   }
 
@@ -62,18 +67,30 @@ public class EnvoyConfiguration {
    * configuration.
    *
    * @param templateYAML the template configuration to resolve.
+   * @param platformFilterTemplateYAML helper template to build platform http filters.
+   * @param nativeFilterTemplateYAML helper template to build native http filters.
    * @return String, the resolved template.
    * @throws ConfigurationException, when the template provided is not fully
    *                                 resolved.
    */
-  String resolveTemplate(final String templateYAML, final String filterTemplateYAML) {
+  String resolveTemplate(final String templateYAML, final String platformFilterTemplateYAML,
+                         final String nativeFilterTemplateYAML) {
     final StringBuilder filterConfigBuilder = new StringBuilder();
-    for (EnvoyHTTPFilterFactory filterFactory : httpFilterFactories) {
-      String filterConfig =
-          filterTemplateYAML.replace("{{ platform_filter_name }}", filterFactory.getFilterName());
+    for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
+      String filterConfig = platformFilterTemplateYAML.replace("{{ platform_filter_name }}",
+                                                               filterFactory.getFilterName());
       filterConfigBuilder.append(filterConfig);
     }
     String filterConfigChain = filterConfigBuilder.toString();
+
+    final StringBuilder nativeFilterConfigBuilder = new StringBuilder();
+    for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
+      String nativeFilterConfig =
+          nativeFilterTemplateYAML.replace("{{ native_filter_name }}", filter.name)
+              .replace("{{ native_filter_typed_config }}", filter.typedConfig);
+      nativeFilterConfigBuilder.append(nativeFilterConfig);
+    }
+    String nativeFilterConfigChain = nativeFilterConfigBuilder.toString();
 
     String resolvedConfiguration =
         templateYAML.replace("{{ stats_domain }}", statsDomain)
@@ -88,7 +105,8 @@ public class EnvoyConfiguration {
             .replace("{{ device_os }}", "Android")
             .replace("{{ app_version }}", appVersion)
             .replace("{{ app_id }}", appId)
-            .replace("{{ virtual_clusters }}", virtualClusters);
+            .replace("{{ virtual_clusters }}", virtualClusters)
+            .replace("{{ native_filter_chain }}", nativeFilterConfigChain);
 
     final Matcher unresolvedKeys = UNRESOLVED_KEY_PATTERN.matcher(resolvedConfiguration);
     if (unresolvedKeys.find()) {

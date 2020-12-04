@@ -17,6 +17,7 @@ objc_library(
         "EnvoyHTTPFilterCallbacksImpl.m",
         "EnvoyHTTPFilterFactory.m",
         "EnvoyHTTPStreamImpl.m",
+        "EnvoyNativeFilterConfig.m",
         "EnvoyNetworkMonitor.m",
     ],
     hdrs = [

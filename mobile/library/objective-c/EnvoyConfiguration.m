@@ -9,11 +9,13 @@
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
-                        filterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpFilterFactories
                   statsFlushSeconds:(UInt32)statsFlushSeconds
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
-                    virtualClusters:(NSString *)virtualClusters {
+                    virtualClusters:(NSString *)virtualClusters
+                  nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
+                platformFilterChain:
+                    (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories {
   self = [super init];
   if (!self) {
     return nil;
@@ -24,26 +26,39 @@
   self.dnsRefreshSeconds = dnsRefreshSeconds;
   self.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
   self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
-  self.httpFilterFactories = httpFilterFactories;
+  self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.statsFlushSeconds = statsFlushSeconds;
   self.appVersion = appVersion;
   self.appId = appId;
   self.virtualClusters = virtualClusters;
+  self.nativeFilterChain = nativeFilterChain;
   return self;
 }
 
 - (nullable NSString *)resolveTemplate:(NSString *)templateYAML {
-  NSString *filterConfigChain = [[NSString alloc] init];
-  NSString *filterTemplate = [[NSString alloc] initWithUTF8String:platform_filter_template];
-  for (EnvoyHTTPFilterFactory *filterFactory in self.httpFilterFactories) {
-    NSString *filterConfig =
-        [filterTemplate stringByReplacingOccurrencesOfString:@"{{ platform_filter_name }}"
-                                                  withString:filterFactory.filterName];
-    filterConfigChain = [filterConfigChain stringByAppendingString:filterConfig];
+  NSString *platformFilterConfigChain = [[NSString alloc] init];
+  NSString *platformFilterTemplate = [[NSString alloc] initWithUTF8String:platform_filter_template];
+  for (EnvoyHTTPFilterFactory *filterFactory in self.httpPlatformFilterFactories) {
+    NSString *platformFilterConfig =
+        [platformFilterTemplate stringByReplacingOccurrencesOfString:@"{{ platform_filter_name }}"
+                                                          withString:filterFactory.filterName];
+    platformFilterConfigChain =
+        [platformFilterConfigChain stringByAppendingString:platformFilterConfig];
+  }
+
+  NSString *nativeFilterConfigChain = [[NSString alloc] init];
+  NSString *nativeFilterTemplate = [[NSString alloc] initWithUTF8String:native_filter_template];
+  for (EnvoyNativeFilterConfig *filterConfig in self.nativeFilterChain) {
+    NSString *nativeFilterConfig =
+        [[nativeFilterTemplate stringByReplacingOccurrencesOfString:@"{{ native_filter_name }}"
+                                                         withString:filterConfig.name]
+            stringByReplacingOccurrencesOfString:@"{{ native_filter_typed_config }}"
+                                      withString:filterConfig.typedConfig];
+    nativeFilterConfigChain = [nativeFilterConfigChain stringByAppendingString:nativeFilterConfig];
   }
 
   NSDictionary<NSString *, NSString *> *templateKeysToValues = @{
-    @"platform_filter_chain" : filterConfigChain,
+    @"platform_filter_chain" : platformFilterConfigChain,
     @"stats_domain" : self.statsDomain,
     @"connect_timeout_seconds" :
         [NSString stringWithFormat:@"%lu", (unsigned long)self.connectTimeoutSeconds],
@@ -58,7 +73,8 @@
     @"device_os" : @"iOS",
     @"app_version" : self.appVersion,
     @"app_id" : self.appId,
-    @"virtual_clusters" : self.virtualClusters
+    @"virtual_clusters" : self.virtualClusters,
+    @"native_filter_chain" : nativeFilterConfigChain,
   };
 
   for (NSString *templateKey in templateKeysToValues) {

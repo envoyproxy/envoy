@@ -21,9 +21,10 @@ public final class EngineBuilder: NSObject {
   private var statsFlushSeconds: UInt32 = 60
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var filterChain: [EnvoyHTTPFilterFactory] = []
+  private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var virtualClusters: String = "[]"
   private var onEngineRunning: (() -> Void)?
+  private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
 
   // MARK: - Public
 
@@ -109,7 +110,7 @@ public final class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add an HTTP filter factory used to construct filters for streams sent by this client.
+  /// Add an HTTP platform filter factory used to construct filters for streams sent by this client.
   ///
   /// - parameter name:    Custom name to use for this filter factory. Useful for having
   ///                      more meaningful trace logs, but not required. Should be unique
@@ -118,10 +119,26 @@ public final class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addFilter(name: String = UUID().uuidString,
-                        factory: @escaping () -> Filter) -> EngineBuilder
+  public func addPlatformFilter(name: String = UUID().uuidString,
+                                factory: @escaping () -> Filter) -> EngineBuilder
   {
-    self.filterChain.append(EnvoyHTTPFilterFactory(filterName: name, factory: factory))
+    self.platformFilterChain.append(EnvoyHTTPFilterFactory(filterName: name, factory: factory))
+    return self
+  }
+
+  /// Add an HTTP native filter factory used to construct filters for streams sent by this client.
+  ///
+  /// - parameter name:        Custom name to use for this filter factory. Useful for having
+  ///                          more meaningful trace logs, but not required. Should be unique
+  ///                          per factory registered.
+  /// - parameter typedConfig: Config string for the filter.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addNativeFilter(name: String = UUID().uuidString,
+                              typedConfig: String) -> EngineBuilder
+  {
+    self.nativeFilterChain.append(EnvoyNativeFilterConfig(name: name, typedConfig: typedConfig))
     return self
   }
 
@@ -185,11 +202,12 @@ public final class EngineBuilder: NSObject {
         dnsRefreshSeconds: self.dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-        filterChain: self.filterChain,
         statsFlushSeconds: self.statsFlushSeconds,
         appVersion: self.appVersion,
         appId: self.appId,
-        virtualClusters: self.virtualClusters)
+        virtualClusters: self.virtualClusters,
+        nativeFilterChain: self.nativeFilterChain,
+        platformFilterChain: self.platformFilterChain)
       return EngineImpl(config: config, logLevel: self.logLevel, engine: engine,
                         onEngineRunning: self.onEngineRunning)
     }

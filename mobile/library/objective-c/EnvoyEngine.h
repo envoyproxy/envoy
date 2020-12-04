@@ -218,6 +218,17 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 
 @end
 
+#pragma mark - EnvoyNativeFilterConfig
+
+@interface EnvoyNativeFilterConfig : NSObject
+
+@property (nonatomic, strong) NSString *name;
+@property (nonatomic, strong) NSString *typedConfig;
+
+- (instancetype)initWithName:(NSString *)name typedConfig:(NSString *)typedConfig;
+
+@end
+
 #pragma mark - EnvoyConfiguration
 
 /// Typed configuration that may be used for starting Envoy.
@@ -228,11 +239,12 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
-@property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpFilterFactories;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
 @property (nonatomic, strong) NSString *virtualClusters;
+@property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
+@property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 
 /**
  Create a new instance of the configuration.
@@ -242,11 +254,13 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
-                        filterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpFilterFactories
                   statsFlushSeconds:(UInt32)statsFlushSeconds
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
-                    virtualClusters:(NSString *)virtualClusters;
+                    virtualClusters:(NSString *)virtualClusters
+                  nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
+                platformFilterChain:
+                    (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories;
 
 /**
  Resolves the provided configuration template using properties on this configuration.

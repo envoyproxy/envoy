@@ -51,7 +51,7 @@ final class ReceiveDataTests: XCTestCase {
     """
     let client = try EngineBuilder(yaml: config)
       .addLogLevel(.debug)
-      .addFilter(factory: DemoFilter.init)
+      .addPlatformFilter(factory: DemoFilter.init)
       .build()
       .streamClient()
 

@@ -40,7 +40,7 @@ final class CancelStreamTests: XCTestCase {
     let expectation = self.expectation(description: "Run called with expected cancellation")
     let client = try EngineBuilder(yaml: config)
       .addLogLevel(.debug)
-      .addFilter(factory: DemoFilter.init)
+      .addPlatformFilter(factory: DemoFilter.init)
       .build()
       .streamClient()
 

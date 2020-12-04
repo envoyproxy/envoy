@@ -270,7 +270,7 @@ static void ios_http_filter_release(const void *context) {
     return kEnvoyFailure;
   }
 
-  for (EnvoyHTTPFilterFactory *filterFactory in config.httpFilterFactories) {
+  for (EnvoyHTTPFilterFactory *filterFactory in config.httpPlatformFilterFactories) {
     [self registerFilterFactory:filterFactory];
   }
 

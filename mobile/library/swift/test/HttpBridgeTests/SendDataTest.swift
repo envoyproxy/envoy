@@ -53,7 +53,7 @@ final class SendDataTests: XCTestCase {
     let expectation = self.expectation(description: "Run called with expected http status")
     let client = try EngineBuilder(yaml: config)
       .addLogLevel(.debug)
-      .addFilter(factory: DemoFilter.init)
+      .addPlatformFilter(factory: DemoFilter.init)
       .build()
       .streamClient()
 
