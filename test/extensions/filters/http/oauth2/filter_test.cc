@@ -73,38 +73,41 @@ public:
 
 class OAuth2Test : public testing::Test {
 public:
-  OAuth2Test() : request_(&cm_.async_client_) { init(); }
+  OAuth2Test() : request_(&cm_.async_client_) {
+    initDefaultConfig();
+    init(); 
+  }
+
+  void initDefaultConfig() {
+    auto* endpoint = p_.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p_.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p_.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p_.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p_.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p_.set_forward_bearer_token(true);
+    auto* matcher = p_.add_pass_through_matcher();
+    matcher->set_name(":method");
+    matcher->set_exact_match("OPTIONS");
+
+    auto credentials = p_.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+  }
 
   void init() {
     // Set up the OAuth client
     oauth_client_ = new MockOAuth2Client();
     std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
 
-    // Set up proto fields
-    envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
-    auto* endpoint = p.mutable_token_endpoint();
-    endpoint->set_cluster("auth.example.com");
-    endpoint->set_uri("auth.example.com/_oauth");
-    endpoint->mutable_timeout()->set_seconds(1);
-    p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
-    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
-    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
-    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
-    p.set_forward_bearer_token(true);
-    auto* matcher = p.add_pass_through_matcher();
-    matcher->set_name(":method");
-    matcher->set_exact_match("OPTIONS");
-
-    auto credentials = p.mutable_credentials();
-    credentials->set_client_id(TEST_CLIENT_ID);
-    credentials->mutable_token_secret()->set_name("secret");
-    credentials->mutable_hmac_secret()->set_name("hmac");
-
-    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+    MessageUtil::validate(p_, ProtobufMessage::getStrictValidationVisitor());
 
     // Create the OAuth config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
+    config_ = std::make_shared<FilterConfig>(p_, factory_context_.cluster_manager_, secret_reader,
                                              scope_, "test.");
 
     filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_);
@@ -136,6 +139,7 @@ public:
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
   Stats::IsolatedStoreImpl scope_;
   Event::SimulatedTimeSystem test_time_;
+  envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p_;
 };
 
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
@@ -240,9 +244,10 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
            TEST_CLIENT_ID +
-           "&scope=user&response_type=code&"
-           "redirect_uri=http%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+	   "&response_type=code"
+           "&scope=user"
+           "&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
   };
 
   // explicitly tell the validator to fail the validation
@@ -546,9 +551,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
            TEST_CLIENT_ID +
-           "&scope=user&response_type=code&"
-           "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+	   "&response_type=code"
+           "&scope=user"
+           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
            "3Fname%3Dadmin%26level%3Dtrace"},
   };
 
@@ -660,6 +666,113 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
   // Expected decoded headers after the callback & validation of the bearer token is complete.
   EXPECT_EQ(request_headers_before, request_headers_after);
 }
+
+TEST_F(OAuth2Test, AuthorizationURLPreservesParameters) {
+  p_.set_authorization_endpoint("https://auth.example.com/oauth/authorize?test_param=test");
+  init();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/not/_oauth"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "http"},
+      {Http::Headers::get().ForwardedProto.get(), "http"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize?client_id=" +
+           TEST_CLIENT_ID +
+           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+	   "&response_type=code"
+           "&scope=user"
+           "&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"
+           "&test_param=test"},
+  };
+
+  // explicitly tell the validator to fail the validation
+  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(OAuth2Test, AuthorizationCustomScopes) {
+  p_.add_scopes("openid");
+  p_.add_scopes("user");
+  init();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/not/_oauth"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "http"},
+      {Http::Headers::get().ForwardedProto.get(), "http"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID +
+           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+	   "&response_type=code"
+           "&scope=openid%20user"
+           "&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"}
+  };
+
+  // explicitly tell the validator to fail the validation
+  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(OAuth2Test, AuthorizationAdditionalParameters) {
+  (*p_.mutable_additional_authorization_parameters())["test_foo"] = "bar";
+  (*p_.mutable_additional_authorization_parameters())["test_bar"] = "baz";
+  init();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/not/_oauth"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "http"},
+      {Http::Headers::get().ForwardedProto.get(), "http"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID +
+           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+	   "&response_type=code"
+           "&scope=user"
+           "&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"
+           "&test_bar=baz&test_foo=bar"}
+  };
+
+  // explicitly tell the validator to fail the validation
+  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
 
 } // namespace Oauth2
 } // namespace HttpFilters

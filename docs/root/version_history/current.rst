@@ -25,6 +25,7 @@ Minor Behavior Changes
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
 * xds: to support TTLs, heartbeating has been added to xDS. As a result, responses that contain empty resources without updating the version will no longer be propagated to the
   subscribers. To undo this for VHDS (which is the only subscriber that wants empty resources), the `envoy.reloadable_features.vhds_heartbeats` can be set to "false".
+* oauth2 filter: preserve query parameters in authorization urls, as per the Oauth2 spec. Add the ability to configure requested scopes using the optional :ref: `scopes <config_http_filters_oauth>` parameter, with a default value of 'user'. Add the ability to pass additional query parameters to the authorization endpoint using the :ref: `additional_authorization_parameters <config_http_filters_oauth>` field.
 
 Bug Fixes
 ---------

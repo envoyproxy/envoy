@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -8,6 +9,7 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/query_params.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
@@ -123,6 +125,10 @@ public:
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
+  const std::vector<std::string>& scopes() { return scopes_; }
+  const Envoy::Http::Utility::QueryParams& additionalAuthorizationParameters() {
+    return additional_authorization_parameters_;
+  }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -137,6 +143,8 @@ private:
   FilterStats stats_;
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
+  const std::vector<std::string> scopes_;
+  const Envoy::Http::Utility::QueryParams additional_authorization_parameters_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

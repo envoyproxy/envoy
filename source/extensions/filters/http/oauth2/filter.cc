@@ -17,6 +17,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -47,9 +48,6 @@ constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};sec
 constexpr const char* CookieTailHttpOnlyFormatString =
     ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
-const char* AuthorizationEndpointFormat =
-    "{}?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}";
-
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
@@ -60,6 +58,16 @@ constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
 constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
 constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
+
+constexpr absl::string_view CLIENT_ID_PARAM = "client_id";
+constexpr absl::string_view STATE_PARAM = "state";
+constexpr absl::string_view SCOPES_PARAM = "scope";
+constexpr absl::string_view RESPONSE_TYPE_PARAM = "response_type";
+constexpr absl::string_view REDIRECT_URI_PARAM = "redirect_uri";
+// Space separated list of default scopes used when no scopes are present in
+// the filter configuration.
+constexpr absl::string_view DEFAULT_SCOPES = "user";
+
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
@@ -91,7 +99,9 @@ FilterConfig::FilterConfig(
       signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
+      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
+      scopes_(proto_config.scopes().begin(), proto_config.scopes().end()),
+      additional_authorization_parameters_(proto_config.additional_authorization_parameters().begin(), proto_config.additional_authorization_parameters().end()) {
   if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -266,18 +276,39 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
     const std::string base_path = absl::StrCat(scheme, "://", host_);
     const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
-    const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
     Formatter::FormatterImpl formatter(config_->redirectUri());
     const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
                                                *Http::ResponseTrailerMapImpl::create(),
                                                decoder_callbacks_->streamInfo(), "");
-    const std::string escaped_redirect_uri =
-        Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
+    // According to https://tools.ietf.org/html/rfc6749#section-3.1, the authorization endpoint may contain
+    // a query component, which should be preserved when adding parameters.
+    Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(config_->authorizationEndpoint());
+    params.emplace(CLIENT_ID_PARAM, config_->clientId());
+    params.emplace(RESPONSE_TYPE_PARAM, "code");
+    params.emplace(REDIRECT_URI_PARAM, redirect_uri);
+    params.emplace(STATE_PARAM, state_path);
+    params.insert(config_->additionalAuthorizationParameters().begin(), config_->additionalAuthorizationParameters().end());
+
+    if (config_->scopes().size() > 0) {
+      params.emplace(SCOPES_PARAM, absl::StrJoin(config_->scopes(), " "));
+    } else {
+      params.emplace(SCOPES_PARAM, DEFAULT_SCOPES);
+    }
+
+    std::vector<std::string> encoded_parameters;
+    for (const auto& kv : params) {
+      const std::string escaped_k = Http::Utility::PercentEncoding::encode(kv.first, ":/=&? ");
+      const std::string escaped_v = Http::Utility::PercentEncoding::encode(kv.second, ":/=&? ");
+      encoded_parameters.push_back(
+        fmt::format("{}={}", escaped_k, escaped_v));
+    }
 
     const std::string new_url =
-        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
-                    config_->clientId(), escaped_redirect_uri, escaped_state);
+      fmt::format("{}?{}",
+                  Http::PathUtil::removeQueryAndFragment(config_->authorizationEndpoint()),
+                  absl::StrJoin(encoded_parameters, "&"));
+
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 

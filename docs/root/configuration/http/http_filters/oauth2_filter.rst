@@ -71,6 +71,13 @@ The following is an example configuring the filter.
         name: hmac
         sds_config:
           path: "/etc/envoy/hmac.yaml"
+    # (Optional): defaults to "user" if unset
+    scopes:
+    - user
+    - openid
+    # (Optional): set of additional parameters to supply to the authorization endpoint
+    aditional_authorization_parameters:
+      blog: "1245"
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters

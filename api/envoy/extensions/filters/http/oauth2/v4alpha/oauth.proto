@@ -47,7 +47,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 9]
+// [#next-free-field: 11]
 message OAuth2Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.oauth2.v3alpha.OAuth2Config";
@@ -80,6 +80,15 @@ message OAuth2Config {
 
   // Any request that matches any of the provided matchers will be passed through without OAuth validation.
   repeated config.route.v4alpha.HeaderMatcher pass_through_matcher = 8;
+
+  // Authorization scopes, as defined by https://tools.ietf.org/html/rfc6749#section-3.3
+  repeated string scopes = 9 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+  // Additional parameters supplied to the authorization request.
+  map<string, string> additional_authorization_parameters = 10 [(validate.rules).map = {
+    keys {string {min_len: 1}}
+    values {string {min_len: 1}}
+  }];
 }
 
 // Filter config.
