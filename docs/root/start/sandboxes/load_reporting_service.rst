@@ -1,29 +1,27 @@
 .. _install_sandboxes_load_reporting_service:
 
-Load Reporting Service (LRS)
-============================
+负载报告服务 (LRS)
+=================================
 
-This simple example demonstrates Envoy's Load Reporting Service (LRS) capability and how to use it.
+这个简单的例子展示了负载报告服务 (LRS) 的特性以及如何使用它。
 
-Lets say Cluster A (downstream) talks to Cluster B (Upstream) and Cluster C (Upstream). When enabling Load Report for
-Cluster A, LRS server should be sending LoadStatsResponse to Cluster A with LoadStatsResponse.Clusters to be B and C.
-LRS server will then receive LoadStatsRequests (with total requests, successful requests etc) from Cluster A to Cluster B and
-from Cluster A to Cluster C.
+假设下游集群 A 和上游集群 B 以及上游集群 C 进行交互。当我们打开了集群 A 的负载报告功能，LRS 服务器即会向集群 A 发送 LoadStatsResponse 并且向集群 B 和 集群 C 发送 LoadStatsResponse.Clusters。
+接着，LRS 服务器随后就将收到来自集群 A、集群 B 和集群 C 的 LoadStatsRequests （包括所有请求，成功请求等）。
 
-In this example, all incoming requests are routed via Envoy to a simple goLang web server aka http_server.
-We scale up two containers and randomly send requests to each. Envoy is configured to initiate the connection with LRS Server.
-LRS Server enables the stats by sending LoadStatsResponse. Sending requests to http_server will be counted towards successful requests and will be visible in LRS Server logs.
+在这个例子中，所有的入向请求都被 Envoy 路由到一个简单的 golang web server，我们称之为 http_server。
+我们为这个 http_server 初始化了两个容器实例，这两个实例会随机地向对方发送请求。并配置 Envoy 建立到 LRS 服务器的连接。
+LRS 服务器通过发送 LoadStatsResponse 来使能状态统计。所有发向 http_server 的成功请求会被计数并且显示在 LRS 服务器的log中。
 
 
-Running the Sandbox
+运行沙盒
 ~~~~~~~~~~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Build the sandbox
+步骤 3: 构建沙盒
 *************************
 
-Terminal 1 ::
+终端 1 ::
 
     $ pwd
     envoy/examples/load_reporting_service
@@ -31,7 +29,7 @@ Terminal 1 ::
     $ docker-compose up --scale http_service=2
 
 
-Terminal 2 ::
+终端 2 ::
 
     $ pwd
     envoy/examples/load_reporting_service
@@ -43,23 +41,23 @@ Terminal 2 ::
     load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp, 0.0.0.0:8082->8081/tcp
     load-reporting-service_lrs_server_1     go run main.go                   Up      0.0.0.0:18000->18000/tcp
 
-Step 4: Start sending stream of HTTP requests
+步骤 4: 开始发送 HTTP 请求流
 *********************************************
 
-Terminal 2 ::
+终端 2 ::
 
   $ pwd
   envoy/examples/load_reporting_service
   $ bash send_requests.sh
 
-The script above (``send_requests.sh``) sends requests randomly to each Envoy, which in turn forwards the requests to the backend service.
+上面的脚本（``send_requests.sh``）会随机地向每个 Envoy 发送请求，随后这些请求会被转发到后端服务。
 
-Step 5: See Envoy Stats
-***********************
+步骤 5: 查看 Envoy 统计数据
+**********************************************
 
-You should see
+你会看到如下结果
 
-Terminal 1 ::
+终端 1 ::
 
     ............................
     lrs_server_1    | 2020/02/12 17:08:20 LRS Server is up and running on :18000
