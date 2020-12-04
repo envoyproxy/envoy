@@ -1,27 +1,27 @@
 .. _install_sandboxes_load_reporting_service:
 
-负载报告服务 (Load Reporting Service/LRS)
-=============================================================
+负载报告服务 (LRS)
+=================================
 
-这个简单的例子展示了负载报告服务 (Load Reporting Service/LRS) 的能力以及如何使用它。
+这个简单的例子展示了负载报告服务 (LRS) 的特性以及如何使用它。
 
 假设下游集群 A 和上游集群 B 以及上游集群 C 进行交互。当我们打开了集群 A 的负载报告功能，LRS 服务器即会向集群 A 发送 LoadStatsResponse 并且向集群 B 和 集群 C 发送 LoadStatsResponse.Clusters。
-接着，LRS 服务器随后就将收到来自集群 A，集群 B 和集群 C 的 LoadStatsRequests （包括所有请求，成功请求，等等）
+接着，LRS 服务器随后就将收到来自集群 A、集群 B 和集群 C 的 LoadStatsRequests （包括所有请求，成功请求等）。
 
 在这个例子中，所有的入向请求都被 Envoy 路由到一个简单的 golang web server，我们称之为 http_server。
 我们为这个 http_server 初始化了两个容器实例，这两个实例会随机地向对方发送请求。并配置 Envoy 建立到 LRS 服务器的连接。
 LRS 服务器通过发送 LoadStatsResponse 来使能状态统计。所有发向 http_server 的成功请求会被计数并且显示在 LRS 服务器的log中。
 
 
-运行沙盒测试
+运行沙盒
 ~~~~~~~~~~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-步骤 3: 构建沙盒环境
+步骤 3: 构建沙盒
 *************************
 
-命令行终端 1 ::
+终端 1 ::
 
     $ pwd
     envoy/examples/load_reporting_service
@@ -29,7 +29,7 @@ LRS 服务器通过发送 LoadStatsResponse 来使能状态统计。所有发向
     $ docker-compose up --scale http_service=2
 
 
-命令行终端 2 ::
+终端 2 ::
 
     $ pwd
     envoy/examples/load_reporting_service
@@ -41,23 +41,23 @@ LRS 服务器通过发送 LoadStatsResponse 来使能状态统计。所有发向
     load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp, 0.0.0.0:8082->8081/tcp
     load-reporting-service_lrs_server_1     go run main.go                   Up      0.0.0.0:18000->18000/tcp
 
-步骤 4: 开始发送HTTP请求流
+步骤 4: 开始发送 HTTP 请求流
 *********************************************
 
-命令行终端 2 ::
+终端 2 ::
 
   $ pwd
   envoy/examples/load_reporting_service
   $ bash send_requests.sh
 
-上面这个脚本（``send_requests.sh``）会随机地向两个 Envoy 发送请求，随后这些请求会被 Envoy 转发给它们对应的后端服务。
+上面的脚本（``send_requests.sh``）会随机地向每个 Envoy 发送请求，随后这些请求会被转发到后端服务。
 
 步骤 5: 查看 Envoy 统计数据
 **********************************************
 
 你会看到如下结果
 
-命令行终端 1 ::
+终端 1 ::
 
     ............................
     lrs_server_1    | 2020/02/12 17:08:20 LRS Server is up and running on :18000
