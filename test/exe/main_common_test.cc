@@ -455,15 +455,4 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   Logger::Registry::getSink()->log(log_msg);
 }
 
-// Verify KillRequest filter is not built into Envoy by default.
-TEST_P(MainCommonTest, KillRequestFilterIsNotBuiltByDefault) {
-  config_file_ = TestEnvironment::temporaryFileSubstitute(
-      "test/exe/testdata/test_with_kill_request_filter.yaml", TestEnvironment::ParamMap(),
-      TestEnvironment::PortMap(), GetParam());
-  argv_ = {"envoy-static", "--use-dynamic-base-id", "-c", config_file_.c_str(), nullptr};
-
-  EXPECT_THROW_WITH_REGEX(MainCommon main_common(argc(), argv()), EnvoyException,
-                          "unknown type: envoy.extensions.filters.http.kill_request");
-}
-
 } // namespace Envoy
