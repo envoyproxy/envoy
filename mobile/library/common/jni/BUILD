@@ -37,5 +37,6 @@ cc_binary(
     deps = [
         ":jni_utility_lib",
         "//library/common:envoy_main_interface_lib",
+        "//library/common/api:c_types",
     ],
 )

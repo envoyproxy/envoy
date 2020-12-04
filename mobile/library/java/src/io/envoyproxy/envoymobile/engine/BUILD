@@ -37,6 +37,7 @@ java_library(
         "JvmCallbackContext.java",
         "JvmFilterContext.java",
         "JvmFilterFactoryContext.java",
+        "JvmStringAccessorContext.java",
     ],
     visibility = ["//visibility:public"],
     deps = [

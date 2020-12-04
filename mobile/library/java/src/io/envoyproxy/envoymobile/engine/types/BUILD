@@ -11,6 +11,7 @@ java_library(
         "EnvoyHTTPFilterFactory.java",
         "EnvoyOnEngineRunning.java",
         "EnvoyStatus.java",
+        "EnvoyStringAccessor.java",
     ],
     visibility = ["//visibility:public"],
 )

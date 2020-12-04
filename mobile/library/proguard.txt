@@ -34,3 +34,7 @@
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmFilterFactoryContext {
    <methods>;
 }
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmStringAccessorContext {
+   <methods>;
+}
