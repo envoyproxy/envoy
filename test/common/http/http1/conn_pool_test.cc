@@ -1160,7 +1160,7 @@ public:
   ~MockDestructSchedulableCallback() override { Die(); }
 };
 
-// Connection pool for test that destructs all connections when destroyed.
+// Connection pool for test that holds on to a schedulable callback that has destructor detection.
 class ConnPoolImplNoDestructForTest : public ConnPoolImplForTest {
 public:
   ConnPoolImplNoDestructForTest(Event::MockDispatcher& dispatcher,
