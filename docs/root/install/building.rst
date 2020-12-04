@@ -1,102 +1,78 @@
 .. _building:
 
 
-Building
-========
+构建
+====
 
-The Envoy build system uses Bazel. In order to ease initial building and for a quick start, we
-provide an Ubuntu 16 based docker container that has everything needed inside of it to build
-and *statically link* Envoy, see :repo:`ci/README.md`.
+Envoy 使用 Bazel 来构建系统。为了更简单地初始化构建和快速开始，我们提供了一个 Ubuntu 16 的基础镜像容器，这个容器包含了需要构建和 *静态链接* Envoy 的所有工具，详情可查看 :repo:`ci/README.md`。
 
-In order to build manually, follow the instructions at :repo:`bazel/README.md`.
+为了能够手动构建，可参照 :repo:`bazel/README.md` 中的使用说明。
 
 .. _install_requirements:
 
-Requirements
-------------
+必备条件
+--------
 
-Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
-recent Linux including Ubuntu 18.04 LTS.
+Envoy 最初实在 Ubuntu 14.04 LTS 上开发和部署的。它可以在任何最近的 Linux 上运行，包括 Ubuntu 18.04 LTS。
 
-Building Envoy has the following requirements:
+构建 Envoy 需要具备以下条件：
+* GCC 7+ 或者 Clang/LLVM 7+ (支持 C++14)。 使用 Clang 时，Clang/LLVM 9+ 时首选 (如下)。
+* 这些 :repo:`Bazel 原生 <bazel/repository_locations.bzl>` 依赖。
 
-* GCC 7+ or Clang/LLVM 7+ (for C++14 support). Clang/LLVM 9+ preferred where Clang is used (see below).
-* These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 
-Please see the linked :repo:`CI <ci/README.md>` and :repo:`Bazel <bazel/README.md>` documentation
-for more information on performing manual builds.
-Please note that for Clang/LLVM 8 and lower, Envoy may need to be built with `--define tcmalloc=gperftools`
-as the new tcmalloc code is not guaranteed to compile with lower versions of Clang.
+关于执行手工构建的更多信息，请看链接 :repo:`CI <ci/README.md>` 和 :repo:`Bazel <bazel/README.md>` 中的文档。
+需要注意的是 Clang/LLVM 8 或者更低版本，Envoy 可能需要用 `--define tcmalloc=gperftools` 参数来构建，因为新的 tcmalloc 代码不能够保证用较低版本的 Clang 来编译。
 
 .. _install_binaries:
 
-Pre-built binaries
-------------------
+预制二进制
+----------
 
-We build and tag Docker images with release versions when we do official releases. These images can
-be found in the following repositories:
+当我们发布官方版本时，我们会用版本号来构建镜像并给它打标签。可以在下面的仓库中找到这些镜像：
 
-* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_: Release binary with
-  symbols stripped on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_: Release
-  binary with debug symbols on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: Release
-  binary with symbols stripped on top of a **glibc** alpine base.
-* `envoyproxy/envoy-alpine-debug <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug/tags/>`_:
-  *Deprecated in favor of envoyproxy/envoy-debug.* Release binary with debug symbols on top of a
-  Release binary with debug symbols on top of a **glibc** alpine base.
+* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_：在 Ubuntu Bionic 基础之上发布消除符号的二进制包。
+* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_: 在 Ubuntu Bionic 基础之上发布带有调试符号的二进制包。
+* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: 在 **glibc** alpine 基础之上发布消除符号的二进制包。
+* `envoyproxy/envoy-alpine-debug <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug/tags/>`_: *为了支持 envoyproxy/envoy-debug，此仓库已被弃用*。 在 **glibc** alpine 基础之上发布带有调试符号的二进制包。
 
 .. note::
 
-  In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
+  在上面的仓库中，我们给每一个安全/稳定的版本打一个标签为 *vX.Y-latest* 的镜像。
 
-On every master commit we additionally create a set of development Docker images. These images can
-be found in the following repositories:
 
-* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: Release binary with
-  symbols stripped on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_: Release
-  binary with debug symbols on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: Release
-  binary with symbols stripped on top of a **glibc** alpine base.
-* `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_:
-  *Deprecated in favor of envoyproxy/envoy-debug-dev.* Release binary with debug symbols on top of a
-  **glibc** alpine base.
+针对每一个主分支提交，我们额外地创建了一套开发 Docker 镜像。在下面的仓库中可以找到这些镜像：
 
-In the above *dev* repositories, the *latest* tag points to the last Envoy SHA in master that passed
-tests.
+* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: 在 Ubuntu Bionic 基础之上发布消除符号的二进制>包。
+* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_: 在 Ubuntu Bionic 基础之上发布带有>调试符号的二进制包。
+* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: 在 **glibc** alpine 基础之上发布消除符号的二进制包。
+* `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_: *为了支持 envoyproxy/envoy-debug-dev，此仓库已被弃用*。在 **glibc** alpine 基础之上发布带有调试符号的二进制包。
+
+在上述的 *dev* 仓库中，*latest* 标签指向主分支中通过测试的最近的 Envoy SHA。
 
 .. note::
 
-  The Envoy project considers master to be release candidate quality at all times, and many
-  organizations track and deploy master in production. We encourage you to do the same so that
-  issues can be reported as early as possible in the development process.
+  Envoy 项目始终视主分支（master）为版本发布的候选分支，很多组织使用主分支在生产中进行追踪和部署。我们鼓励大家做同样的   事情，以便在开发流程中能够尽早的报告遇到的问题。
 
-Packaged Envoy pre-built binaries for a variety of platforms are available via
-`GetEnvoy.io <https://www.getenvoy.io/>`_.
+可以在 `GetEnvoy.io <https://www.getenvoy.io/>`_ 找到为不同平台打包的 Envoy 预制二进制包。
 
-We will consider producing additional binary types depending on community interest in helping with
-CI, packaging, etc. Please open an `issue in GetEnvoy <https://github.com/tetratelabs/getenvoy/issues>`_
-for pre-built binaries for different platforms.
+我们将会根据社区对 CI、打包方面的兴趣来生成额外的二进制包类型。针对不同平台的预制二进制包，请开一个 `GetEnvoy issue <https://github.com/tetratelabs/getenvoy/issues>`_ 。
 
 .. _arm_binaries:
 
-ARM64 binaries
+ARM64 二进制
 ^^^^^^^^^^^^^^
 
 `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_,
 `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_,
-`envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_ and
-`envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_ are Docker
-`multi-arch <https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/>`_ images
-and should run transparently on compatible ARM64 hosts.
+`envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_ 和
+`envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_ 是 docker
+`multi-arch <https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/>`_ 镜像且在兼容的 ARM64 主机上面应该是透明运行的。
 
-Modifying Envoy
----------------
 
-If you're interested in modifying Envoy and testing your changes, one approach
-is to use Docker. This guide will walk through the process of building your own
-Envoy binary, and putting the binary in an Ubuntu container.
+修改 Envoy
+-----------
+
+如果你对于修改 Envoy 和测试你的改变感兴趣，一种方式就是使用 Docker。这个指导将讲述如何构建你自己的 Envoy 二进制包，并且把包放在一个 Ubuntu 容器中。
 
 .. toctree::
     :maxdepth: 2
