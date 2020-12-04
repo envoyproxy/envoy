@@ -3,6 +3,7 @@
 #include "common/formatter/substitution_format_string.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -29,6 +30,7 @@ public:
   std::string body_;
 
   envoy::config::core::v3::SubstitutionFormatString config_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestEmptyIsInvalid) {
@@ -43,7 +45,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   EXPECT_EQ("plain text, path=/bar/foo, code=200",
             formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
                               body_));
@@ -60,7 +62,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_);
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
   const auto out_json = formatter->format(request_headers_, response_headers_, response_trailers_,
                                           stream_info_, body_);
 
@@ -73,6 +75,31 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
     }
 })EOF";
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigTextSource) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "inline string from a DataSource"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  EXPECT_EQ("inline string from a DataSource",
+            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
+                              body_));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFixedText) {
+  const std::string yaml = R"EOF(
+  fixed_text: "plain text that does not expand command operators e.g. code=%RESPONSE_CODE%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  EXPECT_EQ("plain text that does not expand command operators e.g. code=%RESPONSE_CODE%",
+            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
+                              body_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
@@ -89,7 +116,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   for (const auto& yaml : invalid_configs) {
     TestUtility::loadFromYaml(yaml, config_);
     EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatStringUtils::fromProtoConfig(config_), EnvoyException,
+        SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()), EnvoyException,
         "Only string values or nested structs are supported in the JSON access log format.");
   }
 }
