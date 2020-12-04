@@ -61,8 +61,13 @@ using BufferingStreamDecoderPtr = std::unique_ptr<BufferingStreamDecoder>;
  */
 class RawConnectionDriver {
 public:
+  using DoWriteCallback = std::function<void(Network::ClientConnection&)>;
   using ReadCallback = std::function<void(Network::ClientConnection&, const Buffer::Instance&)>;
 
+  RawConnectionDriver(uint32_t port, DoWriteCallback write_request_callback,
+                      ReadCallback response_data_callback, Network::Address::IpVersion version,
+                      Network::TransportSocketPtr transport_socket);
+  // Similar to the constructor above but accepts the request as a constructor argument.
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
                       Network::Address::IpVersion version);
   ~RawConnectionDriver();
@@ -77,29 +82,45 @@ public:
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
     ForwardingFilter(RawConnectionDriver& parent, ReadCallback cb)
-        : parent_(parent), data_callback_(cb) {}
+        : parent_(parent), response_data_callback_(cb) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      data_callback_(*parent_.client_, data);
+      response_data_callback_(*parent_.client_, data);
       data.drain(data.length());
       return Network::FilterStatus::StopIteration;
     }
 
     RawConnectionDriver& parent_;
-    ReadCallback data_callback_;
+    ReadCallback response_data_callback_;
   };
 
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
+    using WriteCb = std::function<void()>;
+
+    ConnectionCallbacks(WriteCb write_cb) : write_cb_(write_cb) {}
+    bool connected() const { return connected_; }
+    bool closed() const { return closed_; }
+
+    // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
+      if (!connected_ && event == Network::ConnectionEvent::Connected) {
+        write_cb_();
+      }
+
       last_connection_event_ = event;
       connecting_ = false;
     }
     void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override { write_cb_(); }
 
     bool connecting_{true};
     Network::ConnectionEvent last_connection_event_;
+
+  private:
+    WriteCb write_cb_;
+    bool connected_{false};
+    bool closed_{false};
   };
 
   Stats::IsolatedStoreImpl stats_store_;

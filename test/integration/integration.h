@@ -358,6 +358,22 @@ public:
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false);
 
+  /**
+   * Helper to create ConnectionDriver.
+   *
+   * @param port the port to connect to.
+   * @param write_request_cb callback used to send data.
+   * @param data_callback the callback on the received data.
+   * @param transport_socket transport socket to use for the client connection
+   **/
+  std::unique_ptr<RawConnectionDriver> createConnectionDriver(
+      uint32_t port, RawConnectionDriver::DoWriteCallback write_request_cb,
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
+      Network::TransportSocketPtr transport_socket) {
+    return std::make_unique<RawConnectionDriver>(port, write_request_cb, data_callback, version_,
+                                                 std::move(transport_socket));
+  }
+
 protected:
   // Create the envoy server in another thread and start it.
   // Will not return until that server is listening.

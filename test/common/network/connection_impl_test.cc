@@ -90,7 +90,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), stream_info, false),
-      ".*assert failure: SOCKET_VALID\\(ioHandle\\(\\)\\.fd\\(\\)\\).*");
+      ".*assert failure: SOCKET_VALID\\(socket_->ioHandle\\(\\)\\.fd\\(\\)\\).*");
 }
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -1509,6 +1509,61 @@ TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
       .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
   file_ready_cb_(Event::FileReadyType::Read);
   file_ready_cb_(Event::FileReadyType::Read);
+}
+
+// Verify that read resumptions requested via setReadBufferReady() are scheduled once read is
+// re-enabled.
+TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
+  InSequence s;
+
+  std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
+  connection_->readDisable(true);
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  // No calls to activate when re-enabling if there are no pending read requests.
+  EXPECT_CALL(*file_event_, activate(_)).Times(0);
+  connection_->readDisable(false);
+
+  // setReadBufferReady triggers an immediate call to activate.
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->setReadBufferReady();
+
+  // When processing a sequence of read disable/read enable, changes to the enabled event mask
+  // happen only when the disable count transitions to/from 0.
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
+  connection_->readDisable(true);
+  connection_->readDisable(true);
+  connection_->readDisable(true);
+  connection_->readDisable(false);
+  connection_->readDisable(false);
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  // Expect a read activation since there have been no transport doRead calls since the call to
+  // setReadBufferReady.
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->readDisable(false);
+
+  // Disable read.
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  connection_->readDisable(true);
+
+  // Expect a read activate when re-enabling since the file ready cb has not done a read.
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->readDisable(false);
+
+  // Do a read to clear the transport_wants_read_ flag, verify that no read activation is scheduled.
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  connection_->readDisable(true);
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  // No read activate call.
+  EXPECT_CALL(*file_event_, activate(_)).Times(0);
+  connection_->readDisable(false);
 }
 
 // Test that BytesSentCb is invoked at the correct times
