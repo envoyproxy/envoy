@@ -2102,10 +2102,10 @@ TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
 
 // Verify that outbound control frame counter decreases when send buffer is drained
 TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
-  // Ping frames are 17 bytes each so 237 full frames and a partial frame fit in the current min
+  // Ping frames are 17 bytes each so 240 full frames and a partial frame fit in the current min
   // size for buffer slices. Setting the limit to 2x+1 the number that fits in a single slice allows
   // the logic below that verifies drain and overflow thresholds.
-  static const int kMaxOutboundControlFrames = 475;
+  static const int kMaxOutboundControlFrames = 481;
   max_outbound_control_frames_ = kMaxOutboundControlFrames;
   initialize();
 
