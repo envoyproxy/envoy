@@ -20,6 +20,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/{version}.tar.gz"],
         release_date = "2020-11-29",
         use_category = ["api"],
+        implied_untracked_deps = [
+            "com_github_spf13_afero",
+        ],
     ),
     com_github_cncf_udpa = dict(
         project_name = "Universal Data Plane API",
