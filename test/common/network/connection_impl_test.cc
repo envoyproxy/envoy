@@ -2087,6 +2087,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
   connection_->addBytesSentCallback([&](uint64_t arg) {
     cb_called++;
     bytes_sent = arg;
+    return true;
   });
 
   // 100 bytes were sent; expect BytesSent event
@@ -2125,11 +2126,13 @@ TEST_F(MockTransportConnectionImplTest, BytesSentMultiple) {
   connection_->addBytesSentCallback([&](uint64_t arg) {
     cb_called1++;
     bytes_sent1 = arg;
+    return true;
   });
 
   connection_->addBytesSentCallback([&](uint64_t arg) {
     cb_called2++;
     bytes_sent2 = arg;
+    return true;
   });
 
   EXPECT_CALL(*transport_socket_, doWrite(_, _))
@@ -2149,6 +2152,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
   Connection::BytesSentCb cb = [&](uint64_t) {
     cb_called++;
     connection_->close(ConnectionCloseType::NoFlush);
+    return true;
   };
   connection_->addBytesSentCallback(cb);
   connection_->addBytesSentCallback(cb);
@@ -2159,6 +2163,71 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
 
   EXPECT_EQ(cb_called, 1);
   EXPECT_EQ(connection_->state(), Connection::State::Closed);
+}
+
+// Test that a callback may unsubscribe from being called in the future.
+// Test defines 3 callbacks. First, the middle one unsubscribes and later
+// on the last added callback unsubscribes.
+TEST_F(MockTransportConnectionImplTest, BytesSentUnsubscribe) {
+  uint32_t cb_called1 = 0;
+  uint32_t cb_called2 = 0;
+  uint32_t cb_called3 = 0;
+  uint32_t bytes_sent2 = 0;
+  uint32_t bytes_sent3 = 0;
+
+  // The first callback should never unsubscribe.
+  connection_->addBytesSentCallback([&](uint64_t) {
+    cb_called1++;
+    return true;
+  });
+
+  // The second callback should unsubscribe after sending 10 bytes.
+  connection_->addBytesSentCallback([&](uint64_t arg) {
+    cb_called2++;
+    bytes_sent2 += arg;
+    return (bytes_sent2 < 10);
+  });
+
+  // The third callback should unsubscribe after sending 20 bytes.
+  connection_->addBytesSentCallback([&](uint64_t arg) {
+    cb_called3++;
+    bytes_sent3 += arg;
+    return (bytes_sent3 < 20);
+  });
+
+  EXPECT_CALL(*transport_socket_, doWrite(_, _))
+      .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 5, false}));
+  // Send 5 bytes. All callbacks should be called.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 1);
+  EXPECT_EQ(cb_called2, 1);
+  EXPECT_EQ(cb_called3, 1);
+
+  // Send next 5 bytes. All callbacks should be called and the second
+  // callback should unsubscribe.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 2);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 2);
+
+  // Send next 5 bytes. Only the first and third callbacks should be called.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 3);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 3);
+
+  // Send next 5 bytes. The first and third callbacks should be called and
+  // the third one should unsubscribe.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 4);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 4);
+
+  // Send next 5 bytes. Only the first callback should be called.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 5);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 4);
 }
 
 // Test that onWrite does not have end_stream set, with half-close disabled
