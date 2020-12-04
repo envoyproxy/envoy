@@ -253,8 +253,7 @@ protected:
 
 using SlicePtr = std::unique_ptr<Slice>;
 
-// OwnedSlice can not be derived from as it has variable sized array as member.
-class OwnedSlice final : public Slice, public InlineStorage {
+class OwnedSlice final : public Slice {
 public:
   /**
    * Create an empty OwnedSlice.
@@ -270,7 +269,7 @@ public:
       slice = std::move(free_list_.back());
       free_list_.pop_back();
     } else {
-      slice.reset(new (slice_capacity) OwnedSlice(slice_capacity));
+      slice.reset(new OwnedSlice(slice_capacity));
     }
     return slice;
   }
@@ -283,9 +282,8 @@ public:
    *         the internal implementation) have a nonzero amount of reservable space at the end.
    */
   static SlicePtr create(const void* data, uint64_t size) {
-    std::unique_ptr<OwnedSlice> slice(create(size));
-    memcpy(slice->base_, data, size);
-    slice->reservable_ = size;
+    auto slice = create(size);
+    slice->append(data, size);
     return slice;
   }
 
@@ -306,7 +304,9 @@ public:
   }
 
 private:
-  OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }
+  OwnedSlice(uint64_t size) : Slice(0, 0, size), storage_(new uint8_t[size]) {
+    base_ = storage_.get();
+  }
 
   bool isMutable() const override { return true; }
 
@@ -324,7 +324,7 @@ private:
   static constexpr uint32_t free_list_max_ = 8;
   static thread_local absl::InlinedVector<std::unique_ptr<OwnedSlice>, free_list_max_> free_list_;
 
-  uint8_t storage_[];
+  std::unique_ptr<uint8_t[]> storage_;
 };
 
 /**

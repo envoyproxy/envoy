@@ -383,12 +383,14 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
 
-  Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
+  Upstream::ThreadLocalCluster* thread_local_cluster =
+      cluster_manager_.getThreadLocalCluster(cluster_name);
 
   if (thread_local_cluster) {
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
   } else {
+    ENVOY_CONN_LOG(debug, "Cluster not found {}", read_callbacks_->connection(), cluster_name);
     config_->stats().downstream_cx_no_route_.inc();
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NoRoute);

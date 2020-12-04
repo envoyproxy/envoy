@@ -29,6 +29,7 @@ struct RawSlice {
   size_t len_ = 0;
 
   bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
+  bool operator!=(const RawSlice& rhs) const { return !(*this == rhs); }
 };
 
 using RawSliceVector = absl::InlinedVector<RawSlice, 16>;
