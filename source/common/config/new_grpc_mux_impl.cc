@@ -7,6 +7,8 @@
 #include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_context_params.h"
+#include "common/config/xds_resource.h"
 #include "common/memory/utils.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -153,13 +155,28 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                                  const std::set<std::string>& resources,
-                                 bool creating_namespace_watch) {
+                                 const bool creating_namespace_watch) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
-  auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, resources);
-  if (creating_namespace_watch) {
+  // If this is a glob collection subscription, we need to compute actual context parameters.
+  std::set<std::string> xdstp_resources;
+  if (resources.size() == 1 && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
+    auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
+    // We only know how to deal with glob collections right now.
+    if (absl::EndsWith(resource.id(), "/*")) {
+      auto encoded_context = XdsContextParams::encodeResource(
+          local_info_.contextProvider().nodeContext(), resource.context(), {}, {});
+      resource.mutable_context()->CopyFrom(encoded_context);
+      XdsResourceIdentifier::EncodeOptions encode_options;
+      encode_options.sort_context_params_ = true;
+      xdstp_resources.insert(XdsResourceIdentifier::encodeUrn(resource, encode_options));
+    }
+  }
+  auto added_removed = sub->second->watch_map_.updateWatchInterest(
+      watch, xdstp_resources.empty() ? resources : xdstp_resources);
+  if (creating_namespace_watch && xdstp_resources.empty()) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub->second->sub_state_.updateSubscriptionInterest({}, {});
   } else {

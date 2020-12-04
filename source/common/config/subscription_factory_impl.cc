@@ -12,6 +12,7 @@
 #include "common/config/xds_resource.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/type_util.h"
 
 namespace Envoy {
 namespace Config {
@@ -117,9 +118,14 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
-    const envoy::config::core::v3::ConfigSource& /*config*/, absl::string_view /*type_url*/,
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
+  if (resource_type != collection_locator.resource_type()) {
+    throw EnvoyException(fmt::format("xdstp:// type does not match {} in {}", resource_type,
+                                     Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
+  }
+  const std::string type_url = TypeUtil::descriptorFullNameToTypeUrl(resource_type);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
 
@@ -129,6 +135,22 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
+  }
+  case xds::core::v3::ResourceLocator::XDSTP: {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
+    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                            api_config_source);
+
+    switch (api_config_source.api_type()) {
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
+      return std::make_unique<GrpcCollectionSubscriptionImpl>(
+          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, type_url,
+          dispatcher_, Utility::configSourceInitialFetchTimeout(config), false);
+    }
+    default:
+      throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
+                                       api_config_source.DebugString()));
+    }
   }
   default:
     throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",

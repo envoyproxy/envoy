@@ -45,6 +45,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "context_provider_lib",
+    hdrs = ["context_provider_impl.h"],
+    deps = [
+        ":xds_context_params_lib",
+        "//include/envoy/config:context_provider_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "datasource_lib",
     srcs = ["datasource.cc"],
     hdrs = ["datasource.h"],
@@ -173,6 +182,7 @@ envoy_cc_library(
     hdrs = ["grpc_subscription_impl.h"],
     deps = [
         ":grpc_mux_lib",
+        ":xds_resource_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -189,6 +199,8 @@ envoy_cc_library(
         ":pausable_ack_queue_lib",
         ":version_converter_lib",
         ":watch_map_lib",
+        ":xds_context_params_lib",
+        ":xds_resource_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
         "//source/common/memory:utils_lib",
@@ -425,6 +437,7 @@ envoy_cc_library(
     hdrs = ["watch_map.h"],
     deps = [
         ":decoded_resource_lib",
+        ":xds_resource_lib",
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",

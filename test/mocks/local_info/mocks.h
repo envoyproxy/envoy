@@ -20,6 +20,7 @@ public:
   MOCK_METHOD(const std::string&, clusterName, (), (const));
   MOCK_METHOD(const std::string&, nodeName, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Node&, node, (), (const));
+  MOCK_METHOD(const Config::ContextProvider&, contextProvider, (), (const));
 
   Network::Address::InstanceConstSharedPtr address_;
   // TODO(htuch): Make this behave closer to the real implementation, with the various property

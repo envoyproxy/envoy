@@ -4,6 +4,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/config/decoded_resource_impl.h"
+#include "common/config/xds_resource.h"
 
 namespace Envoy {
 namespace Config {
@@ -11,6 +12,20 @@ namespace Config {
 namespace {
 // Returns the namespace part (if there's any) in the resource name.
 std::string namespaceFromName(const std::string& resource_name) {
+  // Namespace handling for xdstp:// resource is different to legacy VHDS etc., since we need to
+  // canonicalize context parameters and substitute a * for glob collections.
+  if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
+    // This is not very efficient; it is possible to canonicalize etc. much faster with raw string
+    // operations, but this implementation provides a reference for later optimization while we
+    // adopt xdstp://.
+    auto resource = XdsResourceIdentifier::decodeUrn(resource_name);
+    // Replace resource name component with glob for purpose of matching.
+    const auto pos = resource.id().find_last_of('/');
+    resource.set_id(pos == std::string::npos ? "*" : resource.id().substr(0, pos) + "/*");
+    XdsResourceIdentifier::EncodeOptions encode_options;
+    encode_options.sort_context_params_ = true;
+    return XdsResourceIdentifier::encodeUrn(resource, encode_options);
+  }
   const auto pos = resource_name.find_last_of('/');
   // we are not interested in the "/" character in the namespace
   return pos == std::string::npos ? "" : resource_name.substr(0, pos);

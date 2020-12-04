@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
+#include "common/config/xds_resource.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -119,6 +120,20 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();
   }
+}
+
+GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
+    const xds::core::v3::ResourceLocator& collection_locator, GrpcMuxSharedPtr grpc_mux,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, absl::string_view type_url, Event::Dispatcher& dispatcher,
+    std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
+    : GrpcSubscriptionImpl(grpc_mux, callbacks, resource_decoder, stats, type_url, dispatcher,
+                           init_fetch_timeout, is_aggregated),
+      collection_locator_(collection_locator) {}
+
+void GrpcCollectionSubscriptionImpl::start(const std::set<std::string>& /*resource_names*/,
+                                           bool /*use_namespace_matching*/) {
+  GrpcSubscriptionImpl::start({XdsResourceIdentifier::encodeUrl(collection_locator_)}, true);
 }
 
 } // namespace Config

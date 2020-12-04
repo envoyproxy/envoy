@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/context_provider.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 
@@ -40,6 +41,11 @@ public:
    * @return the full node identity presented to management servers.
    */
   virtual const envoy::config::core::v3::Node& node() const PURE;
+
+  /**
+   * @return the xDS context provider for the node.
+   */
+  virtual const Config::ContextProvider& contextProvider() const PURE;
 };
 
 using LocalInfoPtr = std::unique_ptr<LocalInfo>;

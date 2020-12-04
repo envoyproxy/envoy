@@ -8,6 +8,8 @@
 
 #include "common/common/logger.h"
 
+#include "xds/core/v3/resource_locator.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -15,7 +17,7 @@ namespace Config {
  * Adapter from typed Subscription to untyped GrpcMux. Also handles per-xDS API stats/logging.
  */
 class GrpcSubscriptionImpl : public Subscription,
-                             SubscriptionCallbacks,
+                             protected SubscriptionCallbacks,
                              Logger::Loggable<Logger::Id::config> {
 public:
   GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
@@ -59,6 +61,21 @@ private:
 
 using GrpcSubscriptionImplPtr = std::unique_ptr<GrpcSubscriptionImpl>;
 using GrpcSubscriptionImplSharedPtr = std::shared_ptr<GrpcSubscriptionImpl>;
+
+class GrpcCollectionSubscriptionImpl : public GrpcSubscriptionImpl {
+public:
+  GrpcCollectionSubscriptionImpl(const xds::core::v3::ResourceLocator& collection_locator,
+                                 GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
+                                 OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+                                 absl::string_view type_url, Event::Dispatcher& dispatcher,
+                                 std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
+
+  void start(const std::set<std::string>& resource_names,
+             bool use_namespace_matching = false) override;
+
+private:
+  xds::core::v3::ResourceLocator collection_locator_;
+};
 
 } // namespace Config
 } // namespace Envoy

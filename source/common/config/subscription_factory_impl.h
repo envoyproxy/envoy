@@ -28,7 +28,7 @@ public:
   SubscriptionPtr
   collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,
-                                absl::string_view type_url, Stats::Scope& scope,
+                                absl::string_view resource_type, Stats::Scope& scope,
                                 SubscriptionCallbacks& callbacks,
                                 OpaqueResourceDecoder& resource_decoder) override;
 
