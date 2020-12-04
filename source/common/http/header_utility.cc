@@ -96,7 +96,7 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
 
 HeaderUtility::GetAllOfHeaderAsStringResult
 HeaderUtility::getAllOfHeaderAsString(const HeaderMap::GetResult& header_value,
-                                            absl::string_view seperator) {
+                                      absl::string_view seperator) {
   GetAllOfHeaderAsStringResult result;
   // In this case we concatenate all found headers using a delimiter before performing the
   // final match. We use an InlinedVector of absl::string_view to invoke the optimized join

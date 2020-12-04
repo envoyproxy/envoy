@@ -120,8 +120,7 @@ public:
   virtual MatchResult match(const DataType& matching_data) PURE;
 };
 
-template<class DataType>
-using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
+template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
 
 // InputMatcher provides the interface for determining whether an input value matches.
 class InputMatcher {

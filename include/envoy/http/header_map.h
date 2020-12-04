@@ -777,7 +777,8 @@ public:
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
 using ResponseHeaderMapOptRef = absl::optional<std::reference_wrapper<ResponseHeaderMap>>;
-using ResponseHeaderMapOptConstRef = absl::optional<std::reference_wrapper<const ResponseHeaderMap>>;
+using ResponseHeaderMapOptConstRef =
+    absl::optional<std::reference_wrapper<const ResponseHeaderMap>>;
 
 // Response trailers.
 class ResponseTrailerMap
