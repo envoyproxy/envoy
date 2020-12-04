@@ -57,7 +57,7 @@ message BandwidthLimit {
   // Optional fill_rate for the token buckets (per second). Defaults to 64.
   google.protobuf.UInt32Value fill_rate = 4 [(validate.rules).uint32 = {gte: 1}];
 
-  // If set, the bandwidth limit will be enforced only when total dataplane bandwidth usage
+  // If set, the bandwidth limit will be enforced only when total bandwidth usage for the listener
   // crosses this value. Defaults to 0 meaning limits are always applied.
   // This config should be set at global/listener level.
   // It has no effect if specified at route level.
