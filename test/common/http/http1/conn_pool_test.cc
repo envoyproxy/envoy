@@ -1169,7 +1169,7 @@ public:
                                 MockDestructSchedulableCallback* upstream_ready_cb)
       : ConnPoolImplForTest(dispatcher, cluster, random_generator, upstream_ready_cb) {}
 
-  ~ConnPoolImplNoDestructForTest() override { destructAllConnections(); }
+  ~ConnPoolImplNoDestructForTest() override {}
 };
 
 class Http1ConnPoolDestructImplTest : public testing::Test {
@@ -1216,13 +1216,30 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
           .ok());
 
   conn_pool_->expectEnableUpstreamReady();
-  EXPECT_CALL(*conn_pool_, onClientDestroy());
-  dispatcher_.deferredDelete(std::move(conn_pool_));
+  // Schedules the onUpstreamReady callback.
   inner_decoder->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
+  // Delete the connection pool.
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->destructAllConnections();
+
   // Delete connection pool and check that scheduled callback onUpstreamReady was destroyed.
+  dispatcher_.deferredDelete(std::move(conn_pool_));
   EXPECT_CALL(*upstream_ready_cb_, Die());
+
+  // When the dispatcher removes the connection pool, another call to clearDeferredDeleteList()
+  // cocurs in ~HttpConnPoolImplBase. Avoid recursion.
+  bool deferring_delete = false;
+  ON_CALL(dispatcher_, clearDeferredDeleteList())
+      .WillByDefault(Invoke([this, &deferring_delete]() -> void {
+        if (deferring_delete) {
+          return;
+        }
+        deferring_delete = true;
+        dispatcher_.to_delete_.clear();
+        deferring_delete = false;
+      }));
   dispatcher_.clearDeferredDeleteList();
 }
 
