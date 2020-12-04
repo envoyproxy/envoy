@@ -376,9 +376,8 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
   ReadyWatcher run_watcher2;
   ReadyWatcher delete_watcher2;
 
-  // Expect the following events to happen in order. Execution of post callbacks scheduled while
-  // executing the parent post callback should happen after yielding to other events. The destructor
-  // of the post callback should run before execution of the next post callback starts.
+  // Expect the following events to happen in order. The destructor of the post callback should run
+  // before execution of the next post callback starts.
   InSequence s;
   EXPECT_CALL(parent_watcher, ready());
   EXPECT_CALL(run_watcher1, ready());
