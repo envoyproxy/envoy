@@ -268,12 +268,17 @@ void DispatcherImpl::runPostCallbacks() {
       return;
     }
     callbacks = std::move(post_callbacks_);
+    // post_callbacks_ should be empty after the move, but clear it anyway to avoid depending on
+    // object state after move.
+    post_callbacks_.clear();
   }
   // It is important that the execution and deletion of the callback happen while post_lock_ is not
   // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
   while (!callbacks.empty()) {
     auto& callback = callbacks.front();
     callback();
+    // pop the front so that the destructor of the callback that just executed runs before the next
+    // callback executes.
     callbacks.pop_front();
   }
 }
