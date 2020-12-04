@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -6,9 +9,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
-#include <string>
-#include <vector>
 
 namespace Envoy {
 namespace {
