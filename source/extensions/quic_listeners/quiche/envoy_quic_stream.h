@@ -178,7 +178,7 @@ public:
       // Skip stream watermark buffer book keeping if this header is buffered on
       // the header stream.
       if (!filter_manager_connection_->isUpdatingWatermarkByHeadersStream()) {
-        // Only udpate connection level watermark if it's not in the middle of
+        // Only update connection level watermark if it's not in the middle of
         // another updating caused by header stream send buffer change.
         filter_manager_connection_->adjustBytesToSend(new_buffered_bytes - old_buffered_bytes_);
       }
