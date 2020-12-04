@@ -1889,8 +1889,8 @@ TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
   file_ready_cb_(Event::FileReadyType::Read);
 }
 
-// Verify that read resumptions requested via setReadBufferReady() are scheduled once read is
-// re-enabled.
+// Verify that read resumptions requested via setTransportSocketIsReadable() are scheduled once read
+// is re-enabled.
 TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
   InSequence s;
 
@@ -1905,9 +1905,9 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
   EXPECT_CALL(*file_event_, activate(_)).Times(0);
   connection_->readDisable(false);
 
-  // setReadBufferReady triggers an immediate call to activate.
+  // setTransportSocketIsReadable triggers an immediate call to activate.
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
-  connection_->setReadBufferReady();
+  connection_->setTransportSocketIsReadable();
 
   // When processing a sequence of read disable/read enable, changes to the enabled event mask
   // happen only when the disable count transitions to/from 0.
@@ -1919,7 +1919,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
   connection_->readDisable(false);
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
   // Expect a read activation since there have been no transport doRead calls since the call to
-  // setReadBufferReady.
+  // setTransportSocketIsReadable.
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
   connection_->readDisable(false);
 
@@ -2023,19 +2023,19 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
   connection_->enableHalfClose(true);
   connection_->addReadFilter(read_filter);
 
-  // Add some data to the read buffer and also call setReadBufferReady to mimic what transport
-  // sockets are expected to do when the read buffer high watermark is hit.
+  // Add some data to the read buffer and also call setTransportSocketIsReadable to mimic what
+  // transport sockets are expected to do when the read buffer high watermark is hit.
   EXPECT_CALL(*transport_socket_, doRead(_))
       .WillOnce(Invoke([this](Buffer::Instance& buffer) -> IoResult {
         buffer.add("0123456789");
-        connection_->setReadBufferReady();
+        connection_->setTransportSocketIsReadable();
         return {PostIoAction::KeepOpen, 10, false};
       }));
   // Expect a change to the event mask when hitting the read buffer high-watermark.
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
-  // The setReadBufferReady call adds a spurious read activation.
-  // TODO(antoniovicente) Skip the read activate in setReadBufferReady when read_disable_count_ > 0.
-  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  // The setTransportSocketIsReadable does not call activate because read_disable_count_ > 0 due to
+  // high-watermark.
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read)).Times(0);
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*read_filter, onData(_, false)).WillOnce(Return(FilterStatus::Continue));
   file_ready_cb_(Event::FileReadyType::Read);
@@ -2061,7 +2061,7 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
         data.drain(data.length());
         return FilterStatus::Continue;
       }));
-  // The buffer is fully drained. Expect a read activation because setReadBufferReady set
+  // The buffer is fully drained. Expect a read activation because setTransportSocketIsReadable set
   // transport_wants_read_ and no transport doRead calls have happened.
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
