@@ -8,22 +8,25 @@ static_resources:
     - filters:
       - name: kafka
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.kafka_broker.v2alpha1.KafkaBroker
+          "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
           stat_prefix: testfilter
       - name: tcp
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: ingress_tcp
           cluster: localinstallation
   clusters:
   - name: localinstallation
     connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: {{ data['kafka_real_port'] }}
+    load_assignment:
+      cluster_name: localinstallation
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: {{ data['kafka_real_port'] }}
 admin:
   access_log_path: /dev/null
   profile_path: /dev/null

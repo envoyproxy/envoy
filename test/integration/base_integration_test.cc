@@ -45,7 +45,7 @@ using ::testing::ReturnRef;
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : api_(Api::createApiForTest(stats_store_)),
+    : api_(Api::createApiForTest(stats_store_, time_system_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher("test_thread",
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
@@ -190,9 +190,10 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
 
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
-                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                       Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options);
+                                                enable_half_close_, options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -258,7 +259,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, use_real_stats_);
+      concurrency_, drain_time_, drain_strategy_, use_real_stats_, v2_bootstrap_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -442,13 +443,23 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     EXPECT_TRUE(discovery_request.has_node());
     EXPECT_FALSE(discovery_request.node().id().empty());
     EXPECT_FALSE(discovery_request.node().cluster().empty());
+  } else {
+    EXPECT_FALSE(discovery_request.has_node());
   }
 
   if (expected_type_url != discovery_request.type_url()) {
     return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
                                              discovery_request.type_url(), expected_type_url);
   }
-
+  if (!(expected_error_code == discovery_request.error_detail().code())) {
+    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
+                                             discovery_request.error_detail().code(),
+                                             expected_error_code);
+  }
+  EXPECT_TRUE(
+      IsSubstring("", "", expected_error_substring, discovery_request.error_detail().message()));
+  const std::set<std::string> resource_names_in_request(discovery_request.resource_names().cbegin(),
+                                                        discovery_request.resource_names().cend());
   // Sort to ignore ordering.
   std::set<std::string> expected_sub{expected_resource_names.begin(),
                                      expected_resource_names.end()};
@@ -462,19 +473,6 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",
                                              discovery_request.version_info(), expected_version,
                                              discovery_request.DebugString());
-  }
-  if (discovery_request.error_detail().code() != expected_error_code) {
-    return AssertionFailure() << fmt::format(
-               "error code {} does not match expected {}. (Error message is {}).",
-               discovery_request.error_detail().code(), expected_error_code,
-               discovery_request.error_detail().message());
-  }
-  if (expected_error_code != Grpc::Status::WellKnownGrpcStatus::Ok &&
-      discovery_request.error_detail().message().find(expected_error_substring) ==
-          std::string::npos) {
-    return AssertionFailure() << "\"" << expected_error_substring
-                              << "\" is not a substring of actual error message \""
-                              << discovery_request.error_detail().message() << "\"";
   }
   return AssertionSuccess();
 }

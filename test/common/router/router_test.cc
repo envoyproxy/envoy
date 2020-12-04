@@ -251,7 +251,8 @@ public:
             [&](Http::ResponseDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
-              callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+              callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                    Http::Protocol::Http10);
               return nullptr;
             }));
     expectResponseTimerCreate();
@@ -287,7 +288,8 @@ public:
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder_ = &decoder;
               EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AtLeast(2));
-              callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_, upstream_stream_info_);
+              callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_, upstream_stream_info_,
+                                    Http::Protocol::Http10);
               return nullptr;
             }));
     HttpTestUtility::addDefaultHeaders(default_request_headers_);
@@ -460,6 +462,37 @@ TEST_F(RouterTest, RouteNotFound) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(), "route_not_found");
+}
+
+TEST_F(RouterTest, MissingRequiredHeaders) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.removeMethod();
+
+  EXPECT_CALL(encoder, encodeHeaders(_, _))
+      .WillOnce(Invoke([](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        return Http::HeaderUtility::checkRequiredHeaders(headers);
+      }));
+  EXPECT_CALL(callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable,
+                             testing::Eq("missing required header: :method"), _, _,
+                             "filter_removed_required_headers{missing required header: :method}"))
+      .WillOnce(testing::InvokeWithoutArgs([] {}));
+  router_.decodeHeaders(headers, true);
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, ClusterNotFound) {
@@ -640,8 +673,9 @@ TEST_F(RouterTest, AddCookie) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -692,8 +726,9 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -743,8 +778,9 @@ TEST_F(RouterTest, AddMultipleCookies) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-            return &cancellable_;
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
+            return nullptr;
           }));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -933,7 +969,8 @@ TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -958,7 +995,8 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1014,7 +1052,8 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1044,7 +1083,8 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -1155,7 +1195,8 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1182,7 +1223,8 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -1225,7 +1267,8 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1282,7 +1325,8 @@ void RouterTestBase::testAppendUpstreamHost(
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1414,7 +1458,8 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyUpstreamServiceTime) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1446,7 +1491,8 @@ TEST_F(RouterTest, NoRetriesOverflow) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1473,7 +1519,8 @@ TEST_F(RouterTest, NoRetriesOverflow) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -1500,15 +1547,17 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
   EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
   EXPECT_CALL(encoder, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   Http::TestRequestHeaderMapImpl headers;
@@ -1533,7 +1582,8 @@ TEST_F(RouterTest, UpstreamTimeout) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -1582,7 +1632,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -1625,7 +1676,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatFailure) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -1667,7 +1719,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -1707,7 +1760,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -1752,7 +1806,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -1802,7 +1857,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -1847,7 +1903,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -1897,7 +1954,8 @@ TEST_F(RouterTest, GrpcOkTrailersOnly) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1925,7 +1983,8 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1953,7 +2012,8 @@ TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCode) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -1982,7 +2042,8 @@ TEST_F(RouterTest, GrpcInternalTrailersOnly) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2011,7 +2072,8 @@ TEST_F(RouterTest, GrpcDataEndStream) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2043,7 +2105,8 @@ TEST_F(RouterTest, GrpcReset) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2076,7 +2139,8 @@ TEST_F(RouterTest, GrpcOk) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2111,7 +2175,8 @@ TEST_F(RouterTest, GrpcInternal) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2142,7 +2207,8 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -2188,7 +2254,8 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -2202,7 +2269,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   router_.decodeHeaders(headers, false);
 
   // We verify that both timeouts are started after decodeData(_, true) is called. This
-  // verifies that we are not starting the initial per try timeout on the first onPoolReady.
+  // verifies that we are not starting the initial per try timeout on the first onPoolReady.FOO
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
@@ -2230,7 +2297,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// Verifies that the per try timeout starts when onPoolReady is called when it occurs
+// Verifies that the per try timeout starts when onPoolReady is called when it occursFOO
 // after the downstream request has been read.
 TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
   NiceMock<Http::MockRequestEncoder> encoder;
@@ -2255,7 +2322,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  // Per try timeout starts when onPoolReady is called.
+  // Per try timeout starts when onPoolReady is called.FOO
   expectPerTryTimerCreate();
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
@@ -2264,7 +2331,8 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
 
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+  pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                              Http::Protocol::Http10);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
@@ -2322,7 +2390,8 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   // The per try timeout timer should not be started yet.
-  pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+  pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                              Http::Protocol::Http10);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
@@ -2360,7 +2429,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -2391,7 +2461,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -2440,7 +2511,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -2471,7 +2543,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -2526,7 +2599,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2561,7 +2635,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -2584,7 +2659,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder3 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder3, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder3, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -2630,7 +2706,8 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -2660,7 +2737,8 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -2697,7 +2775,8 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -2740,7 +2819,8 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -2767,7 +2847,8 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2786,7 +2867,8 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
@@ -2827,7 +2909,8 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2850,7 +2933,8 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -2895,7 +2979,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -2922,7 +3007,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -2966,7 +3052,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -2993,7 +3080,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -3031,7 +3119,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -3057,7 +3146,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -3097,7 +3187,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -3138,7 +3229,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -3170,7 +3262,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -3210,7 +3303,8 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -3242,7 +3336,8 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -3298,7 +3393,8 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder1 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   // First is reset
@@ -3334,7 +3430,8 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder2 = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -3384,7 +3481,8 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
@@ -3457,7 +3555,8 @@ TEST_F(RouterTest, RetryNoneHealthy) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -3498,7 +3597,8 @@ TEST_F(RouterTest, RetryUpstreamReset) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -3528,7 +3628,8 @@ TEST_F(RouterTest, RetryUpstreamReset) {
             EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                                   absl::optional<uint64_t>(absl::nullopt)));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -3553,7 +3654,8 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -3587,7 +3689,8 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -3618,7 +3721,8 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
             EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                                   absl::optional<uint64_t>(absl::nullopt)));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -3670,7 +3774,8 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -3694,7 +3799,8 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectPerTryTimerCreate();
@@ -3734,7 +3840,8 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -3777,7 +3884,8 @@ TEST_F(RouterTest, Coalesce100ContinueHeaders) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -3827,7 +3935,8 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -3864,7 +3973,8 @@ TEST_F(RouterTest, RetryUpstream5xx) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -3891,7 +4001,8 @@ TEST_F(RouterTest, RetryUpstream5xx) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -3916,7 +4027,8 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -3957,7 +4069,8 @@ TEST_F(RouterTest, MaxStreamDurationValidlyConfiguredWithoutRetryPolicy) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectMaxStreamDurationTimerCreate();
@@ -3980,7 +4093,8 @@ TEST_F(RouterTest, MaxStreamDurationDisabledIfSetToZero) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -4004,7 +4118,8 @@ TEST_F(RouterTest, MaxStreamDurationCallbackNotCalled) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectMaxStreamDurationTimerCreate();
@@ -4026,7 +4141,8 @@ TEST_F(RouterTest, MaxStreamDurationWhenDownstreamAlreadyStartedWithoutRetryPoli
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectMaxStreamDurationTimerCreate();
@@ -4053,7 +4169,8 @@ TEST_F(RouterTest, MaxStreamDurationWithRetryPolicy) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectMaxStreamDurationTimerCreate();
@@ -4074,7 +4191,8 @@ TEST_F(RouterTest, MaxStreamDurationWithRetryPolicy) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectMaxStreamDurationTimerCreate();
@@ -4095,7 +4213,8 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -4149,7 +4268,8 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -4202,7 +4322,8 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -4237,7 +4358,8 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -4281,7 +4403,8 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -4311,7 +4434,8 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   router_.retry_state_->callback_();
@@ -4339,7 +4463,8 @@ TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -4378,7 +4503,8 @@ TEST_F(RouterTest, RetryRespsectsMaxHostSelectionCount) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -4414,7 +4540,8 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -4453,7 +4580,8 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -4482,7 +4610,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   setNumPreviousRedirect(3);
   sendRequest();
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4501,7 +4629,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
 
   redirect_headers_->setLocation("");
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4519,7 +4647,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
 
   redirect_headers_->setLocation("h");
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4536,7 +4664,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
 
   sendRequest(false);
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
 
@@ -4554,7 +4682,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
 
   redirect_headers_->removeLocation();
 
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
@@ -4571,7 +4699,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
   EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(body_data.get()));
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
@@ -4589,7 +4717,7 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   redirect_headers_->setLocation("https://www.foo.com");
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4613,7 +4741,7 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
   ON_CALL(*mock_predicate, name()).WillByDefault(Return("mock_predicate"));
-  EXPECT_CALL(callbacks_, recreateStream()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4636,7 +4764,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4661,7 +4789,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4684,7 +4812,7 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
               isCrossSchemeRedirectAllowed())
       .WillOnce(Return(true));
   EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4709,7 +4837,8 @@ TEST_F(RouterTest, Shadow) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -4768,7 +4897,8 @@ TEST_F(RouterTest, AltStatName) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -4981,7 +5111,8 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -5012,7 +5143,8 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -5041,7 +5173,8 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -5102,7 +5235,8 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -5130,7 +5264,8 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -5188,7 +5323,8 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -5752,7 +5888,8 @@ TEST_F(RouterTest, CanaryStatusTrue) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -5788,7 +5925,8 @@ TEST_F(RouterTest, CanaryStatusFalse) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -5830,15 +5968,17 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                              Http::Protocol::Http10);
         return nullptr;
       }));
 
   // :authority header in the outgoing request should match the DNS name of
   // the selected upstream host
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -5867,15 +6007,17 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
-        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                              Http::Protocol::Http10);
         return nullptr;
       }));
 
   // :authority header in the outgoing request should match the :authority header of
   // the incoming request
   EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&incoming_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> void {
+      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+        return Http::okStatus();
       }));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
@@ -5953,7 +6095,8 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -5993,7 +6136,8 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -6056,7 +6200,8 @@ public:
               response_decoder_ = &decoder;
               pool_callbacks_ = &callbacks;
               if (pool_ready) {
-                callbacks.onPoolReady(encoder_, cm_.conn_pool_.host_, upstream_stream_info_);
+                callbacks.onPoolReady(encoder_, cm_.conn_pool_.host_, upstream_stream_info_,
+                                      Http::Protocol::Http10);
               }
               return nullptr;
             }));
@@ -6152,7 +6297,8 @@ TEST_F(WatermarkTest, FilterWatermarks) {
                     .value());
   EXPECT_CALL(encoder_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
-  pool_callbacks_->onPoolReady(encoder_, cm_.conn_pool_.host_, upstream_stream_info_);
+  pool_callbacks_->onPoolReady(encoder_, cm_.conn_pool_.host_, upstream_stream_info_,
+                               Http::Protocol::Http10);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_flow_control_drained_total")
                     .value());
@@ -6194,7 +6340,8 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
           [&](Http::ResponseDecoder& decoder,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -6244,7 +6391,8 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*child_span, injectContext(_));
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -6287,7 +6435,8 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*child_span, injectContext(_));
-            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 
@@ -6334,7 +6483,8 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         EXPECT_CALL(*child_span, injectContext(_));
-        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_,
+                              Http::Protocol::Http10);
         return nullptr;
       }));
 
@@ -6376,7 +6526,8 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
             EXPECT_CALL(*child_span_1, injectContext(_));
-            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
   expectResponseTimerCreate();
@@ -6417,7 +6568,8 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
             response_decoder = &decoder;
             EXPECT_CALL(*child_span_2, injectContext(_));
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_,
+                                  Http::Protocol::Http10);
             return nullptr;
           }));
 

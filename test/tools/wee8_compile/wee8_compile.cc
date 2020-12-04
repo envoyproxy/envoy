@@ -1,12 +1,13 @@
 // NOLINT(namespace-envoy)
 
-#include <unistd.h>
-
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <vector>
 
+#include "src/wasm/c-api.h"
 #include "v8-version.h"
 #include "wasm-api/wasm.hh"
 
@@ -126,10 +127,22 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
       std::cerr << "ERROR: Failed to parse corrupted Wasm module." << std::endl;
       return wasm::vec<byte_t>::invalid();
     }
-    if (section_type != 0 /* custom section */) {
-      stripped.insert(stripped.end(), section_start, pos + section_len);
+    if (section_type == 0 /* custom section */) {
+      const auto section_data_start = pos;
+      const auto section_name_len = parseVarint(pos, end);
+      if (section_name_len == static_cast<uint32_t>(-1) || pos + section_name_len > end) {
+        std::cerr << "ERROR: Failed to parse corrupted Wasm module." << std::endl;
+        return wasm::vec<byte_t>::invalid();
+      }
+      auto section_name = std::string(pos, section_name_len);
+      if (section_name.find("precompiled_") == std::string::npos) {
+        stripped.insert(stripped.end(), section_start, section_data_start + section_len);
+      }
+      pos = section_data_start + section_len;
+    } else {
+      pos += section_len;
+      stripped.insert(stripped.end(), section_start, pos /* section end */);
     }
-    pos += section_len;
   }
 
   return wasm::vec<byte_t>::make(stripped.size(), stripped.data());
@@ -154,8 +167,11 @@ wasm::vec<byte_t> serializeWasmModule(const char* path, const wasm::vec<byte_t>&
     return wasm::vec<byte_t>::invalid();
   }
 
-  // TODO(PiotrSikora): figure out how to hook the completion callback.
-  sleep(3);
+  wasm::StoreImpl* store_impl = reinterpret_cast<wasm::StoreImpl*>(store.get());
+  auto isolate = store_impl->isolate();
+  while (isolate->HasPendingBackgroundTasks()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
 
   return module->serialize();
 }

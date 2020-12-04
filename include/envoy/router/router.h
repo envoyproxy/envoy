@@ -1182,10 +1182,6 @@ public:
    */
   virtual bool cancelAnyPendingStream() PURE;
   /**
-   * @return optionally returns the protocol for the connection pool.
-   */
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
-  /**
    * @return optionally returns the host for the connection pool.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
@@ -1237,11 +1233,13 @@ public:
    *             connection pools the description may be different each time this is called.
    * @param upstream_local_address supplies the local address of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
+   * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info) PURE;
+                           const StreamInfo::StreamInfo& info,
+                           absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.
   //
@@ -1274,8 +1272,10 @@ public:
    * Encode headers, optionally indicating end of stream.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request.
+   * @return status indicating success. Encoding will fail if headers do not have required HTTP
+   * headers.
    */
-  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.

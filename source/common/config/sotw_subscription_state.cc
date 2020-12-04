@@ -11,7 +11,7 @@ SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              UntypedConfigUpdateCallbacks& callbacks,
                                              std::chrono::milliseconds init_fetch_timeout,
                                              Event::Dispatcher& dispatcher)
-    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {}
+    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {} 
 
 SotwSubscriptionState::~SotwSubscriptionState() = default;
 
@@ -68,15 +68,30 @@ UpdateAck SotwSubscriptionState::handleResponse(const void* response_proto_ptr) 
 
 void SotwSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DiscoveryResponse& message) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
+
   for (const auto& resource : message.resources()) {
-    if (resource.type_url() != message.type_url()) {
+    if (isHeartbeatResource(resource)) {
+      continue;
+    }
+    non_heartbeat_resources.Add()->CopyFrom(resource);
+    if (!resource.Is<envoy::service::discovery::v3::Resource>() && 
+		    resource.type_url() != message.type_url()) {
       throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
                                        "the message-wide type URL {} in DiscoveryResponse {}",
                                        resource.type_url(), message.type_url(),
                                        message.DebugString()));
     }
   }
-  callbacks().onConfigUpdate(message.resources(), message.version_info());
+
+  {
+    const auto scoped_update = ttl_.scopedTtlUpdate();
+    for (const auto& resource : message.resources()) {
+      setResourceTtl(resource);
+    }
+  }
+
+  callbacks().onConfigUpdate(non_heartbeat_resources, message.version_info());
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();
@@ -128,6 +143,28 @@ void* SotwSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
     request->mutable_error_detail()->CopyFrom(ack.error_detail_);
   }
   return request;
+}
+
+void SotwSubscriptionState::setResourceTtl(const envoy::service::discovery::v3::Resource& resource) {
+  if (resource.has_ttl()) {
+    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
+             resource.name());
+  } else {
+    ttl_.clear(resource.name());
+  }
+}
+
+void SotwSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& expired) {
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  for (const auto& resource : expired) {
+    removed_resources.Add(std::string(resource));
+  }
+  callbacks().onConfigUpdate({}, removed_resources, "");
+}
+
+bool SotwSubscriptionState::isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) {
+    return !resource.hasResource() && last_good_version_info_.has_value() &&
+           resource.version() == last_good_version_info_.value();
 }
 
 } // namespace Config

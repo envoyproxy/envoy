@@ -4,7 +4,8 @@ This is a high level overview of how the repository is laid out to both aid in c
 as well as to clearly specify how extensions are added to the repository. The top level directories
 are:
 
-* [.circleci/](.circleci/): Configuration for [CircleCI](https://circleci.com/gh/envoyproxy).
+* [.azure-pipelines/](.azure-pipelines/): Configuration for
+[Azure Pipelines](https://azure.microsoft.com/en-us/services/devops/pipelines/).
 * [api/](api/): Envoy data plane API.
 * [bazel/](bazel/): Configuration for Envoy's use of [Bazel](https://bazel.build/).
 * [ci/](ci/): Scripts used both during CI as well as to build Docker containers.
@@ -62,9 +63,8 @@ Not every directory within test is described below, but a few highlights:
 ## [source/extensions](source/extensions/) layout
 
 We maintain a very specific code and namespace layout for extensions. This aids in discovering
-code/extensions, and also will allow us in the future to more easily scale out our extension
-maintainers by having OWNERS files specific to certain extensions. (As of this writing, this is not
-currently implemented but that is the plan moving forward.)
+code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNERS).
+
 
 * All extensions are either registered in [all_extensions.bzl](source/extensions/all_extensions.bzl)
   or [extensions_build_config.bzl](source/extensions/extensions_build_config.bzl). The former is
@@ -75,6 +75,14 @@ currently implemented but that is the plan moving forward.)
 * These are the top level extension directories and associated namespaces:
   * [access_loggers/](/source/extensions/access_loggers): Access log implementations which use
     the `Envoy::Extensions::AccessLoggers` namespace.
+  * [bootstrap](/source/extensions/bootstrap): Bootstrap extensions which use
+    the `Envoy::Extensions::Bootstrap` namespace.
+  * [clusters](/source/extensions/clusters): Cluster extensions which use the
+    `Envoy::Extensions::Clusters` namespace.
+  * [compression](/source/extensions/compression): Compression extensions
+    which use `Envoy::Extensions::Compression` namespace.
+  * [fatal_actions](/source/extensions/fatal_actions): Fatal Action extensions
+    which use the `Envoy::Extensions::FatalActions` namespace.
   * [filters/http/](/source/extensions/filters/http): HTTP L7 filters which use the
     `Envoy::Extensions::HttpFilters` namespace.
   * [filters/listener/](/source/extensions/filters/listener): Listener filters which use the
@@ -85,14 +93,24 @@ currently implemented but that is the plan moving forward.)
     `Envoy::Extensions::GrpcCredentials` namespace.
   * [health_checker/](/source/extensions/health_checker): Custom health checkers which use the
     `Envoy::Extensions::HealthCheckers` namespace.
-  * [resolvers/](/source/extensions/resolvers): Network address resolvers which use the
-    `Envoy::Extensions::Resolvers` namespace.
+  * [internal_redirect](/source/extensions/internal_redirect): Internal Redirect
+    extensions which use the `Envoy::Extensions::InternalRedirect` namespace.
+  * [quic_listeners](/source/extensions/quic_listeners): QUIC extensions which
+    use the `Envoy::Quic` namespace.
+  * [resource_monitors](/source/extensions/resource_monitors): Resource monitor
+    extensions which use the `Envoy::Extensions::ResourceMonitors` namespace.
+  * [retry](/source/extensions/retry): Retry extensions which use the
+    `Envoy::Extensions::Retry` namespace.
   * [stat_sinks/](/source/extensions/stat_sinks): Stat sink implementations which use the
     `Envoy::Extensions::StatSinks` namespace.
   * [tracers/](/source/extensions/tracers): Tracers which use the
     `Envoy::Extensions::Tracers` namespace.
   * [transport_sockets/](/source/extensions/transport_sockets): Transport socket implementations
     which use the `Envoy::Extensions::TransportSockets` namespace.
+  * [upstreams](/source/extensions/upstreams): Upstream extensions use the
+    `Envoy::Extensions::Upstreams` namespace.
+  * [watchdog](/source/extensions/watchdog): Watchdog extensions use the
+    `Envoy::Extensions::Watchdog` namespace.
 * Each extension is contained wholly in its own namespace. E.g.,
   `Envoy::Extensions::NetworkFilters::Echo`.
 * Common code that is used by multiple extensions should be in a `common/` directory as close to

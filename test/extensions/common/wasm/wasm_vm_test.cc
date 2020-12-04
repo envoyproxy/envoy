@@ -144,13 +144,6 @@ TEST_P(WasmVmTest, V8BadCode) {
 }
 
 TEST_P(WasmVmTest, V8Code) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->runtime() == "v8");
@@ -164,20 +157,12 @@ TEST_P(WasmVmTest, V8Code) {
     EXPECT_TRUE(!wasm_vm->getCustomSection(wasm_vm->getPrecompiledSectionName()).empty());
   }
   EXPECT_THAT(wasm_vm->getCustomSection("producers"), HasSubstr("rustc"));
-  EXPECT_TRUE(wasm_vm->getCustomSection("emscripten_metadata").empty());
 
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm->clone() != nullptr);
 }
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
@@ -199,13 +184,6 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 }
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
@@ -234,13 +212,6 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 }
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
@@ -279,13 +250,6 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 }
 
 TEST_P(WasmVmTest, V8Memory) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 

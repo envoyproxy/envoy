@@ -130,8 +130,8 @@ proto_library(
         "//envoy/extensions/upstreams/http/generic/v3:pkg",
         "//envoy/extensions/upstreams/http/http/v3:pkg",
         "//envoy/extensions/upstreams/http/tcp/v3:pkg",
+        "//envoy/extensions/upstreams/tcp/generic/v3:pkg",
         "//envoy/extensions/wasm/v3:pkg",
-        "//envoy/extensions/watchdog/abort_action/v3alpha:pkg",
         "//envoy/extensions/watchdog/profile_action/v3alpha:pkg",
         "//envoy/service/accesslog/v3:pkg",
         "//envoy/service/auth/v3:pkg",
@@ -155,6 +155,7 @@ proto_library(
         "//envoy/type/metadata/v3:pkg",
         "//envoy/type/tracing/v3:pkg",
         "//envoy/type/v3:pkg",
+        "//envoy/watchdog/v3alpha:pkg",
     ],
 )
 

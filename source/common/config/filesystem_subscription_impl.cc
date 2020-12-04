@@ -113,7 +113,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   if (collection_entries_field_descriptor == nullptr ||
       collection_entries_field_descriptor->type() != Protobuf::FieldDescriptor::TYPE_MESSAGE ||
       collection_entries_field_descriptor->message_type()->full_name() !=
-          "udpa.core.v1.CollectionEntry" ||
+          "xds.core.v3.CollectionEntry" ||
       !collection_entries_field_descriptor->is_repeated()) {
     throw EnvoyException(fmt::format("Invalid structure for collection type {} in {}",
                                      collection_type, resource_message.DebugString()));
@@ -123,7 +123,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
       reflection->FieldSize(*collection_message, collection_entries_field_descriptor);
   DecodedResourcesWrapper decoded_resources;
   for (uint32_t i = 0; i < num_entries; ++i) {
-    udpa::core::v1::CollectionEntry collection_entry;
+    xds::core::v3::CollectionEntry collection_entry;
     collection_entry.MergeFrom(reflection->GetRepeatedMessage(
         *collection_message, collection_entries_field_descriptor, i));
     // TODO(htuch): implement indirect collection entries.

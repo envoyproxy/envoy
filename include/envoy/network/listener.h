@@ -378,9 +378,6 @@ public:
 
   /**
    * Make this listener readable at the beginning of the next event loop.
-   *
-   * @note: it may become readable during the current loop if feature
-   * ``envoy.reloadable_features.activate_fds_next_event_loop`` is disabled.
    */
   virtual void activateRead() PURE;
 };

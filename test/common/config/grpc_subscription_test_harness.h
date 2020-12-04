@@ -42,15 +42,14 @@ public:
   GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
-        async_client_(new NiceMock<Grpc::MockAsyncClient>()), timer_(new Event::MockTimer()) {
+        async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
     node_.set_id("node_name");
     node_.set_cluster("cluster_name");
     node_.mutable_locality()->set_zone("zone_name");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      timer_cb_ = timer_cb;
-      return timer_;
-    }));
+    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+
+    timer_ = new Event::MockTimer(&dispatcher_);
 
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         std::make_shared<GrpcMuxSotw>(std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
@@ -63,7 +62,11 @@ public:
         /*is_aggregated=*/false);
   }
 
-  ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }
+  ~GrpcSubscriptionTestHarness() override {
+    EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+    EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+    dispatcher_.clearDeferredDeleteList();
+  }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
                          bool expect_node = false) override {
@@ -118,14 +121,16 @@ public:
           last_cluster_names_.end()) {
         envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
-        response->add_resources()->PackFrom(API_DOWNGRADE(*load_assignment));
+        response->add_resources()->PackFrom(*load_assignment);
       }
     }
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             *response, "cluster_name");
+
     EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
+
     if (accept) {
       expectSendMessage(last_cluster_names_, version, false);
       version_ = version;
@@ -170,7 +175,7 @@ public:
   Event::MockDispatcher dispatcher_;
   Random::MockRandomGenerator random_;
   Event::MockTimer* timer_;
-  Event::TimerCb timer_cb_;
+  Event::MockTimer* ttl_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>

@@ -7,8 +7,8 @@
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
 #include "common/config/type_to_endpoint.h"
-#include "common/config/udpa_resource.h"
 #include "common/config/utility.h"
+#include "common/config/xds_resource.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -108,7 +108,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 }
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
-    const udpa::core::v1::ResourceLocator& collection_locator,
+    const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& /*config*/, absl::string_view /*type_url*/,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
@@ -116,16 +116,15 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (collection_locator.scheme()) {
-  case udpa::core::v1::ResourceLocator::FILE: {
-    const std::string path =
-        Http::Utility::localPathFromFilePath(absl::StrJoin(collection_locator.id(), "/"));
+  case xds::core::v3::ResourceLocator::FILE: {
+    const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
   }
   default:
     throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",
-                                     UdpaResourceIdentifier::encodeUrl(collection_locator)));
+                                     XdsResourceIdentifier::encodeUrl(collection_locator)));
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

@@ -34,7 +34,7 @@ EXCLUDED_PREFIXES = (
     "./test/extensions/common/wasm/test_data",
     "./test/extensions/access_loggers/wasm/test_data",
     "./source/extensions/common/wasm/ext",
-    "./examples/wasm",
+    "./examples/wasm-cc",
 )
 SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".mm", ".proto",
             ".rst")
@@ -58,7 +58,7 @@ REAL_TIME_ALLOWLIST = (
     "./test/test_common/simulated_time_system.cc", "./test/test_common/simulated_time_system.h",
     "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
     "./test/test_common/utility.cc", "./test/test_common/utility.h",
-    "./test/integration/integration.h")
+    "./test/integration/integration.h", "./test/tools/wee8_compile/wee8_compile.cc")
 
 # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
 # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
@@ -109,6 +109,22 @@ GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 # These files should not throw exceptions. Add HTTP/1 when exceptions removed.
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
+
+# We want all URL references to exist in repository_locations.bzl files and have
+# metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
+# we have some exceptions for either infrastructure files or places we fall
+# short today (Rust).
+#
+# Please DO NOT extend this allow list without consulting
+# @envoyproxy/dependency-shepherds.
+BUILD_URLS_ALLOWLIST = (
+    "./generated_api_shadow/bazel/repository_locations.bzl",
+    "./generated_api_shadow/bazel/envoy_http_archive.bzl",
+    "./bazel/repository_locations.bzl",
+    "./bazel/external/cargo/crates.bzl",
+    "./api/bazel/repository_locations.bzl",
+    "./api/bazel/envoy_http_archive.bzl",
+)
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
@@ -403,6 +419,9 @@ class FormatChecker:
 
     return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
+
+  def allowlistedForBuildUrls(self, file_path):
+    return file_path in BUILD_URLS_ALLOWLIST
 
   def isApiFile(self, file_path):
     return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
@@ -806,6 +825,8 @@ class FormatChecker:
         not self.isWorkspaceFile(file_path) and not self.isExternalBuildFile(file_path) and
         "@envoy//" in line):
       reportError("Superfluous '@envoy//' prefix")
+    if not self.allowlistedForBuildUrls(file_path) and (" urls = " in line or " url = " in line):
+      reportError("Only repository_locations.bzl may contains URL references")
 
   def fixBuildLine(self, file_path, line, line_number):
     if (self.envoy_build_rule_check and not self.isStarlarkFile(file_path) and

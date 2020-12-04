@@ -71,6 +71,12 @@ template <typename ReturnValue> struct IoCallResult {
    */
   bool ok() const { return err_ == nullptr; }
 
+  /**
+   * This return code is frequent enough that we have a separate function to check.
+   * @return true if the system call failed because the socket would block.
+   */
+  bool wouldBlock() const { return !ok() && err_->getErrorCode() == IoError::IoErrorCode::Again; }
+
   // TODO(danzh): rename it to be more meaningful, i.e. return_value_.
   ReturnValue rc_;
   IoErrorPtr err_;

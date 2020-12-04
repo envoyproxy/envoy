@@ -128,15 +128,36 @@ message PrivateKeyProvider {
   }
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
   // The TLS certificate chain.
+  //
+  // If *certificate_chain* is a filesystem path, a watch will be added to the
+  // parent directory for any file moves to support rotation. This currently
+  // only applies to dynamic secrets, when the *TlsCertificate* is delivered via
+  // SDS.
   config.core.v3.DataSource certificate_chain = 1;
 
   // The TLS private key.
+  //
+  // If *private_key* is a filesystem path, a watch will be added to the parent
+  // directory for any file moves to support rotation. This currently only
+  // applies to dynamic secrets, when the *TlsCertificate* is delivered via SDS.
   config.core.v3.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
+
+  // If specified, updates of file-based *certificate_chain* and *private_key*
+  // sources will be triggered by this watch. The certificate/key pair will be
+  // read together and validated for atomic read consistency (i.e. no
+  // intervening modification occurred between cert/key read, verified by file
+  // hash comparisons). This allows explicit control over the path watched, by
+  // default the parent directories of the filesystem paths in
+  // *certificate_chain* and *private_key* are watched if this field is not
+  // specified. This only applies when a *TlsCertificate* is delivered by SDS
+  // with references to filesystem paths. See the :ref:`SDS key rotation
+  // <sds_key_rotation>` documentation for further details.
+  config.core.v3.WatchedDirectory watched_directory = 7;
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
   // <envoy_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>` field. This can't be
@@ -191,7 +212,7 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -233,7 +254,21 @@ message CertificateValidationContext {
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
+  //
+  // If *trusted_ca* is a filesystem path, a watch will be added to the parent
+  // directory for any file moves to support rotation. This currently only
+  // applies to dynamic secrets, when the *CertificateValidationContext* is
+  // delivered via SDS.
   config.core.v3.DataSource trusted_ca = 1;
+
+  // If specified, updates of a file-based *trusted_ca* source will be triggered
+  // by this watch. This allows explicit control over the path watched, by
+  // default the parent directory of the filesystem path in *trusted_ca* is
+  // watched if this field is not specified. This only applies when a
+  // *CertificateValidationContext* is delivered by SDS with references to
+  // filesystem paths. See the :ref:`SDS key rotation <sds_key_rotation>`
+  // documentation for further details.
+  config.core.v3.WatchedDirectory watched_directory = 11;
 
   // An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will verify that the
   // SHA-256 of the DER-encoded Subject Public Key Information (SPKI) of the presented certificate
@@ -297,8 +332,8 @@ message CertificateValidationContext {
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated = {items {string {min_len: 64 max_bytes: 95}}}];
 
-  // An optional list of Subject Alternative name matchers. Envoy will verify that the
-  // Subject Alternative Name of the presented certificate matches one of the specified matches.
+  // An optional list of Subject Alternative name matchers. If specified, Envoy will verify that the
+  // Subject Alternative Name of the presented certificate matches one of the specified matchers.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
   // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.v3.StringMatcher>`.

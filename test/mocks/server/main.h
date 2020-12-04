@@ -6,7 +6,7 @@
 #include <string>
 
 #include "envoy/server/configuration.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "gmock/gmock.h"
 

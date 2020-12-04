@@ -43,6 +43,8 @@ public:
   // Returns a new'd pointer, meant to be owned by the caller.
   void* getNextRequestWithAck(const UpdateAck& ack) override;
 
+  void ttlExpiryCallback(const std::string& type_url) override;
+
   SotwSubscriptionState(const SotwSubscriptionState&) = delete;
   SotwSubscriptionState& operator=(const SotwSubscriptionState&) = delete;
 
@@ -52,6 +54,9 @@ private:
 
   void handleGoodResponse(const envoy::service::discovery::v3::DiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
+
+  bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource);
+  void setResourceTtl(const envoy::service::discovery::v3::Resource& resource);
 
   // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.

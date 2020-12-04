@@ -55,14 +55,21 @@ public:
 
   void disableInitFetchTimeoutTimer();
 
+  virtual void ttlExpiryCallback(const std::string& type_url) PURE;
+
 protected:
   std::string type_url() const { return type_url_; }
   UntypedConfigUpdateCallbacks& callbacks() const { return callbacks_; }
 
-private:
+  // Not all xDS resources supports heartbeats due to there being specific information encoded in
+  // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
+  // disable heartbeats for these resources (currently only VHDS).
+  const bool supports_heartbeats_;
+  TtlManager ttl_;
   const std::string type_url_;
   // callbacks_ is expected (outside of tests) to be a WatchMap.
   UntypedConfigUpdateCallbacks& callbacks_;
+  Event::Dispatcher& dispatcher_;
   Event::TimerPtr init_fetch_timeout_timer_;
 };
 
