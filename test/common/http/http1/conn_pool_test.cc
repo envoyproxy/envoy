@@ -1229,7 +1229,7 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
   EXPECT_CALL(*upstream_ready_cb_, Die());
 
   // When the dispatcher removes the connection pool, another call to clearDeferredDeleteList()
-  // cocurs in ~HttpConnPoolImplBase. Avoid recursion.
+  // occurs in ~HttpConnPoolImplBase. Avoid recursion.
   bool deferring_delete = false;
   ON_CALL(dispatcher_, clearDeferredDeleteList())
       .WillByDefault(Invoke([this, &deferring_delete]() -> void {
