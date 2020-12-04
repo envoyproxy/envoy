@@ -54,7 +54,7 @@ message BandwidthLimit {
   // .. note::
   //   When using per route configuration, the limit becomes unique to that route.
   //
-  uint64 limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
   // Optional fill_rate for the token buckets (per second). Defaults to 64.
   google.protobuf.UInt32Value fill_rate = 4 [(validate.rules).uint32 = {gte: 1}];
