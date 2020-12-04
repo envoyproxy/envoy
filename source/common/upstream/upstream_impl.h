@@ -51,6 +51,7 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
+#include "common/upstream/stat_names.h"
 #include "common/upstream/transport_socket_match_impl.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -526,7 +527,8 @@ public:
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
-  static ClusterStats generateStats(Stats::Scope& scope);
+  static ClusterStats generateStats(Stats::Scope& scope,
+                                    const ClusterStatNames& cluster_stat_names);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,

@@ -55,7 +55,7 @@ public:
         router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
         dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), cluster_manager_stat_names(stats.symbolTable()) {}
+        singleton_manager_(singleton_manager), cluster_manager_stat_names_(stats.symbolTable()) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -79,7 +79,7 @@ public:
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
   const ClusterManagerStatNames& clusterManagerStatNames() const override {
-    return cluster_manager_stat_names;
+    return cluster_manager_stat_names_;
   }
 
 protected:
@@ -99,7 +99,7 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
-  ClusterManagerStatNames cluster_manager_stat_names;
+  ClusterManagerStatNames cluster_manager_stat_names_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -286,6 +286,8 @@ public:
 
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+
+  const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
@@ -573,6 +575,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
   Router::Context& router_context_;
+  ClusterStatNames cluster_stat_names_;
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
 };

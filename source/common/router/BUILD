@@ -264,6 +264,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "//source/common/upstream:stat_names_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -323,6 +324,7 @@ envoy_cc_library(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:stat_names_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],

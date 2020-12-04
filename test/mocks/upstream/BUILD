@@ -53,7 +53,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:raw_buffer_socket_lib",
-        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

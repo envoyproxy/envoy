@@ -712,6 +712,7 @@ envoy_cc_test(
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

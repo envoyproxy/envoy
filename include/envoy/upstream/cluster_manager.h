@@ -335,6 +335,16 @@ public:
    * @return Config::SubscriptionFactory& the subscription factory.
    */
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
+
+  /**
+   * Returns a struct with all the Stats::StatName objects needed by
+   * Clusters. This helps factor out some relatively heavy name
+   * construction which occur when there is a large CDS update during operation,
+   * relative to recreating all stats from strings on-the-fly.
+   *
+   * @return the stat names.
+   */
+  virtual const ClusterStatNames& clusterStatNames() const PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

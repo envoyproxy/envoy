@@ -92,7 +92,7 @@ public:
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   OriginalDstClusterSharedPtr cluster_;
   ReadyWatcher membership_updated_;

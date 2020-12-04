@@ -259,6 +259,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),
+      cluster_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
                             validation_context.dynamicValidationVisitor(), api, runtime_) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(

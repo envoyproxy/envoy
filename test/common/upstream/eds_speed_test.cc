@@ -24,6 +24,7 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -146,7 +147,7 @@ public:
   const std::string type_url_;
   uint64_t version_{};
   bool initialized_{};
-  Stats::IsolatedStoreImpl stats_;
+  Stats::MockIsolatedStatsStore stats_;
   Config::SubscriptionStats subscription_stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;

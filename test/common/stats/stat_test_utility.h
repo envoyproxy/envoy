@@ -6,6 +6,8 @@
 #include "common/memory/stats.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/test_common/global.h"
+
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 
@@ -74,6 +76,29 @@ private:
   const size_t memory_at_construction_;
 };
 
+class TestSymbolTableHelper {
+public:
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return symbol_table_; }
+
+private:
+  SymbolTableImpl symbol_table_;
+};
+
+class TestSymbolTableImpl {
+public:
+  SymbolTable& operator*() { return global_.get().symbolTable(); }
+  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
+  SymbolTable* operator->() { return &global_.get().symbolTable(); }
+  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
+  Envoy::Test::Global<TestSymbolTableHelper> global_;
+};
+
+class SymbolTableProvider {
+public:
+  TestSymbolTableImpl global_symbol_table_;
+};
+
 // Helper class to use in lieu of an actual Stats::Store for doing lookups by
 // name. The intent is to remove the deprecated Scope::counter(const
 // std::string&) methods, and always use this class for accessing stats by
@@ -87,9 +112,9 @@ private:
 // use the StatName as a key, we must use strings in tests to avoid forcing
 // the tests to construct the StatName using the same pattern of dynamic
 // and symbol strings as production.
-class TestStore : public IsolatedStoreImpl {
+class TestStore : public SymbolTableProvider, public IsolatedStoreImpl {
 public:
-  TestStore() = default;
+  TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
@@ -172,5 +197,8 @@ std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);
 void serializeDeserializeString(absl::string_view in);
 
 } // namespace TestUtil
+
+using TestSymbolTable = TestUtil::TestSymbolTableImpl;
+
 } // namespace Stats
 } // namespace Envoy

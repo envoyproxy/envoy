@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/stat_names.h"
 
 #include "absl/container/fixed_array.h"
 
