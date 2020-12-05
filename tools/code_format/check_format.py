@@ -803,7 +803,9 @@ class FormatChecker:
        not ("test/" in file_path) and \
        ("memcpy(" in line) and \
        not ("NOLINT(safe-memcpy)" in line):
-      reportError("Don't call memcpy() directly; use safeMemcpy, safeMemcpySrc, safeMemcpyDst or MemBlockBuilder instead.")
+      reportError(
+          "Don't call memcpy() directly; use safeMemcpy, safeMemcpySrc, safeMemcpyDst or MemBlockBuilder instead."
+      )
 
     if self.denylistedForExceptions(file_path):
       # Skpping cases where 'throw' is a substring of a symbol like in "foothrowBar".
