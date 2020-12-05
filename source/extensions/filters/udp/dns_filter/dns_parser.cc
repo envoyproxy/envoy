@@ -1,7 +1,8 @@
 #include "extensions/filters/udp/dns_filter/dns_parser.h"
 
-#include "common/common/safe_memcpy.h"
 #include "envoy/network/address.h"
+
+#include "common/common/safe_memcpy.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
@@ -743,8 +744,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
   buffer.writeBEInt<uint16_t>(query_context->response_header_.id);
 
   uint16_t flags;
-  safeMemcpySrc(&flags,
-           static_cast<void*>(&query_context->response_header_.flags));
+  safeMemcpySrc(&flags, static_cast<void*>(&query_context->response_header_.flags));
   buffer.writeBEInt<uint16_t>(flags);
 
   buffer.writeBEInt<uint16_t>(query_context->response_header_.questions);
