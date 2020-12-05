@@ -89,7 +89,7 @@ MockStore::MockStore() {
 }
 MockStore::~MockStore() = default;
 
-MockIsolatedStatsStore::MockIsolatedStatsStore() {}
+MockIsolatedStatsStore::MockIsolatedStatsStore() = default;
 MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;
 
 MockStatsMatcher::MockStatsMatcher() = default;
