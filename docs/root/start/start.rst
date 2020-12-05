@@ -3,18 +3,18 @@
 开始
 ====
 
-这部分以一个非常简单的例子让你开始，且提供一些样例配置。
+本节让你从一个非常简单的配置开始，并提供了一些配置示例。
 
-开始使用 Envoy 的最快速方式就是 :ref:`安装预制的二进制包 <install_binaries>`。你也可以选择从源码进行 :ref:`构建 <building>`。
+开始使用 Envoy 的最快速方式就是 :ref:`安装预制的二进制文件 <install_binaries>`。你也可以选择从源码进行 :ref:`构建 <building>`。
 
-这些样例使用  :ref:`v3 Envoy API <envoy_api_reference>`，但是仅仅使用了 API 的静态配置特性，这些对于简单需求来讲是最有用的。:ref:`动态配置 <arch_overview_dynamic_config>` 支持更多的复杂需求。
+这些示例使用 :ref:`v3 Envoy API <envoy_api_reference>`，但是仅仅使用了 API 的静态配置特性，这些对于简单需求来讲是最有用的。:ref:`动态配置 <arch_overview_dynamic_config>` 支持更多的复杂需求。
 
-快速开始运行简单样例
+快速开始运行简单示例
 ---------------------
 
-这些指导说明使用 Envoy 仓库中的文件来运行样例。下面部分对于同样配置的配置文件和执行步骤进行了详细的解释。
+这些指导说明使用 Envoy 仓库中的文件来运行示例。下面的章节对配置文件和相同配置下的执行步骤做了更详细的解释。
 
-在仓库 :repo:`configs/google_com_proxy.v2.yaml` 中可以找到被用来验证基本的纯 HTTP 代理功能的 Envoy 的最小配置。但这并不是代表一个真实的 Envoy 部署：
+在 :repo:`configs/google_com_proxy.v2.yaml`  中提供了一个非常简单的 Envoy 配置，可以用来验证基本的纯 HTTP 代理。但这并不代表真实的 Envoy 部署：
 
 .. substitution-code-block:: none
 
@@ -115,7 +115,7 @@
 
   $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-最终，你可以用如下命令来进行测试::
+最后，你可以用如下命令来进行测试::
 
   $ curl -v localhost:10000
 
@@ -147,7 +147,7 @@
 
 如果你把应用程序日志、管理和访问日志输出到一个文件，``envoy`` 用户将需要足够的权限来写这个文件。这个可以通过设置 ``ENVOY_UID`` 和/或者通过将文件变成 envoy 用户可写的方法来实现。
 
-例如，在主机上挂在一个日志文件夹并且让它是可写的，你可以采取如下操作：
+例如，在主机上挂载一个日志文件夹并且让它是可写的，你可以采取如下操作：
 
 .. substitution-code-block:: none
 
@@ -161,7 +161,7 @@ You can then configure ``envoy`` to log to files in ``/var/log``
 
 ``envoy`` ``uid`` 和 ``gid`` 的默认值都是 ``101`` 。
 
-``envoy`` 用户还需要权限能够去访问被挂在到容器内部的任何需要的配置文件。
+``envoy`` 用户还需要权限能够去访问被挂载到容器内部的任何需要的配置文件。
 
 如果你运行的环境中有一个严格的 ``umask`` 设置，你可能需要通过设置文件的 ``uid`` 或 ``gid`` 来给 envoy 提供访问权限，或者将配置文件设置为对 envoy 用户可读的。
 
@@ -172,10 +172,10 @@ You can then configure ``envoy`` to log to files in ``/var/log``
   $ docker run -d --name envoy -e ENVOY_UID=`id -u` -p 9901:9901 -p 10000:10000 envoy:v1
 
 
-沙箱
+沙盒
 ----
 
-我们已经创建了一些使用 Docker 组件的沙盒环境，来设定不同的环境以进行 Envoy 特性的测试和样例配置的展示。随着我们对人们兴趣的判定，我们将添加更多的沙箱来验证不同的特性，如下是一些可用的沙盒：
+我们已经创建了一些使用 Docker 组件的沙盒环境，来设定不同的环境以进行 Envoy 特性的测试和示例配置的展示。随着我们对人们兴趣的判定，我们将添加更多的沙盒来验证不同的特性，如下是一些可用的沙盒：
 
 .. toctree::
     :maxdepth: 2
