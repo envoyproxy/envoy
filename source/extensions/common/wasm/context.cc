@@ -199,7 +199,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   b += sizeof(uint32_t);
   for (auto& e : response) {
     uint32_t ttl = e.ttl_.count();
-    memcpy(b, &ttl, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+    safeMemcpyDst(b, &ttl);
     b += sizeof(uint32_t);
   };
   for (auto& e : response) {
@@ -265,46 +265,46 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
   auto buffer = std::unique_ptr<char[]>(new char[counter_block_size + gauge_block_size]);
   char* b = buffer.get();
 
-  memcpy(b, &counter_block_size, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  safeMemcpyDst(b, &counter_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &counter_type, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  safeMemcpyDst(b, &counter_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_counters, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  safeMemcpyDst(b, &num_counters);
   b += sizeof(uint32_t);
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
       n = counter.counter_.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+      safeMemcpyDst(b, &n);
       b += sizeof(uint32_t);
       memcpy(b, counter.counter_.get().name().data(), // NOLINT(safe-memcpy)
              counter.counter_.get().name().size());
       b = align<uint64_t>(b + counter.counter_.get().name().size());
       v = counter.counter_.get().value();
-      memcpy(b, &v, sizeof(uint64_t)); // NOLINT(safe-memcpy)
+      safeMemcpyDst(b, &v);
       b += sizeof(uint64_t);
       v = counter.delta_;
-      memcpy(b, &v, sizeof(uint64_t)); // NOLINT(safe-memcpy)
+      safeMemcpyDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
 
-  memcpy(b, &gauge_block_size, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  safeMemcpyDst(b, &gauge_block_size);
   b += sizeof(uint32_t);
-  memcpy(b, &gauge_type, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  safeMemcpyDst(b, &gauge_type);
   b += sizeof(uint32_t);
-  memcpy(b, &num_gauges, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+  safeMemcpyDst(b, &num_gauges);
   b += sizeof(uint32_t);
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
       n = gauge.get().name().size();
-      memcpy(b, &n, sizeof(uint32_t)); // NOLINT(safe-memcpy)
+      safeMemcpyDst(b, &n);
       b += sizeof(uint32_t);
       memcpy(b, gauge.get().name().data(), gauge.get().name().size()); // NOLINT(safe-memcpy)
       b = align<uint64_t>(b + gauge.get().name().size());
       v = gauge.get().value();
-      memcpy(b, &v, sizeof(uint64_t)); // NOLINT(safe-memcpy)
+      safeMemcpyDst(b, &v);
       b += sizeof(uint64_t);
     }
   }
