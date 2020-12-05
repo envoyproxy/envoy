@@ -1169,7 +1169,7 @@ public:
                                 MockDestructSchedulableCallback* upstream_ready_cb)
       : ConnPoolImplForTest(dispatcher, cluster, random_generator, upstream_ready_cb) {}
 
-  ~ConnPoolImplNoDestructForTest() override {}
+  ~ConnPoolImplNoDestructForTest() override {} = default;
 };
 
 class Http1ConnPoolDestructImplTest : public testing::Test {
