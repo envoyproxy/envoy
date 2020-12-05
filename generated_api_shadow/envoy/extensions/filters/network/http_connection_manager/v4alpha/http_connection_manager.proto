@@ -19,8 +19,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/core/v3/resource_locator.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -652,17 +650,11 @@ message Rds {
   // Configuration source specifier for RDS.
   config.core.v4alpha.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  oneof name_specifier {
-    // The name of the route configuration. This name will be passed to the RDS
-    // API. This allows an Envoy configuration with multiple HTTP listeners (and
-    // associated HTTP connection manager filters) to use different route
-    // configurations.
-    string route_config_name = 2;
-
-    // Resource locator for RDS. This is mutually exclusive to *route_config_name*.
-    // [#not-implemented-hide:]
-    xds.core.v3.ResourceLocator rds_resource_locator = 3;
-  }
+  // The name of the route configuration. This name will be passed to the RDS
+  // API. This allows an Envoy configuration with multiple HTTP listeners (and
+  // associated HTTP connection manager filters) to use different route
+  // configurations.
+  string route_config_name = 2;
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.

@@ -255,6 +255,7 @@ protected:
   Http::Http1::CodecStats& stats_;
   const Http1Settings codec_settings_;
   http_parser parser_;
+  Buffer::Instance* current_dispatching_buffer_{};
   Http::Code error_code_{Http::Code::BadRequest};
   const Http::Http1::HeaderKeyFormatterPtr header_key_formatter_;
   HeaderString current_header_field_;
@@ -267,6 +268,7 @@ protected:
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
+  bool dispatching_slice_already_drained_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };

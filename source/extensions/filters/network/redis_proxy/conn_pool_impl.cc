@@ -91,7 +91,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> par
       redis_cluster_stats_(parent->redis_cluster_stats_),
       refresh_manager_(parent->refresh_manager_) {
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
-  Upstream::ThreadLocalCluster* cluster = parent->cm_.get(cluster_name_);
+  Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
     auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), parent->api_);
     auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), parent->api_);

@@ -60,12 +60,14 @@ bool sliceMatches(const SlicePtr& slice, const std::string& expected) {
 }
 
 TEST_F(OwnedSliceTest, Create) {
-  static constexpr uint64_t Sizes[] = {0, 1, 64, 4096 - sizeof(OwnedSlice), 65535};
-  for (const auto size : Sizes) {
+  static constexpr std::pair<uint64_t, uint64_t> Sizes[] = {
+      {0, 0}, {1, 4096}, {64, 4096}, {4095, 4096}, {4096, 4096}, {4097, 8192}, {65535, 65536}};
+  for (const auto& [size, expected_size] : Sizes) {
     auto slice = OwnedSlice::create(size);
     EXPECT_NE(nullptr, slice->data());
     EXPECT_EQ(0, slice->dataSize());
     EXPECT_LE(size, slice->reservableSize());
+    EXPECT_EQ(expected_size, slice->reservableSize());
   }
 }
 
