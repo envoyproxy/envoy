@@ -32,7 +32,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, KillRequestFilterIntegrationTestAllProtocols
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Request abort controlled via header configuration.
+// Request crash Envoy controlled via header configuration.
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
   initializeFilter(filter_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -41,6 +41,29 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
                                                  {":scheme", "http"},
                                                  {":authority", "host"},
                                                  {"x-envoy-kill-request", "true"}};
+
+  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
+               "");
+}
+
+TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
+  const std::string filter_config_with_custom_kill_header =
+      R"EOF(
+name: envoy.filters.http.kill_request
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest
+  probability:
+    numerator: 100
+  kill_request_header: "x-custom-kill-request"
+)EOF";
+
+  initializeFilter(filter_config_with_custom_kill_header);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-custom-kill-request", "true"}};
 
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
                "");

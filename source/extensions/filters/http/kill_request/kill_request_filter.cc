@@ -15,7 +15,12 @@ bool KillRequestFilter::isKillRequestEnabled() {
 }
 
 Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const auto kill_request_header = headers.get(KillRequestHeaders::get().KillRequest);
+  // If not empty, configured kill header name will override the default header name.
+  const Http::LowerCaseString kill_request_header_name =
+      kill_request_.kill_request_header().empty()
+          ? KillRequestHeaders::get().KillRequest
+          : Http::LowerCaseString(kill_request_.kill_request_header());
+  const auto kill_request_header = headers.get(kill_request_header_name);
   bool is_kill_request = false;
   // This is an implicitly untrusted header, so per the API documentation only
   // the first value is used.
