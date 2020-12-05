@@ -8,9 +8,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
 
-import "xds/core/v3/resource_locator.proto";
-import "xds/core/v3/resource_name.proto";
-
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -145,7 +142,7 @@ message DiscoveryResponse {
 // In particular, initial_resource_versions being sent at the "start" of every
 // gRPC stream actually entails a message for each type_url, each with its own
 // initial_resource_versions.
-// [#next-free-field: 10]
+// [#next-free-field: 8]
 message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DeltaDiscoveryRequest";
 
@@ -181,21 +178,8 @@ message DeltaDiscoveryRequest {
   // A list of Resource names to add to the list of tracked resources.
   repeated string resource_names_subscribe = 3;
 
-  // As with *resource_names_subscribe* but used when subscribing to resources indicated
-  // by a *xds.core.v3.ResourceLocator*. The directives in the resource locator
-  // are ignored and the context parameters are matched with
-  // *context_param_specifier* specific semantics.
-  // [#not-implemented-hide:]
-  repeated xds.core.v3.ResourceLocator xds_resources_subscribe = 8;
-
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
-
-  // As with *resource_names_unsubscribe* but used when unsubscribing to resources indicated by a
-  // *xds.core.v3.ResourceLocator*. This must match a previously subscribed
-  // resource locator provided in *xds_resources_subscribe*.
-  // [#not-implemented-hide:]
-  repeated xds.core.v3.ResourceLocator xds_resources_unsubscribe = 9;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
@@ -219,7 +203,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.DeltaDiscoveryResponse";
@@ -235,18 +219,11 @@ message DeltaDiscoveryResponse {
 
   // Type URL for resources. Identifies the xDS API when muxing over ADS.
   // Must be consistent with the type_url in the Any within 'resources' if 'resources' is non-empty.
-  // This does not need to be set if *udpa_removed_resources* is used instead of
-  // *removed_resources*.
   string type_url = 4;
 
   // Resources names of resources that have be deleted and to be removed from the xDS Client.
   // Removed resources for missing resources can be ignored.
   repeated string removed_resources = 6;
-
-  // As with *removed_resources* but used when a removed resource was named in
-  // its *Resource*s with a *xds.core.v3.ResourceName*.
-  // [#not-implemented-hide:]
-  repeated xds.core.v3.ResourceName udpa_removed_resources = 7;
 
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
   // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
@@ -267,11 +244,7 @@ message Resource {
   }
 
   // The resource's name, to distinguish it from others of the same type of resource.
-  string name = 3 [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
-
-  // Used instead of *name* when a resource with a *xds.core.v3.ResourceName* is delivered.
-  xds.core.v3.ResourceName xds_resource_name = 5
-      [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
+  string name = 3;
 
   // The aliases are a list of other names that this resource can go by.
   repeated string aliases = 4;

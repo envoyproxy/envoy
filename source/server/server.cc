@@ -31,6 +31,7 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_resource.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -535,11 +536,15 @@ void InstanceImpl::initialize(const Options& options,
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config() ||
-      bootstrap_.dynamic_resources().has_lds_resources_locator()) {
+      !bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
+    std::unique_ptr<xds::core::v3::ResourceLocator> lds_resources_locator;
+    if (!bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
+      lds_resources_locator =
+          std::make_unique<xds::core::v3::ResourceLocator>(Config::XdsResourceIdentifier::decodeUrl(
+              bootstrap_.dynamic_resources().lds_resources_locator()));
+    }
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
-                                    bootstrap_.dynamic_resources().has_lds_resources_locator()
-                                        ? &bootstrap_.dynamic_resources().lds_resources_locator()
-                                        : nullptr);
+                                    lds_resources_locator.get());
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
