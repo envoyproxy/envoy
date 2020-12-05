@@ -25,7 +25,7 @@ message CapabilityRestrictionConfig {
   // Additionally, the following WASI capabilities are implemented and can also be allowed:
   // `fd_write` `fd_read`, `fd_seek`, `fd_close`, `fd_fdstat_get`, `environ_get`, `environ_sizes_get`,
   // `args_get`, `args_sizes_get`, `proc_exit`, `clock_time_get`, `random_get`.
-  // 
+  //
   // [#comment:TODO(ryanapilado): update once sanitization is implemented]
   // Note: The value of each capability in the map is ignored and should be left empty.
   map<string, SanitizationConfig> allowed_capabilities = 1;
