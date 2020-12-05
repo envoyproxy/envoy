@@ -23,7 +23,7 @@ void OwnedImpl::addImpl(const void* data, uint64_t size) {
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplace_back(OwnedSlice::create(size));
+      slices_.emplace_back(size);
     }
     uint64_t copy_size = slices_.back().append(src, size);
     src += copy_size;
@@ -59,7 +59,7 @@ void OwnedImpl::prepend(absl::string_view data) {
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplace_front(OwnedSlice::create(size));
+      slices_.emplace_front(size);
     }
     uint64_t copy_size = slices_.front().prepend(data.data(), size);
     size -= copy_size;
@@ -227,7 +227,7 @@ SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   slices_.pop_front();
   if (!slice.isMutable()) {
     // Create a mutable copy of the immutable slice data.
-    auto mutable_slice = OwnedSlice::create(size);
+    Slice mutable_slice{size};
     auto copy_size = mutable_slice.append(slice.data(), size);
     ASSERT(copy_size == size);
     // Drain trackers for the immutable slice will be called as part of the slice destructor.
@@ -260,7 +260,7 @@ void* OwnedImpl::linearize(uint32_t size) {
     return nullptr;
   }
   if (slices_[0].dataSize() < size) {
-    auto new_slice = OwnedSlice::create(size);
+    Slice new_slice{size};
     Slice::Reservation reservation = new_slice.reserve(size);
     ASSERT(reservation.mem_ != nullptr);
     ASSERT(reservation.len_ == size);
@@ -280,8 +280,8 @@ void* OwnedImpl::linearize(uint32_t size) {
 void OwnedImpl::coalesceOrAddSlice(Slice&& other_slice) {
   const uint64_t slice_size = other_slice.dataSize();
   // The `other_slice` content can be coalesced into the existing slice IFF:
-  // 1. The `other_slice` can be coalesced. Objects of type UnownedSlice can not be coalesced. See
-  //    comment in the UnownedSlice class definition;
+  // 1. The `other_slice` can be coalesced. Immutable slices can not be safely coalesced because
+  // their destructors can be arbitrary global side effects.
   // 2. There are existing slices;
   // 3. The `other_slice` content length is under the CopyThreshold;
   // 4. There is enough unused space in the existing slice to accommodate the `other_slice` content.
@@ -378,7 +378,7 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
 
   // If needed, allocate one more slice at the end to provide the remainder of the reservation.
   if (bytes_remaining != 0) {
-    slices_.emplace_back(OwnedSlice::create(bytes_remaining));
+    slices_.emplace_back(bytes_remaining);
     iovecs[num_slices_used] = slices_.back().reserve(bytes_remaining);
     bytes_remaining -= iovecs[num_slices_used].len_;
     num_slices_used++;
@@ -530,7 +530,7 @@ std::string OwnedImpl::toString() const {
 void OwnedImpl::postProcess() {}
 
 void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
-  slices_.emplace_back(OwnedSlice::create(size));
+  slices_.emplace_back(size);
   slices_.back().append(data, size);
   length_ += size;
 }

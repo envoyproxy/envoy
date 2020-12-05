@@ -34,15 +34,28 @@ class Slice {
 public:
   using Reservation = RawSlice;
 
-  Slice() : storage_(nullptr), base_(nullptr), data_(0), reservable_(0), capacity_(0) {}
+  /**
+   * Create an empty Slice with 0 capacity.
+   */
+  Slice() : capacity_(0), storage_(nullptr), base_(nullptr), data_(0), reservable_(0) {}
 
-  Slice(uint64_t size)
-      : storage_(new uint8_t[size]), base_(storage_.get()), data_(0), reservable_(0),
-        capacity_(size) {}
+  /**
+   * Create an empty mutable Slice that owns its storage.
+   * @param min_capacity number of bytes of space the slice should have. Actual capacity is rounded
+   * up to the next multiple of 4kb.
+   */
+  Slice(uint64_t min_capacity)
+      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]), base_(storage_.get()),
+        data_(0), reservable_(0) {}
 
+  /**
+   * Create an immutable Slice that refers to an external buffer fragment.
+   * @param fragment provides externally owned immutable data.
+   */
   Slice(BufferFragment& fragment)
-      : storage_(nullptr), base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
-        data_(0), reservable_(fragment.size()), capacity_(fragment.size()) {
+      : capacity_(fragment.size()), storage_(nullptr),
+        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))), data_(0),
+        reservable_(fragment.size()) {
     addDrainTracker([&fragment]() { fragment.done(); });
   }
 
@@ -273,6 +286,20 @@ public:
   }
 
 protected:
+  /**
+   * Compute a slice size big enough to hold a specified amount of data.
+   * @param data_size the minimum amount of data the slice must be able to store, in bytes.
+   * @return a recommended slice size, in bytes.
+   */
+  static uint64_t sliceSize(uint64_t data_size) {
+    static constexpr uint64_t PageSize = 4096;
+    const uint64_t num_pages = (data_size + PageSize - 1) / PageSize;
+    return num_pages * PageSize;
+  }
+
+  /** Total number of bytes in the slice */
+  uint64_t capacity_;
+
   /** Backing storage for mutable slices which own their own storage. This storage should never be
    * accessed directly; access base_ instead. */
   std::unique_ptr<uint8_t[]> storage_;
@@ -285,9 +312,6 @@ protected:
 
   /** Offset in bytes from the start of the slice to the start of the Reservable section */
   uint64_t reservable_;
-
-  /** Total number of bytes in the slice */
-  uint64_t capacity_;
 
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
@@ -305,31 +329,6 @@ public:
 
 private:
   Slice slice_;
-};
-
-class OwnedSlice {
-public:
-  /**
-   * Create an empty OwnedSlice.
-   * @param capacity number of bytes of space the slice should have.
-   * @return an OwnedSlice with at least the specified capacity.
-   */
-  static Slice create(uint64_t capacity) {
-    uint64_t slice_capacity = sliceSize(capacity);
-    return Slice(slice_capacity);
-  }
-
-private:
-  /**
-   * Compute a slice size big enough to hold a specified amount of data.
-   * @param data_size the minimum amount of data the slice must be able to store, in bytes.
-   * @return a recommended slice size, in bytes.
-   */
-  static uint64_t sliceSize(uint64_t data_size) {
-    static constexpr uint64_t PageSize = 4096;
-    const uint64_t num_pages = (data_size + PageSize - 1) / PageSize;
-    return num_pages * PageSize;
-  }
 };
 
 /**

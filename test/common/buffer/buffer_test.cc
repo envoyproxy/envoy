@@ -14,14 +14,41 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-TEST(SliceTest, OwnedMoveConstruction) {
+class SliceTest : public testing::TestWithParam<bool> {
+public:
+  bool create_unowned_slice() const { return GetParam(); }
+  std::unique_ptr<Slice> createSlice(absl::string_view data) {
+    if (create_unowned_slice()) {
+      auto fragment = new BufferFragmentImpl(
+          data.data(), data.size(),
+          [](const void*, size_t, const BufferFragmentImpl* fragment) { delete fragment; });
+      auto slice = std::make_unique<Slice>(*fragment);
+      return slice;
+    } else {
+      auto slice = std::make_unique<Slice>(data.size());
+      slice->append(data.data(), data.size());
+      return slice;
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(SliceType, SliceTest, testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& param) {
+                           return param.param ? "Unowned" : "Owned";
+                         });
+
+TEST_P(SliceTest, MoveConstruction) {
   constexpr char input[] = "hello world";
-  auto slice1 = std::make_unique<Slice>(4096);
-  slice1->append(input, sizeof(input) - 1);
+
+  auto slice1 = createSlice(input);
   bool drain_tracker_called = false;
   slice1->addDrainTracker([&drain_tracker_called]() { drain_tracker_called = true; });
   EXPECT_EQ(11, slice1->dataSize());
-  EXPECT_EQ(4085, slice1->reservableSize());
+  if (create_unowned_slice()) {
+    EXPECT_EQ(0, slice1->reservableSize());
+  } else {
+    EXPECT_EQ(4085, slice1->reservableSize());
+  }
   EXPECT_EQ(0, memcmp(slice1->data(), input, slice1->dataSize()));
   EXPECT_FALSE(drain_tracker_called);
 
@@ -34,67 +61,41 @@ TEST(SliceTest, OwnedMoveConstruction) {
   slice1.reset();
 
   EXPECT_EQ(11, slice2->dataSize());
-  EXPECT_EQ(4085, slice2->reservableSize());
+  if (create_unowned_slice()) {
+    EXPECT_EQ(0, slice2->reservableSize());
+  } else {
+    EXPECT_EQ(4085, slice2->reservableSize());
+  }
   EXPECT_EQ(0, memcmp(slice2->data(), input, slice2->dataSize()));
   EXPECT_FALSE(drain_tracker_called);
   slice2.reset(nullptr);
   EXPECT_TRUE(drain_tracker_called);
 }
 
-TEST(SliceTest, UnownedMoveConstruction) {
-  constexpr char input[] = "hello world";
-  bool release_callback_called = false;
-  BufferFragmentImpl fragment(
-      input, sizeof(input) - 1,
-      [&release_callback_called](const void*, size_t, const BufferFragmentImpl*) {
-        release_callback_called = true;
-      });
-  auto slice1 = std::make_unique<Slice>(fragment);
-  bool drain_tracker_called = false;
-  slice1->addDrainTracker([&drain_tracker_called]() { drain_tracker_called = true; });
-  EXPECT_EQ(11, slice1->dataSize());
-  EXPECT_EQ(0, slice1->reservableSize());
-  EXPECT_EQ(0, memcmp(slice1->data(), input, slice1->dataSize()));
-  EXPECT_FALSE(release_callback_called);
-  EXPECT_FALSE(drain_tracker_called);
-
-  auto slice2 = std::make_unique<Slice>(std::move(*slice1));
-  // slice1 is cleared as part of the move.
-  EXPECT_EQ(0, slice1->dataSize());
-  EXPECT_EQ(0, slice1->reservableSize());
-  EXPECT_EQ(nullptr, slice1->data());
-  EXPECT_FALSE(release_callback_called);
-  EXPECT_FALSE(drain_tracker_called);
-  slice1.reset();
-
-  EXPECT_EQ(11, slice2->dataSize());
-  EXPECT_EQ(0, slice2->reservableSize());
-  EXPECT_EQ(0, memcmp(slice2->data(), input, slice2->dataSize()));
-  EXPECT_FALSE(release_callback_called);
-  EXPECT_FALSE(drain_tracker_called);
-  slice2.reset(nullptr);
-  EXPECT_TRUE(release_callback_called);
-  EXPECT_TRUE(drain_tracker_called);
-}
-
-TEST(SliceTest, OwnedMoveAssigment) {
+TEST_P(SliceTest, MoveAssigment) {
   constexpr char input1[] = "hello";
-  auto slice1 = std::make_unique<Slice>(4096);
-  slice1->append(input1, sizeof(input1) - 1);
+  auto slice1 = createSlice(input1);
   bool drain_tracker_called1 = false;
   slice1->addDrainTracker([&drain_tracker_called1]() { drain_tracker_called1 = true; });
   EXPECT_EQ(5, slice1->dataSize());
-  EXPECT_EQ(4091, slice1->reservableSize());
+  if (create_unowned_slice()) {
+    EXPECT_EQ(0, slice1->reservableSize());
+  } else {
+    EXPECT_EQ(4091, slice1->reservableSize());
+  }
   EXPECT_EQ(0, memcmp(slice1->data(), input1, slice1->dataSize()));
   EXPECT_FALSE(drain_tracker_called1);
 
   constexpr char input2[] = "how low";
-  auto slice2 = std::make_unique<Slice>(4096);
-  slice2->append(input2, sizeof(input2) - 1);
+  auto slice2 = createSlice(input2);
   bool drain_tracker_called2 = false;
   slice2->addDrainTracker([&drain_tracker_called2]() { drain_tracker_called2 = true; });
   EXPECT_EQ(7, slice2->dataSize());
-  EXPECT_EQ(4089, slice2->reservableSize());
+  if (create_unowned_slice()) {
+    EXPECT_EQ(0, slice2->reservableSize());
+  } else {
+    EXPECT_EQ(4089, slice2->reservableSize());
+  }
   EXPECT_EQ(0, memcmp(slice2->data(), input2, slice2->dataSize()));
   EXPECT_FALSE(drain_tracker_called2);
 
@@ -112,59 +113,15 @@ TEST(SliceTest, OwnedMoveAssigment) {
 
   // The original contents of slice1 are now in slice2.
   EXPECT_EQ(5, slice2->dataSize());
-  EXPECT_EQ(4091, slice2->reservableSize());
+  if (create_unowned_slice()) {
+    EXPECT_EQ(0, slice2->reservableSize());
+  } else {
+    EXPECT_EQ(4091, slice2->reservableSize());
+  }
   EXPECT_EQ(0, memcmp(slice2->data(), input1, slice2->dataSize()));
   EXPECT_FALSE(drain_tracker_called1);
   slice2.reset();
   EXPECT_TRUE(drain_tracker_called1);
-}
-
-TEST(SliceTest, UnownedMoveAssigment) {
-  constexpr char input1[] = "hello";
-  bool release_callback_called1 = false;
-  BufferFragmentImpl fragment1(
-      input1, sizeof(input1) - 1,
-      [&release_callback_called1](const void*, size_t, const BufferFragmentImpl*) {
-        release_callback_called1 = true;
-      });
-  auto slice1 = std::make_unique<Slice>(fragment1);
-  EXPECT_EQ(5, slice1->dataSize());
-  EXPECT_EQ(0, slice1->reservableSize());
-  EXPECT_EQ(0, memcmp(slice1->data(), input1, slice1->dataSize()));
-  EXPECT_FALSE(release_callback_called1);
-
-  constexpr char input2[] = "how low";
-  bool release_callback_called2 = false;
-  BufferFragmentImpl fragment2(
-      input2, sizeof(input2) - 1,
-      [&release_callback_called2](const void*, size_t, const BufferFragmentImpl*) {
-        release_callback_called2 = true;
-      });
-  auto slice2 = std::make_unique<Slice>(fragment2);
-  EXPECT_EQ(7, slice2->dataSize());
-  EXPECT_EQ(0, slice2->reservableSize());
-  EXPECT_EQ(0, memcmp(slice2->data(), input2, slice2->dataSize()));
-  EXPECT_FALSE(release_callback_called2);
-
-  *slice2 = std::move(*slice1);
-  // The contents of the second slice are overwritten and are no more. Release callback is invoked.
-  EXPECT_FALSE(release_callback_called1);
-  EXPECT_TRUE(release_callback_called2);
-
-  // slice1 is cleared as part of the move.
-  EXPECT_EQ(0, slice1->dataSize());
-  EXPECT_EQ(0, slice1->reservableSize());
-  EXPECT_EQ(nullptr, slice1->data());
-  EXPECT_FALSE(release_callback_called1);
-  slice1.reset();
-
-  // The original contents of slice1 are now in slice2.
-  EXPECT_EQ(5, slice2->dataSize());
-  EXPECT_EQ(0, slice2->reservableSize());
-  EXPECT_EQ(0, memcmp(slice2->data(), input1, slice2->dataSize()));
-  EXPECT_FALSE(release_callback_called1);
-  slice2.reset();
-  EXPECT_TRUE(release_callback_called1);
 }
 
 class OwnedSliceTest : public testing::Test {
