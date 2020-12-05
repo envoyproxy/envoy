@@ -20,4 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message KillRequest {
   // The probability that a Kill request will be triggered.
   type.v3.FractionalPercent probability = 1;
+
+  // The name of the kill request header. If this field is not empty, it will override the :ref:`default header <config_http_filters_kill_request_http_header>` name. Otherwise the default header name will be used.
+  string kill_request_header = 2;
 }
