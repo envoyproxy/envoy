@@ -1160,24 +1160,12 @@ public:
   ~MockDestructSchedulableCallback() override { Die(); }
 };
 
-// Connection pool for test that holds on to a schedulable callback that has destructor detection.
-class ConnPoolImplNoDestructForTest : public ConnPoolImplForTest {
-public:
-  ConnPoolImplNoDestructForTest(Event::MockDispatcher& dispatcher,
-                                Upstream::ClusterInfoConstSharedPtr cluster,
-                                Random::RandomGenerator& random_generator,
-                                MockDestructSchedulableCallback* upstream_ready_cb)
-      : ConnPoolImplForTest(dispatcher, cluster, random_generator, upstream_ready_cb) {}
-
-  ~ConnPoolImplNoDestructForTest() override {} = default;
-};
-
 class Http1ConnPoolDestructImplTest : public testing::Test {
 public:
   Http1ConnPoolDestructImplTest()
       : upstream_ready_cb_(new MockDestructSchedulableCallback(&dispatcher_)),
-        conn_pool_(std::make_unique<ConnPoolImplNoDestructForTest>(dispatcher_, cluster_, random_,
-                                                                   upstream_ready_cb_)) {}
+        conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
+                                                         upstream_ready_cb_)) {}
 
   ~Http1ConnPoolDestructImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
