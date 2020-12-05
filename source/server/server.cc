@@ -645,7 +645,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // Setup signals.
   // Since signals are not supported on Windows we have an internal definition for `SIGTERM`
   // On POSIX it resolves as expected to SIGTERM
-  // On Windows we use it internaly for all the console events that indicate that we should
+  // On Windows we use it internally for all the console events that indicate that we should
   // terminate the process.
   if (options.signalHandlingEnabled()) {
     sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
