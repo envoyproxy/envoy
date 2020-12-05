@@ -153,7 +153,7 @@ struct msghdr {
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
 
 #define ENVOY_WIN32_SIGNAL_COUNT 1
-#define ENVOY_WIN32_SIGTERM 0
+#define ENVOY_SIGTERM 0
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"NUL"};
@@ -249,6 +249,8 @@ typedef int signal_t;           // NOLINT(modernize-use-using)
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES
 #define HANDLE_ERROR_INVALID EBADF
+
+#define ENVOY_SIGTERM SIGTERM
 
 namespace Platform {
 constexpr absl::string_view null_device_path{"/dev/null"};

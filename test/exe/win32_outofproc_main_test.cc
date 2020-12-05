@@ -80,7 +80,7 @@ TEST_P(MainCommonTest, EnvoyHandlesCtrlBreakEvent) {
   EXPECT_TRUE(total_sleep <= resonable_sleep_time);
   auto output = TestEnvironment::readFileToStringForTest(log_path_);
   size_t count = 0;
-  for (size_t pos = 0; (pos = output.find("ENVOY_WIN32_SIGTERM", pos)) != std::string::npos;
+  for (size_t pos = 0; (pos = output.find("ENVOY_SIGTERM", pos)) != std::string::npos;
        ++pos, ++count) {
   }
   EXPECT_EQ(1, count);

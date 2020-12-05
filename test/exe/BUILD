@@ -93,6 +93,7 @@ envoy_cc_test(
         "//source/exe:envoy-static",
         "//test/config/integration:google_com_proxy_port_0",
     ],
+    # TODO(envoyproxy/windows-dev): Disable the manual tag.
     tags = ["manual"],
     deps = [
         "//source/common/api:api_lib",

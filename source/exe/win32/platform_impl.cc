@@ -11,7 +11,7 @@
 
 namespace Envoy {
 
-static volatile bool shutdown_pending = false;
+static std::atomic<bool> shutdown_pending = false;
 
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   if (shutdown_pending) {
@@ -19,15 +19,15 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   }
   shutdown_pending = true;
 
-  auto handler = Event::eventBridgeHandlersSingleton::get()[ENVOY_WIN32_SIGTERM];
+  auto handler = Event::eventBridgeHandlersSingleton::get()[ENVOY_SIGTERM];
   if (!handler) {
     return 0;
   }
 
-  // This code is executed as part of a thread running under a Windows
-  // context. For that reason we want to avoid allocating memory or
-  // taking locks. This is why we use do not want to just write to a socket
-  // to wake up the signal handler.
+  // This code is executed as part of a thread running under a thread owned and
+  // managed by Windows console host. For that reason we want to avoid allocating
+  // substantial amount of memory or taking locks.
+  // This is why we write to a socket to wake up the signal handler.
   Buffer::OwnedImpl buffer;
   constexpr absl::string_view data{"a"};
   buffer.add(data);
