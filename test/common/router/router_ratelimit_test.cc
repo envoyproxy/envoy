@@ -113,6 +113,7 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -136,6 +137,7 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -160,6 +162,7 @@ virtual_hosts:
         - remote_address: {}
   )EOF";
 
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -194,6 +197,7 @@ virtual_hosts:
     - destination_cluster: {}
   )EOF";
 
+  factory_context_.cluster_manager_.initializeClusters({"www2test"}, {});
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -233,6 +237,7 @@ virtual_hosts:
         - source_cluster: {}
   )EOF";
 
+  factory_context_.cluster_manager_.initializeClusters({"www2test"}, {});
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
