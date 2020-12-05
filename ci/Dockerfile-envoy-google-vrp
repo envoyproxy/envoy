@@ -15,6 +15,9 @@ ADD configs/google-vrp/supervisor.conf /etc/supervisor.conf
 ADD test/config/integration/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
 ADD test/config/integration/certs/servercert.pem /etc/envoy/certs/servercert.pem
 # ADD %local envoy bin% /usr/local/bin/envoy
+RUN chmod 777 /var/log/supervisor
+RUN chmod a+r /etc/supervisor.conf /etc/envoy/* /etc/envoy/certs/*
+RUN chmod a+rx /usr/local/bin/launch_envoy.sh
 
 EXPOSE 10000
 EXPOSE 10001
