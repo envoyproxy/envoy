@@ -26,7 +26,7 @@ CORS 执行策略选项：
 .. include:: _include/docker-env-setup.rst
 
 第 3 步：启动我们所有的容器
-************************
+*****************************
 
 切换到 ``cors`` 示例中的 ``frontend`` 目录，然后启动容器：
 
@@ -59,7 +59,7 @@ CORS 执行策略选项：
   backend_front-envoy_1       /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8002->8000/tcp, 0.0.0.0:8003->8001/tcp
 
 第 4 步：测试 Envoy 的 CORS 功能
-******************************
+***********************************
 
 现在，你可以在浏览器上打开 http://localhost:8000 来查看前端服务。
 
@@ -75,7 +75,7 @@ CORS 执行策略选项：
   has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
 第 5 步：通过 admin 检查后端的统计信息
-**********************************
+***************************************
 
 当 Envoy 运行时，如果配置了端口，它可以监听 ``admin`` 请求。
 
