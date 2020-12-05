@@ -139,7 +139,7 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
   *current++ = 0; // flags
   const uint32_t nsize = htonl(size);
-  safeMemcpy(reinterpret_cast<uint32_t*>(current), &nsize);
+  safeMemcpyDst(current, &nsize);
   current += sizeof(uint32_t);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
@@ -293,7 +293,7 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   std::array<char, 5> header;
   header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
-  safeMemcpy(reinterpret_cast<uint32_t*>(&header[1]), &nsize);
+  safeMemcpyDst(&header[1], &nsize);
   buffer.prepend(absl::string_view(&header[0], 5));
 }
 

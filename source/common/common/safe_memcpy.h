@@ -15,13 +15,11 @@ template <typename T1, typename T2> inline void safeMemcpy(T1* dst, T2* src) {
 /**
  * @brief Copies src to dst based on the size of dst
  */
-#define safeMemcpySrc(dst, src)                                                              \
-    memcpy(dst, src, sizeof(*(dst)));
+#define safeMemcpySrc(dst, src) memcpy(dst, src, sizeof(*(dst)));
 
 /**
  * @brief Copies src to dst based on the size of src
  */
-#define safeMemcpyDst(dst, src)                                                              \
-    memcpy(dst, src, sizeof(*(src)));
+#define safeMemcpyDst(dst, src) memcpy(dst, src, sizeof(*(src)));
 
 } // namespace Envoy
