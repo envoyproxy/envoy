@@ -170,7 +170,10 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_->addConnectionCallbacks(*callbacks_);
   client_->addReadFilter(
       Network::ReadFilterSharedPtr{new ForwardingFilter(*this, response_data_callback)});
-  client_->addBytesSentCallback([&](uint64_t bytes) { remaining_bytes_to_send_ -= bytes; });
+  client_->addBytesSentCallback([&](uint64_t bytes) {
+    remaining_bytes_to_send_ -= bytes;
+    return true;
+  });
   client_->connect();
 }
 

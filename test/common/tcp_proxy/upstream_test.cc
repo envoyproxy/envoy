@@ -94,7 +94,7 @@ TYPED_TEST(HttpUpstreamTest, ReadDisable) {
 }
 
 TYPED_TEST(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
-  this->upstream_->addBytesSentCallback([&](uint64_t) {});
+  this->upstream_->addBytesSentCallback([&](uint64_t) { return true; });
 }
 
 TYPED_TEST(HttpUpstreamTest, DownstreamDisconnect) {

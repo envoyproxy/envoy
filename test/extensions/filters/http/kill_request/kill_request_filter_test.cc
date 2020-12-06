@@ -42,6 +42,17 @@ TEST_F(KillRequestFilterTest, KillRequestCrashEnvoy) {
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
 
+TEST_F(KillRequestFilterTest, KillRequestCrashEnvoyWithCustomKillHeader) {
+  envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
+  kill_request.mutable_probability()->set_numerator(1);
+  kill_request.set_kill_request_header("x-custom-kill-request");
+  setUpTest(kill_request);
+  request_headers_.addCopy("x-custom-kill-request", "true");
+
+  ON_CALL(random_generator_, random()).WillByDefault(Return(0));
+  EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
+}
+
 TEST_F(KillRequestFilterTest, KillRequestWithMillionDenominatorCrashEnvoy) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
