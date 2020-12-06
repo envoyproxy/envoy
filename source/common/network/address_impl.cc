@@ -174,11 +174,11 @@ std::string Ipv4Instance::sockaddrToString(const sockaddr_in& addr) {
 }
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
-  uint64_t result_high, result_low;
+  absl::uint128 result{0};
   static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
-  safeMemcpySrc(&result_low, &address_.sin6_addr.s6_addr);
-  safeMemcpySrc(&result_high, &address_.sin6_addr.s6_addr + 8);
-  return absl::MakeUint128(result_high, result_low);
+  memcpy(static_cast<void*>(&result), // NOLINT(safe-memcpy)
+         static_cast<const void*>(&address_.sin6_addr.s6_addr), sizeof(absl::uint128));
+  return result;
 }
 
 uint32_t Ipv6Instance::Ipv6Helper::port() const { return ntohs(address_.sin6_port); }

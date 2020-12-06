@@ -117,14 +117,14 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       sockaddr_in sin;
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
-      safeMemcpySrc(&sin.sin_addr, general_name->d.ip->data);
+      safeMemcpyUnsafeSrc(&sin.sin_addr, general_name->d.ip->data);
       Network::Address::Ipv4Instance addr(&sin);
       san = addr.ip()->addressAsString();
     } else if (general_name->d.ip->length == 16) {
       sockaddr_in6 sin6;
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
-      safeMemcpySrc(&sin6.sin6_addr, general_name->d.ip->data);
+      safeMemcpyUnsafeSrc(&sin6.sin6_addr, general_name->d.ip->data);
       Network::Address::Ipv6Instance addr(sin6);
       san = addr.ip()->addressAsString();
     }

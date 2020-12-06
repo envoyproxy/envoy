@@ -172,7 +172,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
       state = DnsQueryParseState::Flags;
       break;
     case DnsQueryParseState::Flags:
-      safeMemcpyDst(static_cast<void*>(&context->header_.flags), &data);
+      safeMemcpyUnsafeDst(static_cast<void*>(&context->header_.flags), &data);
       state = DnsQueryParseState::Questions;
       break;
     case DnsQueryParseState::Questions:
@@ -744,7 +744,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
   buffer.writeBEInt<uint16_t>(query_context->response_header_.id);
 
   uint16_t flags;
-  safeMemcpySrc(&flags, static_cast<void*>(&query_context->response_header_.flags));
+  safeMemcpyUnsafeSrc(&flags, static_cast<void*>(&query_context->response_header_.flags));
   buffer.writeBEInt<uint16_t>(flags);
 
   buffer.writeBEInt<uint16_t>(query_context->response_header_.questions);
