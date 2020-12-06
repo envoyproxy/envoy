@@ -86,7 +86,7 @@ TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
-  EXPECT_EQ(false, config.statsFlushOnAdmin());
+  EXPECT_FALSE(config.statsFlushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
@@ -112,7 +112,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
-  EXPECT_EQ(false, config.statsFlushOnAdmin());
+  EXPECT_FALSE(config.statsFlushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, StatsOnAdmin) {
@@ -137,7 +137,7 @@ TEST_F(ConfigurationImplTest, StatsOnAdmin) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(true, config.statsFlushOnAdmin());
+  EXPECT_TRUE(config.statsFlushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
@@ -185,7 +185,7 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(true, config.statsFlushOnAdmin());
+  EXPECT_TRUE(config.statsFlushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
