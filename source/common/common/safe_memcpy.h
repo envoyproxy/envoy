@@ -14,15 +14,11 @@ template <typename T1, typename T2> inline void safeMemcpy(T1* dst, T2* src) {
 
 /**
  * @brief Copies src to dst based on the size of dst
- * @note  Sizes are not compared, so ensure the src is of size sizeof(*(dst)) before proceeding to
- * call safeMemcpyUnsafeSrc
  */
 #define safeMemcpySrc(dst, src) memcpy(dst, src, sizeof(*(dst)));
 
 /**
  * @brief Copies src to dst based on the size of src
- * @note  Sizes are not compared, so ensure the dst is of size sizeof(*(src)) before proceeding to
- * call safeMemcpyUnsafeDst
  */
 #define safeMemcpyDst(dst, src) memcpy(dst, src, sizeof(*(src)));
 

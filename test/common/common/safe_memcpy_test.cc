@@ -21,17 +21,8 @@ TEST(SafeMemcpyTest, CopyUint8) {
   Eq(dst == std::array<uint8_t, 8>{0, 1, 1, 2, 3, 5, 8, 13});
 }
 
-TEST(SafeMemcpyUnsafeSrcTest, CopyUint8Pointer) {
-  const uint8_t* src = new uint8_t[8];
-  for (int i = 0; i < 8; ++i)
-    src[i] = i;
-  uint8_t dst[8];
-  safeMemcpyUnsafeSrc(&dst, src);
-  Eq(dst == {0, 1, 2, 3, 4, 5, 6, 7});
-  delete src;
-}
-
-TEST(SafeMemcpyUnsafeDstTest, PrependGrpcFrameHeader) {
+// Additional (integration) test - not ordinary copy
+TEST(SafeMemcpyTest, PrependGrpcFrameHeader) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
   std::array<char, 5> expected_header;
