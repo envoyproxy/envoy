@@ -10,8 +10,8 @@
 
 #include "gtest/gtest.h"
 
-using testing::Eq;
 using testing::ElementsAre;
+using testing::Eq;
 
 namespace Envoy {
 
