@@ -1,5 +1,5 @@
-Configuration best practices
-============================
+配置最佳实践
+============
 
 .. toctree::
   :maxdepth: 2
