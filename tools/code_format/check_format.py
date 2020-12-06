@@ -804,7 +804,7 @@ class FormatChecker:
        ("memcpy(" in line) and \
        not ("NOLINT(safe-memcpy)" in line):
       reportError(
-          "Don't call memcpy() directly; use safeMemcpy, safeMemcpySrc, safeMemcpyDst or MemBlockBuilder instead."
+          "Don't call memcpy() directly; use safeMemcpy, safeMemcpyUnsafeSrc, safeMemcpyUnsafeDst or MemBlockBuilder instead."
       )
 
     if self.denylistedForExceptions(file_path):
