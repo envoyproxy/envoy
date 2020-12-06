@@ -1,7 +1,7 @@
 .. _config:
 
-Configuration reference
-=======================
+配置参考
+========
 
 .. toctree::
   :maxdepth: 2
