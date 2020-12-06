@@ -32,6 +32,7 @@ HEXDIGIT
 OWS
 SkyWalking
 TIDs
+WASI
 ceil
 CHACHA
 CHLO
