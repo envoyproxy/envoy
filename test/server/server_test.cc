@@ -578,20 +578,22 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
-  EXPECT_EQ(true, server_->statsFlushOnAdmin());
+  EXPECT_TRUE(server_->statsFlushOnAdmin());
   EXPECT_EQ(std::chrono::seconds(1), server_->statsFlushInterval());
 
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
   time_system_.advanceTimeWait(std::chrono::seconds(2));
-  EXPECT_EQ(0L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+  EXPECT_EQ(0L, counter->value());
 
   // flush via admin
   Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
-  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+  EXPECT_EQ(1L, counter->value());
 
   time_system_.advanceTimeWait(std::chrono::seconds(2));
-  EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "stats.flushed")->value());
+  EXPECT_EQ(1L, counter->value());
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();

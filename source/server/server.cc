@@ -551,7 +551,7 @@ void InstanceImpl::initialize(const Options& options,
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(config_.statsFlushInterval());
   } else {
-    stat_flush_timer_.reset();
+    ASSERT(stat_flush_timer_ == nullptr);
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
