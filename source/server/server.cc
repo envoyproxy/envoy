@@ -606,15 +606,19 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*worker_guard_dog_);
-  initialization_timer_->complete();
-  // Update server stats as soon as initialization is done.
-  updateServerStats();
-  workers_started_ = true;
-  // At this point we are ready to take traffic and all listening ports are up. Notify our parent
-  // if applicable that they can stop listening and drain.
-  restarter_.drainParentListeners();
-  drain_manager_->startParentShutdownSequence();
+  const auto workers_pending_init = std::make_shared<std::atomic<uint64_t>>(options_.concurrency());
+  listener_manager_->startWorkers(*worker_guard_dog_, [this, workers_pending_init]() {
+    if (--(*workers_pending_init) == 0) {
+      initialization_timer_->complete();
+      // Update server stats as soon as initialization is done.
+      updateServerStats();
+      workers_started_ = true;
+      // At this point we are ready to take traffic and all listening ports are up. Notify our
+      // parent if applicable that they can stop listening and drain.
+      restarter_.drainParentListeners();
+      drain_manager_->startParentShutdownSequence();
+    }
+  });
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
