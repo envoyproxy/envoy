@@ -238,6 +238,8 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
+
+  EXPECT_TRUE(stats_store_.findCounterByString("http.async-client.rq_total").has_value());
 }
 
 TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {

@@ -36,7 +36,7 @@ public:
   const StatNames& statNames() const override { return stat_names_; }
 
 private:
-  StatNames stat_names_;
+  const StatNames stat_names_;
 };
 
 } // namespace Router
