@@ -37,7 +37,7 @@ public:
   /**
    * Create an empty Slice with 0 capacity.
    */
-  Slice() {}
+  Slice() = default;
 
   /**
    * Create an empty mutable Slice that owns its storage.

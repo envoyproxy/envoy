@@ -16,9 +16,9 @@ namespace {
 
 class SliceTest : public testing::TestWithParam<bool> {
 public:
-  bool create_unowned_slice() const { return GetParam(); }
+  bool shouldCreateUnownedSlice() const { return GetParam(); }
   std::unique_ptr<Slice> createSlice(absl::string_view data) {
-    if (create_unowned_slice()) {
+    if (shouldCreateUnownedSlice()) {
       auto fragment = new BufferFragmentImpl(
           data.data(), data.size(),
           [](const void*, size_t, const BufferFragmentImpl* fragment) { delete fragment; });
@@ -44,7 +44,7 @@ TEST_P(SliceTest, MoveConstruction) {
   bool drain_tracker_called = false;
   slice1->addDrainTracker([&drain_tracker_called]() { drain_tracker_called = true; });
   EXPECT_EQ(11, slice1->dataSize());
-  if (create_unowned_slice()) {
+  if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice1->reservableSize());
   } else {
     EXPECT_EQ(4085, slice1->reservableSize());
@@ -61,7 +61,7 @@ TEST_P(SliceTest, MoveConstruction) {
   slice1.reset();
 
   EXPECT_EQ(11, slice2->dataSize());
-  if (create_unowned_slice()) {
+  if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice2->reservableSize());
   } else {
     EXPECT_EQ(4085, slice2->reservableSize());
@@ -78,7 +78,7 @@ TEST_P(SliceTest, MoveAssigment) {
   bool drain_tracker_called1 = false;
   slice1->addDrainTracker([&drain_tracker_called1]() { drain_tracker_called1 = true; });
   EXPECT_EQ(5, slice1->dataSize());
-  if (create_unowned_slice()) {
+  if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice1->reservableSize());
   } else {
     EXPECT_EQ(4091, slice1->reservableSize());
@@ -91,7 +91,7 @@ TEST_P(SliceTest, MoveAssigment) {
   bool drain_tracker_called2 = false;
   slice2->addDrainTracker([&drain_tracker_called2]() { drain_tracker_called2 = true; });
   EXPECT_EQ(7, slice2->dataSize());
-  if (create_unowned_slice()) {
+  if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice2->reservableSize());
   } else {
     EXPECT_EQ(4089, slice2->reservableSize());
@@ -113,7 +113,7 @@ TEST_P(SliceTest, MoveAssigment) {
 
   // The original contents of slice1 are now in slice2.
   EXPECT_EQ(5, slice2->dataSize());
-  if (create_unowned_slice()) {
+  if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice2->reservableSize());
   } else {
     EXPECT_EQ(4091, slice2->reservableSize());
