@@ -1,7 +1,7 @@
 .. _install_tools_schema_validator_check_tool:
 
 Schema 验证器检查工具
-====================
+=======================
 
 Schema 验证器检查工具验证传入的配置是否符合给定的 schema。配置可以是 JSON 或者 YAML。为了验证全部的配置，可以参考 :ref:`配置加载检查工具 <install_tools_config_load_check_tool>`。
 
