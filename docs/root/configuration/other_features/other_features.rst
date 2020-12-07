@@ -1,5 +1,5 @@
-Other features
-==============
+其他特性
+=========
 
 .. toctree::
   :maxdepth: 2
