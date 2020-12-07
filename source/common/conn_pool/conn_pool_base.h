@@ -241,9 +241,6 @@ protected:
   // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
 
-  void onUpstreamReady();
-  Event::SchedulableCallbackPtr upstream_ready_cb_;
-
 private:
   std::list<PendingStreamPtr> pending_streams_;
 
@@ -253,6 +250,9 @@ private:
   // The number of streams that can be immediately dispatched
   // if all CONNECTING connections become connected.
   uint32_t connecting_stream_capacity_{0};
+
+  void onUpstreamReady();
+  Event::SchedulableCallbackPtr upstream_ready_cb_;
 };
 
 } // namespace ConnectionPool
