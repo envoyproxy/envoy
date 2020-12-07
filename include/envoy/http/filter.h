@@ -890,6 +890,7 @@ public:
   /**
    * Add a decoder filter that is used when reading stream data.
    * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
    */
   virtual void
   addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
@@ -904,6 +905,7 @@ public:
   /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
    */
   virtual void
   addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
@@ -918,6 +920,7 @@ public:
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
                                Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;

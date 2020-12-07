@@ -7,14 +7,14 @@ import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.common.matcher.v4alpha";
-option java_outer_classname = "ActionProto";
+option java_outer_classname = "SkipActionProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Common Match Actions]
 
-// Indicates that the associated action should be skipped.
-message SkipAction {
+// Indicates that the associated filter should be skipped.
+message SkipFilterMatchAction {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.common.matcher.v3.SkipAction";
+      "envoy.config.common.matcher.v3.SkipFilterMatchAction";
 }
