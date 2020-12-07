@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/common/matcher/v3/action.pb.h"
+#include "envoy/extensions/filters/common/matching/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -111,7 +111,8 @@ public:
   }
 };
 
-class SkipAction : public Matcher::ActionBase<envoy::config::common::matcher::v3::SkipAction> {};
+class SkipAction : public Matcher::ActionBase<
+                       envoy::extensions::filters::common::matching::v3::SkipFilterMatchAction> {};
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
