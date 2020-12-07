@@ -70,11 +70,26 @@ public:
       name: compressor
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-        disable_on_etag_header: true
-        content_length: 100
-        content_type:
-          - text/html
-          - application/json
+        response_direction_config:
+          disable_on_etag_header: true
+          remove_accept_encoding_header: false
+          common_config:
+            enabled:
+              default_value: true
+              runtime_key: foo_key
+            content_length: 100
+            content_type:
+              - text/html
+              - application/json
+        request_direction_config:
+          common_config:
+            enabled:
+              default_value: false
+              runtime_key: enable_requests
+            content_length: 100
+            content_type:
+              - text/html
+              - application/json
         compressor_library:
           name: testlib
           typed_config:
