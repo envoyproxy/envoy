@@ -14,6 +14,8 @@ df -h
 # shellcheck source=ci/setup_cache.sh
 . "$(dirname "$0")"/setup_cache.sh
 
+[ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/c/source
+
 read -ra BAZEL_STARTUP_OPTIONS <<< "${BAZEL_STARTUP_OPTIONS:-}"
 # Default to msvc-cl if not overridden
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:---config=msvc-cl}"
@@ -75,10 +77,13 @@ tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_DELIVERY_DIR}" envo
 # Test invocations of known-working tests on Windows
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only
 
+echo "running flaky test reporting script"
+"${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+
 # Build tests that are known-flaky or known-failing to ensure no compilation regressions
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
 
 # Summarize tests bypasssed to monitor the progress of porting to Windows
-echo "Tests bypassed as skip_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
-echo "Tests bypassed as fails_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
-echo "Tests bypassed as flaky_on_windows: $(bazel query 'kind(".*test rule", attr("tags", "flaky_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unstable tests"
+echo "Tests bypassed as skip_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
+echo "Tests bypassed as fails_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
+echo "Tests bypassed as flaky_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "flaky_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unstable tests"

@@ -227,33 +227,12 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
+      timeSystem())};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
                                                   host_description, downstream_protocol_);
 }
 
-Network::TransportSocketFactoryPtr HttpIntegrationTest::createUpstreamTlsContext() {
-  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  const std::string yaml = absl::StrFormat(
-      R"EOF(
-common_tls_context:
-  tls_certificates:
-  - certificate_chain: { filename: "%s" }
-    private_key: { filename: "%s" }
-  validation_context:
-    trusted_ca: { filename: "%s" }
-require_client_certificate: true
-)EOF",
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
-      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  TestUtility::loadFromYaml(yaml, tls_context);
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context_);
-  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
-}
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
@@ -305,8 +284,12 @@ ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrail
   return [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http_protocol_options()
+          ->set_enable_trailers(true);
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
     }
   };
 }
@@ -1312,11 +1295,12 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
 
 void HttpIntegrationTest::testMaxStreamDuration() {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_stream_duration()->MergeFrom(
         ProtobufUtil::TimeUtil::MillisecondsToDuration(200));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
 
   initialize();
@@ -1341,11 +1325,12 @@ void HttpIntegrationTest::testMaxStreamDuration() {
 
 void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_stream_duration()->MergeFrom(
         ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
 
   Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{

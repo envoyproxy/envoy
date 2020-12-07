@@ -15,6 +15,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -241,14 +242,15 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
 /**
  * Test fixture for connection pool tests.
  */
-class TcpConnPoolImplTest : public testing::TestWithParam<bool> {
+class TcpConnPoolImplTest : public Event::TestUsingSimulatedTime,
+                            public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplTest()
       : test_new_connection_pool_(GetParam()),
         upstream_ready_cb_(test_new_connection_pool_
                                ? nullptr
                                : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
+        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime())),
         conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {}
 
   ~TcpConnPoolImplTest() override {
@@ -268,14 +270,15 @@ public:
 /**
  * Test fixture for connection pool destructor tests.
  */
-class TcpConnPoolImplDestructorTest : public testing::TestWithParam<bool> {
+class TcpConnPoolImplDestructorTest : public Event::TestUsingSimulatedTime,
+                                      public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplDestructorTest()
       : test_new_connection_pool_(GetParam()),
         upstream_ready_cb_(test_new_connection_pool_
                                ? nullptr
                                : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
-    host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
+    host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime());
     if (test_new_connection_pool_) {
       conn_pool_ = std::make_unique<ConnPoolImpl>(
           dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);

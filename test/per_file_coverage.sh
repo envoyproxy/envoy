@@ -21,6 +21,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/singleton:95.1"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/thread_local:95.7"
+"source/common/matcher:92.8"
 "source/common/tracing:94.9"
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.7"
@@ -40,6 +41,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/dynamic_forward_proxy:94.9"
 "source/extensions/filters/http/grpc_json_transcoder:93.3"
 "source/extensions/filters/http/ip_tagging:91.2"
+"source/extensions/filters/http/kill_request:94.4" # Death tests don't report LCOV
 "source/extensions/filters/http/oauth2:96.5"
 "source/extensions/filters/listener:96.0"
 "source/extensions/filters/listener/http_inspector:93.3"

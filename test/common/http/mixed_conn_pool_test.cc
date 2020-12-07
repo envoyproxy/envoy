@@ -19,16 +19,15 @@ namespace Http {
 namespace {
 
 // TODO(alyssawilk) replace this with the MixedConnectionPool once it lands.
-class ConnPoolImplForTest : public HttpConnPoolImplBase {
+class ConnPoolImplForTest : public Event::TestUsingSimulatedTime, public HttpConnPoolImplBase {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state,
                       Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster)
-      : HttpConnPoolImplBase(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
+      : HttpConnPoolImplBase(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
                              Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
                              random, state, {Http::Protocol::Http2, Http::Protocol::Http11}) {}
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override { return nullptr; }
-  Http::Protocol protocol() const override { return Http::Protocol::Http2; }
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData&) override {
     return nullptr;
   }

@@ -6,7 +6,6 @@ load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_version_repository")
 load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
-load("@io_bazel_rules_rust//:workspace.bzl", "bazel_version")
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
 load("@configs_pip3//:requirements.bzl", configs_pip_install = "pip_install")
 load("@headersplit_pip3//:requirements.bzl", headersplit_pip_install = "pip_install")
@@ -14,6 +13,7 @@ load("@kafka_pip3//:requirements.bzl", kafka_pip_install = "pip_install")
 load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
 load("@thrift_pip3//:requirements.bzl", thrift_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
+load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 
 # go version for rules_go
 GO_VERSION = "1.15.5"
@@ -26,9 +26,9 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     gazelle_dependencies()
     apple_rules_dependencies()
     rust_repositories()
-    bazel_version(name = "bazel_version")
     upb_bazel_version_repository(name = "upb_bazel_version")
     antlr_dependencies(472)
+    proxy_wasm_rust_sdk_dependencies()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",

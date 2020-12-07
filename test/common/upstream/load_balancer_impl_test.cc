@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -32,7 +33,8 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class LoadBalancerTestBase : public testing::TestWithParam<bool> {
+class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
+                             public testing::TestWithParam<bool> {
 protected:
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functionality for failover host sets.
@@ -84,7 +86,7 @@ public:
     host_set.degraded_hosts_.clear();
     host_set.excluded_hosts_.clear();
     for (uint32_t i = 0; i < num_hosts; ++i) {
-      host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
+      host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80", simTime()));
     }
     uint32_t i = 0;
     for (; i < num_healthy_hosts; ++i) {
@@ -577,8 +579,8 @@ using FailoverTest = RoundRobinLoadBalancerTest;
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(FailoverTest, BasicFailover) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
@@ -587,7 +589,7 @@ TEST_P(FailoverTest, BasicFailover) {
 
 // Ensure if all the hosts with priority 0 degraded, the first priority degraded hosts are used.
 TEST_P(FailoverTest, BasicDegradedHosts) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
   host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
@@ -598,9 +600,9 @@ TEST_P(FailoverTest, BasicDegradedHosts) {
 // Ensure if all the hosts with priority 0 degraded, but healthy hosts in the failover, the healthy
 // hosts in the second priority are used.
 TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
   host_set_.degraded_hosts_ = host_set_.hosts_;
-  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -608,8 +610,8 @@ TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
 
 // Test that extending the priority set with an existing LB causes the correct updates.
 TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   init(false);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -618,7 +620,7 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
   MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   tertiary_host_set_.hosts_ = *hosts;
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
   HostVector add_hosts;
@@ -640,8 +642,8 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
 // Test that extending the priority set with an existing LB causes the correct updates when the
 // cluster is configured to disable on panic.
 TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
   init(false);
@@ -651,7 +653,7 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
   MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   tertiary_host_set_.hosts_ = *hosts;
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
   HostVector add_hosts;
@@ -672,8 +674,8 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
 
 // Test extending the priority set.
 TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -682,7 +684,7 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   // Update the priority set with a new priority level P=2
   // As it has healthy hosts, it should be selected.
   MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   tertiary_host_set_.hosts_ = *hosts;
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
   HostVector add_hosts;
@@ -697,8 +699,8 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
 }
 
 TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -707,7 +709,8 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   // Update the host set with a new priority level. We should start selecting
   // hosts from that level as it has viable hosts.
   MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
-  HostVectorSharedPtr hosts2(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:84")}));
+  HostVectorSharedPtr hosts2(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:84", simTime())}));
   tertiary_host_set_.hosts_ = *hosts2;
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
   HostVector add_hosts;
@@ -717,7 +720,7 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
 
   // Update the local hosts. We're not doing locality based routing in this
   // test, but it should at least do no harm.
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   updateHosts(hosts, HostsPerLocalityImpl::empty());
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
@@ -728,10 +731,10 @@ TEST_P(FailoverTest, PrioritiesWithNotAllWarmedHosts) {
   // P0: 1 healthy, 1 unhealthy, 1 warmed.
   // P1: 1 healthy.
   // We then expect no spillover, since P0 is still overprovisioned.
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                      makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
-  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
   init(true);
 
@@ -746,9 +749,9 @@ TEST_P(FailoverTest, PrioritiesWithZeroWarmedHosts) {
   // P0: 2 unhealthy, 0 warmed.
   // P1: 1 healthy.
   // We then expect all the traffic to spill over to P1 since P0 has an effective load of zero.
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                      makeTestHost(info_, "tcp://127.0.0.1:81")};
-  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
 
   init(true);
@@ -766,15 +769,15 @@ TEST_P(RoundRobinLoadBalancerTest, NoHosts) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SingleHost) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Normal) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
 
@@ -793,7 +796,7 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 
   // Change host set with no peeks in progress
-  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82"));
+  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime()));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
   peekThenPick({2, 0, 1, 2});
@@ -803,7 +806,7 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
 
-  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:83"));
+  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:83", simTime()));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {hostSet().healthy_hosts_.front()});
   peekThenPick({1, 2, 3});
@@ -812,9 +815,9 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
 // Validate that the RNG seed influences pick order.
 TEST_P(RoundRobinLoadBalancerTest, Seed) {
   hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"),
-      makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"),
+      makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
   };
   hostSet().hosts_ = hostSet().healthy_hosts_;
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
@@ -826,9 +829,9 @@ TEST_P(RoundRobinLoadBalancerTest, Seed) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Locality) {
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:81"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{(*hosts)[1]}, {(*hosts)[0]}, {(*hosts)[2]}});
   hostSet().hosts_ = *hosts;
@@ -856,9 +859,9 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:81"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:84")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:84", simTime())}));
   HostVectorSharedPtr healthy_hosts(new HostVector({(*hosts)[0]}));
   HostVectorSharedPtr degraded_hosts(new HostVector({(*hosts)[1], (*hosts)[2]}));
   HostsPerLocalitySharedPtr hosts_per_locality =
@@ -885,8 +888,8 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Weighted) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
   // Initial weights respected.
@@ -908,7 +911,7 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   // Add a host, it should participate in next round of scheduling.
-  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", 3));
+  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 3));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
@@ -929,7 +932,7 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().healthy_hosts_.pop_back();
   hostSet().hosts_.pop_back();
   hostSet().hosts_.pop_back();
-  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:83", 4));
+  hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:83", simTime(), 4));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().healthy_hosts_[0]->weight(1);
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, removed_hosts);
@@ -947,8 +950,8 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
 
 // Validate that the RNG seed influences pick order when weighted RR.
 TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
   init(false);
@@ -962,12 +965,14 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                              makeTestHost(info_, "tcp://127.0.0.1:81")};
-  hostSet().hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
-      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
 
   init(false);
   EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(nullptr));
@@ -975,9 +980,10 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(hostSet().hosts_[2], lb_->chooseHost(nullptr));
 
   // Take the threshold back above the panic threshold.
-  hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
   hostSet().runCallbacks({}, {});
 
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -988,12 +994,14 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
 
 // Test that no hosts are selected when fail_traffic_on_panic is enabled.
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                              makeTestHost(info_, "tcp://127.0.0.1:81")};
-  hostSet().hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
-      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
 
   common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
@@ -1001,9 +1009,10 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 
   // Take the threshold back above the panic threshold.
-  hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
   hostSet().runCallbacks({}, {});
 
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -1015,7 +1024,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
 // Ensure if the panic threshold is 0%, panic mode is disabled.
 TEST_P(RoundRobinLoadBalancerTest, DisablePanicMode) {
   hostSet().healthy_hosts_ = {};
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
 
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
 
@@ -1030,10 +1039,11 @@ TEST_P(RoundRobinLoadBalancerTest, DisablePanicMode) {
 TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  HostVectorSharedPtr hosts(new HostVector(
-      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
-  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality(
-      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}});
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}));
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}});
 
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
@@ -1072,13 +1082,13 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:81"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:80")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:82")}});
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}});
 
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
@@ -1118,15 +1128,16 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:81"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   HostsPerLocalitySharedPtr upstream_hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:80")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:82")}});
-  HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality(
-      {{makeTestHost(info_, "tcp://127.0.0.1:81")}, {makeTestHost(info_, "tcp://127.0.0.1:80")}});
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())}});
 
   hostSet().healthy_hosts_ = *hosts;
   hostSet().hosts_ = *hosts;
@@ -1152,13 +1163,13 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:81"),
-                                            makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:80")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:82")}});
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
@@ -1189,23 +1200,28 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
-  HostVectorSharedPtr upstream_hosts(new HostVector(
-      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
-       makeTestHost(info_, "tcp://127.0.0.1:84")}));
-  HostVectorSharedPtr local_hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0"),
-                                                  makeTestHost(info_, "tcp://127.0.0.1:1"),
-                                                  makeTestHost(info_, "tcp://127.0.0.1:2")}));
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:84", simTime())}));
+  HostVectorSharedPtr local_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:1", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:2", simTime())}));
 
-  HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
-      {{makeTestHost(info_, "tcp://127.0.0.1:81")},
-       {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:82")},
-       {makeTestHost(info_, "tcp://127.0.0.1:83"), makeTestHost(info_, "tcp://127.0.0.1:84")}});
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                             makeTestHost(info_, "tcp://127.0.0.1:82", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+                             makeTestHost(info_, "tcp://127.0.0.1:84", simTime())}});
 
   HostsPerLocalitySharedPtr local_hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:0")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:1")},
-                            {makeTestHost(info_, "tcp://127.0.0.1:2")}});
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:0", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:1", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:2", simTime())}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(50));
@@ -1236,10 +1252,12 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
     return;
   }
   // upstream_hosts and local_hosts do not matter, zone aware routing is based on per zone hosts.
-  HostVectorSharedPtr upstream_hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80")}));
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime())}));
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
-  HostVectorSharedPtr local_hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0")}));
+  HostVectorSharedPtr local_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", simTime())}));
 
   std::vector<HostVector> upstream_hosts_per_locality;
   std::vector<HostVector> local_hosts_per_locality;
@@ -1255,7 +1273,7 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   // situation.
   // Reuse the same host in all of the structures below to reduce time test takes and this does not
   // impact load balancing logic.
-  HostSharedPtr host = makeTestHost(info_, "tcp://127.0.0.1:80");
+  HostSharedPtr host = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
   HostVector current(45000);
 
   for (int i = 0; i < 45000; ++i) {
@@ -1299,9 +1317,9 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
-  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80")}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime())}));
   HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81")}});
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}});
 
   hostSet().healthy_hosts_ = *hosts;
   hostSet().hosts_ = *hosts;
@@ -1312,10 +1330,12 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
-  HostVectorSharedPtr hosts(new HostVector(
-      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.2:80")}));
-  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality(
-      {{}, {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.2:80")}});
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                                            makeTestHost(info_, "tcp://127.0.0.2:80", simTime())}));
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{},
+                            {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                             makeTestHost(info_, "tcp://127.0.0.2:80", simTime())}});
 
   hostSet().healthy_hosts_ = *hosts;
   hostSet().hosts_ = *hosts;
@@ -1332,12 +1352,14 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
-  HostVectorSharedPtr upstream_hosts(new HostVector(
-      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}));
   HostVectorSharedPtr local_hosts(new HostVector({}, {}));
 
-  HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
-      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}});
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}});
   HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
@@ -1366,12 +1388,14 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPani
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
-  HostVectorSharedPtr upstream_hosts(new HostVector(
-      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}));
   HostVectorSharedPtr local_hosts(new HostVector({}, {}));
 
-  HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
-      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}});
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}});
   HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
@@ -1401,13 +1425,15 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
-  HostVectorSharedPtr upstream_hosts(new HostVector(
-      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}));
   HostVectorSharedPtr local_hosts(new HostVector({}, {}));
 
-  HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
-      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}},
-      true);
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime())},
+                            {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())}},
+                           true);
   const HostsPerLocalitySharedPtr& local_hosts_per_locality = upstream_hosts_per_locality;
 
   hostSet().healthy_hosts_ = *upstream_hosts;
@@ -1434,7 +1460,7 @@ public:
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
 
 TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -1471,8 +1497,8 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, Normal) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -1489,9 +1515,10 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, PNC) {
-  hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -1537,8 +1564,8 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
   stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
@@ -1589,8 +1616,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(-1.0));
 
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
 
@@ -1643,8 +1670,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(0.0));
 
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -1662,8 +1689,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
   stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
@@ -1705,8 +1732,8 @@ TEST_P(RandomLoadBalancerTest, NoHosts) {
 
 TEST_P(RandomLoadBalancerTest, Normal) {
   init();
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -1726,8 +1753,8 @@ TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
   init();
 
   hostSet().healthy_hosts_ = {};
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
-                      makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 }
