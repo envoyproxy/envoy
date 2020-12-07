@@ -27,7 +27,6 @@ ExternalProcessorStreamImpl::ExternalProcessorStreamImpl(
     : callbacks_(callbacks) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(kExternalMethod);
-  assert(descriptor != nullptr);
   Http::AsyncClient::StreamOptions options;
   options.setTimeout(timeout);
 

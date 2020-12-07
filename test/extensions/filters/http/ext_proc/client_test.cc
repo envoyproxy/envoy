@@ -75,7 +75,7 @@ protected:
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   bool grpc_closed_ = false;
 
-  std::unique_ptr<ExternalProcessorClientImpl> client_;
+  ExternalProcessorClientPtr client_;
   Grpc::MockAsyncClientManager client_manager_;
   Grpc::MockAsyncStream stream_;
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
