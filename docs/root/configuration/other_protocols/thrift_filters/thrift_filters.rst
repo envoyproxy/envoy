@@ -1,9 +1,9 @@
 .. _config_thrift_filters:
 
-Thrift filters
+Thrift 过滤器
 ===============
 
-Envoy has the following builtin Thrift filters.
+Envoy 有两个如下所示的内置 Thrift 过滤器。
 
 .. toctree::
   :maxdepth: 2
