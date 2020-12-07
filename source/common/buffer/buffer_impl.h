@@ -37,7 +37,7 @@ public:
   /**
    * Create an empty Slice with 0 capacity.
    */
-  Slice() : capacity_(0), storage_(nullptr), base_(nullptr), data_(0), reservable_(0) {}
+  Slice() {}
 
   /**
    * Create an empty mutable Slice that owns its storage.
@@ -45,8 +45,8 @@ public:
    * up to the next multiple of 4kb.
    */
   Slice(uint64_t min_capacity)
-      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]), base_(storage_.get()),
-        data_(0), reservable_(0) {}
+      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]),
+        base_(storage_.get()) {}
 
   /**
    * Create an immutable Slice that refers to an external buffer fragment.
@@ -54,7 +54,7 @@ public:
    */
   Slice(BufferFragment& fragment)
       : capacity_(fragment.size()), storage_(nullptr),
-        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))), data_(0),
+        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
         reservable_(fragment.size()) {
     addDrainTracker([&fragment]() { fragment.done(); });
   }
@@ -298,7 +298,7 @@ protected:
   }
 
   /** Total number of bytes in the slice */
-  uint64_t capacity_;
+  uint64_t capacity_ = 0;
 
   /** Backing storage for mutable slices which own their own storage. This storage should never be
    * accessed directly; access base_ instead. */
@@ -308,10 +308,10 @@ protected:
   uint8_t* base_{nullptr};
 
   /** Offset in bytes from the start of the slice to the start of the Data section */
-  uint64_t data_;
+  uint64_t data_ = 0;
 
   /** Offset in bytes from the start of the slice to the start of the Reservable section */
-  uint64_t reservable_;
+  uint64_t reservable_ = 0;
 
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
@@ -364,14 +364,14 @@ public:
     return *this;
   }
 
-  void emplace_back(Slice&& slice) {
+  void emplaceBack(Slice&& slice) {
     growRing();
     size_t index = internalIndex(size_);
     ring_[index] = std::move(slice);
     size_++;
   }
 
-  void emplace_front(Slice&& slice) {
+  void emplaceFront(Slice&& slice) {
     growRing();
     start_ = (start_ == 0) ? capacity_ - 1 : start_ - 1;
     ring_[start_] = std::move(slice);
@@ -395,7 +395,7 @@ public:
     return ring_[internalIndex(i)];
   }
 
-  void pop_front() {
+  void popFront() {
     if (size() == 0) {
       return;
     }
@@ -407,7 +407,7 @@ public:
     }
   }
 
-  void pop_back() {
+  void popBack() {
     if (size() == 0) {
       return;
     }
