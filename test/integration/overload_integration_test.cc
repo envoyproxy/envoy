@@ -13,6 +13,8 @@
 
 namespace Envoy {
 
+using testing::HasSubstr;
+
 class FakeResourceMonitorFactory;
 
 class FakeResourceMonitor : public Server::ResourceMonitor {
@@ -316,6 +318,46 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   }
   http_stream.reset();
   codec_client_->close();
+}
+
+TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+          min_timeout: 5s
+    )EOF"));
+
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  // Create an HTTP connection and start a request.
+  FakeStreamPtr http_stream;
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, http_stream));
+  ASSERT_TRUE(http_stream->waitForHeadersComplete());
+  // At this point, Envoy is waiting for the upstream to respond, but that won't
+  // happen before it hits the stream timeout.
+
+  // Set the load so the timer is reduced but not to the minimum value.
+  updateResource(0.8);
+  test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
+  // Advancing past the minimum time shouldn't end the stream.
+  timeSystem().advanceTimeWait(std::chrono::seconds(5));
+
+  // Increase load so that the minimum time has now elapsed.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // Wait for the proxy to notice and take action for the overload.
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_idle_timeout", 1);
+  response->waitForEndStream();
+
+  EXPECT_EQ(response->headers().getStatusValue(), "408");
+  EXPECT_THAT(response->body(), HasSubstr("stream timeout"));
 }
 
 } // namespace Envoy
