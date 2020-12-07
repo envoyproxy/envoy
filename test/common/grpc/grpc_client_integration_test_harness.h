@@ -243,8 +243,9 @@ public:
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
-                                                      ipVersion(), test_time_.timeSystem());
+      FakeUpstreamConfig config(test_time_.timeSystem());
+      config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+      fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -291,7 +292,7 @@ public:
     ON_CALL(*mock_cluster_info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
-    EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
     Upstream::MockHost::MockCreateConnectionData connection_data{client_connection_.release(),
                                                                  host_description_ptr_};
@@ -308,7 +309,8 @@ public:
         std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq(fake_cluster_name_)))
+        .WillRepeatedly(Return(&thread_local_cluster_));
     envoy::config::core::v3::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
@@ -524,9 +526,10 @@ public:
             std::move(cfg), context_manager_, *stats_store_);
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr);
-    fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
-                                                    FakeHttpConnection::Type::HTTP2, ipVersion(),
-                                                    test_time_.timeSystem());
+    FakeUpstreamConfig config(test_time_.timeSystem());
+    config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+    fake_upstream_ =
+        std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, ipVersion(), config);
 
     GrpcClientIntegrationTest::initialize();
   }

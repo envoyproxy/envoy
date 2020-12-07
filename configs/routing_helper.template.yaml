@@ -40,5 +40,9 @@
     healthy_threshold: 2
   outlier_detection:
     success_rate_stdev_factor: 1900
-  http2_protocol_options: {}
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http2_protocol_options: {}
 {% endmacro -%}

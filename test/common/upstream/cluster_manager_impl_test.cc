@@ -539,7 +539,7 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
     create(parseBootstrapFromV3Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
-    Upstream::ThreadLocalCluster* tlc = cluster_manager_->get("cluster_1");
+    Upstream::ThreadLocalCluster* tlc = cluster_manager_->getThreadLocalCluster("cluster_1");
     EXPECT_NE(nullptr, tlc);
 
     if (tlc) {
@@ -744,15 +744,18 @@ public:
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
     create(parseBootstrapFromV3Json(json));
 
-    EXPECT_EQ(nullptr, cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(
+        nullptr,
+        cluster_manager_->getThreadLocalCluster("cluster_0")->loadBalancer().chooseHost(nullptr));
 
     cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
         makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
     cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
         cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
     cluster1->initialize_callback_();
-    EXPECT_EQ(cluster1->prioritySet().getMockHostSet(0)->hosts_[0],
-              cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(
+        cluster1->prioritySet().getMockHostSet(0)->hosts_[0],
+        cluster_manager_->getThreadLocalCluster("cluster_0")->loadBalancer().chooseHost(nullptr));
   }
 };
 
@@ -846,7 +849,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
                                         clustersJson({defaultStaticClusterJson("cluster_1")}));
 
   create(parseBootstrapFromV3Json(json));
-  EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
                                                               Http::Protocol::Http2, nullptr));
   EXPECT_EQ(nullptr,
@@ -904,12 +907,15 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   create(parseBootstrapFromV3Json(json));
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
-  EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
+  EXPECT_EQ(cluster.info(), cluster_manager_->getThreadLocalCluster("cluster_1")->info());
+  EXPECT_EQ(1UL, cluster_manager_->getThreadLocalCluster("cluster_1")
+                     ->prioritySet()
+                     .hostSetsPerPriority()[0]
+                     ->hosts()
+                     .size());
   EXPECT_EQ(
-      1UL,
-      cluster_manager_->get("cluster_1")->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-            cluster_manager_->get("cluster_1")->loadBalancer().chooseHost(nullptr));
+      cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+      cluster_manager_->getThreadLocalCluster("cluster_1")->loadBalancer().chooseHost(nullptr));
 
   // Local reference, primary reference, thread local reference, host reference, async client
   // reference.
@@ -1209,7 +1215,7 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version3"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   checkConfigDump(R"EOF(
 dynamic_warming_clusters:
   - version_info: "version3"
@@ -1355,7 +1361,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version3"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   checkConfigDump(R"EOF(
  dynamic_warming_clusters:
    - version_info: "version3"
@@ -1462,10 +1468,10 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   cluster1->initialize_callback_();
 
-  EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
+  EXPECT_EQ(cluster1->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
   EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
 
@@ -1490,7 +1496,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
-  EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
+  EXPECT_EQ(cluster2->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _)).WillOnce(Return(cp));
@@ -1520,7 +1526,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_CALL(*cp2, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb2));
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
-  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().active_clusters_.size());
 
   // Close the TCP connection. Success is no ASSERT or crash due to referencing
@@ -1602,7 +1608,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
       100);
 
-  auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
+  auto* tls_cluster = cluster_manager_->getThreadLocalCluster(cluster1->info_->name());
 
   EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority().size());
   EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
@@ -1903,7 +1909,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
@@ -2047,7 +2053,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   NiceMock<MockLoadBalancerContext> example_com_context;
   ON_CALL(example_com_context, upstreamTransportSocketOptions())
@@ -2376,7 +2382,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
@@ -2457,7 +2463,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
@@ -2513,7 +2519,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
@@ -3837,7 +3843,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   ClusterUpdateCallbacksHandlePtr cb =
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
 
   // Verify that we get no hosts when the HostSet is empty.
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster(
@@ -4072,7 +4078,7 @@ cluster_manager:
   // The priority for LOGICAL_DNS endpoints are written, so we just verify that there is only a
   // single priority even if the endpoint was configured to be priority 10.
   create(parseBootstrapFromV3Yaml(yaml));
-  const auto cluster = cluster_manager_->get("new_cluster");
+  const auto cluster = cluster_manager_->getThreadLocalCluster("new_cluster");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority().size());
 }
 

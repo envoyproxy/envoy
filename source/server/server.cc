@@ -31,6 +31,7 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_resource.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -535,11 +536,15 @@ void InstanceImpl::initialize(const Options& options,
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config() ||
-      bootstrap_.dynamic_resources().has_lds_resources_locator()) {
+      !bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
+    std::unique_ptr<xds::core::v3::ResourceLocator> lds_resources_locator;
+    if (!bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
+      lds_resources_locator =
+          std::make_unique<xds::core::v3::ResourceLocator>(Config::XdsResourceIdentifier::decodeUrl(
+              bootstrap_.dynamic_resources().lds_resources_locator()));
+    }
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
-                                    bootstrap_.dynamic_resources().has_lds_resources_locator()
-                                        ? &bootstrap_.dynamic_resources().lds_resources_locator()
-                                        : nullptr);
+                                    lds_resources_locator.get());
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
@@ -643,16 +648,15 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
         }
       }) {
   // Setup signals.
-  // Since signals are not supported on Windows we have an internal definition for `SIGTERM`
-  // On POSIX it resolves as expected to SIGTERM
-  // On Windows we use it internally for all the console events that indicate that we should
-  // terminate the process.
   if (options.signalHandlingEnabled()) {
-    sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
-      ENVOY_LOG(warn, "caught ENVOY_SIGTERM");
+// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
+// on Windows.
+#ifndef WIN32
+    sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
+      ENVOY_LOG(warn, "caught SIGTERM");
       instance.shutdown();
     });
-#ifndef WIN32
+
     sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
       ENVOY_LOG(warn, "caught SIGINT");
       instance.shutdown();

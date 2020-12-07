@@ -144,9 +144,9 @@ build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
-coverage:test-coverage --test_arg="-l trace"
-coverage:fuzz-coverage --config=plain-fuzzer
-coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
+build:test-coverage --test_arg="-l trace"
+build:fuzz-coverage --config=plain-fuzzer
+build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
@@ -323,6 +323,12 @@ build:clang-cl --define clang_cl=1
 # Override determinism flags (DATE etc) is valid on clang-cl compiler
 build:clang-cl --copt="-Wno-macro-redefined"
 build:clang-cl --copt="-Wno-builtin-macro-redefined"
+# Workaround problematic missing override declarations of mocks
+# TODO: resolve this class of problematic mocks, e.g.
+# ./test/mocks/http/stream.h(16,21): error: 'addCallbacks'
+#     overrides a member function but is not marked 'override'
+#   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
+build:clang-cl --copt="-Wno-inconsistent-missing-override"
 build:clang-cl --action_env=USE_CLANG_CL=1
 
 # Defaults to 'auto' - Off for windows, so override to linux behavior
