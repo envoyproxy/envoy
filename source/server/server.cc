@@ -658,11 +658,6 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       instance.shutdown();
     });
 #ifndef WIN32
-    sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
-      ENVOY_LOG(warn, "caught SIGTERM");
-      instance.shutdown();
-    });
-
     sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
       ENVOY_LOG(warn, "caught SIGINT");
       instance.shutdown();
