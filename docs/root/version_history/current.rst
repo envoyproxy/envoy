@@ -19,8 +19,10 @@ Minor Behavior Changes
 * grpc_web filter: if a `grpc-accept-encoding` header is present it's passed as-is to the upstream and if it isn't `grpc-accept-encoding:identity` is sent instead. The header was always overwriten with `grpc-accept-encoding:identity,deflate,gzip` before.
 * http: upstream protocol will now only be logged if an upstream stream was established.
 * jwt_authn filter: added support of Jwt time constraint verification with a clock skew (default to 60 seconds) and added a filter config field :ref:`clock_skew_seconds <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.clock_skew_seconds>` to configure it.
+* kill_request: enable a way to configure kill header name in KillRequest proto.
 * memory: enable new tcmalloc with restartable sequences for aarch64 builds.
 * mongo proxy metrics: swapped network connection remote and local closed counters previously set reversed (`cx_destroy_local_with_active_rq` and `cx_destroy_remote_with_active_rq`).
+* performance: improve performance when handling large HTTP/1 bodies.
 * tls: removed RSA key transport and SHA-1 cipher suites from the client-side defaults.
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
 * xds: to support TTLs, heartbeating has been added to xDS. As a result, responses that contain empty resources without updating the version will no longer be propagated to the
