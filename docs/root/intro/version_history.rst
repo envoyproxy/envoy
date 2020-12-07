@@ -1,7 +1,7 @@
 Version history
 ---------------
 
-1.14.6 (Pending)
+1.14.6 (December 7, 2020)
 ================
 Changes
 -------
