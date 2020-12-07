@@ -59,7 +59,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
-  ON_CALL(*mock_buffer_factory_, createOutputBuffer_(_, _, _))
+  ON_CALL(*mock_buffer_factory_, create_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);

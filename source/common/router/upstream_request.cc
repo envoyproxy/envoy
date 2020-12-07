@@ -208,7 +208,6 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
     if (!buffered_request_body_) {
       buffered_request_body_ = parent_.callbacks()->dispatcher().getWatermarkFactory().create(
-          Buffer::BufferType::Other,
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });

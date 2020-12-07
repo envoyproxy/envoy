@@ -477,11 +477,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
-      dispatching_(false),
-      output_buffer_(connection.dispatcher().getWatermarkFactory().create(
-          Buffer::BufferType::HttpStreamOutput, [&]() -> void { this->onBelowLowWatermark(); },
-          [&]() -> void { this->onAboveHighWatermark(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
+                               [&]() -> void { this->onBelowLowWatermark(); },
+                               [&]() -> void { this->onAboveHighWatermark(); },
+                               []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_->setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);

@@ -417,21 +417,6 @@ public:
 
 using InstancePtr = std::unique_ptr<Instance>;
 
-// Informational enum that hints at the buffer's intended use. The first use case for this
-// information is to track the size of each buffer type in tests. Future uses may include stats to
-// monitor buffer usage by type or new overload manager hooks.
-enum class BufferType {
-  // Per-connection input buffer used to read directly from an IoHandle.
-  ConnectionInput,
-  // Per-connection output buffer used to write directly to an IoHandle.
-  ConnectionOutput,
-  // Per-stream HTTP output buffer. In the case of HTTP2 and HTTP3/QUIC, this buffer participates in
-  // per-stream flow control.
-  HttpStreamOutput,
-  // Other buffers, including those used internally by filters and components of the IO pipeline.
-  Other,
-};
-
 /**
  * A factory for creating buffers which call callbacks when reaching high and low watermarks.
  */
@@ -441,14 +426,13 @@ public:
 
   /**
    * Creates and returns a unique pointer to a new buffer.
-   * @param buffer_type supplies a hint about the intended use of the buffer.
    * @param below_low_watermark supplies a function to call if the buffer goes under a configured
    *   low watermark.
    * @param above_high_watermark supplies a function to call if the buffer goes over a configured
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr create(BufferType buffer_type, std::function<void()> below_low_watermark,
+  virtual InstancePtr create(std::function<void()> below_low_watermark,
                              std::function<void()> above_high_watermark,
                              std::function<void()> above_overflow_watermark) PURE;
 };

@@ -41,7 +41,7 @@ IntegrationTcpClient::IntegrationTcpClient(
     Network::Address::InstanceConstSharedPtr source_address)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
-  EXPECT_CALL(factory, createOutputBuffer_(_, _, _))
+  EXPECT_CALL(factory, create_(_, _, _))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
         client_write_buffer_ =

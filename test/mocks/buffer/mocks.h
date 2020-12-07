@@ -74,21 +74,14 @@ public:
   MockBufferFactory();
   ~MockBufferFactory() override;
 
-  Buffer::InstancePtr create(Buffer::BufferType buffer_type, std::function<void()> below_low,
-                             std::function<void()> above_high,
+  Buffer::InstancePtr create(std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) override {
-    // Only create mock output buffers. Creation of other buffer types via this factory is too
-    // disruptive to tests.
-    if (buffer_type == Buffer::BufferType::ConnectionOutput) {
-      auto buffer = Buffer::InstancePtr{createOutputBuffer_(below_low, above_high, above_overflow)};
-      ASSERT(buffer != nullptr);
-      return buffer;
-    }
-
-    return std::make_unique<Buffer::WatermarkBuffer>(below_low, above_high, above_overflow);
+    auto buffer = Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
+    ASSERT(buffer != nullptr);
+    return buffer;
   }
 
-  MOCK_METHOD(Buffer::Instance*, createOutputBuffer_,
+  MOCK_METHOD(Buffer::Instance*, create_,
               (std::function<void()> below_low, std::function<void()> above_high,
                std::function<void()> above_overflow));
 };

@@ -55,12 +55,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
       write_buffer_(dispatcher.getWatermarkFactory().create(
-          Buffer::BufferType::ConnectionOutput,
           [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       read_buffer_(dispatcher.getWatermarkFactory().create(
-          Buffer::BufferType::ConnectionInput,
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
