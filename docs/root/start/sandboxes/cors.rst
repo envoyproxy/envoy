@@ -3,21 +3,14 @@
 CORS 过滤器
 ===========
 
-跨域资源共享（CORS）是一种对资源实施客户端访问控制的方法，该方法通过指定外部域名来访问你域名下的某些或者全部路由。
-浏览器使用响应的 HTTP headers 来确定是否接受跨域的响应报文。
+跨域资源共享（CORS）是一种对资源实施客户端访问控制的方法，该方法通过指定外部域名来访问你域名下的某些或者全部路由。浏览器使用响应的 HTTP headers 来确定是否接受跨域的响应报文。
 
-为了演示 front-envoy 如何执行 CORS 策略，我们
-发布了一组 `docker compose <https://docs.docker.com/compose/>` 沙盒，
-这组沙盒是在不同的 Origin 上部署前端和后端服务，这些服务都在 front-envoy 后面。
+为了演示 front-envoy 如何执行 CORS 策略，我们发布了一组 `docker compose <https://docs.docker.com/compose/>` 沙盒，这组沙盒是在不同的 Origin 上部署前端和后端服务，这些服务都在 front-envoy 后面。
 
-前端服务具有一个用于输入后端的远程域名字段的服务以及单选按钮以选择远程域名的 CORS 执行策略。
-CORS 执行策略选项：
+前端服务具有一个用于输入后端的远程域名字段的服务以及单选按钮以选择远程域名的 CORS 执行策略。CORS 执行策略选项：
 
-  * Disabled: 在请求的路由上禁用了 CORS。这将导致客户端 CORS 错误，
-   因为有效的 CORS 请求必需携带的 http headers 没有被提供。
-  * Open: 在请求的路由上启用了 CORS，但设置了允许的 Origin 为 ``*``。
-    这是一项非常宽松的策略，
-    意味着任何 Origin 都可以请求这个端点上的数据。
+  * Disabled: 在请求的路由上禁用了 CORS。这将导致客户端 CORS 错误，因为有效的 CORS 请求必需携带的 http headers 没有被提供。
+  * Open: 在请求的路由上启用了 CORS，但设置了允许的 Origin 为 ``*``。这是一项非常宽松的策略，意味着任何 Origin 都可以请求这个端点上的数据。
   * Restricted: 在请求的路由上启用了 CORS ，并且仅允许 Origin 为 ``envoyproxy.io``。这将导致客户端 CORS 错误。
 
 运行沙盒
@@ -81,9 +74,7 @@ CORS 执行策略选项：
 
 在示例配置中，后端 admin 绑定到端口 ``8003``。
 
-如果你用浏览器打开 http://localhost:8003/stats，则可以查看
-所有 Envoy 关于后端统计信息。如果你从前端群集发出请求，
-你应该能看到的 ``CORS`` 统计信息中无效或者有效的请求数会增加。
+如果你用浏览器打开 http://localhost:8003/stats，则可以查看所有 Envoy 关于后端统计信息。如果你从前端群集发出请求，你应该能看到的 ``CORS`` 统计信息中无效或者有效的请求数会增加。
 
 .. code-block:: none
 
