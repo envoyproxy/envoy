@@ -76,8 +76,9 @@ public:
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're using dynamic CDS.
     for (auto& cluster : clusters_) {
-      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, upstream_protocol_, version_,
-                                                              timeSystem(), enable_half_close_);
+      auto config = upstreamConfig();
+      config.upstream_protocol_ = upstream_protocol_;
+      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
       cluster.cluster_ = ConfigHelper::buildStaticCluster(
           cluster.name_, cluster.host_upstream_->localAddress()->ip()->port(),
           Network::Test::getLoopbackAddressString(ip_version_));

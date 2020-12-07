@@ -80,10 +80,11 @@ require_client_certificate: true
 
   void createUpstreams() override {
     auto endpoint = upstream_address_fn_(0);
-    fake_upstreams_.emplace_back(new FakeUpstream(
-        createUpstreamSslContext(), endpoint->ip()->port(),
-        use_h2_ ? FakeHttpConnection::Type::HTTP2 : FakeHttpConnection::Type::HTTP1,
-        endpoint->ip()->version(), timeSystem()));
+    FakeUpstreamConfig config = upstreamConfig();
+    config.upstream_protocol_ =
+        use_h2_ ? FakeHttpConnection::Type::HTTP2 : FakeHttpConnection::Type::HTTP1;
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(createUpstreamSslContext(), endpoint->ip()->port(), version_, config));
   }
 
   bool use_h2_{};
