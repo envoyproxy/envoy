@@ -22,8 +22,8 @@ getHttpOptions(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions
   if (options.has_use_downstream_protocol_config()) {
     return options.use_downstream_protocol_config().http_protocol_options();
   }
-  if (options.has_alpn_config()) {
-    return options.alpn_config().http_protocol_options();
+  if (options.has_auto_config()) {
+    return options.auto_config().http_protocol_options();
   }
   return options.explicit_http_config().http_protocol_options();
 }
@@ -33,8 +33,8 @@ getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
   if (options.has_use_downstream_protocol_config()) {
     return options.use_downstream_protocol_config().http2_protocol_options();
   }
-  if (options.has_alpn_config()) {
-    return options.alpn_config().http2_protocol_options();
+  if (options.has_auto_config()) {
+    return options.auto_config().http2_protocol_options();
   }
   return options.explicit_http_config().http2_protocol_options();
 }
@@ -61,7 +61,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     }
     use_downstream_protocol_ = true;
   }
-  if (options.has_alpn_config()) {
+  if (options.has_auto_config()) {
     use_http2_ = true;
     use_alpn_ = true;
   }

@@ -643,12 +643,12 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn) {
 
       new_protocol_options = old_protocol_options;
       new_protocol_options.clear_explicit_http_config();
-      new_protocol_options.mutable_alpn_config();
+      new_protocol_options.mutable_auto_config();
       if (old_protocol_options.explicit_http_config().has_http_protocol_options()) {
-        new_protocol_options.mutable_alpn_config()->mutable_http_protocol_options()->MergeFrom(
+        new_protocol_options.mutable_auto_config()->mutable_http_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http_protocol_options());
       } else if (old_protocol_options.explicit_http_config().has_http2_protocol_options()) {
-        new_protocol_options.mutable_alpn_config()->mutable_http2_protocol_options()->MergeFrom(
+        new_protocol_options.mutable_auto_config()->mutable_http2_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http2_protocol_options());
       }
       (*cluster->mutable_typed_extension_protocol_options())
