@@ -1135,7 +1135,7 @@ typed_config:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-                          EnvoyException, ".*\"NOT_A_VALID_CODE\" for type ");
+                          EnvoyException, "NOT_A_VALID_CODE");
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {
