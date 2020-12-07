@@ -264,13 +264,9 @@ void DispatcherImpl::runPostCallbacks() {
     // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute
     // later in the event loop.
     Thread::LockGuard lock(post_lock_);
-    if (post_callbacks_.empty()) {
-      return;
-    }
     callbacks = std::move(post_callbacks_);
-    // post_callbacks_ should be empty after the move, but clear it anyway to avoid depending on
-    // object state after move.
-    post_callbacks_.clear();
+    // post_callbacks_ should be empty after the move.
+    ASSERT(post_callbacks_.empty());
   }
   // It is important that the execution and deletion of the callback happen while post_lock_ is not
   // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
