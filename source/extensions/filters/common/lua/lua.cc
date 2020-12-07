@@ -90,7 +90,9 @@ CoroutinePtr ThreadLocalState::createCoroutine() {
   return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
 }
 
-ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : state_(luaL_newstate()) {
+ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code)
+    : state_(luaL_newstate()) {
+
   RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());
