@@ -11,9 +11,8 @@ SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num
     : cb_(cb) {
 
   if (signal_num > eventBridgeHandlersSingleton::get().size()) {
-    ENVOY_BUG(false, "Attempting to create SignalEventImpl with a signal id that exceeds the "
-                     "number of supported signals.");
-    return;
+    PANIC("Attempting to create SignalEventImpl with a signal id that exceeds the number of "
+          "supported signals.");
   }
 
   if (eventBridgeHandlersSingleton::get()[signal_num]) {

@@ -28,10 +28,9 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   // managed by Windows console host. For that reason we want to avoid allocating
   // substantial amount of memory or taking locks.
   // This is why we write to a socket to wake up the signal handler.
-  Buffer::OwnedImpl buffer;
-  constexpr absl::string_view data{"a"};
-  buffer.add(data);
-  auto result = handler->write(buffer);
+  char data[] = {'a'};
+  Buffer::RawSlice buffer{data, 1};
+  auto result = handler->writev(&buffer, 1);
   RELEASE_ASSERT(result.rc_ == 1,
                  fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
 
