@@ -87,13 +87,9 @@
 
 - Envoy
 - gRPC
-- Host
-- HTTP header
-- log
-- Mixer
-- Node
-- Pilot
+- Thrift
 - secrets
+- configmaps
 - sidecar
 - TLS / mTLS
 - Virtual service
