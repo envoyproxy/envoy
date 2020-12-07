@@ -137,7 +137,7 @@ as the authorization server. To run this example:
     $ docker-compose pull
     $ # Tearing down the currently running setup
     $ docker-compose down
-    $ FRONT_ENVOY_YAML=config/opa-service/v2.yaml docker-compose up --build -d
+    $ FRONT_ENVOY_YAML=config/opa-service/v3.yaml docker-compose up --build -d
 
 And sending a request to the upstream service (via the Front Envoy) gives:
 

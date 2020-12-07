@@ -403,7 +403,7 @@ void InstanceImpl::initialize(const Options& options,
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
       options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  Configuration::InitialImpl initial_config(bootstrap_, options);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);

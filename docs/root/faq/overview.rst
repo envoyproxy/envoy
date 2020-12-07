@@ -17,6 +17,7 @@ API
 .. toctree::
   :maxdepth: 2
 
+  api/transition
   api/envoy_v2_support
   api/envoy_v3
   api/envoy_upgrade_v3

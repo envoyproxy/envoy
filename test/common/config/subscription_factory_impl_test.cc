@@ -108,6 +108,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
   config.mutable_api_config_source()->add_cluster_names("static_cluster");
   primary_clusters.insert("static_cluster");
@@ -122,6 +123,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
       "static_cluster");
@@ -227,6 +229,7 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(
       envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
@@ -239,6 +242,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   api_config_source->mutable_request_timeout()->set_seconds(5);
@@ -257,6 +261,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterSet primary_clusters;
@@ -269,7 +274,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
                               const Http::AsyncClient::RequestOptions&) {
         EXPECT_EQ("POST", request->headers().getMethodValue());
         EXPECT_EQ("static_cluster", request->headers().getHostValue());
-        EXPECT_EQ("/v2/discovery:endpoints", request->headers().getPathValue());
+        EXPECT_EQ("/v3/discovery:endpoints", request->headers().getPathValue());
         return &http_request_;
       }));
   EXPECT_CALL(http_request_, cancel());
@@ -281,6 +286,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
@@ -294,6 +300,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
   envoy::config::core::v3::GrpcService expected_grpc_service;
   expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster");
@@ -317,27 +324,54 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 
-TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
+// Use of the V2 transport fails by default.
+TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   envoy::config::core::v3::ConfigSource config;
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   config.mutable_api_config_source()->set_transport_api_version(
       envoy::config::core::v3::ApiVersion::V2);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
   NiceMock<Runtime::MockSnapshot> snapshot;
   EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
+  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(false));
   EXPECT_CALL(runtime_, countDeprecatedFeatureUse());
 
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
-  EXPECT_LOG_CONTAINS(
-      "warn", "xDS of version v2 has been deprecated", try {
-        subscription_factory_.subscriptionFromConfigSource(
-            config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
-            resource_decoder_);
-      } catch (EnvoyException&){/* expected, we pass an empty configuration  */});
+  EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
+                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+                              callbacks_, resource_decoder_),
+                          EnvoyException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in");
+}
+
+// Use of AUTO transport fails by default. This will encourage folks to upgrade to explicit V3.
+TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
+  envoy::config::core::v3::ConfigSource config;
+
+  config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::AUTO);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+  NiceMock<Runtime::MockSnapshot> snapshot;
+  EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
+  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(false));
+  EXPECT_CALL(runtime_, countDeprecatedFeatureUse());
+
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+
+  EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
+                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+                              callbacks_, resource_decoder_),
+                          EnvoyException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }
 
 INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestApiConfigSource,

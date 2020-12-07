@@ -23,6 +23,7 @@ namespace {
 
 void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   std::string yaml = R"EOF(
+  transport_api_version: V3
   grpc_service:
     google_grpc:
       target_uri: ext_authz_server
@@ -60,14 +61,17 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
 } // namespace
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO);
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V2);
+#endif
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3);
 }
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   std::string yaml = R"EOF(
   stat_prefix: "wall"
+  transport_api_version: V3
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -150,6 +154,7 @@ TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupp
     auto google_grpc = new envoy::config::core::v3::GrpcService_GoogleGrpc();
     google_grpc->set_stat_prefix("grpc");
     google_grpc->set_target_uri("http://example.com");
+    proto_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     proto_config.mutable_grpc_service()->set_allocated_google_grpc(google_grpc);
 
     testing::StrictMock<Server::Configuration::MockFactoryContext> context;

@@ -529,6 +529,7 @@ public:
   const Http::LowerCaseString case_sensitive_header_name_{"x-case-sensitive-header"};
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
   const std::string default_config_ = R"EOF(
+  transport_api_version: V3
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -561,30 +562,35 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBody) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP1, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP1, 2048);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 2048);
 }
 
 // Verifies that the original request headers will be added and appended when the authorization
 // server returns headers_to_add and headers_to_append in OkResponse message.
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBodyWithHeaders(
       Http::CodecClient::Type::HTTP1, 4,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
@@ -597,18 +603,22 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/false, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisableWithMetadata) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/true, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/false, "403");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
 }
 
@@ -665,6 +675,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
 
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
     const std::string ext_authz_config = R"EOF(
+  transport_api_version: V3
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -735,6 +746,7 @@ body_format:
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initializeConfig();
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   HttpIntegrationTest::initialize();

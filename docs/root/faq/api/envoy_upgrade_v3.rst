@@ -2,7 +2,9 @@ If I upgrade to Envoy 1.13+, do I need to use the v3 API?
 =========================================================
 
 The v2 API is deprecated in the 1.13.0 release (January 2020). It will be fully supported for the
-duration of 2020 and then all support for v2 will be removed from Envoy at EOY 2020.
+duration of 2020 and then all support for v2 will be removed from Envoy during Q1 2021. It is
+disabled by default, see this :ref:`entry <faq_api_version_transition>` for further details.
+
 
 All existing v2 boostrap and xDS configuration should continue to work seamlessly in 1.13.0 and for the
 duration of 2020. Envoy internally operates at v3+, but does so by transparently upgrading

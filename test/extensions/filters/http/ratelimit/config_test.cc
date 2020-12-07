@@ -20,8 +20,10 @@ namespace {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
-                   envoy::extensions::filters::http::ratelimit::v3::RateLimit(), "stats", context),
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit config;
+  config.mutable_rate_limit_service()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+  EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(config, "stats", context),
                ProtoValidationException);
 }
 
@@ -30,6 +32,7 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   domain: test
   timeout: 2s
   rate_limit_service:
+    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: ratelimit_cluster

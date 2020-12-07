@@ -28,9 +28,9 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
               grpc_service:
                 envoy_grpc:
-                  cluster_name: ext_authz-grpc-service
+                  cluster_name: ext_authz-opa-service
                 timeout: 0.250s
-              transport_api_version: V2
+              transport_api_version: V3
           - name: envoy.filters.http.router
             typed_config: {}
 
@@ -49,17 +49,17 @@ static_resources:
                 address: upstream-service
                 port_value: 8080
 
-  - name: ext_authz-grpc-service
+  - name: ext_authz-opa-service
     connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     load_assignment:
-      cluster_name: ext_authz-grpc-service
+      cluster_name: ext_authz-opa-service
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: ext_authz-grpc-service
-                port_value: 9001
+                address: ext_authz-opa-service
+                port_value: 9002
