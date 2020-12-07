@@ -13,8 +13,8 @@ wasm_rust_binary(
     name = "logging_rust.wasm",
     srcs = ["logging_rust.rs"],
     deps = [
-        "//bazel/external/cargo:log",
-        "//bazel/external/cargo:proxy_wasm",
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
     ],
 )
 
@@ -38,7 +38,4 @@ envoy_cc_library(
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
     srcs = ["test_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )

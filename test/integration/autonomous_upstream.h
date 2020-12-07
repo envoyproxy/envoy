@@ -60,18 +60,17 @@ class AutonomousUpstream : public FakeUpstream {
 public:
   AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                      const Network::Address::InstanceConstSharedPtr& address,
-                     FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-                     bool allow_incomplete_streams)
-      : FakeUpstream(std::move(transport_socket_factory), address, type, time_system),
+                     const FakeUpstreamConfig& config, bool allow_incomplete_streams)
+      : FakeUpstream(std::move(transport_socket_factory), address, config),
         allow_incomplete_streams_(allow_incomplete_streams),
         response_trailers_(std::make_unique<Http::TestResponseTrailerMapImpl>()),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
             Http::TestResponseHeaderMapImpl({{":status", "200"}}))) {}
 
   AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
-                     FakeHttpConnection::Type type, Network::Address::IpVersion version,
-                     Event::TestTimeSystem& time_system, bool allow_incomplete_streams)
-      : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system),
+                     Network::Address::IpVersion version, const FakeUpstreamConfig& config,
+                     bool allow_incomplete_streams)
+      : FakeUpstream(std::move(transport_socket_factory), port, version, config),
         allow_incomplete_streams_(allow_incomplete_streams),
         response_trailers_(std::make_unique<Http::TestResponseTrailerMapImpl>()),
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(

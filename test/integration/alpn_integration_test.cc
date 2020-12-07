@@ -35,8 +35,9 @@ public:
       setUpstreamProtocol(protocols_[i]);
       Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext();
       auto endpoint = upstream_address_fn_(i);
-      fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint,
-                                                          protocols_[i], timeSystem(),
+      auto config = upstreamConfig();
+      config.upstream_protocol_ = protocols_[i];
+      fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
                                                           autonomous_allow_incomplete_streams_));
     }
   }
