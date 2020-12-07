@@ -1,8 +1,8 @@
 Version history
 ---------------
 
-1.13.7 (Pending)
-================
+1.13.7 (December 7, 2020)
+=========================
 Changes
 -------
 * tls: fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the SSL connection's internal buffers.
