@@ -14,7 +14,7 @@ CORS 过滤器
 CORS 执行策略选项：
 
   * Disabled: 在请求的路由上禁用了 CORS。这将导致客户端 CORS 错误，
-    因为有效的 CORS 请求必需携带的 http headers 没有被提供。
+   因为有效的 CORS 请求必需携带的 http headers 没有被提供。
   * Open: 在请求的路由上启用了 CORS，但设置了允许的 Origin 为 ``*``。
     这是一项非常宽松的策略，
     意味着任何 Origin 都可以请求这个端点上的数据。
