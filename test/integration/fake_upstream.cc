@@ -450,12 +450,11 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
   return AssertionSuccess();
 }
 
-FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
-                           Event::TestTimeSystem& time_system)
+FakeUpstream::FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
-                   type, time_system, false) {
+                   config) {
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
@@ -480,43 +479,43 @@ makeUdpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 }
 
 FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                           FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-                           bool enable_half_close, bool udp_fake_upstream)
+                           const FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   udp_fake_upstream ? makeUdpListenSocket(address) : makeTcpListenSocket(address),
-                   type, time_system, enable_half_close) {
+                   config.udp_fake_upstream_ ? makeUdpListenSocket(address)
+                                             : makeTcpListenSocket(address),
+                   config) {
   ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
             address->ip()->addressAsString(), address->ip()->port(),
-            Network::Test::addressVersionAsString(address->ip()->version()), udp_fake_upstream);
+            Network::Test::addressVersionAsString(address->ip()->version()),
+            config.udp_fake_upstream_);
 }
 
-FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system,
-                           bool enable_half_close)
+FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
+                           const FakeUpstreamConfig& config)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   makeTcpListenSocket(port, version), type, time_system, enable_half_close) {
+                   makeTcpListenSocket(port, version), config) {
   ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                           uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
-    : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
-                   time_system, false) {
+                           uint32_t port, Network::Address::IpVersion version,
+                           const FakeUpstreamConfig& config)
+    : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version),
+                   config) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                           Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
-                           Event::TestTimeSystem& time_system, bool enable_half_close)
-    : http_type_(type), socket_(Network::SocketSharedPtr(listen_socket.release())),
+                           Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
+    : http_type_(config.upstream_protocol_),
+      socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
-      api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
+      api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),
       dispatcher_(api_->allocateDispatcher("fake_upstream")),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, 0)),
-      read_disable_on_new_connection_(true), enable_half_close_(enable_half_close),
+      read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
