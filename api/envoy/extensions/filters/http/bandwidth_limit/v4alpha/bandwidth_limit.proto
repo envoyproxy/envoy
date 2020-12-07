@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.bandwidth_limit.v4alpha;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v4alpha";
+option java_outer_classname = "BandwidthLimitProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+
+// [#protodoc-title: Bandwidth limit]
+// Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
+// [#extension: envoy.filters.http.bandwidth_limit]
+
+message BandwidthLimit {
+  // Defines the mode for the bandwidth limit filter.
+  // Values represent bitmask.
+  enum EnableMode {
+    // Filter is disabled.
+    Disabled = 0;
+
+    // Filter enabled only for Ingress traffic.
+    Ingress = 1;
+
+    // Filter enabled only for Egress traffic.
+    Egress = 2;
+
+    // Filter enabled for both Ingress and Egress traffic.
+    IngressAndEgress = 4;
+  }
+
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The enable mode for the bandwidth limit filter.
+  // Default is Disabled.
+  EnableMode enable_mode = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // The limit supplied in KiB/s.
+  //
+  // .. note::
+  //   It's fine for the limit to be unset for the global configuration since the bandwidth limit
+  //   can be applied at a the virtual host or route level. Thus, the limit must be set for the
+  //   per route configuration otherwise the config will be rejected.
+  //
+  // .. note::
+  //   When using per route configuration, the limit becomes unique to that route.
+  //
+  google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
+
+  // Optional fill_rate for the token buckets (per second). Defaults to 64.
+  google.protobuf.UInt32Value fill_rate = 4 [(validate.rules).uint32 = {gte: 1}];
+}
