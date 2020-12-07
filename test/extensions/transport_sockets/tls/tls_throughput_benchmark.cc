@@ -33,18 +33,16 @@ static void handleSslError(SSL* ssl, int err, bool is_server) {
 }
 
 static void appendSlice(Buffer::Instance& buffer, uint32_t size) {
-  Buffer::RawSlice slice;
   std::string data(size, 'a');
   RELEASE_ASSERT(data.size() <= 16384, "short_slice_size can't be larger than full slice");
 
   // A 16kb request currently has inline metadata, which makes it 16384+8. This gets rounded up
   // to the next page size. Request enough that there is no extra space, to ensure that this results
   // in a new slice.
-  buffer.reserve(16384, &slice, 1);
+  Buffer::Reservation reservation = buffer.reserveSingleSlice(16384);
 
-  memcpy(slice.mem_, data.data(), data.size());
-  slice.len_ = data.size();
-  buffer.commit(&slice, 1);
+  memcpy(reservation.slices()[0].mem_, data.data(), data.size());
+  reservation.commit(data.size());
 }
 
 // If move_slices is true, add full-sized slices using move similar to how HTTP codecs move data
@@ -56,12 +54,11 @@ static void addFullSlices(Buffer::Instance& output_buffer, int num_slices, bool 
 
   for (int i = 0; i < num_slices; i++) {
     auto start_size = buffer->length();
-    Buffer::RawSlice slices[2];
-    auto num_slices = buffer->reserve(16384, slices, 2);
-    for (unsigned i = 0; i < num_slices; i++) {
-      memset(slices[i].mem_, 'a', slices[i].len_);
+    Buffer::Reservation reservation = buffer->reserve(16384);
+    for (unsigned i = 0; i < reservation.numSlices(); i++) {
+      memset(reservation.slices()[i].mem_, 'a', reservation.slices()[i].len_);
     }
-    buffer->commit(slices, num_slices);
+    reservation.commit(16384);
     RELEASE_ASSERT(buffer->length() - start_size == 16384, "correct reserve/commit");
   }
 

@@ -207,14 +207,9 @@ BENCHMARK(bufferMovePartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 static void bufferReserveCommit(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
-    constexpr uint64_t NumSlices = 2;
-    Buffer::RawSlice slices[NumSlices];
-    uint64_t slices_used = buffer.reserve(state.range(0), slices, NumSlices);
-    uint64_t bytes_to_commit = 0;
-    for (uint64_t i = 0; i < slices_used; i++) {
-      bytes_to_commit += static_cast<uint64_t>(slices[i].len_);
-    }
-    buffer.commit(slices, slices_used);
+    auto size = state.range(0);
+    Buffer::Reservation reservation = buffer.reserve(size);
+    reservation.commit(size);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
     }
@@ -228,14 +223,10 @@ BENCHMARK(bufferReserveCommit)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 static void bufferReserveCommitPartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
-    constexpr uint64_t NumSlices = 2;
-    Buffer::RawSlice slices[NumSlices];
-    uint64_t slices_used = buffer.reserve(state.range(0), slices, NumSlices);
-    ASSERT(slices_used > 0);
+    auto size = state.range(0);
+    Buffer::Reservation reservation = buffer.reserve(size);
     // Commit one byte from the first slice and nothing from any subsequent slice.
-    uint64_t bytes_to_commit = 1;
-    slices[0].len_ = bytes_to_commit;
-    buffer.commit(slices, 1);
+    reservation.commit(1);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
     }

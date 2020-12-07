@@ -101,20 +101,13 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::Instanc
                                        IoHandle::RecvMsgOutput& output, IoHandle& handle,
                                        const Address::Instance& local_address) {
 
-  Buffer::RawSlice slice;
-  const uint64_t num_slices = buffer->reserve(max_packet_size, &slice, 1);
-  ASSERT(num_slices == 1u);
+  Buffer::Reservation reservation = buffer->reserveSingleSlice(max_packet_size);
+  Api::IoCallUint64Result result = handle.recvmsg(reservation.slices(), reservation.numSlices(),
+                                                  local_address.ip()->port(), output);
 
-  Api::IoCallUint64Result result =
-      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
-
-  if (!result.ok()) {
-    return result;
+  if (result.ok()) {
+    reservation.commit(std::min(max_packet_size, static_cast<size_t>(result.rc_)));
   }
-
-  // Adjust memory length and commit slice to buffer
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
-  buffer->commit(&slice, 1);
 
   return result;
 }
@@ -619,16 +612,32 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   }
 
   if (handle.supportsMmsg()) {
-    const uint32_t num_packets_per_mmsg_call = 16u;
-    const uint32_t num_slices_per_packet = 1u;
-    absl::FixedArray<Buffer::InstancePtr> buffers(num_packets_per_mmsg_call);
+    const auto max_packet_size = udp_packet_processor.maxPacketSize();
+
+    // Buffer::Reservation is always passed by value, and can only be constructed
+    // by Buffer::Instance::reserve(), so this is needed to keep a fixed array
+    // in which all elements are legally constructed.
+    //
+    // TODO(ggreenway) PERF: each reservation currently has inline storage for 18 pointers (144
+    // bytes on 64-bit) because the reservation can hold several buffers. For a read of 16 packets,
+    // that is 2304 bytes. Figure out a way to make the reservation only hold 2 pointers for the
+    // `reserveSingleSlice()` case.
+    struct BufferAndReservation {
+      BufferAndReservation(uint64_t max_packet_size)
+          : buffer_(std::make_unique<Buffer::OwnedImpl>()),
+            reservation_(buffer_->reserveSingleSlice(max_packet_size, true)) {}
+
+      Buffer::InstancePtr buffer_;
+      Buffer::Reservation reservation_;
+    };
+    constexpr uint32_t num_packets_per_mmsg_call = 16u;
+    constexpr uint32_t num_slices_per_packet = 1u;
+    absl::InlinedVector<BufferAndReservation, num_packets_per_mmsg_call> buffers;
     RawSliceArrays slices(num_packets_per_mmsg_call,
                           absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
-    for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
-      buffers[i] = std::make_unique<Buffer::OwnedImpl>();
-      const uint64_t num_slices = buffers[i]->reserve(udp_packet_processor.maxPacketSize(),
-                                                      slices[i].data(), num_slices_per_packet);
-      ASSERT(num_slices == num_slices_per_packet);
+    for (uint32_t i = 0; i < num_packets_per_mmsg_call; i++) {
+      buffers.push_back(max_packet_size);
+      slices[i][0] = buffers[i].reservation_.slices()[0];
     }
 
     IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
@@ -650,11 +659,9 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
                      output.msg_[i].peer_address_->asString());
 
-      // Adjust used memory length and commit slice to buffer
-      slice->len_ = std::min(slice->len_, static_cast<size_t>(msg_len));
-      buffers[i]->commit(slice, 1);
+      buffers[i].reservation_.commit(std::min(max_packet_size, static_cast<size_t>(msg_len)));
 
-      passPayloadToProcessor(msg_len, std::move(buffers[i]), output.msg_[i].peer_address_,
+      passPayloadToProcessor(msg_len, std::move(buffers[i].buffer_), output.msg_[i].peer_address_,
                              output.msg_[i].local_address_, udp_packet_processor, receive_time);
     }
     return result;

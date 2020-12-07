@@ -587,7 +587,7 @@ public:
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
-  void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
+  // void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
   void commit(Reservation& reservation, uint64_t length) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
@@ -598,8 +598,9 @@ public:
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
+  // uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   Reservation reserve(uint64_t preferred_length) override;
+  Reservation reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;

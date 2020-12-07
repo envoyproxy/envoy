@@ -135,11 +135,10 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
       std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_valid_address);
 
   Buffer::OwnedImpl buffer;
-  Buffer::RawSlice iovec;
-  buffer.reserve(100, &iovec, 1);
+  Buffer::Reservation reservation = buffer.reserve(100);
 
-  auto result =
-      socket->ioHandle().sendmsg(&iovec, 1, 0, local_valid_address->ip(), *peer_internal_address);
+  auto result = socket->ioHandle().sendmsg(reservation.slices(), reservation.numSlices(), 0,
+                                           local_valid_address->ip(), *peer_internal_address);
   ASSERT_FALSE(result.ok());
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
 }

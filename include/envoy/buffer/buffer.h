@@ -132,16 +132,6 @@ public:
   virtual void prepend(Instance& data) PURE;
 
   /**
-   * Commit a set of slices originally obtained from reserve(). The number of slices should match
-   * the number obtained from reserve(). The size of each slice can also be altered. Commit must
-   * occur once following a reserve() without any mutating operations in between other than to the
-   * iovecs len_ fields.
-   * @param iovecs supplies the array of slices to commit.
-   * @param num_iovecs supplies the size of the slices array.
-   */
-  virtual void commit(RawSlice* iovecs, uint64_t num_iovecs) PURE;
-
-  /**
    * Copy out a section of the buffer.
    * @param start supplies the buffer index to start copying from.
    * @param size supplies the size of the output buffer.
@@ -210,11 +200,16 @@ public:
    * @param num_iovecs supplies the size of the slices array.
    * @return the number of iovecs used to reserve the space.
    */
-  virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
+  // virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
 
   virtual Reservation reserve(uint64_t preferred_length) PURE;
+  virtual Reservation reserveSingleSlice(uint64_t length, bool separate_slice = false) PURE;
+
+private:
+  friend Reservation;
   virtual void commit(Reservation& reservation, uint64_t length) PURE;
 
+public:
   /**
    * Search for an occurrence of data within the buffer.
    * @param data supplies the data to search for.
@@ -440,6 +435,7 @@ public:
     }
   }
   RawSlice* slices() { return slices_.data(); }
+  const RawSlice* slices() const { return slices_.data(); }
   uint64_t numSlices() const { return slices_.size(); }
   void commit(uint64_t length) {
     buffer_.commit(*this, length);
@@ -447,13 +443,23 @@ public:
     owned_slices_.clear();
   }
 
-  // private:
-  friend class Instance;
+  // Tuned to allow reads of 128k, using 16k slices, and including one partially-used
+  // initial slice from a previous allocation.
+  static constexpr uint32_t NUM_ELEMENTS_ = 9;
+
+private:
   Reservation(Instance& buffer) : buffer_(buffer) {}
   Instance& buffer_;
-  static constexpr uint32_t num_elements_ = 9;
-  absl::InlinedVector<RawSlice, num_elements_> slices_;
-  absl::InlinedVector<SliceDataPtr, num_elements_> owned_slices_;
+  absl::InlinedVector<RawSlice, NUM_ELEMENTS_> slices_;
+  absl::InlinedVector<SliceDataPtr, NUM_ELEMENTS_> owned_slices_;
+
+public:
+  // The following are for use only by implementations of Buffer. Because c++
+  // doesn't allow inheritance of friendship, these are just trying to make
+  // misuse easy to spot in a code review.
+  static Reservation bufferImplUseOnlyConstruct(Instance& buffer) { return Reservation(buffer); }
+  decltype(slices_)& bufferImplUseOnlySlices() { return slices_; }
+  decltype(owned_slices_)& bufferImplUseOnlyOwnedSlices() { return owned_slices_; }
 };
 
 } // namespace Buffer
