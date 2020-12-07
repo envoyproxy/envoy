@@ -893,7 +893,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
 // Test whether Rds can correctly deliver LuaPerRoute configuration.
 TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 // When the route configuration is updated dynamically via RDS and the configuration contains an
-// inline Lua code, Envoy may call luaL_newstate
+// inline Lua code, Envoy may call `luaL_newstate`
 // (https://www.lua.org/manual/5.1/manual.html#luaL_newstate) in multiple threads to create new
 // lua_State objects.
 // During lua_State creation, 'LuaJIT' uses some static local variables shared by multiple threads
