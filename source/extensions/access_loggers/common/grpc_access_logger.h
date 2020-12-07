@@ -12,6 +12,7 @@
 #include "common/common/assert.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -247,8 +248,18 @@ private:
       stats_.logs_written_.inc();
       return true;
     }
+<<<<<<< HEAD
     stats_.logs_dropped_.inc();
     return false;
+=======
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.disallow_unbounded_access_logs")) {
+      stats_.logs_dropped_.inc();
+      return false;
+    }
+    stats_.logs_written_.inc();
+    return true;
+>>>>>>> a9cbacc16 (generalizing gRPC access logger base class (GrpcAccessLoggel))
   }
 
   const std::chrono::milliseconds buffer_flush_interval_msec_;
