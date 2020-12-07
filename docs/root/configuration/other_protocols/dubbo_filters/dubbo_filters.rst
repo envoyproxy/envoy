@@ -1,9 +1,9 @@
 .. _config_dubbo_filters:
 
-Dubbo filters
-===============
+Dubbo 过滤器
+=============
 
-Envoy has the following builtin Dubbo filters.
+Envoy 有如下所示的内置 Dubbo 过滤器。
 
 .. toctree::
   :maxdepth: 2
