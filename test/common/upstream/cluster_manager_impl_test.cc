@@ -408,6 +408,7 @@ static_resources:
       eds_config:
         api_config_source:
           api_type: GRPC
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: static_cluster
