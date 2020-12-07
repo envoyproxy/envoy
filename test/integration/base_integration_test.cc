@@ -412,7 +412,7 @@ void BaseIntegrationTest::createXdsUpstream() {
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
     addFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2);
   }
-  xds_upstream_ = fake_upstreams_[1].get();
+  xds_upstream_ = fake_upstreams_.back().get();
 }
 
 void BaseIntegrationTest::createXdsConnection() {
