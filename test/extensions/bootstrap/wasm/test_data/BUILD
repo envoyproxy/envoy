@@ -13,8 +13,8 @@ wasm_rust_binary(
     name = "logging_rust.wasm",
     srcs = ["logging_rust.rs"],
     deps = [
-        "//bazel/external/cargo:log",
-        "//bazel/external/cargo:proxy_wasm",
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
     ],
 )
 
