@@ -1,7 +1,7 @@
 .. _config_overview:
 
-Overview
-========
+概览
+=====
 
 .. toctree::
   :maxdepth: 2
