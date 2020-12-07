@@ -1594,8 +1594,8 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
   upstream_request_->encodeMetadata(metadata_map_vector);
 
   // Cleanup.
-  ASSERT_TRUE(fake_upstream_connection_->close());
   response->waitForEndStream();
+  ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
