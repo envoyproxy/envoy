@@ -24,11 +24,11 @@ namespace Buffer {
  * | Unused space    | Usable content | New content can be   |
  * | that formerly   |                | added here with      |
  * | was in the Data |                | reserve()/commit()   |
- * | section         |                |                      |
+ * | section         |                | or append()          |
  * +-----------------+----------------+----------------------+
- *                   ^
- *                   |
- *                   data()
+ * ^                 ^                ^                      ^
+ * |                 |                |                      |
+ * base_             data()           base_ + reservable_    base_ + capacity_
  */
 class Slice {
 public:
@@ -297,7 +297,8 @@ protected:
     return num_pages * PageSize;
   }
 
-  /** Total number of bytes in the slice */
+  /** Length of the byte array that base_ points to. This is also the offset in bytes from the start
+   * of the slice to the end of the Reservable section. */
   uint64_t capacity_;
 
   /** Backing storage for mutable slices which own their own storage. This storage should never be
@@ -307,10 +308,11 @@ protected:
   /** Start of the slice. Points to storage_ iff the slice owns its own storage. */
   uint8_t* base_{nullptr};
 
-  /** Offset in bytes from the start of the slice to the start of the Data section */
+  /** Offset in bytes from the start of the slice to the start of the Data section. */
   uint64_t data_;
 
-  /** Offset in bytes from the start of the slice to the start of the Reservable section */
+  /** Offset in bytes from the start of the slice to the start of the Reservable section which is
+   * also the end of the Data section. */
   uint64_t reservable_;
 
   /** Hooks to execute when the slice is destroyed. */
@@ -387,11 +389,11 @@ public:
   const Slice& back() const { return ring_[internalIndex(size_ - 1)]; }
 
   Slice& operator[](size_t i) {
-    ASSERT(size_ > 0);
+    ASSERT(!empty());
     return ring_[internalIndex(i)];
   }
   const Slice& operator[](size_t i) const {
-    ASSERT(size_ > 0);
+    ASSERT(!empty());
     return ring_[internalIndex(i)];
   }
 
