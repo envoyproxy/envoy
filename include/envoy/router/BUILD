@@ -9,6 +9,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "context_interface",
+    hdrs = ["context.h"],
+)
+
+envoy_cc_library(
     name = "rds_interface",
     hdrs = ["rds.h"],
     deps = [

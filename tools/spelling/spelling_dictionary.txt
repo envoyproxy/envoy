@@ -30,6 +30,7 @@ DSR
 HEXDIG
 HEXDIGIT
 OWS
+STATNAME
 SkyWalking
 TIDs
 ceil

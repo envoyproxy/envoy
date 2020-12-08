@@ -93,7 +93,8 @@ public:
       current_upstream_log->CopyFrom(upstream_log.value());
     }
 
-    config_ = std::make_shared<FilterConfig>("prefix.", context_,
+    Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
+    config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
                                              ShadowWriterPtr(new MockShadowWriter()), router_proto);
     router_ = std::make_shared<TestFilter>(*config_);
     router_->setDecoderFilterCallbacks(callbacks_);

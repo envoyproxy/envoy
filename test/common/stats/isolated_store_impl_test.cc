@@ -205,21 +205,23 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
 /**
  * Test stats macros. @see stats_macros.h
  */
-#define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT)                                    \
+#define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                          \
   COUNTER(test_counter)                                                                            \
   GAUGE(test_gauge, Accumulate)                                                                    \
   HISTOGRAM(test_histogram, Microseconds)                                                          \
-  TEXT_READOUT(test_text_readout)
+  TEXT_READOUT(test_text_readout)                                                                  \
+  STATNAME(prefix)
 
 struct TestStats {
   ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,
-                 GENERATE_TEXT_READOUT_STRUCT)
+                 GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)
 };
 
 TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
-  TestStats test_stats{ALL_TEST_STATS(
-      POOL_COUNTER_PREFIX(*store_, "test."), POOL_GAUGE_PREFIX(*store_, "test."),
-      POOL_HISTOGRAM_PREFIX(*store_, "test."), POOL_TEXT_READOUT_PREFIX(*store_, "test."))};
+  TestStats test_stats{
+      ALL_TEST_STATS(POOL_COUNTER_PREFIX(*store_, "test."), POOL_GAUGE_PREFIX(*store_, "test."),
+                     POOL_HISTOGRAM_PREFIX(*store_, "test."),
+                     POOL_TEXT_READOUT_PREFIX(*store_, "test."), GENERATE_STATNAME_STRUCT)};
 
   Counter& counter = test_stats.test_counter_;
   EXPECT_EQ("test.test_counter", counter.name());
@@ -242,6 +244,25 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullGaugeImpl& g = store_->nullGauge("");
   g.inc();
   EXPECT_EQ(0, g.value());
+}
+
+TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
+  MAKE_STAT_NAMES_STRUCT(StatNames, ALL_TEST_STATS);
+  StatNames stat_names(store_->symbolTable());
+  EXPECT_EQ("prefix", store_->symbolTable().toString(stat_names.prefix_));
+  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopePtr scope2 = store_->createScope("scope2.");
+  MAKE_STATS_STRUCT(Stats, StatNames, ALL_TEST_STATS);
+  Stats stats1(stat_names, *scope1);
+  EXPECT_EQ("scope1.test_counter", stats1.test_counter_.name());
+  EXPECT_EQ("scope1.test_gauge", stats1.test_gauge_.name());
+  EXPECT_EQ("scope1.test_histogram", stats1.test_histogram_.name());
+  EXPECT_EQ("scope1.test_text_readout", stats1.test_text_readout_.name());
+  Stats stats2(stat_names, *scope2, stat_names.prefix_);
+  EXPECT_EQ("scope2.prefix.test_counter", stats2.test_counter_.name());
+  EXPECT_EQ("scope2.prefix.test_gauge", stats2.test_gauge_.name());
+  EXPECT_EQ("scope2.prefix.test_histogram", stats2.test_histogram_.name());
+  EXPECT_EQ("scope2.prefix.test_text_readout", stats2.test_text_readout_.name());
 }
 
 } // namespace Stats
