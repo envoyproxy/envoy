@@ -41,10 +41,8 @@ namespace Upstream {
 
 class CdsSpeedTest {
 public:
-  CdsSpeedTest(State& state, bool v2_config)
-      : state_(state), v2_config_(v2_config),
-        type_url_(v2_config_ ? "type.googleapis.com/envoy.api.v2.Cluster"
-                             : "type.googleapis.com/envoy.config.cluster.v3.Cluster"),
+  CdsSpeedTest(State& state)
+      : state_(state), type_url_("type.googleapis.com/envoy.config.cluster.v3.Cluster"),
         subscription_stats_(Config::Utility::generateStats(stats_)),
         api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
         grpc_mux_(new Config::GrpcMuxImpl(
@@ -90,11 +88,8 @@ public:
 
       auto* resource = response->mutable_resources()->Add();
       resource->PackFrom(cluster);
-      if (v2_config_) {
-        RELEASE_ASSERT(
-            resource->type_url() == "type.googleapis.com/envoy.config.cluster.v3.Cluster", "");
-        resource->set_type_url("type.googleapis.com/envoy.api.v2.Cluster");
-      }
+      RELEASE_ASSERT(resource->type_url() == "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+                     "");
     }
 
     validation_visitor_.setSkipValidation(ignore_unknown_dynamic_fields);
@@ -107,7 +102,6 @@ public:
 
   TestDeprecatedV2Api _deprecated_v2_api_;
   State& state_;
-  const bool v2_config_;
   const std::string type_url_;
   uint64_t version_{};
   bool initialized_{};
@@ -138,8 +132,8 @@ public:
 } // namespace Upstream
 } // namespace Envoy
 
-static void addV3Clusters(State& state) {
-  Envoy::Upstream::CdsSpeedTest speed_test(state, false);
+static void addClusters(State& state) {
+  Envoy::Upstream::CdsSpeedTest speed_test(state);
   // if we've been instructed to skip tests, only run once no matter the argument:
   const uint32_t num_clusters = skipExpensiveBenchmarks() ? 1 : state.range(1);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
@@ -150,30 +144,14 @@ static void addV3Clusters(State& state) {
   }
 }
 
-BENCHMARK(addV3Clusters)
-    ->Ranges({{false, true}, {64, 100000}})
-    ->Unit(benchmark::kMillisecond)
-    ->Complexity();
-
-static void addV2Clusters(State& state) {
-  // this true is the only difference from addV3clusters above
-  Envoy::Upstream::CdsSpeedTest speed_test(state, true);
-  const uint32_t num_clusters = skipExpensiveBenchmarks() ? 1 : state.range(1);
-  for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
-    state.PauseTiming();
-    speed_test.clusterHelper(state.range(0), num_clusters);
-    state.ResumeTiming();
-  }
-}
-
-BENCHMARK(addV2Clusters)
+BENCHMARK(addClusters)
     ->Ranges({{false, true}, {64, 100000}})
     ->Unit(benchmark::kMillisecond)
     ->Complexity();
 
 // Look for suboptimal behavior when receiving two identical updates
 static void duplicateUpdate(State& state) {
-  Envoy::Upstream::CdsSpeedTest speed_test(state, false);
+  Envoy::Upstream::CdsSpeedTest speed_test(state);
   const uint32_t num_clusters = skipExpensiveBenchmarks() ? 1 : state.range(0);
   for (auto _ : state) { // NOLINT(clang-analyzer-deadcode.DeadStores)
     state.PauseTiming();
