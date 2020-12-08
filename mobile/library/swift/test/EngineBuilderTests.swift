@@ -28,12 +28,12 @@ final class EngineBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
-    MockEnvoyEngine.onRunWithYAML = nil
+    MockEnvoyEngine.onRunWithTemplate = nil
   }
 
-  func testCustomConfigYAMLUsesSpecifiedYAMLWhenRunningEnvoy() throws {
+  func testCustomConfigTemplateUsesSpecifiedYAMLWhenRunningEnvoy() throws {
     let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRunWithYAML = { yaml, _ in
+    MockEnvoyEngine.onRunWithTemplate = { yaml, _, _ in
       XCTAssertEqual("foobar", yaml)
       expectation.fulfill()
     }
