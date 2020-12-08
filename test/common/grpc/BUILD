@@ -148,6 +148,7 @@ envoy_cc_test_library(
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
         "//source/common/http/http2:conn_pool_lib",
+        "//source/common/router:context_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
