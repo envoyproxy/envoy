@@ -34,7 +34,8 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   // If an old TLS stack does not negotiate alpn, it likely does not support
   // HTTP/2. Fail over to HTTP/1.
   protocol_ = Protocol::Http11;
-  auto tcp_client = static_cast<Tcp::ActiveTcpClient*>(&client);
+  auto tcp_client = dynamic_cast<Tcp::ActiveTcpClient*>(&client);
+  ASSERT(tcp_client != nullptr);
   std::string alpn = tcp_client->connection_->nextProtocol();
   if (!alpn.empty()) {
     if (alpn == Http::Utility::AlpnNames::get().Http11) {

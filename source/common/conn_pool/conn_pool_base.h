@@ -215,12 +215,13 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void incrConnectingStreamCapacity(int32_t delta) {
+  void incrConnectingStreamCapacity(uint32_t delta) {
     state_.incrConnectingStreamCapacity(delta);
     connecting_stream_capacity_ += delta;
   }
-  void decrConnectingStreamCapacity(int32_t delta) {
+  void decrConnectingStreamCapacity(uint32_t delta) {
     state_.decrConnectingStreamCapacity(delta);
+    ASSERT(connecting_stream_capacity_ > delta);
     connecting_stream_capacity_ -= delta;
   }
 

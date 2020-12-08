@@ -711,7 +711,7 @@ public:
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
-    // If HTTP2 is true, the upstream protocol will be negotiated using ALPN.
+    // If USE_ALPN and HTTP2 are true, the upstream protocol will be negotiated using ALPN.
     // If ALPN is attempted but not supported by the upstream (non-TLS or simply not
     // negotiated) HTTP/1.1 is used.
     static const uint64_t USE_ALPN = 0x8;

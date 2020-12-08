@@ -949,8 +949,8 @@ ClusterImplBase::ClusterImplBase(
   if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
       !raw_factory_pointer->supportsAlpn()) {
     throw EnvoyException(
-        fmt::format("ALPN configured for a cluster which has a non-ALPN transport socket: {}",
-                    cluster.DebugString()));
+        fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
+                    cluster.name(), cluster.DebugString()));
   }
 
   // Create the default (empty) priority set before registering callbacks to
