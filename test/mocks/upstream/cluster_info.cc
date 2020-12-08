@@ -39,7 +39,8 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
-      stats_(ClusterInfoImpl::generateStats(stats_store_)),
+      stat_names_(stats_store_.symbolTable()),
+      stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       request_response_size_stats_(std::make_unique<ClusterRequestResponseSizeStats>(
