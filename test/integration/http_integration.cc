@@ -385,31 +385,40 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
   EXPECT_EQ(response->body(), expected_body);
 }
 
+absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
+    const std::vector<uint64_t>& upstream_indices,
+    std::chrono::milliseconds connection_wait_timeout,
+    FakeHttpConnectionPtr& fake_upstream_connection) {
+  AssertionResult result = AssertionFailure();
+  int upstream_index = 0;
+  Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
+  // Loop over the upstreams until the call times out or an upstream request is received.
+  while (!result) {
+    upstream_index = upstream_index % upstream_indices.size();
+    result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
+        *dispatcher_, fake_upstream_connection, std::chrono::milliseconds(5),
+        max_request_headers_kb_, max_request_headers_count_);
+    if (result) {
+      return upstream_index;
+      break;
+    } else if (!bound.withinBound()) {
+      result = (AssertionFailure() << "Timed out waiting for new connection.");
+      break;
+    }
+    ++upstream_index;
+  }
+  RELEASE_ASSERT(result, result.message());
+  return {};
+}
+
 absl::optional<uint64_t>
 HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices,
                                                 std::chrono::milliseconds connection_wait_timeout) {
   absl::optional<uint64_t> upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    AssertionResult result = AssertionFailure();
-    int upstream_index = 0;
-    Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
-    // Loop over the upstreams until the call times out or an upstream request is received.
-    while (!result) {
-      upstream_index = upstream_index % upstream_indices.size();
-      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
-          *dispatcher_, fake_upstream_connection_, std::chrono::milliseconds(5),
-          max_request_headers_kb_, max_request_headers_count_);
-      if (result) {
-        upstream_with_request = upstream_index;
-        break;
-      } else if (!bound.withinBound()) {
-        result = (AssertionFailure() << "Timed out waiting for new connection.");
-        break;
-      }
-      ++upstream_index;
-    }
-    RELEASE_ASSERT(result, result.message());
+    waitForNextUpstreamConnection(upstream_indices, connection_wait_timeout,
+                                  fake_upstream_connection_);
   }
   // Wait for the next stream on the upstream connection.
   AssertionResult result =
