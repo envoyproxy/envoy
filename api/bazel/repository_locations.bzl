@@ -97,7 +97,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "ebea8a6968722524d1bcc4426fb6a29907ddc2902aac7de1559012d3eee90cf9",
         strip_prefix = "skywalking-data-collect-protocol-{version}",
         urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v{version}.tar.gz"],
-        release_date = "2020-07-29",
+        release_date = "2020-07-31",
         use_category = ["api"],
     ),
 )
