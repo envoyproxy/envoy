@@ -104,6 +104,7 @@ public:
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
+  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
@@ -169,6 +170,7 @@ public:
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
+  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
