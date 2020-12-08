@@ -70,6 +70,7 @@ public:
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
+  const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -83,6 +84,8 @@ public:
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
+  Stats::TestSymbolTable symbol_table_;
+  ClusterStatNames cluster_stat_names_;
 };
 } // namespace Upstream
 
