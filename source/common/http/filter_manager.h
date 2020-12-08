@@ -56,11 +56,12 @@ private:
 
 using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
 
+template <class HeaderType>
 class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
 public:
   explicit HttpHeadersDataInputBase(const std::string& name) : name_(name) {}
 
-  virtual absl::optional<std::reference_wrapper<const HeaderMap>>
+  virtual absl::optional<std::reference_wrapper<const HeaderType>>
   headerMap(const HttpMatchingData& data) const PURE;
 
   Matcher::DataInputGetResult get(const HttpMatchingData& data) override {
@@ -91,21 +92,21 @@ private:
   absl::optional<HeaderUtility::GetAllOfHeaderAsStringResult> header_as_string_result_;
 };
 
-class HttpRequestHeadersDataInput : public HttpHeadersDataInputBase {
+class HttpRequestHeadersDataInput : public HttpHeadersDataInputBase<RequestHeaderMap> {
 public:
   explicit HttpRequestHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const HeaderMap>>
+  absl::optional<std::reference_wrapper<const RequestHeaderMap>>
   headerMap(const HttpMatchingData& data) const override {
     return data.requestHeaders();
   }
 };
 
-class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase {
+class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const HeaderMap>>
+  absl::optional<std::reference_wrapper<const ResponseHeaderMap>>
   headerMap(const HttpMatchingData& data) const override {
     return data.responseHeaders();
   }
