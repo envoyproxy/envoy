@@ -1295,8 +1295,9 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
   if (nullptr == filter_manager_.streamInfo().route_entry_) {
     cached_cluster_info_ = nullptr;
   } else {
-    Upstream::ThreadLocalCluster* local_cluster = connection_manager_.cluster_manager_.get(
-        filter_manager_.streamInfo().route_entry_->clusterName());
+    Upstream::ThreadLocalCluster* local_cluster =
+        connection_manager_.cluster_manager_.getThreadLocalCluster(
+            filter_manager_.streamInfo().route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 

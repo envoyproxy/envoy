@@ -6,14 +6,12 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -62,26 +60,11 @@ enum class CheckStatus {
 };
 
 /**
- * Possible error kind for Error status..
- */
-enum class ErrorKind {
-  // Other error.
-  Other,
-  // The request timed out. This will only be set if the timeout is measure when the check request
-  // was created.
-  Timedout,
-};
-
-/**
  * Authorization response object for a RequestCallback.
  */
 struct Response {
   // Call status.
   CheckStatus status;
-
-  // In case status is Error, this will contain the kind of error that occurred.
-  ErrorKind error_kind{ErrorKind::Other};
-
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
   Http::HeaderVector headers_to_append;
@@ -134,23 +117,13 @@ public:
    * passed request parameters to make a permit/deny decision.
    * @param callback supplies the completion callbacks.
    *        NOTE: The callback may happen within the calling stack.
-   * @param dispatcher is the dispatcher of the current thread.
    * @param request is the proto message with the attributes of the specific payload.
    * @param parent_span source for generating an egress child span as part of the trace.
    * @param stream_info supplies the client's stream info.
    */
-  virtual void check(RequestCallbacks& callback, Event::Dispatcher& dispatcher,
+  virtual void check(RequestCallbacks& callback,
                      const envoy::service::auth::v3::CheckRequest& request,
                      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
-
-protected:
-  /**
-   * @return should we start the request time out when the check request is created.
-   */
-  static bool timeoutStartsAtCheckCreation() {
-    return Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created");
-  }
 };
 
 using ClientPtr = std::unique_ptr<Client>;

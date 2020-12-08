@@ -487,8 +487,12 @@ typed_config:
 TEST_P(Http2FloodMitigationTest, Metadata) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1139,9 +1143,13 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_http2_protocol_options()
+
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
         ->mutable_max_consecutive_inbound_frames_with_empty_payload()
         ->set_value(0);
+    ConfigHelper::setProtocolOptions(*cluster, protocol_options);
   });
   if (!initializeUpstreamFloodTest()) {
     return;
@@ -1194,10 +1202,13 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_http2_protocol_options()
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
         ->mutable_override_stream_error_on_invalid_http_message()
         ->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   if (!initializeUpstreamFloodTest()) {
     return;
@@ -1238,6 +1249,60 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               HasSubstr("upstream_reset_before_response_started"));
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("LR"));
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // Send client request which will send an upstream request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Start the response with a 200 status.
+  auto* upstream = fake_upstreams_.front().get();
+  Http2Frame buf = Http2Frame::makeHeadersFrameWithStatus("200", Http2Frame::makeClientStreamId(0),
+                                                          Http2Frame::HeadersFlags::EndHeaders);
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Send empty data frames.
+  for (int i = 0; i < 2; i++) {
+    buf = Http2Frame::makeEmptyDataFrame(Http2Frame::makeClientStreamId(0));
+    ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForReset();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  auto* upstream = fake_upstreams_.front().get();
+  Http2Frame buf = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  for (int i = 0; i < 2; i++) {
+    buf = Http2Frame::makeEmptyContinuationFrame(Http2Frame::makeClientStreamId(0));
+    ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
 
 } // namespace Envoy

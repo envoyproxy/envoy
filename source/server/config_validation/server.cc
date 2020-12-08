@@ -88,7 +88,7 @@ void ValidationInstance::initialize(const Options& options,
       bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),
       options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap);
+  Configuration::InitialImpl initial_config(bootstrap, options);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_);

@@ -90,7 +90,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
-      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80", time_system)};
   Http::CodecClientProd client(
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
@@ -170,7 +170,10 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_->addConnectionCallbacks(*callbacks_);
   client_->addReadFilter(
       Network::ReadFilterSharedPtr{new ForwardingFilter(*this, response_data_callback)});
-  client_->addBytesSentCallback([&](uint64_t bytes) { remaining_bytes_to_send_ -= bytes; });
+  client_->addBytesSentCallback([&](uint64_t bytes) {
+    remaining_bytes_to_send_ -= bytes;
+    return true;
+  });
   client_->connect();
 }
 

@@ -41,6 +41,7 @@ dynamic_resources:
     resource_api_version: V3
     api_config_source:
       api_type: GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
@@ -48,7 +49,11 @@ dynamic_resources:
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_cds_cluster
       endpoints:
@@ -61,7 +66,6 @@ static_resources:
   - name: aggregate_cluster
     connect_timeout: 0.25s
     lb_policy: CLUSTER_PROVIDED
-    protocol_selection: USE_DOWNSTREAM_PROTOCOL # this should be ignored, as cluster_1 and cluster_2 specify HTTP/2.
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
