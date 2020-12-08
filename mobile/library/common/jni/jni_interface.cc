@@ -538,9 +538,6 @@ jvm_http_filter_on_resume_response(envoy_headers* headers, envoy_data* data,
                                    context);
 }
 
-static void ios_http_filter_set_request_callbacks(envoy_http_filter_callbacks callbacks,
-                                                  const void* context) {}
-
 static void* jvm_on_error(envoy_error error, void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_error");
   JNIEnv* env = get_env();
