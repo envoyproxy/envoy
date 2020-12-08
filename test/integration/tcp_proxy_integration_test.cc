@@ -141,7 +141,7 @@ TEST_P(TcpProxyIntegrationTest, NoUpstream) {
     lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
   });
   config_helper_.skipPortUsageValidation();
-  enable_half_close_ = false;
+  enableHalfClose(false);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -384,7 +384,7 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   autonomous_upstream_ = true;
 
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -408,7 +408,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   config_helper_.setBufferLimits(1024, 1024);
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -441,7 +441,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithNoData) {
   autonomous_upstream_ = true;
 
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -466,7 +466,7 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithNoData) {
 
 TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithLargeOutstandingData) {
   config_helper_.setBufferLimits(1024, 1024);
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
