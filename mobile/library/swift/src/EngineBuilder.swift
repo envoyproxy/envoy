@@ -191,12 +191,7 @@ public final class EngineBuilder: NSObject {
   /// - returns: A new instance of Envoy.
   public func build() throws -> Engine {
     let engine = self.engineType.init()
-    switch self.base {
-    case .custom(let yaml):
-      return EngineImpl(configYAML: yaml, logLevel: self.logLevel, engine: engine,
-                        onEngineRunning: self.onEngineRunning)
-    case .standard:
-      let config = EnvoyConfiguration(
+    let config = EnvoyConfiguration(
         statsDomain: self.statsDomain,
         connectTimeoutSeconds: self.connectTimeoutSeconds,
         dnsRefreshSeconds: self.dnsRefreshSeconds,
@@ -208,6 +203,12 @@ public final class EngineBuilder: NSObject {
         virtualClusters: self.virtualClusters,
         nativeFilterChain: self.nativeFilterChain,
         platformFilterChain: self.platformFilterChain)
+
+    switch self.base {
+    case .custom(let yaml):
+      return EngineImpl(yaml: yaml, config: config, logLevel: self.logLevel, engine: engine,
+                        onEngineRunning: self.onEngineRunning)
+    case .standard:
       return EngineImpl(config: config, logLevel: self.logLevel, engine: engine,
                         onEngineRunning: self.onEngineRunning)
     }
