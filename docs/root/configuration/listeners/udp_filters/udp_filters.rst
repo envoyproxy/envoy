@@ -1,9 +1,9 @@
 .. _config_udp_listener_filters:
 
-UDP listener filters
+UDP 监听器过滤器
 ====================
 
-Envoy has the following builtin UDP listener filters.
+Envoy 有以下内置的 UDP 监听器过滤器。
 
 .. toctree::
   :maxdepth: 2
