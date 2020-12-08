@@ -23,7 +23,7 @@ void OwnedImpl::addImpl(const void* data, uint64_t size) {
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplaceBack(size);
+      slices_.emplace_back(size);
     }
     uint64_t copy_size = slices_.back().append(src, size);
     src += copy_size;
@@ -42,7 +42,7 @@ void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   length_ += fragment.size();
-  slices_.emplaceBack(fragment);
+  slices_.emplace_back(fragment);
 }
 
 void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
@@ -59,7 +59,7 @@ void OwnedImpl::prepend(absl::string_view data) {
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplaceFront(size);
+      slices_.emplace_front(size);
     }
     uint64_t copy_size = slices_.front().prepend(data.data(), size);
     size -= copy_size;
@@ -74,8 +74,8 @@ void OwnedImpl::prepend(Instance& data) {
   while (!other.slices_.empty()) {
     uint64_t slice_size = other.slices_.back().dataSize();
     length_ += slice_size;
-    slices_.emplaceFront(std::move(other.slices_.back()));
-    other.slices_.popBack();
+    slices_.emplace_front(std::move(other.slices_.back()));
+    other.slices_.pop_back();
     other.length_ -= slice_size;
   }
   other.postProcess();
@@ -116,7 +116,7 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
 
   // In case an extra slice was reserved, remove empty slices from the end of the buffer.
   while (!slices_.empty() && slices_.back().dataSize() == 0) {
-    slices_.popBack();
+    slices_.pop_back();
   }
 
   ASSERT(num_slices_committed > 0);
@@ -157,7 +157,7 @@ void OwnedImpl::drainImpl(uint64_t size) {
     }
     uint64_t slice_size = slices_.front().dataSize();
     if (slice_size <= size) {
-      slices_.popFront();
+      slices_.pop_front();
       length_ -= slice_size;
       size -= slice_size;
     } else {
@@ -169,7 +169,7 @@ void OwnedImpl::drainImpl(uint64_t size) {
   // Make sure to drain any zero byte fragments that might have been added as
   // sentinels for flushed data.
   while (!slices_.empty() && slices_.front().dataSize() == 0) {
-    slices_.popFront();
+    slices_.pop_front();
   }
 }
 
@@ -218,13 +218,13 @@ SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   // Remove zero byte fragments from the front of the queue to ensure
   // that the extracted slice has data.
   while (!slices_.empty() && slices_.front().dataSize() == 0) {
-    slices_.popFront();
+    slices_.pop_front();
   }
   ASSERT(!slices_.empty());
   auto slice = std::move(slices_.front());
   auto size = slice.dataSize();
   length_ -= size;
-  slices_.popFront();
+  slices_.pop_front();
   if (!slice.isMutable()) {
     // Create a mutable copy of the immutable slice data.
     Slice mutable_slice{size};
@@ -271,7 +271,7 @@ void* OwnedImpl::linearize(uint32_t size) {
     // drained bytes, avoid use of the overridable 'drain' method to avoid incorrectly checking if
     // we dipped below low-watermark.
     drainImpl(size);
-    slices_.emplaceFront(std::move(new_slice));
+    slices_.emplace_front(std::move(new_slice));
     length_ += size;
   }
   return slices_.front().data();
@@ -293,7 +293,7 @@ void OwnedImpl::coalesceOrAddSlice(Slice&& other_slice) {
     other_slice.transferDrainTrackersTo(slices_.back());
   } else {
     // Take ownership of the slice.
-    slices_.emplaceBack(std::move(other_slice));
+    slices_.emplace_back(std::move(other_slice));
     length_ += slice_size;
   }
 }
@@ -308,7 +308,7 @@ void OwnedImpl::move(Instance& rhs) {
     const uint64_t slice_size = other.slices_.front().dataSize();
     coalesceOrAddSlice(std::move(other.slices_.front()));
     other.length_ -= slice_size;
-    other.slices_.popFront();
+    other.slices_.pop_front();
   }
   other.postProcess();
 }
@@ -321,7 +321,7 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
     const uint64_t slice_size = other.slices_.front().dataSize();
     const uint64_t copy_size = std::min(slice_size, length);
     if (copy_size == 0) {
-      other.slices_.popFront();
+      other.slices_.pop_front();
     } else if (copy_size < slice_size) {
       // TODO(brian-pane) add reference-counting to allow slices to share their storage
       // and eliminate the copy for this partial-slice case?
@@ -330,7 +330,7 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
       other.length_ -= copy_size;
     } else {
       coalesceOrAddSlice(std::move(other.slices_.front()));
-      other.slices_.popFront();
+      other.slices_.pop_front();
       other.length_ -= slice_size;
     }
     length -= copy_size;
@@ -378,7 +378,7 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
 
   // If needed, allocate one more slice at the end to provide the remainder of the reservation.
   if (bytes_remaining != 0) {
-    slices_.emplaceBack(bytes_remaining);
+    slices_.emplace_back(bytes_remaining);
     iovecs[num_slices_used] = slices_.back().reserve(bytes_remaining);
     bytes_remaining -= iovecs[num_slices_used].len_;
     num_slices_used++;
@@ -530,7 +530,7 @@ std::string OwnedImpl::toString() const {
 void OwnedImpl::postProcess() {}
 
 void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
-  slices_.emplaceBack(size);
+  slices_.emplace_back(size);
   slices_.back().append(data, size);
   length_ += size;
 }

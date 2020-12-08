@@ -333,7 +333,7 @@ TEST(SliceDequeTest, CreateDelete) {
 
     // Append a view to the deque.
     const std::string slice1 = "slice1";
-    slices.emplaceBack(
+    slices.emplace_back(
         *OwnedBufferFragmentImpl::create(slice1, [&slice1_deleted](
                                                      const OwnedBufferFragmentImpl* fragment) {
            slice1_deleted = true;
@@ -346,7 +346,7 @@ TEST(SliceDequeTest, CreateDelete) {
 
     // Append another view to the deque, and verify that both views are accessible.
     const std::string slice2 = "slice2";
-    slices.emplaceBack(
+    slices.emplace_back(
         *OwnedBufferFragmentImpl::create(slice2, [&slice2_deleted](
                                                      const OwnedBufferFragmentImpl* fragment) {
            slice2_deleted = true;
@@ -361,7 +361,7 @@ TEST(SliceDequeTest, CreateDelete) {
 
     // Prepend a view to the deque, to exercise the ring buffer wraparound case.
     const std::string slice3 = "slice3";
-    slices.emplaceFront(
+    slices.emplace_front(
         *OwnedBufferFragmentImpl::create(slice3, [&slice3_deleted](
                                                      const OwnedBufferFragmentImpl* fragment) {
            slice3_deleted = true;
@@ -376,7 +376,7 @@ TEST(SliceDequeTest, CreateDelete) {
     EXPECT_TRUE(sliceMatches(slices.back(), slice2));
 
     // Remove the first view from the deque, and verify that its slice is deleted.
-    slices.popFront();
+    slices.pop_front();
     EXPECT_FALSE(slices.empty());
     ASSERT_EQ(2, slices.size());
     EXPECT_FALSE(slice1_deleted);

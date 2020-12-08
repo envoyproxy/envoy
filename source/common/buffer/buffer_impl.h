@@ -45,8 +45,8 @@ public:
    * up to the next multiple of 4kb.
    */
   Slice(uint64_t min_capacity)
-      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]),
-        base_(storage_.get()) {}
+      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]), base_(storage_.get()),
+        data_(0), reservable_(0) {}
 
   /**
    * Create an immutable Slice that refers to an external buffer fragment.
@@ -54,7 +54,7 @@ public:
    */
   Slice(BufferFragment& fragment)
       : capacity_(fragment.size()), storage_(nullptr),
-        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
+        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))), data_(0),
         reservable_(fragment.size()) {
     addDrainTracker([&fragment]() { fragment.done(); });
   }
@@ -298,7 +298,7 @@ protected:
   }
 
   /** Total number of bytes in the slice */
-  uint64_t capacity_ = 0;
+  uint64_t capacity_;
 
   /** Backing storage for mutable slices which own their own storage. This storage should never be
    * accessed directly; access base_ instead. */
@@ -308,10 +308,10 @@ protected:
   uint8_t* base_{nullptr};
 
   /** Offset in bytes from the start of the slice to the start of the Data section */
-  uint64_t data_ = 0;
+  uint64_t data_;
 
   /** Offset in bytes from the start of the slice to the start of the Reservable section */
-  uint64_t reservable_ = 0;
+  uint64_t reservable_;
 
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
@@ -364,14 +364,14 @@ public:
     return *this;
   }
 
-  void emplaceBack(Slice&& slice) {
+  void emplace_back(Slice&& slice) { // NOLINT(readability-identifier-naming)
     growRing();
     size_t index = internalIndex(size_);
     ring_[index] = std::move(slice);
     size_++;
   }
 
-  void emplaceFront(Slice&& slice) {
+  void emplace_front(Slice&& slice) { // NOLINT(readability-identifier-naming)
     growRing();
     start_ = (start_ == 0) ? capacity_ - 1 : start_ - 1;
     ring_[start_] = std::move(slice);
@@ -395,7 +395,7 @@ public:
     return ring_[internalIndex(i)];
   }
 
-  void popFront() {
+  void pop_front() { // NOLINT(readability-identifier-naming)
     if (size() == 0) {
       return;
     }
@@ -407,7 +407,7 @@ public:
     }
   }
 
-  void popBack() {
+  void pop_back() { // NOLINT(readability-identifier-naming)
     if (size() == 0) {
       return;
     }
