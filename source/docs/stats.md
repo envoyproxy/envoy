@@ -184,7 +184,14 @@ showing the memory layout for a few scenarios of constructing and joining symbol
 
 There are several ways to create hot-path contention looking up stats by name,
 and there is no bulletproof way to prevent it from occurring.
- * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests.
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
+   scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
+   in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path,
+   so that we do not need to take symbol-table locks on worker threads. As an example, see
+   [ClusterInfoImpl::generateStats](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/upstream_impl.cc)
+   and its
+   [MAKE_STAT_NAMES_STRUCT](https://github.com/envoyproxy/envoy/blob/master/include/envoy/upstream/usptream.h)
+   invocation.
  * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
    made in the hot path.
 
