@@ -126,18 +126,6 @@ TEST(SubstitutionFormatterTest, plainStringFormatter) {
               ProtoEq(ValueUtil::stringValue("plain")));
 }
 
-TEST(SubstitutionFormatterTest, plainStringFormatterImpl) {
-  PlainStringFormatterImpl formatter("plain");
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  StreamInfo::MockStreamInfo stream_info;
-  std::string body;
-
-  EXPECT_EQ("plain", formatter.format(request_headers, response_headers, response_trailers,
-                                      stream_info, body));
-}
-
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
 

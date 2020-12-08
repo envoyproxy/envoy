@@ -130,18 +130,6 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
   return log_line;
 }
 
-PlainStringFormatterImpl::PlainStringFormatterImpl(const std::string& str) {
-  str_.set_string_value(str);
-}
-
-std::string PlainStringFormatterImpl::format(const Http::RequestHeaderMap&,
-                                             const Http::ResponseHeaderMap&,
-                                             const Http::ResponseTrailerMap&,
-                                             const StreamInfo::StreamInfo&,
-                                             absl::string_view) const {
-  return str_.string_value();
-}
-
 std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_headers,
                                       const Http::ResponseHeaderMap& response_headers,
                                       const Http::ResponseTrailerMap& response_trailers,

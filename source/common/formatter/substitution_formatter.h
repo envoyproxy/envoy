@@ -146,25 +146,6 @@ private:
 };
 
 /**
- * Formatter for string literals. It ignores headers and stream info and returns string by
- * which it was initialized. Similar to PlainStringFormatter but for the Formatter interface.
- */
-class PlainStringFormatterImpl : public Formatter {
-public:
-  PlainStringFormatterImpl(const std::string& str);
-
-  // Formatter::format
-  std::string format(const Http::RequestHeaderMap& request_headers,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const Http::ResponseTrailerMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info,
-                     absl::string_view local_reply_body) const override;
-
-private:
-  ProtobufWkt::Value str_;
-};
-
-/**
  * FormatterProvider for string literals. It ignores headers and stream info and returns string by
  * which it was initialized.
  */

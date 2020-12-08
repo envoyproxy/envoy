@@ -90,18 +90,6 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigTextSource) {
                               body_));
 }
 
-TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFixedText) {
-  const std::string yaml = R"EOF(
-  fixed_text: "plain text that does not expand command operators e.g. code=%RESPONSE_CODE%"
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
-  EXPECT_EQ("plain text that does not expand command operators e.g. code=%RESPONSE_CODE%",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_));
-}
-
 TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   const std::vector<std::string> invalid_configs = {
       R"(

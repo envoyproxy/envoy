@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message SubstitutionFormatString {
   oneof format {
     option (validate.required) = true;
@@ -39,7 +39,8 @@ message SubstitutionFormatString {
     //
     //   upstream connect error:503:path=/foo
     //
-    string text_format = 1 [(validate.rules).string = {min_len: 1}];
+    // Deprecated in favor of `text_format_source.inline_string`
+    string text_format = 1 [deprecated = true];
 
     // Specify a format with command operators to form a JSON string.
     // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
@@ -65,11 +66,24 @@ message SubstitutionFormatString {
     //
     google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
 
-    // Specify a format with command operators, similar to text_format, but from a DataSource.
+    // Specify a format with command operators to form a text string.
+    // Its details is described in :ref:`format string<config_access_log_format_strings>`.
+    //
+    // For example, setting ``text_format`` like below,
+    //
+    // .. validated-code-block:: yaml
+    //   :type-name: envoy.config.core.v3.SubstitutionFormatString
+    //
+    //   text_format_source:
+    //     inline_string: "%LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=%REQ(:path)%\n"
+    //
+    // generates plain text similar to:
+    //
+    // .. code-block:: text
+    //
+    //   upstream connect error:503:path=/foo
+    //
     DataSource text_format_source = 5;
-
-    // Specify fixed text with no command operators.
-    string fixed_text = 6;
   }
 
   // If set to true, when command operators are evaluated to null,

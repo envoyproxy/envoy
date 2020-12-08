@@ -168,6 +168,24 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
           comparison:
             op: EQ
             value:
+              default_value: 403
+              runtime_key: key_b
+      body:
+        inline_string: ""
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
+              default_value: 404
+              runtime_key: key_b
+      body_format_override:
+        text_format: ""
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
               default_value: 410
               runtime_key: key_b
       body:
@@ -200,7 +218,27 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   EXPECT_EQ(body_, "400 body text");
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=410 matches the second filter; rewrite body only
+  // code=403 matches the second filter; does not rewrite code, sets an empty body and content_type.
+  resetData(403);
+  body_ = "original body text";
+  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, static_cast<Http::Code>(403));
+  EXPECT_EQ(stream_info_.response_code_, 403U);
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "403");
+  EXPECT_EQ(body_, "");
+  EXPECT_EQ(content_type_, "text/plain");
+
+  // code=404 matches the third filter; does not rewrite code, sets an empty body and content_type.
+  resetData(404);
+  body_ = "original body text";
+  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, static_cast<Http::Code>(404));
+  EXPECT_EQ(stream_info_.response_code_, 404U);
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "404");
+  EXPECT_EQ(body_, "");
+  EXPECT_EQ(content_type_, "text/plain");
+
+  // code=410 matches the fourth filter; rewrite body only
   resetData(410);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(410));
@@ -209,7 +247,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   EXPECT_EQ(body_, "410 body text");
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=420 matches the third filter; rewrite code only
+  // code=420 matches the fifth filter; rewrite code only
   resetData(420);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
@@ -218,7 +256,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   EXPECT_EQ(body_, TestInitBody);
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=430 matches the fourth filter; rewrite nothing
+  // code=430 matches the sixth filter; rewrite nothing
   resetData(430);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(430));
