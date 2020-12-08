@@ -139,7 +139,7 @@ public:
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
-  MockBufferFactory buffer_factory_;
+  testing::NiceMock<MockBufferFactory> buffer_factory_;
 
 private:
   const std::string name_;

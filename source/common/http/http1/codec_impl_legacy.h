@@ -201,7 +201,7 @@ public:
   void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
-  Buffer::WatermarkBuffer& buffer() { return output_buffer_; }
+  Buffer::Instance& buffer() { return *output_buffer_; }
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
@@ -213,7 +213,7 @@ public:
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supportsHttp10() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
-  virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
+  virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   Http::Http1::CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
 
@@ -422,7 +422,7 @@ private:
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
-  Buffer::WatermarkBuffer output_buffer_;
+  Buffer::InstancePtr output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -509,7 +509,7 @@ private:
   void sendProtocolErrorOld(absl::string_view details);
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
-  void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
+  void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
   void doFloodProtectionChecks() const;
   void checkHeaderNameForUnderscores() override;
 
