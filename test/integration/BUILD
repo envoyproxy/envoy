@@ -343,10 +343,6 @@ envoy_cc_test(
         "http2_integration_test.h",
     ],
     shard_count = 4,
-    # TODO(envoyproxy/windows-dev): Diagnose flake, observed to fail at;
-    # IpVersions/Http2MetadataIntegrationTest.UpstreamMetadataAfterEndStream/IPv6
-    # (expected 200, received 503)
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -1308,6 +1304,8 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
+    # TODO(envoyproxy/windows-dev): Investigate flakes in #14286.
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",

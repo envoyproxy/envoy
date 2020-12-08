@@ -33,7 +33,7 @@ services:
       - envoymesh
 
   ext_authz-opa-service:
-    image: openpolicyagent/opa:0.21.0-istio
+    image: openpolicyagent/opa:0.25.1-istio
     volumes:
       - ./config/opa-service/policy.rego:/etc/policy.rego
     command:

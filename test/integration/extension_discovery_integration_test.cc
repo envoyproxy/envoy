@@ -46,6 +46,8 @@ public:
             discovery->mutable_default_config()->PackFrom(default_configuration);
           }
           discovery->set_apply_default_config_without_warming(apply_without_warming);
+          discovery->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
           api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
           api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -68,7 +70,7 @@ public:
       auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ecds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ecds_cluster->set_name("ecds_cluster");
-      ecds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ecds_cluster);
     });
     // Make HCM do a direct response to avoid timing issues with the upstream.
     config_helper_.addConfigModifier(

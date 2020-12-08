@@ -515,7 +515,7 @@ public:
 /**
  * All cluster stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                               \
+#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
   COUNTER(bind_errors)                                                                             \
@@ -643,9 +643,8 @@ public:
 /**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
-struct ClusterStats {
-  ALL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(ClusterStatNames, ALL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(ClusterStats, ClusterStatNames, ALL_CLUSTER_STATS);
 
 /**
  * Struct definition for all cluster load report stats. @see stats_macros.h
@@ -778,8 +777,7 @@ public:
    *         and contains extension-specific protocol options for upstream connections.
    */
   template <class Derived>
-  const std::shared_ptr<const Derived>
-  extensionProtocolOptionsTyped(const std::string& name) const {
+  std::shared_ptr<const Derived> extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
   }
 
@@ -1055,6 +1053,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
+using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream
 } // namespace Envoy

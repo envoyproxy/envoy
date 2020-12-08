@@ -206,7 +206,7 @@ public:
    * @param cb supplies the callback to invoke when the signal fires.
    * @return SignalEventPtr a signal event that is owned by the caller.
    */
-  virtual SignalEventPtr listenForSignal(int signal_num, SignalCb cb) PURE;
+  virtual SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) PURE;
 
   /**
    * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context

@@ -62,6 +62,7 @@
             domain: envoy_front
             request_type: external
             rate_limit_service:
+              transport_api_version: V3
               grpc_service:
                 envoy_grpc:
                   cluster_name: ratelimit
@@ -155,7 +156,11 @@ static_resources:
                 address: collector-grpc.lightstep.com
                 port_value: 443
                 protocol: TCP
-    http2_protocol_options: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
   {% for service, options in clusters.items() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
   {% endfor %}

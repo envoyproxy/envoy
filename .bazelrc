@@ -144,9 +144,9 @@ build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
-coverage:test-coverage --test_arg="-l trace"
-coverage:fuzz-coverage --config=plain-fuzzer
-coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
+build:test-coverage --test_arg="-l trace"
+build:fuzz-coverage --config=plain-fuzzer
+build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
@@ -298,6 +298,7 @@ build:windows --action_env=TMPDIR
 build:windows --define signal_trace=disabled
 build:windows --define hot_restart=disabled
 build:windows --define tcmalloc=disabled
+build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
 build:windows --cxxopt="/std:c++17"
 

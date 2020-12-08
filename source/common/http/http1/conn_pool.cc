@@ -76,7 +76,7 @@ void ActiveClient::StreamWrapper::onDecodeComplete() {
     parent_.codec_client_->close();
   } else {
     auto* pool = &parent_.parent();
-    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->scheduleOnUpstreamReady();
     parent_.stream_wrapper_.reset();
 
     pool->checkForDrained();
