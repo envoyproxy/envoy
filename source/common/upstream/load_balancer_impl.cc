@@ -791,7 +791,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
           time_source_.monotonicTime() - host->creationTime());
       // todo(nezdolik) Store a collection of hosts that adhere to EP warming policy and are in slow
       // start window and check if host is there.
-      if (host_create_duration > slow_start_window) {
+      if (host_create_duration <= slow_start_window) {
         // todo(nezdolik) parametrize this, default should be 1.
         host_weight *= 0.1;
       }
