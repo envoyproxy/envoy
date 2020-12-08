@@ -87,13 +87,16 @@ public:
     expected_str_ = data_.toString();
   }
 
-  void doRequestCompression(Http::TestRequestHeaderMapImpl&& headers) { doRequest(headers, true); }
-
-  void doRequestNoCompression(Http::TestRequestHeaderMapImpl&& headers) {
-    doRequest(headers, false);
+  void doRequestCompression(Http::TestRequestHeaderMapImpl&& headers, bool with_trailers) {
+    doRequest(headers, true, with_trailers);
   }
 
-  void doRequest(Http::TestRequestHeaderMapImpl& headers, bool with_compression) {
+  void doRequestNoCompression(Http::TestRequestHeaderMapImpl&& headers) {
+    doRequest(headers, false, false);
+  }
+
+  void doRequest(Http::TestRequestHeaderMapImpl& headers, bool with_compression,
+                 bool with_trailers) {
     uint64_t buffer_content_size;
     if (!absl::SimpleAtoi(headers.get_("content-length"), &buffer_content_size)) {
       buffer_content_size = 5;
@@ -101,9 +104,13 @@ public:
     populateBuffer(buffer_content_size);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-    Http::TestRequestTrailerMapImpl trailers;
-    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
     if (with_compression) {
+      if (with_trailers) {
+        EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
+        Http::TestRequestTrailerMapImpl trailers;
+        EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+      }
       EXPECT_EQ(expected_str_.length(),
                 stats_.counter("test.test.request.total_uncompressed_bytes").value());
       EXPECT_EQ(data_.length(), stats_.counter("test.test.request.total_compressed_bytes").value());
@@ -118,7 +125,7 @@ public:
   }
 
   void doResponseNoCompression(Http::TestResponseHeaderMapImpl& headers) {
-    doResponse(headers, false, true);
+    doResponse(headers, false, false);
   }
 
   void doResponse(Http::TestResponseHeaderMapImpl& headers, bool with_compression,
@@ -153,8 +160,6 @@ public:
     } else {
       EXPECT_EQ("", headers.get_("content-encoding"));
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
-      Http::TestResponseTrailerMapImpl trailers;
-      EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
       EXPECT_EQ(1, stats_.counter(fmt::format("test.test.{}not_compressed", response_stats_prefix_))
                        .value());
     }
@@ -223,7 +228,25 @@ TEST_F(CompressorFilterTest, CompressRequest) {
   }
 }
 )EOF");
-  doRequestCompression({{":method", "post"}, {"content-length", "256"}});
+  doRequestCompression({{":method", "post"}, {"content-length", "256"}}, false);
+  Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
+  doResponseNoCompression(headers);
+}
+
+TEST_F(CompressorFilterTest, CompressRequestWithTrailers) {
+  setUpFilter(R"EOF(
+{
+  "request_direction_config": {},
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  config_->setExpectedCompressCalls(2);
+  doRequestCompression({{":method", "post"}, {"content-length", "256"}}, true);
   Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
   doResponseNoCompression(headers);
 }

@@ -32,7 +32,7 @@ message Compressor {
     config.core.v3.RuntimeFeatureFlag enabled = 1;
 
     // Minimum response length, in bytes, which will trigger compression. The default value is 30.
-    google.protobuf.UInt32Value content_length = 2;
+    google.protobuf.UInt32Value min_content_length = 2;
 
     // Set of strings that allows specifying which mime-types yield compression; e.g.,
     // application/json, text/html, etc. When this field is not defined, compression will be applied

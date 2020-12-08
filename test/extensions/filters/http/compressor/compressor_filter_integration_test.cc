@@ -77,7 +77,7 @@ public:
             enabled:
               default_value: true
               runtime_key: foo_key
-            content_length: 100
+            min_content_length: 100
             content_type:
               - text/html
               - application/json
@@ -86,7 +86,7 @@ public:
             enabled:
               default_value: false
               runtime_key: enable_requests
-            content_length: 100
+            min_content_length: 100
             content_type:
               - text/html
               - application/json

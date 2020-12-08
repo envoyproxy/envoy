@@ -36,7 +36,7 @@ An example configuration of the filter may look like the following:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
         response_direction_config:
           common_config:
-            content_length: 100
+            min_content_length: 100
             content_type:
               - text/html
               - application/json

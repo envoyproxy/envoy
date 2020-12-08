@@ -79,7 +79,7 @@ public:
 
     const CompressorStats& stats() const { return stats_; }
     const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
-    uint32_t minimumLength() const { return content_length_; }
+    uint32_t minimumLength() const { return min_content_length_; }
     bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
 
@@ -96,7 +96,7 @@ public:
     static StringUtil::CaseUnorderedSet
     contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
-    const uint32_t content_length_;
+    const uint32_t min_content_length_;
     const StringUtil::CaseUnorderedSet content_type_values_;
     const CompressorStats stats_;
   };
@@ -175,6 +175,7 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& buffer, bool end_stream) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,

@@ -46,16 +46,13 @@ struct CompressorRegistry : public StreamInfo::FilterState::Object {
 // Key to per stream CompressorRegistry objects.
 const std::string& compressorRegistryKey() { CONSTRUCT_ON_FIRST_USE(std::string, "compressors"); }
 
-Http::FilterDataStatus maybeCompress(const Compression::Compressor::CompressorPtr& compressor,
-                                     const CompressorStats& stats, Buffer::Instance& data,
-                                     bool end_stream) {
-  if (compressor != nullptr) {
-    stats.total_uncompressed_bytes_.add(data.length());
-    compressor->compress(data, end_stream ? Envoy::Compression::Compressor::State::Finish
-                                          : Envoy::Compression::Compressor::State::Flush);
-    stats.total_compressed_bytes_.add(data.length());
-  }
-  return Http::FilterDataStatus::Continue;
+void compressAndUpdateStats(const Compression::Compressor::CompressorPtr& compressor,
+                            const CompressorStats& stats, Buffer::Instance& data, bool end_stream) {
+  ASSERT(compressor != nullptr);
+  stats.total_uncompressed_bytes_.add(data.length());
+  compressor->compress(data, end_stream ? Envoy::Compression::Compressor::State::Finish
+                                        : Envoy::Compression::Compressor::State::Flush);
+  stats.total_compressed_bytes_.add(data.length());
 }
 
 } // namespace
@@ -65,7 +62,7 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
-      content_length_{contentLengthUint(proto_config.content_length().value())},
+      min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
       content_type_values_(contentTypeSet(proto_config.content_type())), stats_{generateStats(
                                                                              stats_prefix, scope)} {
 }
@@ -122,7 +119,7 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
   }
   envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig config = {};
   if (proto_config.has_content_length()) {
-    config.set_allocated_content_length(
+    config.set_allocated_min_content_length(
         // According to
         // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
         // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
@@ -176,8 +173,24 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
 }
 
 Http::FilterDataStatus CompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  return maybeCompress(request_compressor_, config_->requestDirectionConfig().stats(), data,
-                       end_stream);
+  if (request_compressor_ != nullptr) {
+    compressAndUpdateStats(request_compressor_, config_->requestDirectionConfig().stats(), data,
+                           end_stream);
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus CompressorFilter::decodeTrailers(Http::RequestTrailerMap&) {
+  if (request_compressor_ != nullptr) {
+    Buffer::OwnedImpl empty_buffer;
+    // The presence of trailers means the stream is ended, but decodeData()
+    // is never called with end_stream=true, thus let the compression library know
+    // that the stream is ended.
+    compressAndUpdateStats(request_compressor_, config_->requestDirectionConfig().stats(),
+                           empty_buffer, true);
+    decoder_callbacks_->addDecodedData(empty_buffer, true);
+  }
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -235,15 +248,21 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
 }
 
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  return maybeCompress(response_compressor_, config_->responseDirectionConfig().stats(), data,
-                       end_stream);
+  if (response_compressor_ != nullptr) {
+    compressAndUpdateStats(response_compressor_, config_->responseDirectionConfig().stats(), data,
+                           end_stream);
+  }
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (response_compressor_ != nullptr) {
     Buffer::OwnedImpl empty_buffer;
-    response_compressor_->compress(empty_buffer, Envoy::Compression::Compressor::State::Finish);
-    config_->responseDirectionConfig().stats().total_compressed_bytes_.add(empty_buffer.length());
+    // The presence of trailers means the stream is ended, but encodeData()
+    // is never called with end_stream=true, thus let the compression library know
+    // that the stream is ended.
+    compressAndUpdateStats(response_compressor_, config_->responseDirectionConfig().stats(),
+                           empty_buffer, true);
     encoder_callbacks_->addEncodedData(empty_buffer, true);
   }
   return Http::FilterTrailersStatus::Continue;
@@ -481,7 +500,7 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     uint64_t length;
     const bool is_minimum_content_length =
         absl::SimpleAtoi(content_length->value().getStringView(), &length) &&
-        length >= content_length_;
+        length >= min_content_length_;
     if (!is_minimum_content_length) {
       stats_.content_length_too_small_.inc();
     }
