@@ -72,7 +72,7 @@ ejection algorithm works as follows:
    multiplier decreases with time. The host's health is checked at intervals equal to 
    :ref:`outlier_detection.interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`. 
    If the host is healthy during that check, the ejection time multiplier is decremented. Assuming that the host stays healthy 
-   it would take aproximately :ref:`outlier_detection.max_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` / 
+   it would take approximately :ref:`outlier_detection.max_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` / 
    :ref:`outlier_detection.base_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>` * 
    :ref:`outlier_detection.interval<envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>` seconds to bring down the ejection time to the minimum 
    value :ref:`outlier_detection.base_ejection_time<envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>`.
