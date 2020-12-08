@@ -52,7 +52,7 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
     : tls_slot_(ThreadLocal::TypedSlot<LuaThreadLocal>::makeUnique(tls)) {
 
   // First verify that the supplied code can be parsed.
-  CSmartPtr<lua_State, lua_close> state(lua_open());
+  CSmartPtr<lua_State, lua_close> state(luaL_newstate());
   RELEASE_ASSERT(state.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state.get());
 
@@ -90,7 +90,9 @@ CoroutinePtr ThreadLocalState::createCoroutine() {
   return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
 }
 
-ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : state_(lua_open()) {
+ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code)
+    : state_(luaL_newstate()) {
+
   RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());
