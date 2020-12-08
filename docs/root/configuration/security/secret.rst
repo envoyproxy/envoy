@@ -177,8 +177,10 @@ This example shows how to configure secrets fetched from remote SDS servers:
                 tls_certificate_sds_secret_configs:
                 - name: client_cert
                   sds_config:
+                    resource_api_version: V3
                     api_config_source:
                       api_type: GRPC
+                      transport_api_version: V3
                       grpc_services:
                         google_grpc:
                           target_uri: unix:/tmp/uds_path
@@ -193,16 +195,20 @@ This example shows how to configure secrets fetched from remote SDS servers:
               tls_certificate_sds_secret_configs:
               - name: server_cert
                 sds_config:
+                  resource_api_version: V3
                   api_config_source:
                     api_type: GRPC
+                    transport_api_version: V3
                     grpc_services:
                       envoy_grpc:
                         cluster_name: sds_server_mtls
               validation_context_sds_secret_config:
                 name: validation_context
                 sds_config:
+                  resource_api_version: V3
                   api_config_source:
                     api_type: GRPC
+                    transport_api_version: V3
                     grpc_services:
                       envoy_grpc:
                         cluster_name: sds_server_uds

@@ -286,6 +286,24 @@ TEST(DeferredTaskTest, DeferredTask) {
   dispatcher->clearDeferredDeleteList();
 }
 
+TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
+  InSequence s;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  ReadyWatcher post_watcher;
+  ReadyWatcher delete_watcher;
+
+  // DeferredDelete should always run before post callbacks.
+  EXPECT_CALL(delete_watcher, ready());
+  EXPECT_CALL(post_watcher, ready());
+
+  dispatcher->post([&]() { post_watcher.ready(); });
+  dispatcher->deferredDelete(
+      std::make_unique<TestDeferredDeletable>([&]() -> void { delete_watcher.ready(); }));
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+}
+
 class DispatcherImplTest : public testing::Test {
 protected:
   DispatcherImplTest()

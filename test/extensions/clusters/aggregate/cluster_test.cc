@@ -32,7 +32,9 @@ const std::string secondary_name("secondary");
 
 class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AggregateClusterTest() : stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_)) {
+  AggregateClusterTest()
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
   }
@@ -126,7 +128,7 @@ public:
     ON_CALL(secondary_, loadBalancer()).WillByDefault(ReturnRef(secondary_load_balancer_));
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -142,6 +144,7 @@ public:
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
+  Upstream::ClusterStatNames stat_names_;
   Upstream::ClusterStats stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};

@@ -218,7 +218,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
 
 void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
-SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
+SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
@@ -258,6 +258,11 @@ void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
 }
 
 void DispatcherImpl::runPostCallbacks() {
+  // Clear the deferred delete list before running post callbacks to reduce non-determinism in
+  // callback processing, and more easily detect if a scheduled post callback refers to one of the
+  // objects that is being deferred deleted.
+  clearDeferredDeleteList();
+
   std::list<std::function<void()>> callbacks;
   {
     // Take ownership of the callbacks under the post_lock_. The lock must be released before
