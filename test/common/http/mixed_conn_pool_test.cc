@@ -39,7 +39,8 @@ public:
 class MixedConnPoolImplTest : public testing::Test {
 public:
   MixedConnPoolImplTest()
-      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_)) {}
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_)) {}
 
   ~MixedConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -48,6 +49,7 @@ public:
   Upstream::ClusterConnectivityState state_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
