@@ -190,7 +190,6 @@ private:
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
-  TimeSource& time_source_;
 };
 
 } // namespace ConnPool

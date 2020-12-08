@@ -27,8 +27,7 @@ EdsClusterImpl::EdsClusterImpl(
       local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()),
-      time_source_(factory_context.dispatcher().timeSource()) {
+                        : cluster.eds_cluster_config().service_name()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();

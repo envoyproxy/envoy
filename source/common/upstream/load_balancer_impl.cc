@@ -701,10 +701,12 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
       endpoint_warming_policy(common_config.has_slow_start_config()
                                   ? common_config.slow_start_config().endpoint_warming_policy()
                                   : envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT),
-      slow_start_window(common_config.has_slow_start_config()
-                            ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.slow_start_config(),
-                                                              slow_start_window, 0)
-                            : 0),
+      slow_start_window(std::chrono::milliseconds(
+                            common_config.has_slow_start_config()
+                                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.slow_start_config(),
+                                                                  slow_start_window, 0)
+                                : 0) *
+                        1000),
       time_source_(time_source) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
@@ -728,6 +730,7 @@ void EdfLoadBalancerBase::initialize() {
   }
 }
 
+// todo (nezdolik) do we need to purge hosts that are out of the window?
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_added,
                                                       const HostVector& hosts_removed) {
   // Host exits slow start mode when it leaves the cluster.
@@ -735,20 +738,15 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_ad
     hosts_in_slow_start_.erase(host);
   }
   for (const auto& host : hosts_added) {
-    auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        time_source_.systemTime().time_since_epoch());
-    // Translate `slow_start_window`(seconds) into milliseconds.
-    auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window * 1000);
+    auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_source_.monotonicTime() - host->creationTime());
     // Check if host existence time is within slow start window.
-    if (current_time - host->creationTime() <= slow_start_window_ms) {
+    if (host_create_duration <= slow_start_window) {
       // If it is, then we need to verify that hosts adheres to endpoint warming policy.
       switch (endpoint_warming_policy) {
       case envoy::config::cluster::v3::Cluster::CommonLbConfig::NO_WAIT:
         // Host enters slow start immediately
         hosts_in_slow_start_.insert(host);
-        if (host->creationTime() > latest_host_added_time) {
-          latest_host_added_time = host->creationTime();
-        }
         break;
       case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
         // Check health status of host. It should be marked as healthy and have first passed
@@ -756,9 +754,6 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_ad
         if (host->health() == Upstream::Host::Health::Healthy &&
             !host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
           hosts_in_slow_start_.insert(host);
-          if (host->creationTime() > latest_host_added_time) {
-            latest_host_added_time = host->creationTime();
-          }
         }
         break;
       default:
@@ -792,14 +787,11 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
       auto host_weight = hostWeight(*host);
-      auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-          time_source_.systemTime().time_since_epoch());
-      // translate `slow_start_window`(seconds) into milliseconds
-      auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window * 1000);
-      // add math.abs anywhere?
+      auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+          time_source_.monotonicTime() - host->creationTime());
       // todo(nezdolik) Store a collection of hosts that adhere to EP warming policy and are in slow
       // start window and check if host is there.
-      if (current_time - host->creationTime() > slow_start_window_ms) {
+      if (host_create_duration > slow_start_window) {
         // todo(nezdolik) parametrize this, default should be 1.
         host_weight *= 0.1;
       }
@@ -811,6 +803,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       scheduler.edf_->add(host_weight, host);
     }
 
+    // Cycle through hosts to achieve the intended offset behavior.
     // Cycle through hosts to achieve the intended offset behavior.
     // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the schedule across
     // refreshes for the weighted case.
@@ -844,20 +837,24 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
-  auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source_.systemTime().time_since_epoch());
-  // todo(nezdolik) extract this as a field
-  auto slow_start_window_ms = std::chrono::milliseconds(slow_start_window * 1000);
-  // First check if any host is within slow start window. This condition holds if at least latest
-  // added host is within slow start window.
-  // If all hosts are out of the window, we no longer need to track them and therefore we erase
-  // tracked hosts set.
-  if (current_time - latest_host_added_time > slow_start_window_ms) {
-    hosts_in_slow_start_.erase(hosts_in_slow_start_.begin(), hosts_in_slow_start_.end());
+  if (hosts_in_slow_start_.size() == 0) {
     return true;
   } else {
-    // Second, check if there is any hosts in tracked hosts set.
-    return hosts_in_slow_start_.size() == 0;
+    auto current_time =
+        std::chrono::time_point_cast<std::chrono::milliseconds>(time_source_.monotonicTime());
+
+    // Check if any host is within slow start window. This condition holds if at least latest
+    // added host is within slow start window.
+    // If all hosts are out of the window, we no longer need to track them and therefore we erase
+    // tracked hosts set.
+    auto latest_host_added_time = std::chrono::time_point_cast<std::chrono::milliseconds>(
+        (*hosts_in_slow_start_.begin())->creationTime());
+    if (current_time - latest_host_added_time > slow_start_window) {
+      hosts_in_slow_start_.erase(hosts_in_slow_start_.begin(), hosts_in_slow_start_.end());
+      return true;
+    } else {
+      return false;
+    }
   }
 }
 

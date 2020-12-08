@@ -276,9 +276,6 @@ HostDescriptionImpl::HostDescriptionImpl(
       health_check_config.port_value() == 0
           ? dest_address
           : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
-  // todo(nezdolik) is this good enough?
-  creation_time_ = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time_source.systemTime().time_since_epoch());
 }
 
 Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(

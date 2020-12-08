@@ -449,6 +449,11 @@ message Cluster {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
 
+    enum EndpointWarmingPolicy {
+      NO_WAIT = 0;
+      WAIT_FOR_FIRST_PASSING_HC = 1;
+    }
+
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
     message ZoneAwareLbConfig {
@@ -512,15 +517,10 @@ message Cluster {
       google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
     }
 
-    enum EndpointWarmingPolicy {
-      NO_WAIT = 0;
-      WAIT_FOR_FIRST_PASSING_HC = 1;
-    }
-
     // Configuration for slow start mode.
-    // [#next-free-field: 3]
     message SlowStartConfig {
       google.protobuf.UInt32Value slow_start_window = 1;
+
       EndpointWarmingPolicy endpoint_warming_policy = 2;
     }
 

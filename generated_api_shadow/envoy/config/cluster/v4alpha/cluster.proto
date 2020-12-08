@@ -450,10 +450,15 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.cluster.v3.Cluster.CommonLbConfig";
+
+    enum EndpointWarmingPolicy {
+      NO_WAIT = 0;
+      WAIT_FOR_FIRST_PASSING_HC = 1;
+    }
 
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
@@ -518,6 +523,16 @@ message Cluster {
       google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
     }
 
+    // Configuration for slow start mode.
+    message SlowStartConfig {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
+
+      google.protobuf.UInt32Value slow_start_window = 1;
+
+      EndpointWarmingPolicy endpoint_warming_policy = 2;
+    }
+
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
     // If not specified, the default is 50%.
     // To disable panic mode, set to 0%.
@@ -575,6 +590,9 @@ message Cluster {
 
     // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
     ConsistentHashingLbConfig consistent_hashing_lb_config = 7;
+
+    // Configuration for slow start mode.
+    SlowStartConfig slow_start_config = 8;
   }
 
   message RefreshRate {

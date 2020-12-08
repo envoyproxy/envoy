@@ -17,7 +17,7 @@
 #include "common/runtime/runtime_protos.h"
 #include "common/upstream/edf_scheduler.h"
 
-#include "absl/container/node_hash_set.h"
+#include "absl/container/btree_set.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -418,9 +418,14 @@ private:
   // Slow start related configs
   const envoy::config::cluster::v3::Cluster::CommonLbConfig::EndpointWarmingPolicy
       endpoint_warming_policy;
-  const uint32_t slow_start_window;
+  const std::chrono::milliseconds slow_start_window;
   TimeSource& time_source_;
-  absl::node_hash_set<HostSharedPtr> hosts_in_slow_start_;
+  struct orderByCreateDateDesc {
+    bool operator()(const HostSharedPtr l, const HostSharedPtr r) const {
+      return l->creationTime() > r->creationTime();
+    }
+  };
+  absl::btree_set<HostSharedPtr, orderByCreateDateDesc> hosts_in_slow_start_;
   std::chrono::milliseconds latest_host_added_time;
 };
 
