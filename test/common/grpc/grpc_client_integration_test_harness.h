@@ -20,9 +20,10 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/stats/symbol_table_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/router/context_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
@@ -239,7 +240,7 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_->symbolTable()) {}
+        http_context_(stats_store_->symbolTable()), router_context_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -306,7 +307,7 @@ public:
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_ptr_, *stats_store_, *dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_), http_context_);
+        std::move(shadow_writer_ptr_), http_context_, router_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq(fake_cluster_name_)))
@@ -473,6 +474,7 @@ public:
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   envoy::config::core::v3::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =

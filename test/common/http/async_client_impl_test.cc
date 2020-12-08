@@ -11,6 +11,7 @@
 #include "common/http/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/router/context_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"
@@ -41,10 +42,11 @@ namespace {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : http_context_(stats_store_.symbolTable()),
+      : http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
         client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
                 cm_, runtime_, random_,
-                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_) {
+                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_,
+                router_context_) {
     message_->headers().setMethod("GET");
     message_->headers().setHost("host");
     message_->headers().setPath("/");
@@ -86,6 +88,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   AsyncClientImpl client_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
@@ -235,6 +238,8 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
+
+  EXPECT_TRUE(stats_store_.findCounterByString("http.async-client.rq_total").has_value());
 }
 
 TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {

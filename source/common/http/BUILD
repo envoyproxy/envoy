@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/http:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
+        "//include/envoy/router:context_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/router:router_ratelimit_interface",
         "//include/envoy/router:shadow_writer_interface",

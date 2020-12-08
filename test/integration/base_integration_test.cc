@@ -162,6 +162,8 @@ void BaseIntegrationTest::createEnvoy() {
     std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     config_helper_.addConfigModifier(
         [lds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_resource_api_version(
+              envoy::config::core::v3::V3);
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
         });
   }

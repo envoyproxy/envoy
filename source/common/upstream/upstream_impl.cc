@@ -639,8 +639,9 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
                       hosts_removed, overprovisioning_factor);
 }
 
-ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
+ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
+                                            const ClusterStatNames& stat_names) {
+  return ClusterStats(stat_names, scope);
 }
 
 ClusterRequestResponseSizeStats
@@ -745,7 +746,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
+      stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
+      load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
                                   ? std::make_unique<OptionalClusterStats>(config, *stats_scope_)

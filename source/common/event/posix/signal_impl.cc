@@ -1,13 +1,12 @@
-#include "common/event/signal_impl.h"
-
 #include "common/event/dispatcher_impl.h"
+#include "common/event/signal_impl.h"
 
 #include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
 
-SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, int signal_num, SignalCb cb)
+SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num, SignalCb cb)
     : cb_(cb) {
   evsignal_assign(
       &raw_event_, &dispatcher.base(), signal_num,

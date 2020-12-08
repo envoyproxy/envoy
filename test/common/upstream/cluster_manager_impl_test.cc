@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/raw_buffer_socket.h"
+#include "common/router/context_impl.h"
 
 #include "extensions/transport_sockets/raw_buffer/config.h"
 
@@ -48,14 +49,14 @@ std::string clustersJson(const std::vector<std::string>& clusters) {
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
-      : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()) {
-  }
+      : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
+        router_context_(factory_.stats_.symbolTable()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_);
+        *factory_.api_, http_context_, grpc_context_, router_context_);
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -99,7 +100,8 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
+        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
+        router_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -149,6 +151,7 @@ public:
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
+  Router::ContextImpl router_context_;
 };
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
@@ -435,6 +438,7 @@ static_resources:
       eds_config:
         api_config_source:
           api_type: GRPC
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: static_cluster

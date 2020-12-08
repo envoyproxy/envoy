@@ -479,6 +479,7 @@ typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
       common_config:
         log_name: foo
+        transport_api_version: V3
         grpc_service:
           envoy_grpc:
             cluster_name: cluster_0
