@@ -273,14 +273,13 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
   // Create an HTTP connection and complete a request.
-  FakeStreamPtr http_stream;
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, http_stream));
-  ASSERT_TRUE(http_stream->waitForHeadersComplete());
-  ASSERT_TRUE(http_stream->waitForData(*dispatcher_, 10));
-  http_stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
 
   // At this point, the connection should be idle but still open.
@@ -306,15 +305,14 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
     // connection. If a new stream comes in, it will set the connection header
     // to "close" on the response and close the connection after.
     auto response = codec_client_->makeRequestWithBody(request_headers, 10);
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, http_stream));
-    ASSERT_TRUE(http_stream->waitForHeadersComplete());
-    ASSERT_TRUE(http_stream->waitForData(*dispatcher_, 10));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
     response->waitForEndStream();
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
-  http_stream.reset();
   codec_client_->close();
 }
 
