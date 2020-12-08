@@ -273,7 +273,7 @@ void DispatcherImpl::runPostCallbacks() {
   while (!callbacks.empty()) {
     auto& callback = callbacks.front();
     callback();
-    // pop the front so that the destructor of the callback that just executed runs before the next
+    // Pop the front so that the destructor of the callback that just executed runs before the next
     // callback executes.
     callbacks.pop_front();
   }
