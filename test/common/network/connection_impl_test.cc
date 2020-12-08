@@ -1236,7 +1236,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // If the current bytes buffered plus the bytes we write this loop go over
     // the watermark and we're not currently above, we will get a callback for
     // going above.
-    if (bytes_to_write + bytes_buffered > 11 && is_below) {
+    if (bytes_to_write + bytes_buffered > 10 && is_below) {
       ENVOY_LOG_MISC(trace, "Expect onAboveWriteBufferHighWatermark");
       EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
       is_below = false;
