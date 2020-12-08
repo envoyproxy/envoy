@@ -144,12 +144,7 @@ public:
   void eject(MonotonicTime ejection_time);
   void uneject(MonotonicTime ejection_time);
 
-  uint32_t ejectTimeBackoff() const { return eject_time_backoff_; }
-  void onNoEjection() {
-    if (eject_time_backoff_ != 0) {
-      eject_time_backoff_--;
-    };
-  }
+  uint32_t& ejectTimeBackoff() { return eject_time_backoff_; }
 
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
@@ -286,6 +281,7 @@ public:
     return enforcing_consecutive_local_origin_failure_;
   }
   uint64_t enforcingLocalOriginSuccessRate() const { return enforcing_local_origin_success_rate_; }
+  uint64_t maxEjectionTimeMs() const { return max_ejection_time_ms_; }
 
 private:
   const uint64_t interval_ms_;
@@ -308,6 +304,7 @@ private:
   const uint64_t consecutive_local_origin_failure_;
   const uint64_t enforcing_consecutive_local_origin_failure_;
   const uint64_t enforcing_local_origin_success_rate_;
+  const uint64_t max_ejection_time_ms_;
 
   static const uint64_t DEFAULT_INTERVAL_MS = 10000;
   static const uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
@@ -328,6 +325,7 @@ private:
   static const uint64_t DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 5;
   static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
   static const uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
+  static const uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
 };
 
 /**
