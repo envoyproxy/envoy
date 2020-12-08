@@ -284,7 +284,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "deprecated_features=disabled"
     "--define" "use_new_codecs_in_integration_tests=false"
     "--define" "tcmalloc=gperftools"
-    "--define" "zlib=ng")
+    "--define" "zlib=ng"
+    "--@envoy//source/extensions/filters/http/kill_request:enabled"
+    "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
 
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain

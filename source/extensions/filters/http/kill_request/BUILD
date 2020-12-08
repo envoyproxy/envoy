@@ -7,7 +7,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
+envoy_extension_package(enabled_default = False)
 
 envoy_cc_library(
     name = "kill_request_filter_lib",

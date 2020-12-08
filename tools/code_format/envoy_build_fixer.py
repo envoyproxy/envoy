@@ -89,7 +89,7 @@ def FixPackageAndLicense(path, contents):
     # Envoy package is inserted after the load block containing the
     # envoy_package import.
     package_and_parens = package_string + '()'
-    if package_and_parens not in contents:
+    if package_and_parens[:-1] not in contents:
       contents = re.sub(regex_to_use, r'\1\n%s\n\n' % package_and_parens, contents)
       if package_and_parens not in contents:
         raise EnvoyBuildFixerError('Unable to insert %s' % package_and_parens)
