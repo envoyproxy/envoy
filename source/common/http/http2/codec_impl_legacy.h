@@ -521,7 +521,6 @@ private:
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
-  bool allow_protocol_error_frame_for_test_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   Event::TimerPtr keepalive_send_timer_;

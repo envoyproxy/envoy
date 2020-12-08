@@ -271,7 +271,8 @@ FakeHttpConnection::FakeHttpConnection(
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : FakeConnectionBase(shared_connection, time_system), type_(type) {
+    : FakeConnectionBase(shared_connection, time_system), type_(type),
+      expect_protocol_error_(false) {
   if (type == Type::HTTP1) {
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
@@ -356,7 +357,13 @@ void FakeHttpConnection::encodeProtocolError() {
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
   if (codec != nullptr) {
-    shared_connection_.connection().dispatcher().post([codec]() { codec->protocolErrorForTest(); });
+    shared_connection_.connection().dispatcher().post([this, codec]() {
+      expect_protocol_error_ = true;
+      codec->protocolErrorForTest();
+      // We'd ideally set expect_protocol_error_ back to false after this, but
+      // it's difficult to sequence that correctly since it needs to be true
+      // until the PROTOCOL_ERROR goaway frame is flushed.
+    });
     return;
   }
 
@@ -366,8 +373,13 @@ void FakeHttpConnection::encodeProtocolError() {
       dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
   ASSERT(legacy_codec != nullptr);
 
-  shared_connection_.connection().dispatcher().post(
-      [legacy_codec]() { legacy_codec->protocolErrorForTest(); });
+  shared_connection_.connection().dispatcher().post([this, legacy_codec]() {
+    expect_protocol_error_ = true;
+    legacy_codec->protocolErrorForTest();
+    // We'd ideally set expect_protocol_error_ back to false after this, but
+    // it's difficult to sequence that correctly since it needs to be true
+    // until the PROTOCOL_ERROR goaway frame is flushed.
+  });
 }
 
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {

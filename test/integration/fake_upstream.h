@@ -442,7 +442,7 @@ private:
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       Http::Status status = parent_.codec_->dispatch(data);
 
-      if (Http::isCodecProtocolError(status)) {
+      if (Http::isCodecProtocolError(status) && !parent_.expect_protocol_error_) {
         ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
         // We don't do a full stream shutdown like HCM, but just shutdown the
         // connection for now.
@@ -463,6 +463,7 @@ private:
 
   const Type type_;
   Http::ServerConnectionPtr codec_;
+  bool expect_protocol_error_ : 1;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };

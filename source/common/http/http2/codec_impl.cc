@@ -722,13 +722,8 @@ void ConnectionImpl::protocolErrorForTest() {
                                  NGHTTP2_PROTOCOL_ERROR, nullptr, 0);
   ASSERT(rc == 0);
 
-  // We have to temporarily allow PROTOCOL_ERROR goaway frames in our
-  // onFrameSend nghttp2 callback.
-  allow_protocol_error_frame_for_test_ = true;
-  if (sendPendingFramesAndHandleError()) {
-    // Intended to check through coverage that this error case is tested
+  if (sendPendingFrames().ok()) {
   }
-  allow_protocol_error_frame_for_test_ = false;
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
@@ -870,12 +865,6 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   case NGHTTP2_GOAWAY: {
     ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
     if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
-      if (allow_protocol_error_frame_for_test_ &&
-          frame->goaway.error_code == NGHTTP2_PROTOCOL_ERROR) {
-        // This is an edge case for integration tests where we want to exercise
-        // GOAWAY frame types other than NO_ERROR.
-        break;
-      }
 
       // TODO(mattklein123): Returning this error code abandons standard nghttp2 frame accounting.
       // As such, it is not reliable to call sendPendingFrames() again after this and we assume
