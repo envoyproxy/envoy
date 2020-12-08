@@ -43,13 +43,14 @@ TEST_P(SliceTest, MoveConstruction) {
   auto slice1 = createSlice(input);
   bool drain_tracker_called = false;
   slice1->addDrainTracker([&drain_tracker_called]() { drain_tracker_called = true; });
-  EXPECT_EQ(11, slice1->dataSize());
+  slice1->drain(1);
+  EXPECT_EQ(10, slice1->dataSize());
   if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice1->reservableSize());
   } else {
     EXPECT_EQ(4085, slice1->reservableSize());
   }
-  EXPECT_EQ(0, memcmp(slice1->data(), input, slice1->dataSize()));
+  EXPECT_EQ(0, memcmp(slice1->data(), input + 1, slice1->dataSize()));
   EXPECT_FALSE(drain_tracker_called);
 
   auto slice2 = std::make_unique<Slice>(std::move(*slice1));
@@ -60,13 +61,13 @@ TEST_P(SliceTest, MoveConstruction) {
   EXPECT_FALSE(drain_tracker_called);
   slice1.reset();
 
-  EXPECT_EQ(11, slice2->dataSize());
+  EXPECT_EQ(10, slice2->dataSize());
   if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice2->reservableSize());
   } else {
     EXPECT_EQ(4085, slice2->reservableSize());
   }
-  EXPECT_EQ(0, memcmp(slice2->data(), input, slice2->dataSize()));
+  EXPECT_EQ(0, memcmp(slice2->data(), input + 1, slice2->dataSize()));
   EXPECT_FALSE(drain_tracker_called);
   slice2.reset(nullptr);
   EXPECT_TRUE(drain_tracker_called);
@@ -77,26 +78,28 @@ TEST_P(SliceTest, MoveAssigment) {
   auto slice1 = createSlice(input1);
   bool drain_tracker_called1 = false;
   slice1->addDrainTracker([&drain_tracker_called1]() { drain_tracker_called1 = true; });
-  EXPECT_EQ(5, slice1->dataSize());
+  slice1->drain(1);
+  EXPECT_EQ(4, slice1->dataSize());
   if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice1->reservableSize());
   } else {
     EXPECT_EQ(4091, slice1->reservableSize());
   }
-  EXPECT_EQ(0, memcmp(slice1->data(), input1, slice1->dataSize()));
+  EXPECT_EQ(0, memcmp(slice1->data(), input1 + 1, slice1->dataSize()));
   EXPECT_FALSE(drain_tracker_called1);
 
   constexpr char input2[] = "how low";
   auto slice2 = createSlice(input2);
   bool drain_tracker_called2 = false;
   slice2->addDrainTracker([&drain_tracker_called2]() { drain_tracker_called2 = true; });
-  EXPECT_EQ(7, slice2->dataSize());
+  slice2->drain(2);
+  EXPECT_EQ(5, slice2->dataSize());
   if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice2->reservableSize());
   } else {
     EXPECT_EQ(4089, slice2->reservableSize());
   }
-  EXPECT_EQ(0, memcmp(slice2->data(), input2, slice2->dataSize()));
+  EXPECT_EQ(0, memcmp(slice2->data(), input2 + 2, slice2->dataSize()));
   EXPECT_FALSE(drain_tracker_called2);
 
   *slice2 = std::move(*slice1);
@@ -112,13 +115,13 @@ TEST_P(SliceTest, MoveAssigment) {
   slice1.reset();
 
   // The original contents of slice1 are now in slice2.
-  EXPECT_EQ(5, slice2->dataSize());
+  EXPECT_EQ(4, slice2->dataSize());
   if (shouldCreateUnownedSlice()) {
     EXPECT_EQ(0, slice2->reservableSize());
   } else {
     EXPECT_EQ(4091, slice2->reservableSize());
   }
-  EXPECT_EQ(0, memcmp(slice2->data(), input1, slice2->dataSize()));
+  EXPECT_EQ(0, memcmp(slice2->data(), input1 + 1, slice2->dataSize()));
   EXPECT_FALSE(drain_tracker_called1);
   slice2.reset();
   EXPECT_TRUE(drain_tracker_called1);
