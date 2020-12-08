@@ -153,9 +153,11 @@ protected:
   // a generic pointer.
   // It MUST be defined after the filter_manager_ as some filters may have callbacks that
   // write_buffer_ invokes during its clean up.
+  // This bufer is always allocated, never nullptr.
   Buffer::InstancePtr write_buffer_;
   // Ensure that if the consumer of the data from this connection isn't
   // consuming, that the connection eventually stops reading from the wire.
+  // This bufer is always allocated, never nullptr.
   Buffer::InstancePtr read_buffer_;
   uint32_t read_buffer_limit_ = 0;
   bool connecting_{false};

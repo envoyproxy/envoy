@@ -402,7 +402,8 @@ public:
    */
   virtual void setWatermarks(uint32_t watermark) PURE;
   /**
-   * Returns the configured high watermark.
+   * Returns the configured high watermark. A return value of 0 indicates that watermark
+   * functionality is disabled.
    */
   virtual uint32_t highWatermark() const PURE;
   /**

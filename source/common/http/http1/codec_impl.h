@@ -446,6 +446,8 @@ private:
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This bufer is always allocated, never nullptr.
   Buffer::InstancePtr output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;

@@ -167,11 +167,11 @@ public:
 
   void setWatermarks(uint32_t) override {
     // Not implemented.
+    // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
+    // WatermarkBuffer implementations.
     ASSERT(false);
   }
   uint32_t highWatermark() const override { return 0; }
-  // Returns true if the high watermark callbacks have been called more recently
-  // than the low watermark callbacks.
   bool highWatermarkTriggered() const override { return false; }
 
   absl::string_view asStringView() const { return {start(), size_}; }
