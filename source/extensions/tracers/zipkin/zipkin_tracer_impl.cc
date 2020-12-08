@@ -80,6 +80,8 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = zipkin_config.collector_cluster();
+  hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
+                                                          : zipkin_config.collector_cluster();
 
   CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
@@ -180,7 +182,7 @@ void ReporterImpl::flushSpans() {
     Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setPath(collector_.endpoint_);
-    message->headers().setHost(driver_.cluster());
+    message->headers().setHost(driver_.hostname());
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf

@@ -120,11 +120,11 @@ transport_socket:
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             HttpIntegrationTest::createUpstreamTlsContext(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
+            endpoint->ip()->version(), upstreamConfig(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
+            endpoint->ip()->version(), upstreamConfig(), false));
       }
     }
   }

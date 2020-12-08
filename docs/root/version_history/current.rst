@@ -5,7 +5,8 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* config: v2 is now fatal-by-default. This may be overridden by setting :option:`--bootstrap-version` 2 on the CLI for a v2 bootstrap file and also enabling the runtime `envoy.reloadable_features.enable_deprecated_v2_api` feature.
+* config: v2 is now fatal-by-default. This may be overridden by setting :option:`--bootstrap-version` 2 on the CLI for a v2 bootstrap file and also enabling the runtime `envoy.reloadable_features.enable_deprecated_v2_api` feature. See
+  the :ref:`FAQ entry <faq_api_version_transition>` for further details.
 
 Minor Behavior Changes
 ----------------------
@@ -19,8 +20,10 @@ Minor Behavior Changes
 * grpc_web filter: if a `grpc-accept-encoding` header is present it's passed as-is to the upstream and if it isn't `grpc-accept-encoding:identity` is sent instead. The header was always overwriten with `grpc-accept-encoding:identity,deflate,gzip` before.
 * http: upstream protocol will now only be logged if an upstream stream was established.
 * jwt_authn filter: added support of Jwt time constraint verification with a clock skew (default to 60 seconds) and added a filter config field :ref:`clock_skew_seconds <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.clock_skew_seconds>` to configure it.
+* kill_request: enable a way to configure kill header name in KillRequest proto.
 * memory: enable new tcmalloc with restartable sequences for aarch64 builds.
 * mongo proxy metrics: swapped network connection remote and local closed counters previously set reversed (`cx_destroy_local_with_active_rq` and `cx_destroy_remote_with_active_rq`).
+* performance: improve performance when handling large HTTP/1 bodies.
 * tls: removed RSA key transport and SHA-1 cipher suites from the client-side defaults.
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
 * xds: to support TTLs, heartbeating has been added to xDS. As a result, responses that contain empty resources without updating the version will no longer be propagated to the
@@ -81,11 +84,13 @@ New Features
 * thrift_proxy: added a new :ref: `payload_passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>` option to skip decoding body in the Thrift message.
 * tls: added support for RSA certificates with 4096-bit keys in FIPS mode.
 * tracing: added SkyWalking tracer.
+* tracing: added support for setting the hostname used when sending spans to a Zipkin collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_hostname>` field.
 * xds: added support for resource TTLs. A TTL is specified on the :ref:`Resource <envoy_api_msg_Resource>`. For SotW, a :ref:`Resource <envoy_api_msg_Resource>` can be embedded
   in the list of resources to specify the TTL.
 
 Deprecated
 ----------
+* cluster: HTTP configuration for upstream clusters has beem reworked. HTTP-specific configuration is now done in the new :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message, configured via the cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`. This replaces explicit HTTP configuration in cluster config, including :ref:`upstream_http_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.upstream_http_protocol_options>` :ref:`common_http_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` :ref:`http_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.http_protocol_options>` :ref:`http2_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.http2_protocol_options>` and :ref:`protocol_selection<envoy_v3_api_field_config.cluster.v3.Cluster.protocol_selection>`. Examples of before-and-after configuration can be found in the :ref:`http_protocol_options docs <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` and all of Envoy's example configurations have been updated to the new style of config.
 * gzip: :ref:`HTTP Gzip filter <config_http_filters_gzip>` is rejected now unless explicitly allowed with :ref:`runtime override <config_runtime_deprecation>` `envoy.deprecated_features.allow_deprecated_gzip_http_filter` set to `true`.
 * logging: the `--log-format-prefix-with-location` option is removed.
 * ratelimit: the :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` action is deprecated in favor of the more generic :ref:`metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>` action.

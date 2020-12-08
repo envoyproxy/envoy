@@ -55,6 +55,8 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "extensions/upstreams/http/config.h"
+
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
@@ -517,12 +519,15 @@ private:
  */
 class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::Id::upstream> {
 public:
+  using HttpProtocolOptionsConfigImpl =
+      Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
-  static ClusterStats generateStats(Stats::Scope& scope);
+  static ClusterStats generateStats(Stats::Scope& scope,
+                                    const ClusterStatNames& cluster_stat_names);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,
@@ -545,12 +550,14 @@ public:
     return per_connection_buffer_limit_bytes_;
   }
   uint64_t features() const override { return features_; }
-  const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  const Http::Http1Settings& http1Settings() const override {
+    return http_protocol_options_->http1_settings_;
+  }
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
-    return http2_options_;
+    return http_protocol_options_->http2_options_;
   }
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
-    return common_http_protocol_options_;
+    return http_protocol_options_->common_http_protocol_options_;
   }
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
@@ -627,7 +634,7 @@ public:
   bool warmHosts() const override { return warm_hosts_; }
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const override {
-    return upstream_http_protocol_options_;
+    return http_protocol_options_->upstream_http_protocol_options_;
   }
 
   absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
@@ -663,6 +670,9 @@ private:
   Runtime::Loader& runtime_;
   const std::string name_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
+  const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
+      extension_protocol_options_;
+  const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const uint64_t max_requests_per_connection_;
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
@@ -677,10 +687,6 @@ private:
   mutable ClusterLoadReportStats load_report_stats_;
   const std::unique_ptr<OptionalClusterStats> optional_cluster_stats_;
   const uint64_t features_;
-  const Http::Http1Settings http1_settings_;
-  const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
-  const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
-  const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;

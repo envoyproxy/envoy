@@ -95,14 +95,16 @@ class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
-      : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
-        config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
+      : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
+        router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
+        config_(pool_.add("test"), local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-                false, std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_),
+                false, std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_,
+                router_context_),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
-
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
     ON_CALL(*cm_.conn_pool_.host_, address()).WillByDefault(Return(host_address_));
     ON_CALL(*cm_.conn_pool_.host_, locality()).WillByDefault(ReturnRef(upstream_locality_));
     router_.downstream_connection_.local_address_ = host_address_;
@@ -358,11 +360,13 @@ public:
   envoy::config::core::v3::Locality upstream_locality_;
   envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Stats::StatNamePool pool_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Envoy::ConnectionPool::MockCancellable cancellable_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -506,7 +510,7 @@ TEST_F(RouterTest, ClusterNotFound) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_cluster").value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));

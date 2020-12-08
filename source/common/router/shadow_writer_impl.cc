@@ -16,7 +16,7 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
   // It's possible that the cluster specified in the route configuration no longer exists due
   // to a CDS removal. Check that it still exists before shadowing.
   // TODO(mattklein123): Optimally we would have a stat but for now just fix the crashing issue.
-  if (!cm_.get(cluster)) {
+  if (!cm_.getThreadLocalCluster(cluster)) {
     ENVOY_LOG(debug, "shadow cluster '{}' does not exist", cluster);
     return;
   }
