@@ -188,9 +188,9 @@ and there is no bulletproof way to prevent it from occurring.
    scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
    in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path,
    so that we do not need to take symbol-table locks on worker threads. As an example, see
-   [ClusterInfoImpl::generateStats](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/upstream_impl.cc)
+   [ClusterInfoImpl::generateStats](https://github.com/envoyproxy/envoy/blob/master/source/common/upstream/upstream_impl.cc)
    and its
-   [MAKE_STAT_NAMES_STRUCT](https://github.com/envoyproxy/envoy/blob/master/include/envoy/upstream/usptream.h)
+   [MAKE_STAT_NAMES_STRUCT](https://github.com/envoyproxy/envoy/blob/master/include/envoy/upstream/upstream.h)
    invocation.
  * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
    made in the hot path.
