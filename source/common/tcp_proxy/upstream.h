@@ -92,7 +92,6 @@ private:
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
   ~HttpUpstream() override;
-
   virtual bool isValidResponse(const Http::ResponseHeaderMap&) PURE;
 
   void doneReading();
@@ -112,6 +111,15 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
+  void setOnGenericPoolReadyParameters(std::unique_ptr<GenericUpstream>&& upstream, GenericConnectionPoolCallbacks& callbacks, Upstream::HostDescriptionConstSharedPtr host, Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+      upstream_ = std::move(upstream);
+      callbacks_ = &callbacks;
+      host_ = host;
+      ssl_info_ = ssl_info;
+  }
+
+  friend class DecoderShim;
+
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
@@ -121,6 +129,11 @@ protected:
   const std::string hostname_;
 
 private:
+  void deferredOnPoolReady() {
+    callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host_,
+                                 request_encoder_->getStream().connectionLocalAddress(),
+                                 ssl_info_);
+  }
   class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
@@ -129,6 +142,8 @@ private:
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
+      } else {
+          parent_.deferredOnPoolReady();
       }
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
@@ -147,6 +162,14 @@ private:
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   bool read_half_closed_{};
   bool write_half_closed_{};
+
+  // Parameters used to defer onPoolGenericReady
+  // TODO(irozzo) Find a better way, it seems quite risky to me to have a
+  // circular dependency here.
+  std::unique_ptr<GenericUpstream> upstream_;
+  GenericConnectionPoolCallbacks* callbacks_{};
+  Upstream::HostDescriptionConstSharedPtr host_;
+  Ssl::ConnectionInfoConstSharedPtr ssl_info_;
 };
 
 class Http1Upstream : public HttpUpstream {

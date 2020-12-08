@@ -108,6 +108,9 @@ void HttpUpstream::onBelowWriteBufferLowWatermark() {
 }
 
 void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
+  if (callbacks_) {
+    upstream_.reset();
+  }
   if (!request_encoder_) {
     return;
   }
@@ -222,12 +225,9 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
   upstream_handle_ = nullptr;
-  Http::RequestEncoder* latched_encoder = &request_encoder;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
-                                 latched_encoder->getStream().connectionLocalAddress(),
-                                 info.downstreamSslConnection());
+  upstream_->setOnGenericPoolReadyParameters(std::move(upstream_), *callbacks_, host, info.downstreamSslConnection());
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
