@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.h"
+#include "envoy/extensions/filters/http/bandwidth_limit/v3alpha/bandwidth_limit.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -46,12 +46,13 @@ struct BandwidthLimitStats {
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
   using EnableMode =
-      envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
+      envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit_EnableMode;
 
 public:
-  FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
-               bool per_route = false);
+  FilterConfig(
+      const envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit& config,
+      Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
+      bool per_route = false);
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
   BandwidthLimitStats& stats() const { return stats_; }

@@ -6,7 +6,7 @@
 
 #include "common/http/utility.h"
 
-using envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit;
+using envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit;
 using Envoy::Extensions::HttpFilters::Common::StreamRateLimiter;
 
 namespace Envoy {
@@ -14,11 +14,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
-FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-    Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
+FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
+                           Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
     : stats_(generateStats(config.stat_prefix(), scope)), runtime_(runtime), scope_(scope),
-      time_source_(time_source), limit_kbps_(config.has_limit_kbps() ? config.limit_kbps() : 0),
+      time_source_(time_source),
+      limit_kbps_(config.has_limit_kbps() ? config.limit_kbps().value() : 0),
       enable_mode_(config.enable_mode()),
       enforce_threshold_Kbps_(
           config.has_enforce_threshold_kbps() && !per_route

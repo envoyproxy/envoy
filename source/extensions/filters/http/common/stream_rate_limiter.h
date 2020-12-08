@@ -14,8 +14,8 @@ namespace Envoy {
 
 class ScopeTrackedObject;
 
-namespace Event{
-  class Timer;
+namespace Event {
+class Timer;
 } // namespace Event
 
 namespace Extensions {
@@ -27,10 +27,10 @@ namespace Common {
  */
 class StreamRateLimiter : Logger::Loggable<Logger::Id::filter> {
 public:
-  // We currently divide each second into 64 segments for the token bucket. Thus, the rate limit is
-  // KiB per second, divided into 16 segments, ~16ms apart. 64 is used because it divides into 1024
+  // We currently divide each second into 16 segments for the token bucket. Thus, the rate limit is
+  // KiB per second, divided into 16 segments, ~63ms apart. 16 is used because it divides into 1024
   // evenly.
-  static constexpr uint64_t DefaultFillRate = 64;
+  static constexpr uint64_t DefaultFillRate = 16;
 
   /**
    * @param max_kbps maximum rate in KiB/s.
@@ -44,7 +44,7 @@ public:
    * @param dispatcher the stream's dispatcher to use for creating timers.
    * @param scope the stream's scope
    */
-  StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,                    
+  StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
