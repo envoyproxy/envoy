@@ -17,7 +17,7 @@ using EnableMode =
 TEST(Factory, GlobalEmptyConfig) {
   const std::string yaml = R"(
 stat_prefix: test
-enforce_threshold_kbps = 1024
+enforce_threshold_kbps: 1024
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -37,8 +37,8 @@ TEST(Factory, RouteSpecificFilterConfig) {
   const std::string config_yaml = R"(
 stat_prefix: test
 enable_mode: IngressAndEgress
-limit_kbps = 10
-fill_rate = 16
+limit_kbps: 10
+fill_rate: 16
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -62,9 +62,9 @@ TEST(Factory, RouteSpecificEnforcedThresholdIgnored) {
   const std::string config_yaml = R"(
 stat_prefix: test
 enable_mode: IngressAndEgress
-limit_kbps = 10
-fill_rate = 16
-enforce_threshold_kbps = 100
+limit_kbps: 10
+fill_rate: 16
+enforce_threshold_kbps: 100
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -73,15 +73,14 @@ enforce_threshold_kbps = 100
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->enforce_threshold(), absl::nullopt);
-  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_IngressAndEgress);
 }
 
-TEST(Factory, PerRouteConfigNoTokenBucket) {
+TEST(Factory, PerRouteConfigNoLimits) {
   const std::string config_yaml = R"(
 stat_prefix: test
   )";
@@ -96,13 +95,13 @@ stat_prefix: test
                EnvoyException);
 }
 
-TEST(Factory, FillTimerTooLow) {
+TEST(Factory, FillRateTooHigh) {
   const std::string config_yaml = R"(
 stat_prefix: test
 enable_mode: IngressAndEgress
-limit_kbps = 10
-fill_rate = 16
-enforce_threshold_kbps = 100
+limit_kbps: 10
+fill_rate: 33
+enforce_threshold_kbps: 100
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -111,7 +110,7 @@ enforce_threshold_kbps = 100
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
                                                        ProtobufMessage::getNullValidationVisitor()),
                EnvoyException);

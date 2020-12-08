@@ -45,10 +45,12 @@ struct BandwidthLimitStats {
  * Configuration for the HTTP bandwidth limit filter.
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
+public:
   using EnableMode =
       envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit_EnableMode;
 
-public:
+  static constexpr uint64_t MaxFillRate = 32;
+
   FilterConfig(
       const envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit& config,
       Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,

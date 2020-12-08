@@ -29,6 +29,10 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
   if (per_route && !config.has_limit_kbps()) {
     throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
   }
+
+  if (fill_rate_ > MaxFillRate) {
+    throw EnvoyException("bandwidthlimitfilter: fill rate must be <= 32");
+  }
   // The token bucket is configured with a max token count of the number of ticks per second,
   // and refills at the same rate, so that we have a per second limit which refills gradually in
   // 1/fill_rate intervals.
