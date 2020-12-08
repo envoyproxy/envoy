@@ -59,16 +59,13 @@ to binaries, libraries, headers, etc.
 
 # Adding external dependencies to Envoy (Python)
 
-Python dependencies should be added via `pip3` and `rules_python`. The process
+Python dependencies should be added via `pip_install` and `rules_python`. The process
 is:
 
-1. Define a `pip3_import()` pointing at your target `requirements.txt` in
-   [`bazel/repositories_extra.bzl`](repositories_extra.bzl)
+1. Define a `pip_install()` pointing at your target `requirements.txt` in
+   [`bazel/dependency_imports.bzl`](bazel/dependency_imports.bzl)
 
-2. Add a `pip_install()` invocation in
-   [`bazel/dependency_imports.bzl`](dependency_imports.bzl).
-
-3. Add a `requirements("<package name")` in the `BUILD` file that depends on
+2. Add a `requirements("<package name")` in the `BUILD` file that depends on
    this package.
 
 You can use [`tools/config_validation/BUILD`](../tools/config_validation/BUILD) as an example
