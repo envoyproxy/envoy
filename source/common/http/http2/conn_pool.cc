@@ -74,9 +74,10 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state) {
   return std::make_unique<FixedHttpConnPoolImpl>(
-      host, priority, dispatcher, options, transport_socket_options, random_generator,
+      host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(

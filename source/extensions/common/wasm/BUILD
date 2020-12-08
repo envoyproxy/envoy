@@ -16,6 +16,16 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "wasm_runtime_factory_interface",
+    hdrs = [
+        "wasm_runtime_factory.h",
+    ],
+    deps = [
+        "@proxy_wasm_cpp_host//:include",
+    ],
+)
+
 # NB: Used to break the circular dependency between wasm_lib and null_plugin_lib.
 envoy_cc_library(
     name = "wasm_hdr",
@@ -86,6 +96,7 @@ envoy_cc_library(
     deps = [
         ":wasm_hdr",
         ":wasm_interoperation_lib",
+        ":wasm_runtime_factory_interface",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",
         "//include/envoy/server:lifecycle_notifier_interface",
@@ -107,7 +118,8 @@ envoy_cc_library(
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:value_export_util",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
-        "@proxy_wasm_cpp_host//:lib",
+        "@proxy_wasm_cpp_host//:common_lib",
+        "@proxy_wasm_cpp_host//:null_lib",
     ] + select(
         {
             "//bazel:windows_x86_64": [],

@@ -84,6 +84,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+        "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
         "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
     ],
 )
@@ -105,6 +106,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+        "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
     ],
 )
 
@@ -162,10 +164,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = ["active_quic_listener_test.cc"],
-    tags = [
-        "fails_on_windows",
-        "nofips",
-    ],
+    tags = ["nofips"],
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
@@ -290,5 +289,6 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
         "@com_googlesource_quiche//:quic_test_tools_first_flight_lib",
+        "@com_googlesource_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
     ],
 )

@@ -19,16 +19,15 @@ namespace Http {
 namespace {
 
 // TODO(alyssawilk) replace this with the MixedConnectionPool once it lands.
-class ConnPoolImplForTest : public HttpConnPoolImplBase {
+class ConnPoolImplForTest : public Event::TestUsingSimulatedTime, public HttpConnPoolImplBase {
 public:
-  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Random::RandomGenerator& random,
-                      Upstream::ClusterInfoConstSharedPtr cluster)
-      : HttpConnPoolImplBase(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
+  ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state,
+                      Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster)
+      : HttpConnPoolImplBase(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
                              Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
-                             random, {Http::Protocol::Http2, Http::Protocol::Http11}) {}
+                             random, state, {Http::Protocol::Http2, Http::Protocol::Http11}) {}
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override { return nullptr; }
-  Http::Protocol protocol() const override { return Http::Protocol::Http2; }
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData&) override {
     return nullptr;
   }
@@ -40,12 +39,13 @@ public:
 class MixedConnPoolImplTest : public testing::Test {
 public:
   MixedConnPoolImplTest()
-      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, random_, cluster_)) {}
+      : conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_)) {}
 
   ~MixedConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
   }
 
+  Upstream::ClusterConnectivityState state_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;

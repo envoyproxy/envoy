@@ -74,16 +74,6 @@ private:
     Queue::Iterator iterator_;
   };
 
-  // A simple wrapper around a float that ensures value() is sane (in the range [0, 1]).
-  class DurationScaleFactor {
-  public:
-    DurationScaleFactor(double value);
-    double value() const { return value_; }
-
-  private:
-    double value_;
-  };
-
   struct Hash {
     // Magic declaration to allow heterogeneous lookup.
     using is_transparent = void; // NOLINT(readability-identifier-naming)
@@ -113,7 +103,7 @@ private:
 
   static MonotonicTime computeTriggerTime(const Queue::Item& item,
                                           std::chrono::milliseconds duration,
-                                          DurationScaleFactor scale_factor);
+                                          UnitFloat scale_factor);
 
   ScalingTimerHandle activateTimer(std::chrono::milliseconds duration, RangeTimerImpl& timer);
 
@@ -124,7 +114,7 @@ private:
   void onQueueTimerFired(Queue& queue);
 
   Dispatcher& dispatcher_;
-  DurationScaleFactor scale_factor_;
+  UnitFloat scale_factor_;
   absl::flat_hash_set<std::unique_ptr<Queue>, Hash, Eq> queues_;
 };
 

@@ -30,6 +30,7 @@ DSR
 HEXDIG
 HEXDIGIT
 OWS
+STATNAME
 SkyWalking
 TIDs
 ceil
@@ -237,6 +238,7 @@ Postgre
 Postgres
 Prereq
 QDCOUNT
+QPACK
 QUIC
 QoS
 RAII
@@ -314,6 +316,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TP
 TPM
 TSAN
 TSI
@@ -1217,6 +1220,7 @@ workspace
 writev
 xDS
 xDSes
+xdstp
 xeon
 xform
 xhtml

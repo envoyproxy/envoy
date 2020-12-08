@@ -1,10 +1,4 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load(
-    "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_select_wasm_v8",
-    "envoy_select_wasm_wasmtime",
-    "envoy_select_wasm_wavm",
-)
 
 licenses(["notice"])  # Apache 2
 
@@ -19,29 +13,14 @@ cc_library(
 )
 
 cc_library(
-    name = "lib",
-    # Note that the select cannot appear in the glob.
-    srcs = glob(
-        [
-            "src/**/*.h",
-            "src/**/*.cc",
-        ],
-        exclude = [
-            "src/v8/*.cc",
-            "src/wavm/*.cc",
-            "src/wasmtime/*.cc",
-        ],
-    ) + envoy_select_wasm_v8(glob([
-        "src/v8/*.cc",
-    ])) + envoy_select_wasm_wavm(glob([
-        "src/wavm/*.cc",
-    ])) + envoy_select_wasm_wasmtime(glob([
-        "src/wasmtime/*.cc",
-    ])),
-    copts = envoy_select_wasm_wavm([
-        '-DWAVM_API=""',
-        "-Wno-non-virtual-dtor",
-        "-Wno-old-style-cast",
+    name = "common_lib",
+    srcs = glob([
+        "src/*.h",
+        "src/*.cc",
+        "src/common/*.h",
+        "src/common/*.cc",
+        "src/third_party/*.h",
+        "src/third_party/*.cc",
     ]),
     deps = [
         ":include",
@@ -53,11 +32,54 @@ cc_library(
         "//external:zlib",
         "@proxy_wasm_cpp_sdk//:api_lib",
         "@proxy_wasm_cpp_sdk//:common_lib",
-    ] + envoy_select_wasm_v8([
-        "//external:wee8",
-    ]) + envoy_select_wasm_wavm([
-        "@envoy//bazel/foreign_cc:wavm",
-    ]) + envoy_select_wasm_wasmtime([
-        "@com_github_wasm_c_api//:wasmtime_lib",
+    ],
+)
+
+cc_library(
+    name = "null_lib",
+    srcs = glob([
+        "src/null/*.cc",
     ]),
+    deps = [
+        ":common_lib",
+    ],
+)
+
+cc_library(
+    name = "v8_lib",
+    srcs = glob([
+        "src/v8/*.cc",
+    ]),
+    deps = [
+        ":common_lib",
+        "//external:wee8",
+    ],
+)
+
+cc_library(
+    name = "wavm_lib",
+    srcs = glob([
+        "src/wavm/*.cc",
+    ]),
+    copts = [
+        '-DWAVM_API=""',
+        "-Wno-non-virtual-dtor",
+        "-Wno-old-style-cast",
+    ],
+    deps = [
+        ":common_lib",
+        "@envoy//bazel/foreign_cc:wavm",
+    ],
+)
+
+cc_library(
+    name = "wasmtime_lib",
+    srcs = glob([
+        "src/wasmtime/*.h",
+        "src/wasmtime/*.cc",
+    ]),
+    deps = [
+        ":common_lib",
+        "@com_github_wasm_c_api//:wasmtime_lib",
+    ],
 )

@@ -10,25 +10,7 @@
 
 namespace quic {
 
-// static
-bool QuicCertUtilsImpl::ExtractSubjectNameFromDERCert(quiche::QuicheStringPiece cert,
-                                                      quiche::QuicheStringPiece* subject_out) {
-  CBS tbs_certificate;
-  if (!SeekToSubject(cert, &tbs_certificate)) {
-    return false;
-  }
-
-  CBS subject;
-  if (!CBS_get_asn1_element(&tbs_certificate, &subject, CBS_ASN1_SEQUENCE)) {
-    return false;
-  }
-  *subject_out =
-      absl::string_view(reinterpret_cast<const char*>(CBS_data(&subject)), CBS_len(&subject));
-  return true;
-}
-
-// static
-bool QuicCertUtilsImpl::SeekToSubject(quiche::QuicheStringPiece cert, CBS* tbs_certificate) {
+bool seekToSubject(absl::string_view cert, CBS* tbs_certificate) {
   CBS der;
   CBS_init(&der, reinterpret_cast<const uint8_t*>(cert.data()), cert.size());
   CBS certificate;
@@ -62,6 +44,24 @@ bool QuicCertUtilsImpl::SeekToSubject(quiche::QuicheStringPiece cert, CBS* tbs_c
       !CBS_get_asn1(tbs_certificate, nullptr, CBS_ASN1_SEQUENCE)) {
     return false;
   }
+  return true;
+}
+
+// static
+// NOLINTNEXTLINE(readability-identifier-naming)
+bool QuicCertUtilsImpl::ExtractSubjectNameFromDERCert(absl::string_view cert,
+                                                      absl::string_view* subject_out) {
+  CBS tbs_certificate;
+  if (!seekToSubject(cert, &tbs_certificate)) {
+    return false;
+  }
+
+  CBS subject;
+  if (!CBS_get_asn1_element(&tbs_certificate, &subject, CBS_ASN1_SEQUENCE)) {
+    return false;
+  }
+  *subject_out =
+      absl::string_view(reinterpret_cast<const char*>(CBS_data(&subject)), CBS_len(&subject));
   return true;
 }
 

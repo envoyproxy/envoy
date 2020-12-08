@@ -44,7 +44,8 @@ private:
   }
 };
 
-class BoundedLoadHashingLoadBalancerTest : public testing::Test {
+class BoundedLoadHashingLoadBalancerTest : public Event::TestUsingSimulatedTime,
+                                           public testing::Test {
 public:
   HostOverloadFactorPredicate
   getHostOverloadFactorPredicate(const std::vector<std::string>& addresses) {
@@ -65,7 +66,7 @@ public:
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
     for (uint32_t i = 0; i < num_hosts; i++) {
       normalized_host_weights.push_back(
-          {makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i)), equal_weight});
+          {makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i), simTime()), equal_weight});
     }
   }
 
@@ -74,7 +75,7 @@ public:
                    NormalizedHostWeightVector& ring) {
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
     for (uint32_t i = 0; i < num_hosts; i++) {
-      HostConstSharedPtr h = makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i));
+      HostConstSharedPtr h = makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i), simTime());
       ring.push_back({h, equal_weight});
       ring.push_back({h, equal_weight});
       hosts.push_back({h, equal_weight});

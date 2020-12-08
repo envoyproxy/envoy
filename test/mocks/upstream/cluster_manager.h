@@ -34,6 +34,11 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
+  void initializeClusters(const std::vector<std::string>& active_cluster_names,
+                          const std::vector<std::string>& warming_cluster_names);
+
+  void initializeThreadLocalClusters(const std::vector<std::string>& cluster_names);
+
   // Upstream::ClusterManager
   MOCK_METHOD(bool, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster,
@@ -42,9 +47,10 @@ public:
   MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
   MOCK_METHOD(void, initializeSecondaryClusters,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
-  MOCK_METHOD(ClusterInfoMap, clusters, ());
+  MOCK_METHOD(ClusterInfoMaps, clusters, ());
+
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
-  MOCK_METHOD(ThreadLocalCluster*, get, (absl::string_view cluster));
+  MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
   MOCK_METHOD(Http::ConnectionPool::Instance*, httpConnPoolForCluster,
               (const std::string& cluster, ResourcePriority priority,
                absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
@@ -64,6 +70,7 @@ public:
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
+  const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -75,6 +82,10 @@ public:
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
+  absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
+  absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
+  Stats::TestSymbolTable symbol_table_;
+  ClusterStatNames cluster_stat_names_;
 };
 } // namespace Upstream
 

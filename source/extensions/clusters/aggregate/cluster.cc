@@ -18,7 +18,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api),
+                                added_via_api, factory_context.dispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random), tls_(tls),
       clusters_(config.clusters().begin(), config.clusters().end()) {}
 
@@ -38,7 +38,7 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
     if (skip_predicate(cluster)) {
       continue;
     }
-    auto tlc = cluster_manager_.get(cluster);
+    auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
     // It is possible that the cluster doesn't exist, e.g., the cluster cloud be deleted or the
     // cluster hasn't been added by xDS.
     if (tlc == nullptr) {
@@ -67,7 +67,7 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
 
 void Cluster::startPreInit() {
   for (const auto& cluster : clusters_) {
-    auto tlc = cluster_manager_.get(cluster);
+    auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
     // It is possible when initializing the cluster, the included cluster doesn't exist. e.g., the
     // cluster could be added dynamically by xDS.
     if (tlc == nullptr) {
@@ -94,7 +94,7 @@ void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predic
   tls_.runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()](
                            OptRef<ThreadLocal::ThreadLocalObject>) {
     PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
-    Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
+    Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
     ASSERT(cluster != nullptr);
     dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer())
         .refresh(std::move(priority_context));

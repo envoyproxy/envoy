@@ -4,8 +4,11 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/scaled_timer_minimum.h"
 #include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local_object.h"
+
+#include "common/common/interval_value.h"
 
 namespace Envoy {
 namespace Server {
@@ -19,18 +22,17 @@ namespace Server {
  */
 class OverloadActionState {
 public:
-  static constexpr OverloadActionState inactive() { return OverloadActionState(0); }
+  static constexpr OverloadActionState inactive() { return OverloadActionState(UnitFloat::min()); }
 
-  static constexpr OverloadActionState saturated() { return OverloadActionState(1.0); }
+  static constexpr OverloadActionState saturated() { return OverloadActionState(UnitFloat::max()); }
 
-  explicit constexpr OverloadActionState(float value)
-      : action_value_(std::min(1.0f, std::max(0.0f, value))) {}
+  explicit constexpr OverloadActionState(UnitFloat value) : action_value_(value) {}
 
-  float value() const { return action_value_; }
-  bool isSaturated() const { return action_value_ == 1; }
+  float value() const { return action_value_.value(); }
+  bool isSaturated() const { return action_value_.value() == UnitFloat::max().value(); }
 
 private:
-  float action_value_;
+  UnitFloat action_value_;
 };
 
 /**
@@ -56,6 +58,10 @@ public:
 
   // Get a scaled timer whose minimum corresponds to the configured value for the given timer type.
   virtual Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
+                                            Event::TimerCb callback) PURE;
+
+  // Get a scaled timer whose minimum is determined by the given scaling rule.
+  virtual Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
                                             Event::TimerCb callback) PURE;
 };
 

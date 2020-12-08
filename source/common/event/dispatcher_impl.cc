@@ -218,7 +218,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
 
 void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
-SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
+SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
@@ -275,6 +275,19 @@ void DispatcherImpl::runPostCallbacks() {
       post_callbacks_.pop_front();
     }
     callback();
+  }
+}
+
+void DispatcherImpl::runFatalActionsOnTrackedObject(
+    const FatalAction::FatalActionPtrList& actions) const {
+  // Only run if this is the dispatcher of the current thread and
+  // DispatcherImpl::Run has been called.
+  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+    return;
+  }
+
+  for (const auto& action : actions) {
+    action->run(current_object_);
   }
 }
 

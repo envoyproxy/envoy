@@ -165,7 +165,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     if (slices_to_commit > 0) {
       read_buffer.commit(slices, slices_to_commit);
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
         keep_reading = false;
       }
     }
@@ -293,6 +293,17 @@ void SslSocket::shutdownSsl() {
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(rawSsl());
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      // Windows operate under `EmulatedEdge`. These are level events that are artificially
+      // made to behave like edge events. And if the rc is 0 then in that case we want read
+      // activation resumption. This code is protected with an `constexpr` if, to minimize the tax
+      // on POSIX systems that operate in Edge events.
+      if (rc == 0) {
+        // See https://www.openssl.org/docs/manmaster/man3/SSL_shutdown.html
+        // if return value is 0,  Call SSL_read() to do a bidirectional shutdown.
+        callbacks_->setTransportSocketIsReadable();
+      }
+    }
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     drainErrorQueue();
     info_->setState(Ssl::SocketState::ShutdownSent);

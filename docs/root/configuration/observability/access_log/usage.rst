@@ -187,6 +187,10 @@ The following command operators are supported:
     HTTP response code. Note that a response code of '0' means that the server never sent the
     beginning of a response. This generally means that the (downstream) client disconnected.
 
+    Note that in the case of 100-continue responses, only the response code of the final headers
+    will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
+    If a 100-continue results in a disconnect, the 100 will be logged.
+
   TCP
     Not implemented ("-").
 

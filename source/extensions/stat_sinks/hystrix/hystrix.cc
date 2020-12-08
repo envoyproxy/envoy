@@ -339,7 +339,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   }
   incCounter();
   std::stringstream ss;
-  Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
+  Upstream::ClusterManager::ClusterInfoMaps all_clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
   absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
@@ -370,7 +370,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
     }
   }
 
-  for (auto& cluster : clusters) {
+  for (auto& cluster : all_clusters.active_clusters_) {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.second.get().info();
 
     std::unique_ptr<ClusterStatsCache>& cluster_stats_cache_ptr =
@@ -407,9 +407,9 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   }
 
   // check if any clusters were removed, and remove from cache
-  if (clusters.size() < cluster_stats_cache_map_.size()) {
+  if (all_clusters.active_clusters_.size() < cluster_stats_cache_map_.size()) {
     for (auto it = cluster_stats_cache_map_.begin(); it != cluster_stats_cache_map_.end();) {
-      if (clusters.find(it->first) == clusters.end()) {
+      if (all_clusters.active_clusters_.find(it->first) == all_clusters.active_clusters_.end()) {
         auto next_it = std::next(it);
         cluster_stats_cache_map_.erase(it);
         it = next_it;

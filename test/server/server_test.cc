@@ -1,8 +1,10 @@
 #include <memory>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/fatal_action_config.h"
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
@@ -19,6 +21,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
+#include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
@@ -655,11 +658,13 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
-// Validate that bootstrap pb_text loads.
-TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
-  EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
-                          initialize("test/server/test_data/server/node_bootstrap.pb_text"));
-  EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
+// Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
+// set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2TransportWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/dynamic_v2.yaml"),
+                          DeprecatedMajorVersionException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
@@ -668,8 +673,7 @@ TEST_P(ServerInstanceImplTest,
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       DeprecatedMajorVersionException,
-      "Support for v2 will be removed from Envoy at the start of Q1 2021. You may make use of v2 "
-      "in Q3 2020 by setting");
+      "Support for v2 will be removed from Envoy at the start of Q1 2021.");
 }
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
@@ -786,12 +790,25 @@ TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
 }
 
 // Validate that bootstrap v2 YAML with deprecated fields loads fails if V3 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromYaml) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3SelectedFromYaml)) {
   options_.bootstrap_version_ = 3;
 
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
       EnvoyException, "has unknown fields");
+}
+
+// Validate that bootstrap with v2 dynamic transport loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2TransportWithoutExplicitVersion)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/dynamic_v2.yaml");
+}
+
+// Validate that bootstrap pb_text loads.
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
+  EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
+                          initialize("test/server/test_data/server/node_bootstrap.pb_text"));
+  EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
 }
 
 // Validate that we blow up on invalid version number.
@@ -1212,6 +1229,72 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
       "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
 }
 
+// Insufficient support on Windows.
+#ifndef WIN32
+class SafeFatalAction : public Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override {
+    std::cerr << "Called SafeFatalAction" << std::endl;
+  }
+
+  bool isAsyncSignalSafe() const override { return true; }
+};
+
+class UnsafeFatalAction : public Configuration::FatalAction {
+public:
+  void run(const ScopeTrackedObject* /*current_object*/) override {
+    std::cerr << "Called UnsafeFatalAction" << std::endl;
+  }
+
+  bool isAsyncSignalSafe() const override { return false; }
+};
+
+TEST_P(ServerInstanceImplTest, WithFatalActions) {
+  // Inject Safe Factory.
+  NiceMock<Configuration::MockFatalActionFactory> mock_safe_factory;
+  EXPECT_CALL(mock_safe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+  }));
+  EXPECT_CALL(mock_safe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.safe"));
+
+  Registry::InjectFactory<Configuration::FatalActionFactory> registered_safe_factory(
+      mock_safe_factory);
+
+  // Inject Unsafe Factory
+  NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
+  EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+  }));
+  EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
+
+  Registry::InjectFactory<Configuration::FatalActionFactory> registered_unsafe_factory(
+      mock_unsafe_factory);
+
+  EXPECT_DEATH(
+      {
+        EXPECT_CALL(mock_safe_factory, createFatalActionFromProto(_, _))
+            .WillOnce(
+                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                          Instance* /*server*/) { return std::make_unique<SafeFatalAction>(); }));
+        EXPECT_CALL(mock_unsafe_factory, createFatalActionFromProto(_, _))
+            .WillOnce(
+                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                          Instance* /*server*/) { return std::make_unique<UnsafeFatalAction>(); }));
+        absl::Notification abort_called;
+        auto server_thread =
+            startTestServer("test/server/test_data/server/fatal_actions.yaml", false);
+        // Trigger SIGABRT, wait for the ABORT
+        server_->dispatcher().post([&] {
+          abort();
+          abort_called.Notify();
+        });
+
+        abort_called.WaitForNotification();
+      },
+      "");
+}
+#endif
+
 // Static configuration validation. We test with both allow/reject settings various aspects of
 // configuration from YAML.
 class StaticValidationTest
@@ -1340,6 +1423,16 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
     }
   }
   ASSERT_TRUE(disabled_filter_found);
+}
+
+TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
+  // These are already the defaults. Repeated here for clarity.
+  process_object_ = nullptr;
+  process_context_ = nullptr;
+
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  ProcessContextOptRef context = server_->processContext();
+  EXPECT_FALSE(context.has_value());
 }
 
 } // namespace

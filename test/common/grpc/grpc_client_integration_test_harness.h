@@ -20,9 +20,10 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
-#include "common/stats/symbol_table_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/router/context_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
@@ -239,12 +240,13 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_->symbolTable()) {}
+        http_context_(stats_store_->symbolTable()), router_context_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
-      fake_upstream_ = std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP2,
-                                                      ipVersion(), test_time_.timeSystem());
+      FakeUpstreamConfig config(test_time_.timeSystem());
+      config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+      fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
     }
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
@@ -291,23 +293,25 @@ public:
     ON_CALL(*mock_cluster_info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
-    EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
     Upstream::MockHost::MockCreateConnectionData connection_data{client_connection_.release(),
                                                                  host_description_ptr_};
     EXPECT_CALL(*mock_host_, createConnection_(_, _)).WillRepeatedly(Return(connection_data));
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = Http::Http2::allocateConnPool(
-        *dispatcher_, random_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr);
+    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, random_, host_ptr_,
+                                                    Upstream::ResourcePriority::Default, nullptr,
+                                                    nullptr, state_);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_ptr_, *stats_store_, *dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_), http_context_);
+        std::move(shadow_writer_ptr_), http_context_, router_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq(fake_cluster_name_)))
+        .WillRepeatedly(Return(&thread_local_cluster_));
     envoy::config::core::v3::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
@@ -456,6 +460,7 @@ public:
   const TestMetadata empty_metadata_;
 
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
+  Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
   const std::string fake_cluster_name_{"fake_cluster"};
   Upstream::MockClusterManager cm_;
@@ -469,6 +474,7 @@ public:
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   envoy::config::core::v3::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =
@@ -522,9 +528,10 @@ public:
             std::move(cfg), context_manager_, *stats_store_);
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr);
-    fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
-                                                    FakeHttpConnection::Type::HTTP2, ipVersion(),
-                                                    test_time_.timeSystem());
+    FakeUpstreamConfig config(test_time_.timeSystem());
+    config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+    fake_upstream_ =
+        std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, ipVersion(), config);
 
     GrpcClientIntegrationTest::initialize();
   }

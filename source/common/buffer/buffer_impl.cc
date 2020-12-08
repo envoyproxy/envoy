@@ -201,6 +201,17 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
   return raw_slices;
 }
 
+RawSlice OwnedImpl::frontSlice() const {
+  // Ignore zero-size slices and return the first slice with data.
+  for (const auto& slice : slices_) {
+    if (slice->dataSize() > 0) {
+      return RawSlice{slice->data(), slice->dataSize()};
+    }
+  }
+
+  return {nullptr, 0};
+}
+
 SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
   // Remove zero byte fragments from the front of the queue to ensure

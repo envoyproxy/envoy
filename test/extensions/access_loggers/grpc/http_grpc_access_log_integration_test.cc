@@ -34,7 +34,7 @@ public:
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
-      accesslog_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*accesslog_cluster);
     });
 
     config_helper_.addConfigModifier(
@@ -127,6 +127,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());

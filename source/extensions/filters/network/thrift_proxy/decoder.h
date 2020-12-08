@@ -17,6 +17,7 @@ namespace ThriftProxy {
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
   FUNCTION(StopIteration)                                                                          \
   FUNCTION(WaitForData)                                                                            \
+  FUNCTION(PassthroughData)                                                                        \
   FUNCTION(MessageBegin)                                                                           \
   FUNCTION(MessageEnd)                                                                             \
   FUNCTION(StructBegin)                                                                            \
@@ -56,6 +57,8 @@ private:
   }
 };
 
+class DecoderCallbacks;
+
 /**
  * DecoderStateMachine is the Thrift message state machine as described in
  * source/extensions/filters/network/thrift_proxy/docs.
@@ -63,9 +66,9 @@ private:
 class DecoderStateMachine : public Logger::Loggable<Logger::Id::thrift> {
 public:
   DecoderStateMachine(Protocol& proto, MessageMetadataSharedPtr& metadata,
-                      DecoderEventHandler& handler)
-      : proto_(proto), metadata_(metadata), handler_(handler), state_(ProtocolState::MessageBegin) {
-  }
+                      DecoderEventHandler& handler, DecoderCallbacks& callbacks)
+      : proto_(proto), metadata_(metadata), handler_(handler), callbacks_(callbacks),
+        state_(ProtocolState::MessageBegin) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -129,6 +132,7 @@ private:
 
   // These functions map directly to the matching ProtocolState values. Each returns the next state
   // or ProtocolState::WaitForData if more data is required.
+  DecoderStatus passthroughData(Buffer::Instance& buffer);
   DecoderStatus messageBegin(Buffer::Instance& buffer);
   DecoderStatus messageEnd(Buffer::Instance& buffer);
   DecoderStatus structBegin(Buffer::Instance& buffer);
@@ -165,8 +169,10 @@ private:
   Protocol& proto_;
   MessageMetadataSharedPtr metadata_;
   DecoderEventHandler& handler_;
+  DecoderCallbacks& callbacks_;
   ProtocolState state_;
   std::vector<Frame> stack_;
+  uint32_t body_bytes_{};
 };
 
 using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;
@@ -179,6 +185,11 @@ public:
    * @return DecoderEventHandler& a new DecoderEventHandler for a message.
    */
   virtual DecoderEventHandler& newDecoderEventHandler() PURE;
+
+  /**
+   * @return True if payload passthrough is enabled and is supported by filter chain.
+   */
+  virtual bool passthroughEnabled() const PURE;
 };
 
 /**

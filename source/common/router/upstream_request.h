@@ -77,7 +77,8 @@ public:
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                   const StreamInfo::StreamInfo& info) override;
+                   const StreamInfo::StreamInfo& info,
+                   absl::optional<Http::Protocol> protocol) override;
   UpstreamToDownstream& upstreamToDownstream() override { return *this; }
 
   void clearRequestEncoder();

@@ -126,6 +126,8 @@ public:
     return {{const_cast<char*>(start()), size_}};
   }
 
+  Buffer::RawSlice frontSlice() const override { return {const_cast<char*>(start()), size_}; }
+
   uint64_t length() const override { return size_; }
 
   void* linearize(uint32_t /*size*/) override {

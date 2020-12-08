@@ -71,7 +71,7 @@ public:
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
-  SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
+  SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
@@ -93,6 +93,9 @@ public:
       }
     }
   }
+
+  void
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
 
 private:
   // Holds a reference to the watchdog registered with this dispatcher and the timer used to ensure

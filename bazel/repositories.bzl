@@ -4,7 +4,6 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
-load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -98,7 +97,6 @@ def _go_deps(skip_targets):
 
 def _rust_deps():
     external_http_archive("io_bazel_rules_rust")
-    raze_fetch_remote_crates()
 
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
@@ -164,6 +162,7 @@ def envoy_dependencies(skip_targets = []):
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
+    external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
     external_http_archive("com_github_google_flatbuffers")

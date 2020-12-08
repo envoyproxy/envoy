@@ -163,7 +163,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureEmptyCertChain) {
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(leaf_cert_);
   quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  quiche::QuicheStringPiece chlo_hash{"aaaaa"};
+  absl::string_view chlo_hash{"aaaaa"};
   std::string server_config{"Server Config"};
   const std::string ocsp_response;
   const std::string cert_sct;
@@ -181,7 +181,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidLeafCert) {
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(leaf_cert_);
   quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  quiche::QuicheStringPiece chlo_hash{"aaaaa"};
+  absl::string_view chlo_hash{"aaaaa"};
   std::string server_config{"Server Config"};
   const std::string ocsp_response;
   const std::string cert_sct;
@@ -197,7 +197,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidLeafCert) {
 TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureUnsupportedECKey) {
   configCertVerificationDetails(true);
   quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  quiche::QuicheStringPiece chlo_hash{"aaaaa"};
+  absl::string_view chlo_hash{"aaaaa"};
   std::string server_config{"Server Config"};
   const std::string ocsp_response;
   const std::string cert_sct;
@@ -236,7 +236,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidSignature) {
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(leaf_cert_);
   quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
-  quiche::QuicheStringPiece chlo_hash{"aaaaa"};
+  absl::string_view chlo_hash{"aaaaa"};
   std::string server_config{"Server Config"};
   const std::string ocsp_response;
   const std::string cert_sct;

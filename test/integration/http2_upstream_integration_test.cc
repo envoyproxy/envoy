@@ -406,10 +406,11 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
   // Set max response header count to 200.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_headers_count()->set_value(200);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   Http::TestResponseHeaderMapImpl response_headers(default_response_headers_);
   for (int i = 0; i < 150; i++) {
@@ -467,6 +468,7 @@ typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
       common_config:
         log_name: foo
+        transport_api_version: V3
         grpc_service:
           envoy_grpc:
             cluster_name: cluster_0

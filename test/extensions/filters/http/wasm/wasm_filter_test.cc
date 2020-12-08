@@ -2,6 +2,7 @@
 
 #include "extensions/filters/http/wasm/wasm_filter.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/router/mocks.h"
 #include "test/test_common/wasm_base.h"
@@ -95,20 +96,8 @@ protected:
   Grpc::MockAsyncClientManager async_client_manager_;
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    std::make_tuple("v8", "cpp"), std::make_tuple("v8", "rust"),
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    std::make_tuple("wavm", "cpp"), std::make_tuple("wavm", "rust"),
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-    std::make_tuple("wasmtime", "cpp"), std::make_tuple("wasmtime", "rust"),
-#endif
-    std::make_tuple("null", "cpp"));
-INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest, testing_values);
+INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmHttpFilterTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_language_values);
 
 // Bad code in initial config.
 TEST_P(WasmHttpFilterTest, BadCode) {
@@ -586,8 +575,7 @@ TEST_P(WasmHttpFilterTest, AsyncCall) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
-  EXPECT_CALL(cluster_manager_, get(Eq("cluster"))).Times(testing::AtLeast(1));
-  EXPECT_CALL(cluster_manager_, get(Eq("bogus cluster"))).WillRepeatedly(Return(nullptr));
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -631,7 +619,7 @@ TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
-  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -681,8 +669,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallBadCall) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  EXPECT_CALL(cluster_manager_, get(Eq("cluster"))).Times(testing::AtLeast(1));
-  EXPECT_CALL(cluster_manager_, get(Eq("bogus cluster"))).WillRepeatedly(Return(nullptr));
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   // Just fail the send.
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
@@ -702,8 +689,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallFailure) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
-  EXPECT_CALL(cluster_manager_, get(Eq("cluster"))).Times(testing::AtLeast(1));
-  EXPECT_CALL(cluster_manager_, get(Eq("bogus cluster"))).WillRepeatedly(Return(nullptr));
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -743,8 +729,7 @@ TEST_P(WasmHttpFilterTest, AsyncCallAfterDestroyed) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
-  EXPECT_CALL(cluster_manager_, get(Eq("cluster"))).Times(testing::AtLeast(1));
-  EXPECT_CALL(cluster_manager_, get(Eq("bogus cluster"))).WillRepeatedly(Return(nullptr));
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1263,9 +1248,11 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
 }
 
 // Test metadata access including CEL expressions.
-// TODO: re-enable this on Windows if and when the CEL `Antlr` parser compiles on Windows.
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM) || defined(ENVOY_WASM_WASMTIME)
 TEST_P(WasmHttpFilterTest, Metadata) {
+#ifdef WIN32
+  // TODO: re-enable this on Windows if and when the CEL `Antlr` parser compiles on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
   setupTest("", "metadata");
   setupFilter();
   envoy::config::core::v3::Node node_data;
@@ -1319,7 +1306,6 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   filter().onDestroy();
   filter().onDestroy(); // Does nothing.
 }
-#endif
 
 TEST_P(WasmHttpFilterTest, Property) {
   if (std::get<1>(GetParam()) == "rust") {

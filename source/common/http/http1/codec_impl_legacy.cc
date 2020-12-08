@@ -78,8 +78,8 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      is_response_to_head_request_(false), is_response_to_connect_request_(false),
-      header_key_formatter_(header_key_formatter) {
+      connect_request_(false), is_response_to_head_request_(false),
+      is_response_to_connect_request_(false), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -262,6 +262,10 @@ void StreamEncoderImpl::endEncode() {
 
   connection_.flushOutput(true);
   connection_.onEncodeComplete();
+  // With CONNECT half-closing the connection is used to signal end stream.
+  if (connect_request_) {
+    connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+  }
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
@@ -381,6 +385,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     head_request_ = true;
   } else if (method->value() == Headers::get().MethodValues.Connect) {
     disableChunkEncoding();
+    connection_.connection().enableHalfClose(true);
     connect_request_ = true;
   }
   if (Utility::isUpgrade(headers)) {
@@ -526,6 +531,16 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
       [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
 }
 
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
+  Http::Status status = ConnectionImpl::dispatch(data);
+  if (status.ok() && data.length() > 0) {
+    // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
+    // after a response is complete indicates an error.
+    return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
+  }
+  return status;
+}
+
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   ASSERT(buffered_body_.length() == 0);
@@ -539,8 +554,17 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
-      total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
+    current_dispatching_buffer_ = &data;
+    while (data.length() > 0) {
+      auto slice = data.frontSlice();
+      dispatching_slice_already_drained_ = false;
+      const size_t parsed = dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
+      if (!dispatching_slice_already_drained_) {
+        ASSERT(parsed <= slice.len_);
+        data.drain(parsed);
+      }
+
+      total_parsed += parsed;
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK) {
         // Parse errors trigger an exception in dispatchSlice so we are guaranteed to be paused at
         // this point.
@@ -548,6 +572,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
         break;
       }
     }
+    current_dispatching_buffer_ = nullptr;
     dispatchBufferedBody();
   } else {
     dispatchSlice(nullptr, 0);
@@ -555,7 +580,6 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ASSERT(buffered_body_.length() == 0);
 
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
-  data.drain(total_parsed);
 
   // If an upgrade has been handled and there is body data or early upgrade
   // payload to send on, send it on.
@@ -717,7 +741,13 @@ int ConnectionImpl::onHeadersCompleteBase() {
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
-  buffered_body_.add(data, length);
+  auto slice = current_dispatching_buffer_->frontSlice();
+  if (data == slice.mem_ && length == slice.len_) {
+    buffered_body_.move(*current_dispatching_buffer_, length);
+    dispatching_slice_already_drained_ = true;
+  } else {
+    buffered_body_.add(data, length);
+  }
 }
 
 void ConnectionImpl::dispatchBufferedBody() {

@@ -48,14 +48,15 @@ namespace {
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
  */
-class ConnPoolImplForTest : public FixedHttpConnPoolImpl {
+class ConnPoolImplForTest : public Event::TestUsingSimulatedTime, public FixedHttpConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       Random::RandomGenerator& random_generator)
       : FixedHttpConnPoolImpl(
-            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource()),
             Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,
+            state_,
             [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) {
               return nullptr; // Not used: createCodecClient overloaded.
@@ -66,7 +67,7 @@ public:
   ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
     EXPECT_EQ(0U, busy_clients_.size());
-    EXPECT_EQ(0U, pending_streams_.size());
+    EXPECT_FALSE(hasPendingStreams());
   }
 
   struct TestCodecClient {
@@ -107,7 +108,8 @@ public:
             }
           }
         },
-        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
+        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+        *test_client.client_dispatcher_);
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
@@ -121,6 +123,7 @@ public:
 
   void expectAndRunUpstreamReady() { post_cb_(); }
 
+  Upstream::ClusterConnectivityState state_;
   Api::ApiPtr api_;
   Event::MockDispatcher& mock_dispatcher_;
   Event::PostCb post_cb_;

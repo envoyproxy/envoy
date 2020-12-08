@@ -87,6 +87,7 @@ protected:
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
+  bool connect_request_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
 
@@ -162,7 +163,6 @@ public:
 private:
   bool upgrade_request_{};
   bool head_request_{};
-  bool connect_request_{};
 };
 
 /**
@@ -275,6 +275,7 @@ protected:
   CodecStats& stats_;
   const Http1Settings codec_settings_;
   http_parser parser_;
+  Buffer::Instance* current_dispatching_buffer_{};
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
   HeaderString current_header_field_;
@@ -288,6 +289,7 @@ protected:
   bool deferred_end_stream_headers_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
+  bool dispatching_slice_already_drained_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -580,6 +582,7 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
+  Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
   Status onMessageBegin() override { return okStatus(); }
   Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

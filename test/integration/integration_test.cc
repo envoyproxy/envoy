@@ -483,6 +483,38 @@ TEST_P(IntegrationTest, TestSmuggling) {
   }
 }
 
+TEST_P(IntegrationTest, TestPipelinedResponses) {
+  initialize();
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+
+  ASSERT_TRUE(tcp_client->write(
+      "POST /test/long/url HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked\r\n\r\n"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  ASSERT_THAT(data, HasSubstr("POST"));
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"));
+
+  tcp_client->waitForData("0\r\n\r\n", false);
+  std::string response = tcp_client->data();
+
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
+  EXPECT_THAT(response, EndsWith("0\r\n\r\n"));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value(), 1);
+}
+
 TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -521,8 +553,12 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http_protocol_options()->set_allow_chunked_length(true);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http_protocol_options()
+          ->set_allow_chunked_length(true);
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
     }
   });
 
@@ -1396,7 +1432,10 @@ TEST_P(IntegrationTest, TestFlood) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {
@@ -1442,7 +1481,10 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {

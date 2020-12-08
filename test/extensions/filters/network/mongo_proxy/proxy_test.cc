@@ -626,8 +626,8 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
@@ -650,8 +650,8 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
 }
 
 } // namespace MongoProxy

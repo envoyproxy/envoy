@@ -6,6 +6,7 @@
 
 #include "extensions/common/wasm/wasm.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -89,20 +90,7 @@ public:
   }
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto test_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8",
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm",
-#endif
-#if defined(ENVOY_WASM_WASMTIME)
-    "wasmtime",
-#endif
-    "null");
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest, test_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest, Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmCommonTest, EnvoyWasm) {
   auto envoy_wasm = std::make_unique<EnvoyWasm>();
@@ -969,7 +957,8 @@ public:
   std::unique_ptr<TestContext> context_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest, test_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
+                         Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmCommonContextTest, OnDnsResolve) {
   std::string code;

@@ -858,11 +858,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
 void Context::onDownstreamConnectionClose(CloseType close_type) {
   ContextBase::onDownstreamConnectionClose(close_type);
   downstream_closed_ = true;
-  // Call close on TCP connection, if upstream connection closed or there was a failure seen in
-  // this connection.
-  if (upstream_closed_ || getRequestStreamInfo()->hasAnyResponseFlag()) {
-    onCloseTCP();
-  }
+  onCloseTCP();
 }
 
 void Context::onUpstreamConnectionClose(CloseType close_type) {
@@ -896,7 +892,7 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
     return WasmResult::BadArgument;
   }
   auto cluster_string = std::string(cluster);
-  if (clusterManager().get(cluster_string) == nullptr) {
+  if (clusterManager().getThreadLocalCluster(cluster_string) == nullptr) {
     return WasmResult::BadArgument;
   }
 
