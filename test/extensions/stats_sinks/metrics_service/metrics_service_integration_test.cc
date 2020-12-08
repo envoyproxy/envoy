@@ -100,7 +100,7 @@ public:
         }
         if (metrics_family.name() == "cluster.cluster_0.upstream_rq_time" &&
             metrics_family.type() == ::io::prometheus::client::MetricType::SUMMARY) {
-           Stats::HistogramStatisticsImpl empty_statistics;
+          Stats::HistogramStatisticsImpl empty_statistics;
           EXPECT_EQ(metrics_family.metric(0).summary().quantile_size(),
                     empty_statistics.supportedQuantiles().size());
         }
