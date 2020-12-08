@@ -76,9 +76,9 @@ Reservation WatermarkBuffer::reserve(uint64_t preferred_length) {
       adjusted_length = OwnedSlice::default_slice_size_;
     } else {
       const uint64_t available_length = high_watermark_ - current_length;
-      adjusted_length = std::min(available_length, preferred_length);
       adjusted_length =
           IntUtil::roundUpToMultiple(adjusted_length, OwnedSlice::default_slice_size_);
+      adjusted_length = std::min(available_length, preferred_length);
     }
   }
 
