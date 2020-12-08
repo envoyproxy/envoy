@@ -227,7 +227,8 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setOnGenericPoolReadyParameters(std::move(upstream_), *callbacks_, host, info.downstreamSslConnection());
+  upstream_->setOnGenericPoolReadyParameters(std::move(upstream_), *callbacks_, host,
+                                             info.downstreamSslConnection());
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,

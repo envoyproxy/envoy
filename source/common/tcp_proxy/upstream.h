@@ -111,15 +111,17 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
-  void setOnGenericPoolReadyParameters(std::unique_ptr<GenericUpstream>&& upstream, GenericConnectionPoolCallbacks& callbacks, Upstream::HostDescriptionConstSharedPtr host, Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-      upstream_ = std::move(upstream);
-      callbacks_ = &callbacks;
-      host_ = host;
-      ssl_info_ = ssl_info;
+  void setOnGenericPoolReadyParameters(std::unique_ptr<GenericUpstream>&& upstream,
+                                       GenericConnectionPoolCallbacks& callbacks,
+                                       Upstream::HostDescriptionConstSharedPtr host,
+                                       Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+    upstream_ = std::move(upstream);
+    callbacks_ = &callbacks;
+    host_ = host;
+    ssl_info_ = ssl_info;
   }
 
   friend class DecoderShim;
-
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
@@ -131,8 +133,8 @@ protected:
 private:
   void deferredOnPoolReady() {
     callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host_,
-                                 request_encoder_->getStream().connectionLocalAddress(),
-                                 ssl_info_);
+                                   request_encoder_->getStream().connectionLocalAddress(),
+                                   ssl_info_);
   }
   class DecoderShim : public Http::ResponseDecoder {
   public:
@@ -143,7 +145,7 @@ private:
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else {
-          parent_.deferredOnPoolReady();
+        parent_.deferredOnPoolReady();
       }
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
