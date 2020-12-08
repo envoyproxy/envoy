@@ -1305,4 +1305,55 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
 
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityIdleStream) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // There is one open request to so that upstream connection is created. However
+  // the priority frame references both streams that are in the IDLE state.
+  floodClient(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(1),
+                                            Http2Frame::makeClientStreamId(2)),
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM + 1,
+              "cluster.cluster_0.http2.inbound_priority_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityOpenStream) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+  floodClient(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                            Http2Frame::makeClientStreamId(1)),
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 + 1,
+              "cluster.cluster_0.http2.inbound_priority_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityClosedStream) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto frame = Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                             Http2Frame::makeClientStreamId(1));
+  auto buf = serializeFrames(
+      frame, Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 + 1);
+
+  auto* upstream = fake_upstreams_.front().get();
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Upstream connection should be disconnected
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  EXPECT_EQ(
+      1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
+}
+
 } // namespace Envoy
