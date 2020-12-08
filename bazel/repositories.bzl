@@ -53,7 +53,7 @@ _default_envoy_build_config = repository_rule(
 
 # Python dependencies.
 def _python_deps():
-    # TODO(htuch): convert these to pip3_import.
+    # TODO(htuch): convert these to pip_install.
     external_http_archive(
         name = "com_github_twitter_common_lang",
         build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
