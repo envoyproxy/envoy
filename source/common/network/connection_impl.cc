@@ -695,8 +695,15 @@ void ConnectionImpl::onWriteReady() {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
-      for (BytesSentCb& cb : bytes_sent_callbacks_) {
-        cb(result.bytes_processed_);
+      auto it = bytes_sent_callbacks_.begin();
+      while (it != bytes_sent_callbacks_.end()) {
+        if ((*it)(result.bytes_processed_)) {
+          // move to the next callback.
+          it++;
+        } else {
+          // remove the current callback.
+          it = bytes_sent_callbacks_.erase(it);
+        }
 
         // If a callback closes the socket, stop iterating.
         if (!ioHandle().isOpen()) {

@@ -586,11 +586,19 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    current_dispatching_buffer_ = &data;
+    while (data.length() > 0) {
+      auto slice = data.frontSlice();
+      dispatching_slice_already_drained_ = false;
       auto statusor_parsed = dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
       if (!statusor_parsed.ok()) {
         return statusor_parsed.status();
       }
+      if (!dispatching_slice_already_drained_) {
+        ASSERT(statusor_parsed.value() <= slice.len_);
+        data.drain(statusor_parsed.value());
+      }
+
       total_parsed += statusor_parsed.value();
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK) {
         // Parse errors trigger an exception in dispatchSlice so we are guaranteed to be paused at
@@ -599,6 +607,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
         break;
       }
     }
+    current_dispatching_buffer_ = nullptr;
     dispatchBufferedBody();
   } else {
     auto result = dispatchSlice(nullptr, 0);
@@ -609,7 +618,6 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ASSERT(buffered_body_.length() == 0);
 
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
-  data.drain(total_parsed);
 
   // If an upgrade has been handled and there is body data or early upgrade
   // payload to send on, send it on.
@@ -785,7 +793,13 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
-  buffered_body_.add(data, length);
+  auto slice = current_dispatching_buffer_->frontSlice();
+  if (data == slice.mem_ && length == slice.len_) {
+    buffered_body_.move(*current_dispatching_buffer_, length);
+    dispatching_slice_already_drained_ = true;
+  } else {
+    buffered_body_.add(data, length);
+  }
 }
 
 void ConnectionImpl::dispatchBufferedBody() {
