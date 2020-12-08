@@ -553,8 +553,12 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http_protocol_options()->set_allow_chunked_length(true);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http_protocol_options()
+          ->set_allow_chunked_length(true);
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
     }
   });
 
@@ -1428,7 +1432,10 @@ TEST_P(IntegrationTest, TestFlood) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {
@@ -1474,7 +1481,10 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {

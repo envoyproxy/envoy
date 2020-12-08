@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "common/common/interval_value.h"
+
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -11,8 +13,8 @@ namespace Event {
  * Describes a minimum timer value that is equal to a scale factor applied to the maximum.
  */
 struct ScaledMinimum {
-  explicit ScaledMinimum(double scale_factor) : scale_factor_(scale_factor) {}
-  const double scale_factor_;
+  explicit ScaledMinimum(UnitFloat scale_factor) : scale_factor_(scale_factor) {}
+  const UnitFloat scale_factor_;
 };
 
 /**
@@ -41,8 +43,8 @@ public:
     struct Visitor {
       explicit Visitor(std::chrono::milliseconds value) : value_(value) {}
       std::chrono::milliseconds operator()(ScaledMinimum scale_factor) {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(scale_factor.scale_factor_ *
-                                                                     value_);
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            scale_factor.scale_factor_.value() * value_);
       }
       std::chrono::milliseconds operator()(AbsoluteMinimum absolute_value) {
         return absolute_value.value_;

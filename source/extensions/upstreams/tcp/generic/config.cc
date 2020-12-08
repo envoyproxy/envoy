@@ -16,7 +16,7 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     const absl::optional<TunnelingConfig>& config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const {
   if (config.has_value()) {
-    auto* cluster = cluster_manager.get(cluster_name);
+    auto* cluster = cluster_manager.getThreadLocalCluster(cluster_name);
     if (!cluster) {
       return nullptr;
     }

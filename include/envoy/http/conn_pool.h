@@ -39,10 +39,12 @@ public:
    * @param encoder supplies the request encoder to use.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
-   * @param info supplies the stream info object associated with the upstream connection.
+   * @param info supplies the stream info object associated with the upstream L4 connection.
+   * @param protocol supplies the protocol associated with the stream, or absl::nullopt for raw TCP.
    */
   virtual void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                           const StreamInfo::StreamInfo& info) PURE;
+                           const StreamInfo::StreamInfo& info,
+                           absl::optional<Http::Protocol> protocol) PURE;
 };
 
 /**
@@ -51,11 +53,6 @@ public:
 class Instance : public Envoy::ConnectionPool::Instance, public Event::DeferredDeletable {
 public:
   ~Instance() override = default;
-
-  /**
-   * @return Http::Protocol Reports the protocol in use by this connection pool.
-   */
-  virtual Http::Protocol protocol() const PURE;
 
   /**
    * Determines whether the connection pool is actively processing any requests.
