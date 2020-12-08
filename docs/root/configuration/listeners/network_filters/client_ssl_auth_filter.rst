@@ -15,7 +15,7 @@
 每一个配置的客户端 TLS 认证过滤器都有一个基于 *auth.clientssl.<stat_prefix>.* 的统计信息，统计信息如下所示：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
   update_success, Counter, 更新成功的总数
@@ -33,7 +33,7 @@ REST API
 
 .. http:get:: /v1/certs/list/approved
 
-  认证过滤器会在每次刷新间隔中调用这些 API 接口以获取当前已批准的 certificates（证书）/principals（主体） 列表。预期的响应 JSON 如下所示：
+  认证过滤器会在每次刷新间隔中调用这些 API 接口以获取当前已批准的证书（certificates）/主体（principals）列表。预期的 JSON 响应如下所示：
 
   .. code-block:: json
 
@@ -42,7 +42,7 @@ REST API
     }
 
   certificates
-    *(required, array)* 获取的 certificates（证书）/principals（主体） 列表。
+    *(required, array)* 获取的证书/主体列表。
 
   每个证书对象被定义为：
 
