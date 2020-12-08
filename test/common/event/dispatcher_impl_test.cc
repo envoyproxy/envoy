@@ -389,15 +389,19 @@ TEST_F(DispatcherImplTest, Post) {
 
 TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
   ReadyWatcher parent_watcher;
+  ReadyWatcher deferred_delete_watcher;
   ReadyWatcher run_watcher1;
   ReadyWatcher delete_watcher1;
   ReadyWatcher run_watcher2;
   ReadyWatcher delete_watcher2;
 
   // Expect the following events to happen in order. The destructor of the post callback should run
-  // before execution of the next post callback starts.
+  // before execution of the next post callback starts. The post callback runner should yield after
+  // running each group of callbacks in a chain, so the deferred deletion should run before the
+  // post callbacks that are also scheduled by the parent post callback.
   InSequence s;
   EXPECT_CALL(parent_watcher, ready());
+  EXPECT_CALL(deferred_delete_watcher, ready());
   EXPECT_CALL(run_watcher1, ready());
   EXPECT_CALL(delete_watcher1, ready());
   EXPECT_CALL(run_watcher2, ready());
@@ -418,6 +422,8 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
       }
       cv_.notifyOne();
     });
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
+        [&deferred_delete_watcher]() -> void { deferred_delete_watcher.ready(); }));
   });
 
   Thread::LockGuard lock(mu_);
