@@ -56,28 +56,16 @@ static void BM_LookupsMixed(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 500);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsMixed);
+BENCHMARK(BM_LookupsMixed)->Unit(::benchmark::kMillisecond);
 
 static void BM_LookupsNoEvictions(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 1000);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsNoEvictions);
+BENCHMARK(BM_LookupsNoEvictions)->Unit(::benchmark::kMillisecond);
 
 static void BM_LookupsAllEvictions(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 10);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsAllEvictions);
-
-int main(int argc, char** argv) {
-  Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logger_context(spdlog::level::warn,
-                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
-  benchmark::Initialize(&argc, argv);
-
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}
+BENCHMARK(BM_LookupsAllEvictions)->Unit(::benchmark::kMillisecond);
