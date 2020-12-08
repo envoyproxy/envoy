@@ -38,7 +38,7 @@
     address:
       socket_address: { address: 0.0.0.0, port_value: 9901 }
 
-:ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` 包含了当 Envoy 启动时静态配置的一切资源，与之相反的是当 Envoy 运行时动态配置的资源。:ref:`v2 API Overview <config_overview>` 描述了这些。
+:ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` 包含了当 Envoy 启动时静态配置的一切资源，与之相反的是当 Envoy 运行时动态配置的资源。:ref:`v2 API 概览 <config_overview>` 描述了这些。
 
 .. code-block:: yaml
 
@@ -118,7 +118,6 @@
 最后，你可以用如下命令来进行测试::
 
   $ curl -v localhost:10000
-
 
 如果你想用 docker-compose 来使用 Envoy，你可以用一个 volume 来覆写提供的配置文件。
 
