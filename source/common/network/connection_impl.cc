@@ -742,8 +742,6 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 
-std::string ConnectionImpl::transportProtocol() const { return transport_socket_->protocol(); }
-
 absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return socket_->lastRoundTripTime();
 };

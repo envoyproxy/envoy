@@ -296,7 +296,6 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
 
   // Basic checks.
-  ASSERT_THAT(envoy_quic_session_.transportProtocol(), "quic");
   ASSERT_FALSE(envoy_quic_session_.startSecureTransport());
 
   // Receive a GET request on created stream.

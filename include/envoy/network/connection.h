@@ -329,11 +329,6 @@ public:
   virtual absl::string_view transportFailureReason() const PURE;
 
   /**
-   * @return std::string type of the underlying transport socket.
-   */
-  virtual std::string transportProtocol() const PURE;
-
-  /**
    * Instructs a transport socket to start using secure transport.
    * Note: Not all transport sockets support such operation.
    * @return boolean telling if underlying transport socket was able to

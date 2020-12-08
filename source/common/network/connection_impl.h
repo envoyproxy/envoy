@@ -93,7 +93,6 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override;
-  std::string transportProtocol() const override;
   bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
 

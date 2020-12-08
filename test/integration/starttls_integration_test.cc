@@ -70,24 +70,21 @@ Network::FilterStatus StartTlsSwitchFilter::onCommand(Buffer::Instance& buf, boo
   }
 
   if (message == "switch") {
-    if (read_callbacks_->connection().transportProtocol() ==
-        Extensions::TransportSockets::TransportProtocolNames::get().StartTls) {
-      buf.drain(buf.length());
-      buf.add("usetls");
-      read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
-        // Wait until 6 bytes long "usetls" has been sent.
-        if (bytes >= 6) {
-          read_callbacks_->connection().startSecureTransport();
-          // Unsubscribe the callback.
-          // Switch to tls has been completed.
-          return false;
-        }
-        return true;
-      });
-      if (write_back) {
-        read_callbacks_->connection().write(buf, false);
-        stopIteration = true;
+    buf.drain(buf.length());
+    buf.add("usetls");
+    read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
+      // Wait until 6 bytes long "usetls" has been sent.
+      if (bytes >= 6) {
+        read_callbacks_->connection().startSecureTransport();
+        // Unsubscribe the callback.
+        // Switch to tls has been completed.
+        return false;
       }
+      return true;
+    });
+    if (write_back) {
+      read_callbacks_->connection().write(buf, false);
+      stopIteration = true;
     }
   }
   return stopIteration ? Network::FilterStatus::StopIteration : Network::FilterStatus::Continue;
