@@ -53,4 +53,4 @@ REST API
     }
 
   fingerprint_sha256
-    *(required, string)* 已批准的的客户端证书的 SHA256 哈希。Envoy 会给出一个哈希来确定是否有匹配的客户端证书。
+    *(required, string)* 已批准的客户端证书的 SHA256 哈希值。Envoy 会将该哈希值与所提交的客户端证书进行匹配，以确定是否存在摘要匹配。
