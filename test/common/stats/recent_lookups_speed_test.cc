@@ -40,6 +40,7 @@ public:
 
   void test(benchmark::State& state) {
     for (auto _ : state) {
+      UNREFERENCED_PARAMETER(_);
       Envoy::Random::RandomGeneratorImpl random;
       for (uint64_t i = 0; i < lookups_.size(); ++i) {
         recent_lookups_.lookup(lookups_[random.random() % lookups_.size()]);
@@ -52,20 +53,20 @@ private:
   Envoy::Stats::RecentLookups recent_lookups_;
 };
 
-static void BM_LookupsMixed(benchmark::State& state) {
+static void bmLookupsMixed(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 500);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsMixed)->Unit(::benchmark::kMillisecond);
+BENCHMARK(bmLookupsMixed)->Unit(::benchmark::kMillisecond);
 
-static void BM_LookupsNoEvictions(benchmark::State& state) {
+static void bmLookupsNoEvictions(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 1000);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsNoEvictions)->Unit(::benchmark::kMillisecond);
+BENCHMARK(bmLookupsNoEvictions)->Unit(::benchmark::kMillisecond);
 
-static void BM_LookupsAllEvictions(benchmark::State& state) {
+static void bmLookupsAllEvictions(benchmark::State& state) {
   RecentLookupsSpeedTest speed_test(1000, 10);
   speed_test.test(state);
 }
-BENCHMARK(BM_LookupsAllEvictions)->Unit(::benchmark::kMillisecond);
+BENCHMARK(bmLookupsAllEvictions)->Unit(::benchmark::kMillisecond);

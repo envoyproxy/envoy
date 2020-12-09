@@ -16,8 +16,9 @@
 #include "benchmark/benchmark.h"
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_CreateRace(benchmark::State& state) {
+static void bmCreateRace(benchmark::State& state) {
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Envoy::Thread::ThreadFactory& thread_factory = Envoy::Thread::threadFactoryForTest();
 
     // Make 100 threads, each of which will race to encode an overlapping set of
@@ -58,10 +59,10 @@ static void BM_CreateRace(benchmark::State& state) {
     initial.free(table);
   }
 }
-BENCHMARK(BM_CreateRace)->Unit(::benchmark::kMillisecond);
+BENCHMARK(bmCreateRace)->Unit(::benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_JoinStatNames(benchmark::State& state) {
+static void bmJoinStatNames(benchmark::State& state) {
   Envoy::Stats::SymbolTableImpl symbol_table;
   Envoy::Stats::IsolatedStoreImpl store(symbol_table);
   Envoy::Stats::StatNamePool pool(symbol_table);
@@ -71,13 +72,14 @@ static void BM_JoinStatNames(benchmark::State& state) {
   Envoy::Stats::StatName d = pool.add("d");
   Envoy::Stats::StatName e = pool.add("e");
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Envoy::Stats::Utility::counterFromStatNames(store, Envoy::Stats::makeStatNames(a, b, c, d, e));
   }
 }
-BENCHMARK(BM_JoinStatNames);
+BENCHMARK(bmJoinStatNames);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_JoinElements(benchmark::State& state) {
+static void bmJoinElements(benchmark::State& state) {
   Envoy::Stats::SymbolTableImpl symbol_table;
   Envoy::Stats::IsolatedStoreImpl store(symbol_table);
   Envoy::Stats::StatNamePool pool(symbol_table);
@@ -86,8 +88,9 @@ static void BM_JoinElements(benchmark::State& state) {
   Envoy::Stats::StatName c = pool.add("c");
   Envoy::Stats::StatName e = pool.add("e");
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Envoy::Stats::Utility::counterFromElements(
         store, Envoy::Stats::makeElements(a, b, c, Envoy::Stats::DynamicName("d"), e));
   }
 }
-BENCHMARK(BM_JoinElements);
+BENCHMARK(bmJoinElements);
