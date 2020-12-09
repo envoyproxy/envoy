@@ -87,7 +87,7 @@ HttpIntegrationTest::ConnectionCreationFunction UdsListenerIntegrationTest::crea
         Network::Utility::resolveUrl(fmt::format("unix://{}", getListenerSocketName())),
         Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
         nullptr));
-    conn->enableHalfClose(enable_half_close_);
+    conn->enableHalfClose(enableHalfClose());
     return conn;
   };
 }
