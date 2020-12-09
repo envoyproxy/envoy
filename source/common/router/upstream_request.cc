@@ -391,7 +391,7 @@ void UpstreamRequest::onPoolReady(
   calling_encode_headers_ = true;
   auto* headers = parent_.downstreamHeaders();
   if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
-    parent_.downstreamHeaders()->setHost(host->hostname());
+    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname());
   }
 
   if (span_ != nullptr) {

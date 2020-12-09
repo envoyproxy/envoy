@@ -183,6 +183,14 @@ void appendXff(RequestHeaderMap& headers, const Network::Address::Instance& remo
 void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
 
 /**
+ * Update authority with the specified hostname and copy the original authority to the forwarded
+ * host header.
+ * @param headers headers where authority should be updated.
+ * @param hostname hostname that authority should be updated with.
+ */
+void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname);
+
+/**
  * Creates an SSL (https) redirect path based on the input host and path headers.
  * @param headers supplies the request headers.
  * @return std::string the redirect path.

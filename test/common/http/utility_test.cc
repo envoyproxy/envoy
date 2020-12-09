@@ -300,6 +300,36 @@ TEST(HttpUtility, appendVia) {
   }
 }
 
+TEST(HttpUtility, updateAuthority) {
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "dns.name");
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name");
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"}, {"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "newhost.com");
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name");
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+}
+
 TEST(HttpUtility, createSslRedirectPath) {
   {
     TestRequestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};

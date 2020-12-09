@@ -910,20 +910,25 @@ message RouteAction {
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
-    // this value.
+    // this value. The original value of the host header will be appended to the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header.
     string host_rewrite_literal = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
-    // the hostname of the upstream host chosen by the cluster manager. This
-    // option is applicable only when the destination cluster for a route is of
-    // type *strict_dns* or *logical_dns*. Setting this to true with other cluster
-    // types has no effect.
+    // the hostname of the upstream host chosen by the cluster manager. The original
+    // value of the host header will be appended to the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header. This option is
+    // applicable only when the destination cluster for a route is of type
+    // *strict_dns* or *logical_dns*. Setting this to true with other cluster types
+    // has no effect.
     google.protobuf.BoolValue auto_host_rewrite = 7;
 
     // Indicates that during forwarding, the host header will be swapped with the content of given
     // downstream or :ref:`custom <config_http_conn_man_headers_custom_request_headers>` header.
-    // If header value is empty, host header is left intact.
+    // The original value of the host header will be appended to the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header. If header value is empty, host
+    // and XFH headers are left intact.
     //
     // .. attention::
     //
@@ -938,7 +943,9 @@ message RouteAction {
 
     // Indicates that during forwarding, the host header will be swapped with
     // the result of the regex substitution executed on path value with query and fragment removed.
-    // This is useful for transitioning variable content between path segment and subdomain.
+    // The original value of the host header will be appended to the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header. This is useful for
+    // transitioning variable content between path segment and subdomain.
     //
     // For example with the following config:
     //
