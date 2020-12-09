@@ -24,6 +24,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -1067,7 +1068,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // buffer. This allows us to track the bytes actually written to the socket.
 
   EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
-      .Times(1)
+      .Times(AtLeast(1))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
         client_write_buffer_ =
