@@ -32,7 +32,7 @@ static_resources:
                 port_value: 3306
 
 admin:
-  access_log_path: "/dev/null"
+  access_log_path: "NUL"
   address:
     socket_address:
       address: 0.0.0.0

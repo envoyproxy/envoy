@@ -98,6 +98,8 @@ public:
   using PostServerHook = std::function<void(Server::Instance& server)>;
 
   MainCommon(int argc, const char* const* argv);
+  MainCommon(std::vector<std::string> args);
+
   bool run() { return base_.run(); }
   // Only tests have a legitimate need for this today.
   Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
