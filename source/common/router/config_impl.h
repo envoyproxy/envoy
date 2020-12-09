@@ -450,7 +450,7 @@ public:
     if (!isDirectResponse()) {
       return false;
     }
-    return !host_redirect_.empty() || !path_redirect_.empty() || !prefix_rewrite_redirect_.empty();
+    return !host_redirect_.empty() || !path_redirect_.empty() || !prefix_rewrite_redirect_.empty() || regex_rewrite_redirect_;
   }
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
@@ -536,7 +536,9 @@ protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   std::string regex_rewrite_substitution_;
+  std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
   absl::optional<ConnectConfig> connect_config_;
@@ -544,11 +546,11 @@ protected:
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
   /**
-   * returns the correct path rewrite string for this route.
+   * returns the correct path rewrite string for this route. the provided container may be used
+   * to store memory that backs the returned path, and so the lifetime of the container must
+   * outlife any use of the returned path.
    */
-  const std::string& getPathRewrite() const {
-    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
-  }
+  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers, absl::optional<std::string> &container) const;
 
   void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
