@@ -39,6 +39,7 @@ envoy_cc_test(
     ],
     deps = [
         ":test_cluster_manager",
+        "//source/common/router:context_lib",
         "//test/mocks/upstream:cds_api_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:cluster_real_priority_set_mocks",
@@ -601,6 +602,7 @@ envoy_cc_test(
         "//source/common/upstream:static_cluster_lib",
         "//source/common/upstream:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/upstreams/http:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",

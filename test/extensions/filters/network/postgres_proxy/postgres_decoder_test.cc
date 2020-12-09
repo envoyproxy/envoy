@@ -363,7 +363,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "COMMIT");
   decoder_->onData(data_, false);
@@ -375,7 +375,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "C", "ROLLBACK");
   decoder_->onData(data_, false);
@@ -533,6 +533,9 @@ public:
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
   MOCK_METHOD(std::string, toString, (), (const, override));
+  MOCK_METHOD(void, setWatermarks, (uint32_t), (override));
+  MOCK_METHOD(uint32_t, highWatermark, (), (const, override));
+  MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
 };
 
 // Test verifies that decoder calls Buffer::linearize method

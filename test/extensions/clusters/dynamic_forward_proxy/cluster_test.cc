@@ -108,7 +108,7 @@ public:
   MOCK_METHOD(void, onMemberUpdateCb,
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -210,7 +210,7 @@ protected:
   }
 
 private:
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;

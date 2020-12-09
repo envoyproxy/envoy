@@ -230,11 +230,12 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
   if (!test_new_connection_pool_) {
     dynamic_cast<OriginalConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
   } else {
-    Event::PostCb& post_cb = dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->post_cb_;
     if (run) {
-      post_cb();
+      mock_upstream_ready_cb_->invokeCallback();
     } else {
-      EXPECT_CALL(mock_dispatcher_, post(_)).WillOnce(testing::SaveArg<0>(&post_cb));
+      EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
+          .Times(1)
+          .RetiresOnSaturation();
     }
   }
 }
@@ -247,9 +248,7 @@ class TcpConnPoolImplTest : public Event::TestUsingSimulatedTime,
 public:
   TcpConnPoolImplTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_cb_(test_new_connection_pool_
-                               ? nullptr
-                               : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime())),
         conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {}
 
@@ -275,9 +274,7 @@ class TcpConnPoolImplDestructorTest : public Event::TestUsingSimulatedTime,
 public:
   TcpConnPoolImplDestructorTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_cb_(test_new_connection_pool_
-                               ? nullptr
-                               : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
+        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime());
     if (test_new_connection_pool_) {
       conn_pool_ = std::make_unique<ConnPoolImpl>(

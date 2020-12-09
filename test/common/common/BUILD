@@ -355,3 +355,9 @@ envoy_cc_test(
         "//source/common/http:status_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "interval_value_test",
+    srcs = ["interval_value_test.cc"],
+    deps = ["//source/common/common:interval_value"],
+)

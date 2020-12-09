@@ -28,8 +28,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
   field in the HTTP connection manager configuration. To modify the idle timeout for upstream
   connections use the
-  :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field
-  in the cluster configuration.
+  :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>` field in the Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, keyed by `envoy.extensions.upstreams.http.v3.HttpProtocolOptions`
 
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
 

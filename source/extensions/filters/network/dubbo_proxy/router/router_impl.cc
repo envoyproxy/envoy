@@ -39,7 +39,8 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
 
   route_entry_ = route_->routeEntry();
 
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(route_entry_->clusterName());
+  Upstream::ThreadLocalCluster* cluster =
+      cluster_manager_.getThreadLocalCluster(route_entry_->clusterName());
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "dubbo router: unknown cluster '{}'", *callbacks_,
                      route_entry_->clusterName());

@@ -185,6 +185,28 @@ TEST_F(TcpUpstreamTest, V2Header) {
   tcp_upstream_->encodeData(buffer, false);
 }
 
+// Verifies that a reset after end_stream=true doesn't trigger a callback
+// on the router filter.
+TEST_F(TcpUpstreamTest, ResetAfterEndStream) {
+  Buffer::OwnedImpl buffer("something");
+  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferStringEqual("something"), _, true));
+  tcp_upstream_->onUpstreamData(buffer, true);
+  tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Verifies that if we send data after the upstream has been reset nothing crashes.
+TEST_F(TcpUpstreamTest, DataAfterReset) {
+  tcp_upstream_->resetStream();
+  Buffer::OwnedImpl buffer("something");
+  tcp_upstream_->onUpstreamData(buffer, true);
+}
+
+// Verifies that if we send headers after the upstream has been reset nothing crashes.
+TEST_F(TcpUpstreamTest, HeadersAfterReset) {
+  tcp_upstream_->resetStream();
+  EXPECT_FALSE(tcp_upstream_->encodeHeaders(request_, false).ok());
+}
+
 TEST_F(TcpUpstreamTest, TrailersEndStream) {
   // Swallow the headers.
   EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
