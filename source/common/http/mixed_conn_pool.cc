@@ -24,8 +24,12 @@ HttpConnPoolImplMixed::createCodecClient(Upstream::Host::CreateConnectionData& d
 }
 
 void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& client) {
-  // When we upgrade from a TCP client to non-TCP we get a spurious onConnected
-  // from the new client. Ignore that.
+  // onConnected is called under the stack of the Network::Connection raising
+  // the Connected event. The first time it is called, it's called for a TCP
+  // client, the TCP client is detached from the connection and discarded, and an
+  // HTTP client is associated with that connection. When the first call returns, the
+  // Network::Connection will inform the new callback (the HTTP client) that it
+  // is connected. The early return is to ignore that second call.
   if (client.protocol() != absl::nullopt) {
     return;
   }
