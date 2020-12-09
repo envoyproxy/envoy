@@ -276,8 +276,8 @@ void DispatcherImpl::runPostCallbacks() {
   // It is important that the execution and deletion of the callback happen while post_lock_ is not
   // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
   while (!callbacks.empty()) {
-    auto& callback = callbacks.front();
-    callback();
+    // Run the callback.
+    callbacks.front()();
     // Pop the front so that the destructor of the callback that just executed runs before the next
     // callback executes.
     callbacks.pop_front();
