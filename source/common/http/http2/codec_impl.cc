@@ -569,7 +569,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false),
-      allow_protocol_error_frame_for_test_(false), random_(random_generator) {
+      random_(random_generator) {
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), interval));
@@ -716,14 +716,13 @@ void ConnectionImpl::shutdownNotice() {
   }
 }
 
-void ConnectionImpl::protocolErrorForTest() {
+Status ConnectionImpl::protocolErrorForTest() {
   int rc = nghttp2_submit_goaway(session_, NGHTTP2_FLAG_NONE,
                                  nghttp2_session_get_last_proc_stream_id(session_),
                                  NGHTTP2_PROTOCOL_ERROR, nullptr, 0);
   ASSERT(rc == 0);
 
-  if (sendPendingFrames().ok()) {
-  }
+  return sendPendingFrames();
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {

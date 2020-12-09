@@ -428,27 +428,21 @@ void FakeHttpConnection::encodeProtocolError() {
   if (codec != nullptr) {
     shared_connection_.connection().dispatcher().post([this, codec]() {
       expect_protocol_error_ = true;
-      codec->protocolErrorForTest();
-      // We'd ideally set expect_protocol_error_ back to false after this, but
-      // it's difficult to sequence that correctly since it needs to be true
-      // until the PROTOCOL_ERROR goaway frame is flushed.
+      Http::Status status = codec->protocolErrorForTest();
+      ASSERT(Http::getStatusCode(status) == Http::StatusCode::CodecProtocolError);
     });
-    return;
+  } else {
+    // Fall back to trying the Legacy ServerConnectionImpl which is used in certain test
+    // configurations, specifically the bazel.compile_time_options tests.
+    Http::Legacy::Http2::ServerConnectionImpl* legacy_codec =
+        dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
+    ASSERT(legacy_codec != nullptr);
+
+    shared_connection_.connection().dispatcher().post([this, legacy_codec]() {
+      expect_protocol_error_ = true;
+      legacy_codec->protocolErrorForTest();
+    });
   }
-
-  // Fall back to trying the Legacy ServerConnectionImpl which is used in certain test
-  // configurations, specifically the bazel.compile_time_options tests.
-  Http::Legacy::Http2::ServerConnectionImpl* legacy_codec =
-      dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
-  ASSERT(legacy_codec != nullptr);
-
-  shared_connection_.connection().dispatcher().post([this, legacy_codec]() {
-    expect_protocol_error_ = true;
-    legacy_codec->protocolErrorForTest();
-    // We'd ideally set expect_protocol_error_ back to false after this, but
-    // it's difficult to sequence that correctly since it needs to be true
-    // until the PROTOCOL_ERROR goaway frame is flushed.
-  });
 }
 
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
