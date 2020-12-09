@@ -35,6 +35,7 @@ static const std::string TEST_CALLBACK = "/_oauth";
 static const std::string TEST_CLIENT_ID = "1";
 static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
+static const std::string TEST_DEFAULT_SCOPE = "user";
 static const std::string TEST_ENCODED_AUTH_SCOPES = "user%20openid%20email";
 
 namespace {
@@ -184,7 +185,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
                                                 scope_, "test.");
 
   // Auth_scopes was not set, should return default value.
-  std::vector<std::string> default_scope = {"user"};
+  std::vector<std::string> default_scope = {TEST_DEFAULT_SCOPE};
   EXPECT_EQ(test_config_->authScopes(), default_scope);
 }
 
