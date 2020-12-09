@@ -20,7 +20,7 @@ class TcpProxyIntegrationTest : public testing::TestWithParam<TcpProxyIntegratio
 public:
   TcpProxyIntegrationTest()
       : BaseIntegrationTest(GetParam().version, ConfigHelper::tcpProxyConfig()) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   void initialize() override;
