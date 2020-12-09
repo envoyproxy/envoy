@@ -92,7 +92,7 @@ TEST_F(ExtProcStreamTest, OpenCloseStream) {
 TEST_F(ExtProcStreamTest, SendToStream) {
   auto stream = client_->start(*this, 200ms);
   // Send something and ensure that we get it. Doesn't really matter what.
-  EXPECT_CALL(stream_, sendMessageRaw_(_, false)).Times(1);
+  EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
   stream->send(std::move(req), false);
   EXPECT_CALL(stream_, closeStream()).Times(1);

@@ -39,7 +39,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
         "//source/common/http:header_map_lib",
-        "//source/extensions/filters/http/ext_proc:client_impl",
+        "//source/extensions/filters/http/ext_proc:client_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_runtime_lib",

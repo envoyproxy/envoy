@@ -44,7 +44,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "client_impl",
+    name = "client_lib",
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
     deps = [
