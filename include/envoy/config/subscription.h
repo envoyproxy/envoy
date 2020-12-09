@@ -204,7 +204,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
 /**
  * Per subscription stats. @see stats_macros.h
  */
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT)                                       \
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT, HISTOGRAM)                            \
   COUNTER(init_fetch_timeout)                                                                      \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_failure)                                                                          \
@@ -212,6 +212,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
   GAUGE(version, NeverImport)                                                                      \
+  HISTOGRAM(update_duration, Milliseconds)                                                         \
   TEXT_READOUT(version_text)
 
 /**
@@ -219,7 +220,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
  */
 struct SubscriptionStats {
   ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
-                         GENERATE_TEXT_READOUT_STRUCT)
+                         GENERATE_TEXT_READOUT_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 } // namespace Config
