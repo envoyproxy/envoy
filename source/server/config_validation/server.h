@@ -103,14 +103,12 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-  bool statsFlushOnAdmin() const override { return config_.statsFlushOnAdmin(); }
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return config_.statsFlushInterval();
-  }
   void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+
+  Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;

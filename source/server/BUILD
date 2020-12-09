@@ -417,6 +417,7 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
         "//include/envoy/server:bootstrap_extension_config_interface",
+        "//include/envoy/server:configuration_interface",
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:fatal_action_interface",
         "//include/envoy/server:instance_interface",

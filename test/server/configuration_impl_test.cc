@@ -85,8 +85,8 @@ TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
-  EXPECT_FALSE(config.statsFlushOnAdmin());
+  EXPECT_EQ(std::chrono::milliseconds(5000), config.statsConfig().flushInterval());
+  EXPECT_FALSE(config.statsConfig().flushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
@@ -111,8 +111,8 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
-  EXPECT_FALSE(config.statsFlushOnAdmin());
+  EXPECT_EQ(std::chrono::milliseconds(500), config.statsConfig().flushInterval());
+  EXPECT_FALSE(config.statsConfig().flushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, StatsOnAdmin) {
@@ -137,7 +137,7 @@ TEST_F(ConfigurationImplTest, StatsOnAdmin) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_TRUE(config.statsFlushOnAdmin());
+  EXPECT_TRUE(config.statsConfig().flushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
@@ -161,8 +161,7 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
   EXPECT_THROW(TestUtility::validate(bootstrap), Envoy::ProtoValidationException);
 }
 
-// this should throw an exception in the v4 api as both fields
-// will be apart of a oneof, `stats_flush`.
+// this should throw an proto validation exception in the v4 api with the oneof promotion
 TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
   std::string json = R"EOF(
   {
@@ -183,9 +182,7 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
-
-  EXPECT_TRUE(config.statsFlushOnAdmin());
+  EXPECT_THROW(config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException);
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
@@ -404,7 +401,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(1, config.statsSinks().size());
+  EXPECT_EQ(1, config.statsConfig().sinks().size());
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {

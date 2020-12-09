@@ -574,16 +574,14 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
   options_.bootstrap_version_ = 3;
-  options_.config_proto_.set_stats_flush_on_admin(true);
-
   auto server_thread =
-      startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
-  EXPECT_TRUE(server_->statsFlushOnAdmin());
-  EXPECT_EQ(std::chrono::seconds(1), server_->statsFlushInterval());
+      startTestServer("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", true);
+  EXPECT_TRUE(server_->statsConfig().flushOnAdmin());
+  EXPECT_EQ(std::chrono::seconds(5), server_->statsConfig().flushInterval());
 
   auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
 
-  time_system_.advanceTimeWait(std::chrono::seconds(2));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
   EXPECT_EQ(0L, counter->value());
 
   // flush via admin
@@ -592,7 +590,7 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
   EXPECT_EQ(1L, counter->value());
 
-  time_system_.advanceTimeWait(std::chrono::seconds(2));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
   EXPECT_EQ(1L, counter->value());
 
   server_->dispatcher().post([&] { server_->shutdown(); });

@@ -54,6 +54,20 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  if (bootstrap.has_stats_flush_interval() &&
+      bootstrap.stats_flush_case() != envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
+    throw EnvoyException("Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+  }
+
+  flush_interval_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
+
+  if (bootstrap.stats_flush_case() == envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin) {
+    flush_on_admin_ = bootstrap.stats_flush_on_admin();
+  }
+}
+
 void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
@@ -83,15 +97,22 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
 
-  stats_flush_interval_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
-
-  if (bootstrap.stats_flush_case() == envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin) {
-    stats_flush_on_admin_ = bootstrap.stats_flush_on_admin();
-  }
-
   initializeWatchdogs(bootstrap, server);
-  initializeStatsSinks(bootstrap, server);
+  initializeStatsConfig(bootstrap, server);
+}
+
+void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server) {
+  ENVOY_LOG(info, "loading stats configuration");
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+
+  for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
+    // Generate factory and translate stats sink custom config
+    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
+
+    stats_config_->sinks().emplace_back(factory.createStatsSink(*message, server.serverFactoryContext()));
+  }
 }
 
 void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& configuration,
@@ -118,20 +139,6 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   // in the context of "envoy.filters.network.http_connection_manager" filter.
   // The side effect of this is that provider-specific configuration
   // is no longer validated in this step.
-}
-
-void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                    Instance& server) {
-  ENVOY_LOG(info, "loading stats sink configuration");
-
-  for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
-    // Generate factory and translate stats sink custom config
-    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
-
-    stats_sinks_.emplace_back(factory.createStatsSink(*message, server.serverFactoryContext()));
-  }
 }
 
 void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,

@@ -65,6 +65,27 @@ public:
   actions() const PURE;
 };
 
+class StatsConfig {
+public:
+  virtual ~StatsConfig() = default;
+
+  /**
+   * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.
+   */
+  virtual std::list<Stats::SinkPtr>& sinks() PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.
+   *         The server latches counters.
+   */
+  virtual std::chrono::milliseconds flushInterval() const PURE;
+
+  /**
+   * @return bool indicator to flush stats on-demand via the admin interface instead of on a timer.
+   */
+  virtual bool flushOnAdmin() const PURE;
+};
+
 /**
  * The main server configuration.
  */
@@ -79,20 +100,9 @@ public:
   virtual Upstream::ClusterManager* clusterManager() PURE;
 
   /**
-   * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.
+   * @return const StatsConfig& the configuration of server stats.
    */
-  virtual std::list<Stats::SinkPtr>& statsSinks() PURE;
-
-  /**
-   * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.
-   *         The server latches counters.
-   */
-  virtual std::chrono::milliseconds statsFlushInterval() const PURE;
-
-  /**
-   * @return bool indicator to flush stats on-demand via the admin interface instead of on a timer.
-   */
-  virtual bool statsFlushOnAdmin() const PURE;
+  virtual StatsConfig& statsConfig() PURE;
 
   /**
    * @return const Watchdog& the configuration of the main thread watchdog.

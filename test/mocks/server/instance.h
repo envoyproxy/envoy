@@ -78,8 +78,7 @@ public:
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
-  MOCK_METHOD(bool, statsFlushOnAdmin, (), (const));
+  MOCK_METHOD(Configuration::StatsConfig&, statsConfig, (), ());
   MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
@@ -147,7 +146,6 @@ public:
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
-  MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

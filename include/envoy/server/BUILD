@@ -112,6 +112,7 @@ envoy_cc_library(
     hdrs = ["instance.h"],
     deps = [
         ":admin_interface",
+        ":configuration_interface",
         ":drain_manager_interface",
         ":hot_restart_interface",
         ":lifecycle_notifier_interface",
@@ -169,6 +170,7 @@ envoy_cc_library(
     hdrs = ["factory_context.h"],
     deps = [
         ":admin_interface",
+        ":configuration_interface",
         ":drain_manager_interface",
         ":lifecycle_notifier_interface",
         ":process_context_interface",
