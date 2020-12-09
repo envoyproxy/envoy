@@ -160,7 +160,6 @@ envoy_cc_benchmark_binary(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:utility_lib",
         "//source/common/upstream:cds_api_lib",
-        "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/config:utility_lib",
@@ -175,7 +174,6 @@ envoy_cc_benchmark_binary(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

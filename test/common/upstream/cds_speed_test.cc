@@ -5,7 +5,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -13,7 +12,6 @@
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/singleton/manager_impl.h"
-#include "common/upstream/eds.h"
 #include "common/upstream/static_cluster.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -60,7 +58,7 @@ public:
 
   void resetCluster() {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
-    static_cluster_ = ConfigHelper::buildStaticCluster("cluster", 1024, "127.0.0.1");
+    static_cluster_ = ConfigHelper::buildStaticCluster("staticcluster", 1024, "127.0.0.1");
     Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", static_cluster_.alt_stat_name().empty() ? static_cluster_.name()
                                                                : static_cluster_.alt_stat_name()));
@@ -100,12 +98,11 @@ public:
     state_.PauseTiming();
   }
 
-  TestDeprecatedV2Api _deprecated_v2_api_;
   State& state_;
   const std::string type_url_;
   uint64_t version_{};
   bool initialized_{};
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   Config::SubscriptionStats subscription_stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster static_cluster_;
