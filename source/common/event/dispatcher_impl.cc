@@ -263,23 +263,24 @@ void DispatcherImpl::runPostCallbacks() {
   // objects that is being deferred deleted.
   clearDeferredDeleteList();
 
-  while (true) {
-    // It is important that this declaration is inside the body of the loop so that the callback is
-    // destructed while post_lock_ is not held. If callback is declared outside the loop and reused
-    // for each iteration, the previous iteration's callback is destructed when callback is
-    // re-assigned, which happens while holding the lock. This can lead to a deadlock (via
-    // recursive mutex acquisition) if destroying the callback runs a destructor, which through some
-    // callstack calls post() on this dispatcher.
-    std::function<void()> callback;
-    {
-      Thread::LockGuard lock(post_lock_);
-      if (post_callbacks_.empty()) {
-        return;
-      }
-      callback = post_callbacks_.front();
-      post_callbacks_.pop_front();
-    }
-    callback();
+  std::list<std::function<void()>> callbacks;
+  {
+    // Take ownership of the callbacks under the post_lock_. The lock must be released before
+    // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute
+    // later in the event loop.
+    Thread::LockGuard lock(post_lock_);
+    callbacks = std::move(post_callbacks_);
+    // post_callbacks_ should be empty after the move.
+    ASSERT(post_callbacks_.empty());
+  }
+  // It is important that the execution and deletion of the callback happen while post_lock_ is not
+  // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
+  while (!callbacks.empty()) {
+    // Run the callback.
+    callbacks.front()();
+    // Pop the front so that the destructor of the callback that just executed runs before the next
+    // callback executes.
+    callbacks.pop_front();
   }
 }
 
