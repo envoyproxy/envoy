@@ -463,6 +463,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
+  if (route.redirect().has_regex_rewrite()) {
+    if (!prefix_rewrite_redirect_.empty()) {
+      throw EnvoyException("Cannot specify both prefix_rewrite and regex_rewrite for redirects");
+    }
+    auto rewrite_spec = route.redirect().regex_rewrite();
+    regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
+  }
+
   if (enable_preserve_query_in_path_redirects_ && path_redirect_has_query_ && strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
@@ -567,7 +576,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Handle path rewrite
-  if (!getPathRewrite().empty() || regex_rewrite_ != nullptr) {
+  absl::optional<std::string> container;
+  if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -602,6 +612,32 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
   return runtime;
 }
 
+const std::string&
+RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
+                                   absl::optional<std::string>& container) const {
+  // Just use the prefix rewrite  if this isn't a redirect.
+  if (!isRedirect()) {
+    return prefix_rewrite_;
+  }
+
+  // Return the regex rewrite substitution for redirects, if set.
+  if (regex_rewrite_redirect_ != nullptr) {
+    std::string path(headers.getPathValue());
+
+    // Replace the entire path, but preserve the query parameters
+    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+
+    // Store the result in the output container, and return a reference to the underlying string.
+    container = std::move(path.replace(
+        0, just_path.size(),
+        regex_rewrite_redirect_->replaceAll(just_path, regex_rewrite_redirect_substitution_)));
+    return container.value();
+  }
+
+  // Otherwise, return the prefix rewrite used for redirects.
+  return prefix_rewrite_redirect_;
+}
+
 // finalizePathHeaders does the "standard" path rewriting, meaning that it
 // handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
 // which can be specified. The "matched_path" argument applies only to the
@@ -612,7 +648,8 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
 void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
-  const auto& rewrite = getPathRewrite();
+  absl::optional<std::string> container;
+  const auto& rewrite = getPathRewrite(headers, container);
   if (rewrite.empty() && regex_rewrite_ == nullptr) {
     // There are no rewrites configured. Just return.
     return;
