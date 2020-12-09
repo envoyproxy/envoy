@@ -178,6 +178,25 @@ public:
 };
 
 void StartTlsIntegrationTest::initialize() {
+  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
+      // Connection constructor will first create write buffer.
+      // Test tracks how many bytes are sent.
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                           std::function<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer_ =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
+        ON_CALL(*client_write_buffer_, move(_))
+            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+        ON_CALL(*client_write_buffer_, drain(_))
+            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+        return client_write_buffer_;
+      }))
+      // Connection constructor will also create read buffer, but the test does
+      // not track received bytes.
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                           std::function<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
+      }));
   config_helper_.renameListener("tcp_proxy");
   addStartTlsSwitchFilter(config_helper_);
 
@@ -196,17 +215,6 @@ void StartTlsIntegrationTest::initialize() {
   payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 
   BaseIntegrationTest::initialize();
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
-      .WillRepeatedly(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                                 std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer_, move(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer_, drain(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer_;
-      }));
 
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
