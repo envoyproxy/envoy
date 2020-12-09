@@ -1294,6 +1294,41 @@ TEST_F(DispatcherWithWatchdogTest, PeriodicTouchTimer) {
   time_system_.advanceTimeAndRun(min_touch_interval_, *dispatcher_, Dispatcher::RunType::NonBlock);
 }
 
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeEachPostCallback) {
+  ReadyWatcher watcher1;
+  ReadyWatcher watcher2;
+  ReadyWatcher watcher3;
+  dispatcher_->post([&]() { watcher1.ready(); });
+  dispatcher_->post([&]() { watcher2.ready(); });
+  dispatcher_->post([&]() { watcher3.ready(); });
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeDeferredDelete) {
+  ReadyWatcher watcher1;
+  ReadyWatcher watcher2;
+  ReadyWatcher watcher3;
+
+  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher1]() -> void { watcher1.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher2]() -> void { watcher2.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher3]() -> void { watcher3.ready(); });
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeSchedulableCallback) {
   ReadyWatcher watcher;
 
