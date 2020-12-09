@@ -3,7 +3,7 @@
 Bootstrap 配置
 ---------------
 
-为了使用 xDS API，必须提供一份 bootstrap 配置文件。这能够提供静态服务器配置且可配置 Envoy 来访问 :ref:`动态配置（如有需要） <arch_overview_dynamic_config>` 。在命令行中可以通过选项 `-c` 来提供，例如：
+要使用 xDS API，须提供一份 bootstrap 配置文件。它提供了静态的服务器配置，并配置 Envoy 来访问 :ref:`动态配置（如有需要） <arch_overview_dynamic_config>` 。在命令行中可以通过选项 `-c` 来提供，例如：
 
 .. code-block:: console
 
