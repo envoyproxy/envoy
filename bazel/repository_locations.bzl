@@ -60,6 +60,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "BoringSSL",
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
+        # To update BoringSSL, which tracks Chromium releases:
+        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
+        # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
+        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         # chromium-87.0.4280.66
         version = "1ce6682c7f6cfe0426ed54a37c10775bea9d3502",
         sha256 = "b878d84f90b9a95fa1e53f46f1b69a5116621e117a6d4dbf602d884311ee6aa7",
@@ -68,10 +72,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
         cpe = "cpe:2.3:a:google:boringssl:*",
-        # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
-        # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
     ),
     boringssl_fips = dict(
         project_name = "BoringSSL (FIPS)",
@@ -236,6 +236,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "LuaJIT",
         project_desc = "Just-In-Time compiler for Lua",
         project_url = "https://luajit.org",
+        # The last release version, 2.1.0-beta3 has a number of CVEs filed
+        # against it. These may not impact correct non-malicious Lua code, but for prudence we bump.
         version = "1d8b747c161db457e032a023ebbff511f5de5ec2",
         sha256 = "20a159c38a98ecdb6368e8d655343b6036622a29a1621da9dc303f7ed9bf37f3",
         release_date = "2020-10-12",
@@ -244,8 +246,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
         cpe = "cpe:2.3:a:luajit:luajit:*",
-        # The last release version, 2.1.0-beta3 has a number of CVEs filed
-        # against it. These may not impact correct non-malicious Lua code, but for prudence we bump.
     ),
     com_github_moonjit_moonjit = dict(
         project_name = "Moonjit",
@@ -353,10 +353,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "zlib",
         project_desc = "zlib compression library",
         project_url = "https://zlib.net",
-        version = "79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
         # Use the dev branch of zlib to resolve fuzz bugs and out of bound
         # errors resulting in crashes in zlib 1.2.11.
         # TODO(asraa): Remove when zlib > 1.2.11 is released.
+        version = "79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
         sha256 = "155a8f8c1a753fb05b16a1b0cc0a0a9f61a78e245f9e0da483d13043b3bcbf2e",
         release_date = "2019-04-14",
         strip_prefix = "zlib-{version}",
@@ -561,7 +561,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "0.1.0",
         sha256 = "b6d46438523a3ec0f3cead544190ee13223a52f6a6765a29eae7b7cc24cc83a0",
         release_date = "2020-10-15",
-        strip_prefix = "",
         urls = ["https://github.com/bazelbuild/rules_python/releases/download/{version}/rules_python-{version}.tar.gz"],
         use_category = ["build"],
     ),
@@ -665,6 +664,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
+        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
+        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
         version = "8.7.220.10",
         sha256 = "f22734640e0515bc34d1ca3772513aef24374fafa44d0489d3a9a57cadec69fb",
         release_date = "2020-10-27",
@@ -672,8 +673,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
         cpe = "cpe:2.3:a:google:v8:*",
-        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
-        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
     ),
     com_googlesource_quiche = dict(
         project_name = "QUICHE",
@@ -757,6 +756,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
+        # Included to access FuzzedDataProvider.h. This is compiler agnostic but
+        # provided as part of the compiler-rt source distribution. We can't use the
+        # Clang variant as we are not a Clang-LLVM only shop today.
         version = "10.0.0",
         sha256 = "6a7da64d3a0a7320577b68b9ca4933bdcab676e898b759850e827333c3282c75",
         release_date = "2020-03-24",
@@ -764,9 +766,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
         use_category = ["test_only"],
-        # Included to access FuzzedDataProvider.h. This is compiler agnostic but
-        # provided as part of the compiler-rt source distribution. We can't use the
-        # Clang variant as we are not a Clang-LLVM only shop today.
     ),
     upb = dict(
         project_name = "upb",

@@ -25,6 +25,11 @@ class ReleaseDateError(Exception):
   pass
 
 
+# Print colorized output using colorama
+def Colorize(color, str):
+  print(getattr(Fore, color) + f'{str}' + Style.RESET_ALL)
+
+
 # Format a datetime object as UTC YYYY-MM-DD.
 def FormatUtcDate(date):
   # We only handle naive datetime objects right now, which is what PyGithub
@@ -39,12 +44,11 @@ def VerifyAndPrintLatestRelease(dep, repo, metadata_version, release_date):
   try:
     latest_release = repo.get_latest_release()
     if latest_release.created_at > release_date and latest_release.tag_name != metadata_version:
-      print(Fore.YELLOW +
-            f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}> : '
-            f'{latest_release.tag_name}@<{latest_release.created_at}>' + Style.RESET_ALL)
-  # except github.UnknownObjectException:
-  except github.GithubException as e:
-    # print(Fore.RED + 'GitHub API status get_latest_release(): {}'.format(str(e)) + Style.RESET_ALL)
+      Colorize(
+          "YELLOW",
+          f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}> : '
+          f'{latest_release.tag_name}@<{latest_release.created_at}>')
+  except github.UnknownObjectException:
     pass
 
 
@@ -52,7 +56,7 @@ def VerifyAndPrintLatestRelease(dep, repo, metadata_version, release_date):
 def VerifyAndPrintReleaseDate(dep, github_release_date, metadata_release_date):
   mismatch = ''
   iso_release_date = FormatUtcDate(github_release_date)
-  print(Fore.GREEN + f'{dep} has a GitHub release date {iso_release_date}' + Style.RESET_ALL)
+  Colorize("GREEN", f'{dep} has a GitHub release date {iso_release_date}')
   if iso_release_date != metadata_release_date:
     raise ReleaseDateError(f'Mismatch with metadata release date of {metadata_release_date}')
 
@@ -63,45 +67,37 @@ def GetReleaseDate(dep, repo, metadata_version, github_release):
 
     try:
       latest = repo.get_latest_release()
-    except github.GithubException as e:
-      # print(Fore.RED + 'GitHub API status get_latest_release(): {}'.format(str(e)) + Style.RESET_ALL)
+    except github.UnknownObjectException:
       latest = ""
 
     if latest and (github_release.version <= latest.tag_name):
-      # print("latest.tag_name: ", latest.tag_name)
-      # print("github_release.version: ", github_release.version)
       release = repo.get_release(github_release.version)
-      # print("release.published_at", release.published_at)
       return release.published_at
     else:
       tags = repo.get_tags()
       current_metadata_tag_commit_date = ""
       for tag in tags.reversed:
-        # print("tag.name: ",version.parse(tag.name))
-        # print("github_release.version",github_release.version)
         if tag.name == github_release.version:
           # return tag.commit.commit.committer.date
           current_metadata_tag_commit_date = tag.commit.commit.committer.date
         if not (version.parse(tag.name).is_prerelease) and version.parse(tag.name) > version.parse(
             github_release.version):
-          print(
-              Fore.YELLOW +
+          Colorize(
+              "YELLOW",
               f'*WARNING* {dep} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}> : '
-              f'{tag.name}@<{tag.commit.commit.committer.date}>' + Style.RESET_ALL)
+              f'{tag.name}@<{tag.commit.commit.committer.date}>')
       return current_metadata_tag_commit_date
     return None
   else:
     assert (metadata_version == github_release.version)
     commit = repo.get_commit(github_release.version)
-    # print("github_release.version: ",github_release.version)
-    # print("commit.commit.committer.date: ",commit.commit.committer.date)
     commits = repo.get_commits(since=commit.commit.committer.date)
     count = commits.totalCount - 1
     if count > 0:
-      print(
-          Fore.YELLOW +
+      Colorize(
+          "YELLOW",
           f'*WARNING* {dep} has had {count} commits since {github_release.version}@<{commit.commit.committer.date}>'
-          + Style.RESET_ALL)
+      )
     # for stuff in commits:
     #   if github_release.version != stuff.sha:
     #     print(stuff)
@@ -121,7 +117,6 @@ def VerifyAndPrintReleaseDates(repository_locations, github_instance):
       print("github_release: ", github_release)
     repo = github_instance.get_repo(f'{github_release.organization}/{github_release.project}')
     release_date = GetReleaseDate(dep, repo, metadata['version'], github_release)
-    # print("release_date: ", release_date)
     if release_date:
       # Check whether there is a more recent version and warn if necessary.
       VerifyAndPrintLatestRelease(dep, repo, github_release.version, release_date)
@@ -143,14 +138,12 @@ if __name__ == '__main__':
   path = sys.argv[1]
   spec_loader = utils.repository_locations_utils.load_repository_locations_spec
   path_module = utils.LoadModule('repository_locations', path)
-  # print("spec_loader: ",spec_loader)
-  # print("path_module: ",path_module)
   try:
     VerifyAndPrintReleaseDates(spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC),
                                github.Github(access_token))
   except ReleaseDateError as e:
-    print(
-        Fore.RED +
+    Colorize(
+        "RED",
         f'*ERROR* An error occurred while processing {path}, please verify the correctness of the '
-        f'metadata: {e}' + Style.RESET_ALL)
+        f'metadata: {e}')
     sys.exit(1)
