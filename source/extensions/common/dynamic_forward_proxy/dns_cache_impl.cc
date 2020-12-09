@@ -292,8 +292,8 @@ void DnsCacheImpl::runRemoveCallbacks(const std::string& host) {
 }
 
 void DnsCacheImpl::notifyThreads(const std::string& host) {
-  tls_slot_.runOnAllThreads([host_ptr = std::make_shared<const std::string>(host)](
-                                OptRef<ThreadLocalHostInfo> local_host_info) {
+  auto host_ptr = std::make_shared<const std::string>(host);
+  tls_slot_.runOnAllThreads([host_ptr](OptRef<ThreadLocalHostInfo> local_host_info) {
     local_host_info->onHostMapUpdate(host_ptr);
   });
 }
