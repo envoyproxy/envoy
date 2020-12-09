@@ -66,6 +66,10 @@ steps:
   - bash: |
       echo "disk space at end of build:"
       df -h
+      # Cleanup offending files with unicode names
+      rm -rf ${ENVOY_DOCKER_BUILD_DIR}/*/*/external/go_sdk/test/fixedbugs
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
     displayName: "Check disk space at end"
     condition: always()
 
