@@ -46,10 +46,11 @@ void StreamRateLimiter::onTokenTimer() {
   if (!saw_data_) {
     // The first time we see any data on this stream (via writeData()), reset the number of tokens
     // to 1. This will ensure that we start pacing the data at the desired rate (and don't send a
-    // full 1 sec of data right away which might not introduce enough delay for a stream that doesn't
-    // have enough data to span more than 1s of rate allowance). Once we reset, we will subsequently
-    // allow for bursting within the second to account for our data provider being bursty.
-    // The shared token bucket will reset only first time even when called reset from multiple streams.
+    // full 1 sec of data right away which might not introduce enough delay for a stream that
+    // doesn't have enough data to span more than 1s of rate allowance). Once we reset, we will
+    // subsequently allow for bursting within the second to account for our data provider being
+    // bursty. The shared token bucket will reset only first time even when called reset from
+    // multiple streams.
     token_bucket_->reset(1);
     saw_data_ = true;
   }
@@ -97,6 +98,7 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
   buffer_.move(incoming_buffer);
   saw_end_stream_ = end_stream;
   if (!token_timer_->enabled()) {
+    ENVOY_LOG(trace, "stream limiter: token timer enabled.");
     // TODO(mattklein123): In an optimal world we would be able to continue iteration with the data
     // we want in the buffer, but have a way to clear end_stream in case we can't send it all.
     // The filter API does not currently support that and it will not be a trivial change to add.

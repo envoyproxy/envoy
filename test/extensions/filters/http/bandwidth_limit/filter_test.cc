@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.h"
+#include "envoy/extensions/filters/http/bandwidth_limit/v3alpha/bandwidth_limit.pb.h"
 
 #include "extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
@@ -7,40 +7,35 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::AnyNumber;
+using testing::Matcher;
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
 static const std::string config_yaml = R"(
-stat_prefix: test
-enable_mode: IngressAndEgress
-limit_kbps = 10
-fill_rate = 16
+  stat_prefix: test
+  enable_mode: IngressAndEgress
+  limit_kbps: 1
   )";
 
 class FilterTest : public testing::Test {
 public:
   FilterTest() = default;
 
-  void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
-    // EXPECT_CALL(
-    //     runtime_.snapshot_,
-    //     featureEnabled(absl::string_view("test_enabled"),
-    //                    testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
-    //     .WillRepeatedly(testing::Return(enabled));
-    // EXPECT_CALL(
-    //     runtime_.snapshot_,
-    //     featureEnabled(absl::string_view("test_enforced"),
-    //                    testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
-    //     .WillRepeatedly(testing::Return(enforced));
-
-    envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit config;
+  void setup(const std::string& yaml) {
+    envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, dispatcher_, stats_, runtime_);
+    config_ = std::make_shared<FilterConfig>(config, stats_, runtime_, time_system_);
     filter_ = std::make_shared<BandwidthLimiter>(config_);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
   }
 
   uint64_t findCounter(const std::string& name) {
@@ -48,78 +43,124 @@ public:
     return counter != nullptr ? counter->value() : 0;
   }
 
-  Stats::IsolatedStoreImpl stats_;
-  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> encoder_callbacks_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Stats::IsolatedStoreImpl> stats_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_filter_callbacks_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<BandwidthLimiter> filter_;
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestRequestTrailerMapImpl request_trailers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
+  Http::TestResponseTrailerMapImpl response_trailers_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  Buffer::OwnedImpl data_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
-TEST_F(FilterTest, Runtime) {
-  setup(fmt::format(config_yaml, "1"), false, false);
-  EXPECT_EQ(&runtime_, &(config_->runtime()));
-}
-
 TEST_F(FilterTest, Disabled) {
-  setup(fmt::format(config_yaml, "1"), false, false);
-  auto headers = Http::TestRequestHeaderMapImpl();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
-}
-
-TEST_F(FilterTest, RequestOk) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  enable_mode: Disabled
+  limit_kbps: 10
+  fill_rate: 32
+  )";
   setup(fmt::format(config_yaml, "1"));
-  auto headers = Http::TestRequestHeaderMapImpl();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.enabled"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.enabled"));
 }
 
-TEST_F(FilterTest, BandwidthLimited) {
-  setup(fmt::format(config_yaml, "0"));
+TEST_F(FilterTest, BandwidthLimitOnEncodeFlow) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  enable_mode: Egress
+  limit_kbps: 1
+  )";
+  setup(fmt::format(config_yaml, "1"));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code code, absl::string_view body,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
-        EXPECT_EQ(Http::Code::TooManyRequests, code);
-        EXPECT_EQ("local_rate_limited", body);
+  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  Event::MockTimer* token_timer =
+      new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
+  EXPECT_CALL(encoder_filter_callbacks_.dispatcher_, createTimer_(_)).Times(AnyNumber());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
 
-        Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-        modify_headers(response_headers);
-        EXPECT_EQ("true", response_headers.get(Http::LowerCaseString("x-test-rate-limit"))[0]
-                              ->value()
-                              .getStringView());
+  EXPECT_EQ(1UL, config_->limit());
+  EXPECT_EQ(16UL, config_->fill_rate());
 
-        EXPECT_EQ(grpc_status, absl::nullopt);
-        EXPECT_EQ(details, "local_rate_limited");
-      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  Http::MetadataMap metadata_map;
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  auto headers = Http::TestRequestHeaderMapImpl();
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+  // Send a small amount of data which should be within limit.
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
+  token_timer->invokeCallback();
+
+  // Advance time by 1s which should refill all tokens.
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+
+  // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
+  EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  Buffer::OwnedImpl data2(std::string(1152, 'a'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
+
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
+  token_timer->invokeCallback();
+
+  // Fire timer, also advance time.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
+  token_timer->invokeCallback();
+
+  // Get new data with current data buffered, not end_stream.
+  Buffer::OwnedImpl data3(std::string(64, 'b'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data3, false));
+
+  // Fire timer, also advance time.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
+  token_timer->invokeCallback();
+
+  // Fire timer, also advance time. No time enable because there is nothing buffered.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'b')), false));
+  token_timer->invokeCallback();
+
+  // Advance time by 1s for a full refill.
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+
+  // Now send 1024 in one shot with end_stream true which should go through and end the stream.
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  Buffer::OwnedImpl data4(std::string(1024, 'c'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
+  EXPECT_CALL(encoder_filter_callbacks_,
+              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
+  token_timer->invokeCallback();
+
+  filter_->onDestroy();
 }
-
-/*
-TEST_F(FilterTest, RequestRateLimitedButNotEnforced) {
-  setup(fmt::format(config_yaml, "0"), true, false);
-
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _)).Times(0);
-
-  auto headers = Http::TestRequestHeaderMapImpl();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
-}
-*/
 
 } // namespace BandwidthLimitFilter
 } // namespace HttpFilters

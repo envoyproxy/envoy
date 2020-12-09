@@ -34,7 +34,7 @@ message BandwidthLimit {
     Egress = 2;
 
     // Filter enabled for both Ingress and Egress traffic.
-    IngressAndEgress = 4;
+    IngressAndEgress = 3;
   }
 
   // The human readable prefix to use when emitting stats.

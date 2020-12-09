@@ -97,7 +97,6 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
-
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
@@ -110,10 +109,7 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 

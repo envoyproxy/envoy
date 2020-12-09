@@ -16,8 +16,7 @@ using EnableMode =
 
 TEST(Factory, GlobalEmptyConfig) {
   const std::string yaml = R"(
-stat_prefix: test
-enforce_threshold_kbps: 1024
+  stat_prefix: test
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -35,10 +34,56 @@ enforce_threshold_kbps: 1024
 
 TEST(Factory, RouteSpecificFilterConfig) {
   const std::string config_yaml = R"(
-stat_prefix: test
-enable_mode: IngressAndEgress
-limit_kbps: 10
-fill_rate: 16
+  stat_prefix: test
+  enable_mode: IngressAndEgress
+  limit_kbps: 10
+  fill_rate: 32
+  )";
+
+  BandwidthLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  const auto route_config = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
+  EXPECT_EQ(config->limit(), 10);
+  EXPECT_EQ(config->fill_rate(), 32);
+  EXPECT_EQ(config->enforce_threshold(), absl::nullopt);
+  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_IngressAndEgress);
+  EXPECT_FALSE(config->tokenBucket() == nullptr);
+}
+
+TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  limit_kbps: 10
+  fill_rate: 32
+  )";
+
+  BandwidthLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  const auto route_config = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
+  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_Disabled);
+  EXPECT_EQ(config->limit(), 10);
+  EXPECT_EQ(config->fill_rate(), 32);
+}
+
+TEST(Factory, RouteSpecificFilterConfigDefaultFillRate) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  enable_mode: IngressAndEgress
+  limit_kbps: 10
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -53,18 +98,15 @@ fill_rate: 16
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fill_rate(), 16);
-  EXPECT_EQ(config->enforce_threshold(), absl::nullopt);
-  EXPECT_EQ(config->enable_mode(), EnableMode::BandwidthLimit_EnableMode_IngressAndEgress);
-  EXPECT_FALSE(config->tokenBucket() == nullptr);
 }
 
-TEST(Factory, RouteSpecificEnforcedThresholdIgnored) {
+TEST(Factory, RouteSpecificEnforceThresholdIgnored) {
   const std::string config_yaml = R"(
-stat_prefix: test
-enable_mode: IngressAndEgress
-limit_kbps: 10
-fill_rate: 16
-enforce_threshold_kbps: 100
+  stat_prefix: test
+  enable_mode: IngressAndEgress
+  limit_kbps: 10
+  fill_rate: 32
+  enforce_threshold_kbps: 100
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -82,7 +124,7 @@ enforce_threshold_kbps: 100
 
 TEST(Factory, PerRouteConfigNoLimits) {
   const std::string config_yaml = R"(
-stat_prefix: test
+  stat_prefix: test
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -97,11 +139,11 @@ stat_prefix: test
 
 TEST(Factory, FillRateTooHigh) {
   const std::string config_yaml = R"(
-stat_prefix: test
-enable_mode: IngressAndEgress
-limit_kbps: 10
-fill_rate: 33
-enforce_threshold_kbps: 100
+  stat_prefix: test
+  enable_mode: IngressAndEgress
+  limit_kbps: 10
+  fill_rate: 33
+  enforce_threshold_kbps: 100
   )";
 
   BandwidthLimitFilterConfig factory;
