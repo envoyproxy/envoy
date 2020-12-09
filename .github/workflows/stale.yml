@@ -38,5 +38,5 @@ jobs:
         exempt-issue-labels: 'no stalebot,help wanted'
         stale-pr-label: 'stale'
         exempt-pr-labels: 'no stalebot'
-        operations-per-run: 100
+        operations-per-run: 500
         ascending: true
