@@ -16,7 +16,10 @@ using ::testing::ReturnRef;
 
 MockClusterManager::MockClusterManager(TimeSource&) : MockClusterManager() {}
 
-MockClusterManager::MockClusterManager() : cluster_stat_names_(*symbol_table_) {
+MockClusterManager::MockClusterManager()
+    : cluster_stat_names_(*symbol_table_), cluster_load_report_stat_names_(*symbol_table_),
+      cluster_request_response_size_stat_names_(*symbol_table_),
+      cluster_timeout_budget_stat_names_(*symbol_table_) {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, tcpConnPoolForCluster(_, _, _)).WillByDefault(Return(&tcp_conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
