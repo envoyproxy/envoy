@@ -548,7 +548,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (!host_rewrite_.empty()) {
-    headers.setHost(host_rewrite_);
+    Http::Utility::updateAuthority(headers, host_rewrite_);
   } else if (auto_host_rewrite_header_) {
     const auto header = headers.get(*auto_host_rewrite_header_);
     if (!header.empty()) {
@@ -556,13 +556,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
       // value is used.
       const absl::string_view header_value = header[0]->value().getStringView();
       if (!header_value.empty()) {
-        headers.setHost(header_value);
+        Http::Utility::updateAuthority(headers, header_value);
       }
     }
   } else if (host_rewrite_path_regex_ != nullptr) {
     const std::string path(headers.getPathValue());
     absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(path));
-    headers.setHost(
+    Http::Utility::updateAuthority(headers,
         host_rewrite_path_regex_->replaceAll(just_path, host_rewrite_path_regex_substitution_));
   }
 

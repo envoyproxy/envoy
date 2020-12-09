@@ -303,11 +303,28 @@ void Utility::appendXff(RequestHeaderMap& headers,
   headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
+void Utility::appendXfh(RequestHeaderMap& headers, absl::string_view hostname) {
+  if (!hostname.empty()) {
+    headers.appendForwardedHost(hostname);
+  }
+}
+
 void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& via) {
   // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
   //     (a) Validating we do not expect whitespace in via headers
   //     (b) Add runtime guarding in case users have upstreams which expect it.
   headers.appendVia(via, ", ");
+}
+
+void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname) {
+  HeaderEntry* header_host = headers.Host();
+  if (!header_host || hostname.empty()) {
+    return;
+  }
+
+  const std::string& orig_host_value = std::string(header_host->value().getStringView());
+  header_host->value(hostname);
+  appendXfh(headers, orig_host_value);
 }
 
 std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {

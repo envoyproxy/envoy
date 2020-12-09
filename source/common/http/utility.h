@@ -176,11 +176,26 @@ private:
 void appendXff(RequestHeaderMap& headers, const Network::Address::Instance& remote_address);
 
 /**
+ * Append to x-forwarded-host header.
+ * @param headers supplies the headers to append to.
+ * @param hostname supplies the hostname to append.
+ */
+void appendXfh(RequestHeaderMap& headers, absl::string_view hostname);
+
+/**
  * Append to via header.
  * @param headers supplies the headers to append to.
  * @param via supplies the via header to append.
  */
 void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
+
+/**
+ * Update authority with the specified hostname and copy the original authority to the forwarded
+ * host header.
+ * @param headers headers where authority should be updated.
+ * @param hostname hostname that authority should be updated with.
+ */
+void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.

@@ -327,6 +327,19 @@ A few very important notes about XFF:
      XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
      allow Envoy to generate a new one with a single internal origin IP.
 
+.. _config_http_conn_man_headers_x-forwarded-host:
+
+x-forwarded-host
+----------------
+
+The *x-forwarded-host* (XFH) header is a standard proxy header which indicates the original host
+requested by the client in the *:authority* (*host* in HTTP1) header. A compliant proxy *appends*
+the original value of the *:authority* header to XFH only if the *:authority* header is modified.
+
+Envoy updates the *:authority* header and appends its original value to XFH only if one of the
+:ref:`host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>` options
+are used.
+
 .. _config_http_conn_man_headers_x-forwarded-proto:
 
 x-forwarded-proto
