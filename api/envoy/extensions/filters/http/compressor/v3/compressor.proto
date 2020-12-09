@@ -27,11 +27,13 @@ message Compressor {
       "envoy.config.filter.http.compressor.v2.Compressor";
 
   message CommonDirectionConfig {
-    // Runtime flag that controls whether the filter is enabled for compression or not. If set to false, the
-    // filter will operate as a pass-through filter. If the field is omitted, the filter will be enabled.
+    // Runtime flag that controls whether compression is enabled or not for the direction this
+    // common config is put in. If set to false, the filter will operate as a pass-through filter
+    // in the chosen direction. If the field is omitted, the filter will be enabled.
     config.core.v3.RuntimeFeatureFlag enabled = 1;
 
-    // Minimum response length, in bytes, which will trigger compression. The default value is 30.
+    // Minimum value of Content-Length header of request or response messages (depending on the direction
+    // this common config is put in), in bytes, which will trigger compression. The default value is 30.
     google.protobuf.UInt32Value min_content_length = 2;
 
     // Set of strings that allows specifying which mime-types yield compression; e.g.,
