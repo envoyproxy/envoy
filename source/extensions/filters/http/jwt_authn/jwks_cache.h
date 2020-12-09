@@ -6,14 +6,17 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "jwt_verify_lib/jwks.h"
+#include "jwt_verify_lib/jwt.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-class JwksCache;
-using JwksCachePtr = std::unique_ptr<JwksCache>;
+using ::google::jwt_verify::Status;
+
+class Cache;
+using CachePtr = std::unique_ptr<Cache>;
 
 /**
  * Interface to access all configured Jwt rules and their cached Jwks objects.
@@ -33,9 +36,9 @@ using JwksCachePtr = std::unique_ptr<JwksCache>;
  *     verifyJwt(jwks_data->getJwksObj(), jwt);
  */
 
-class JwksCache {
+class Cache {
 public:
-  virtual ~JwksCache() = default;
+  virtual ~Cache() = default;
 
   // Interface to access a Jwks config rule and its cached Jwks object.
   class JwksData {
@@ -58,6 +61,14 @@ public:
     // Set a remote Jwks.
     virtual const ::google::jwt_verify::Jwks*
     setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) PURE;
+
+    virtual Status getJwtStatus() PURE;
+
+    virtual void addTokenResult(const std::string& token,
+                                ::google::jwt_verify::Jwt& token_result) PURE;
+
+    virtual bool findTokenResult(const std::string& token,
+                                 ::google::jwt_verify::Jwt& token_result) PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
@@ -66,7 +77,7 @@ public:
   virtual JwksData* findByProvider(const std::string& provider) PURE;
 
   // Factory function to create an instance.
-  static JwksCachePtr
+  static CachePtr
   create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
          TimeSource& time_source, Api::Api& api);
 };

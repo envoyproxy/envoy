@@ -31,7 +31,7 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::jwt>,
 public:
   AuthenticatorImpl(const CheckAudience* check_audience,
                     const absl::optional<std::string>& provider, bool allow_failed,
-                    bool allow_missing, JwksCache& jwks_cache,
+                    bool allow_missing, Cache& jwks_cache,
                     Upstream::ClusterManager& cluster_manager,
                     CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
@@ -65,7 +65,7 @@ private:
   void startVerify();
 
   // The jwks cache object.
-  JwksCache& jwks_cache_;
+  Cache& jwks_cache_;
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
 
@@ -81,8 +81,7 @@ private:
   // The JWT object.
   std::unique_ptr<::google::jwt_verify::Jwt> jwt_;
   // The JWKS data object
-  JwksCache::JwksData* jwks_data_{};
-
+  Cache::JwksData* jwks_data_{};
   // The HTTP request headers
   Http::HeaderMap* headers_{};
   // The active span for the request
@@ -141,9 +140,9 @@ void AuthenticatorImpl::startVerify() {
 
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
   ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-  Status status = jwt_->parseFromString(curr_token_->token());
-  if (status != Status::Ok) {
-    doneWithStatus(status);
+  jwks_data_->addTokenResult(curr_token_->token(), *jwt_);
+  if (jwks_data_->getJwtStatus() != Status::Ok) {
+    doneWithStatus(jwks_data_->getJwtStatus());
     return;
   }
 
@@ -174,7 +173,7 @@ void AuthenticatorImpl::startVerify() {
   if (jwks_data_->getJwtProvider().clock_skew_seconds() > 0) {
     clock_skew_seconds = jwks_data_->getJwtProvider().clock_skew_seconds();
   }
-  status = jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now()), clock_skew_seconds);
+  Status status = jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now()), clock_skew_seconds);
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -293,7 +292,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        const absl::optional<std::string>& provider,
-                                       bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
+                                       bool allow_failed, bool allow_missing, Cache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
                                        CreateJwksFetcherCb create_jwks_fetcher_cb,
                                        TimeSource& time_source) {

@@ -1,6 +1,8 @@
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include <chrono>
+#include <memory>
+#include <string>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
@@ -26,7 +28,7 @@ namespace {
 // Default cache expiration time in 5 minutes.
 constexpr int PubkeyCacheExpirationSec = 600;
 
-class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
+class JwksDataImpl : public Cache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api)
       : jwt_provider_(jwt_provider), time_source_(time_source) {
@@ -63,6 +65,23 @@ public:
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
+  Status getJwtStatus() override { return jwt_status_; }
+
+  void addTokenResult(const std::string& token, ::google::jwt_verify::Jwt& token_result) override {
+    jwt_status_ = token_result.parseFromString(token);
+    if (jwt_status_ == Status::Ok) {
+      jwt_ = std::make_unique<::google::jwt_verify::Jwt>(token_result);
+    }
+  }
+
+  bool findTokenResult(const std::string& token, ::google::jwt_verify::Jwt& token_result) override {
+    Status status = token_result.parseFromString(token);
+    if (status != Status::Ok) {
+      return false;
+    }
+    return true;
+  }
+
 private:
   // Get the expiration time for a remote Jwks
   std::chrono::steady_clock::time_point getRemoteJwksExpirationTime() const {
@@ -92,9 +111,13 @@ private:
   TimeSource& time_source_;
   // The pubkey expiration time.
   MonotonicTime expiration_time_;
+  // Jwt object for verified token.
+  std::unique_ptr<::google::jwt_verify::Jwt> jwt_;
+  // A valid error on parsing Jwt.
+  Status jwt_status_;
 };
 
-class JwksCacheImpl : public JwksCache {
+class JwksCacheImpl : public Cache {
 public:
   // Load the config from envoy config.
   JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source, Api::Api& api) {
@@ -132,10 +155,10 @@ private:
 
 } // namespace
 
-JwksCachePtr
-JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-                  TimeSource& time_source, Api::Api& api) {
-  return JwksCachePtr(new JwksCacheImpl(config, time_source, api));
+CachePtr
+Cache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
+              TimeSource& time_source, Api::Api& api) {
+  return CachePtr(new JwksCacheImpl(config, time_source, api));
 }
 
 } // namespace JwtAuthn
