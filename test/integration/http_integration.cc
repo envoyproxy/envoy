@@ -400,9 +400,8 @@ absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
         max_request_headers_kb_, max_request_headers_count_);
     if (result) {
       return upstream_index;
-      break;
     } else if (!bound.withinBound()) {
-      result = (AssertionFailure() << "Timed out waiting for new connection.");
+      RELEASE_ASSERT(0, "Timed out waiting for new connection.");
       break;
     }
     ++upstream_index;
@@ -417,8 +416,8 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   absl::optional<uint64_t> upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    waitForNextUpstreamConnection(upstream_indices, connection_wait_timeout,
-                                  fake_upstream_connection_);
+    upstream_with_request = waitForNextUpstreamConnection(upstream_indices, connection_wait_timeout,
+                                                          fake_upstream_connection_);
   }
   // Wait for the next stream on the upstream connection.
   AssertionResult result =
