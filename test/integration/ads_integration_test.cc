@@ -1274,9 +1274,9 @@ public:
         Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
 
     test_server_->waitForCounterGe("runtime.load_success", 1);
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {},
-                                        {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+    EXPECT_TRUE(
+        compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {}, {}));
   }
 };
 
@@ -1544,6 +1544,44 @@ TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(TypeUrlAnnotationRegression)) {
                                                              "1", true);
 
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
+class AdsSetNodeAlwaysIntegrationTest : public AdsIntegrationTest {
+public:
+  AdsSetNodeAlwaysIntegrationTest() = default;
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      ads_config->set_set_node_on_first_message_only(false);
+    });
+    AdsIntegrationTest::initialize();
+  }
+
+  void testBasicFlow() {
+    // Check that the node is sent in each request.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {buildCluster("cluster_0")}, {buildCluster("cluster_0")},
+        {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                        {"cluster_0"}, {"cluster_0"}, {}, true));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+        {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, true));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsSetNodeAlwaysIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(AdsSetNodeAlwaysIntegrationTest, Basic) {
+  initialize();
+  testBasicFlow();
 }
 
 } // namespace Envoy
