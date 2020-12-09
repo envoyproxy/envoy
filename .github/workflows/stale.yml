@@ -1,9 +1,11 @@
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 * * * *'
 
 jobs:
-  Prune Stale:
+  prune_stale:
+    name: Prune Stale
     runs-on: ubuntu-latest
 
     steps:
