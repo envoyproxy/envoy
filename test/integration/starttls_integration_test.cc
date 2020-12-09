@@ -179,7 +179,6 @@ public:
 
 void StartTlsIntegrationTest::initialize() {
   EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
-      .Times(1)
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
         client_write_buffer_ =
