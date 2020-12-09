@@ -97,6 +97,7 @@ void DispatcherImpl::clearDeferredDeleteList() {
     current_to_delete_ = &to_delete_1_;
   }
 
+  touchWatchdog();
   deferred_deleting_ = true;
 
   // Calling clear() on the vector does not specify which order destructors run in. We want to
@@ -276,6 +277,9 @@ void DispatcherImpl::runPostCallbacks() {
   // It is important that the execution and deletion of the callback happen while post_lock_ is not
   // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
   while (!callbacks.empty()) {
+    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
+    // executing a long list of callbacks.
+    touchWatchdog();
     // Run the callback.
     callbacks.front()();
     // Pop the front so that the destructor of the callback that just executed runs before the next
