@@ -28,6 +28,15 @@ namespace Envoy {
 namespace Event {
 namespace {
 
+class RunOnDelete {
+public:
+  RunOnDelete(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
+  ~RunOnDelete() { on_destroy_(); }
+
+private:
+  std::function<void()> on_destroy_;
+};
+
 void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
   // `arg` contains the ReadyWatcher passed in from evwatch_prepare_new.
   auto watcher = static_cast<ReadyWatcher*>(arg);
@@ -370,6 +379,51 @@ TEST_F(DispatcherImplTest, Post) {
       work_finished_ = true;
     }
     cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
+TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
+  ReadyWatcher parent_watcher;
+  ReadyWatcher deferred_delete_watcher;
+  ReadyWatcher run_watcher1;
+  ReadyWatcher delete_watcher1;
+  ReadyWatcher run_watcher2;
+  ReadyWatcher delete_watcher2;
+
+  // Expect the following events to happen in order. The destructor of the post callback should run
+  // before execution of the next post callback starts. The post callback runner should yield after
+  // running each group of callbacks in a chain, so the deferred deletion should run before the
+  // post callbacks that are also scheduled by the parent post callback.
+  InSequence s;
+  EXPECT_CALL(parent_watcher, ready());
+  EXPECT_CALL(deferred_delete_watcher, ready());
+  EXPECT_CALL(run_watcher1, ready());
+  EXPECT_CALL(delete_watcher1, ready());
+  EXPECT_CALL(run_watcher2, ready());
+  EXPECT_CALL(delete_watcher2, ready());
+
+  dispatcher_->post([&]() {
+    parent_watcher.ready();
+    auto on_delete_task1 =
+        std::make_shared<RunOnDelete>([&delete_watcher1]() { delete_watcher1.ready(); });
+    dispatcher_->post([&run_watcher1, on_delete_task1]() { run_watcher1.ready(); });
+    auto on_delete_task2 =
+        std::make_shared<RunOnDelete>([&delete_watcher2]() { delete_watcher2.ready(); });
+    dispatcher_->post([&run_watcher2, on_delete_task2]() { run_watcher2.ready(); });
+    dispatcher_->post([this]() {
+      {
+        Thread::LockGuard lock(mu_);
+        work_finished_ = true;
+      }
+      cv_.notifyOne();
+    });
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
+        [&deferred_delete_watcher]() -> void { deferred_delete_watcher.ready(); }));
   });
 
   Thread::LockGuard lock(mu_);
