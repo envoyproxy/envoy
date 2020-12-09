@@ -48,10 +48,10 @@ def upstream_envoy_overrides():
     http_archive(
         name = "com_google_absl",
         patches = ["@envoy_mobile//bazel:abseil.patch"],
-        sha256 = "573baccd67aa591b8c7209bfb0c77e0d15633d77ced39d1ccbb1232828f7f7d9",
-        strip_prefix = "abseil-cpp-ce4bc927755fdf0ed03d679d9c7fa041175bb3cb",
+        sha256 = "635367c5cac4bbab95d0485ba9e68fa422546b06ce050190c99be7e23aba3ce3",
+        strip_prefix = "abseil-cpp-8f1c34a77a2ba04512b7f9cbc6013d405e6a0b31",
         # 2020-08-08
-        urls = ["https://github.com/abseil/abseil-cpp/archive/ce4bc927755fdf0ed03d679d9c7fa041175bb3cb.tar.gz"],
+        urls = ["https://github.com/abseil/abseil-cpp/archive/8f1c34a77a2ba04512b7f9cbc6013d405e6a0b31.tar.gz"],
     )
 
     # This should be kept in sync with Envoy itself, we just need to apply this patch
