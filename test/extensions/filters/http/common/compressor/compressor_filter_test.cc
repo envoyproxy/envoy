@@ -132,9 +132,6 @@ public:
                   bool with_trailers) {
     uint64_t buffer_content_size;
     if (!absl::SimpleAtoi(headers.get_("content-length"), &buffer_content_size)) {
-      ASSERT_TRUE(
-          StringUtil::CaseInsensitiveCompare()(headers.get_("transfer-encoding"), "chunked"));
-      // In case of chunked stream just feed the buffer with 1000 bytes.
       buffer_content_size = 1000;
     }
     populateBuffer(buffer_content_size);
@@ -316,6 +313,13 @@ TEST_F(CompressorFilterTest, EmptyResponse) {
   EXPECT_EQ("", headers.get_("content-length"));
   EXPECT_EQ("", headers.get_("content-encoding"));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, true));
+}
+
+// No compression when request was a HEAD
+TEST_F(CompressorFilterTest, HeadRequest) {
+  doRequestNoCompression({{":method", "HEAD"}, {"accept-encoding", "deflate, test"}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "HEAD"}, {"content-length", "256"}};
+  doResponseNoCompression(headers);
 }
 
 // Verify removeAcceptEncoding header.
@@ -552,10 +556,7 @@ INSTANTIATE_TEST_SUITE_P(
     IsMinimumContentLengthTestSuite, IsMinimumContentLengthTest,
     testing::Values(std::make_tuple("content-length", "31", "", true),
                     std::make_tuple("content-length", "29", "", false),
-                    std::make_tuple("transfer-encoding", "chunked", "", true),
-                    std::make_tuple("transfer-encoding", "Chunked", "", true),
-                    std::make_tuple("transfer-encoding", "chunked", "\"content_length\": 500,",
-                                    true),
+                    std::make_tuple("", "", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "501", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "499", "\"content_length\": 500,", false)));
 

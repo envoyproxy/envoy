@@ -188,6 +188,7 @@ private:
   bool isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
+  bool isResponseWithContent(Http::ResponseHeaderMap& headers) const;
 
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
   void insertVaryHeader(Http::ResponseHeaderMap& headers);
@@ -212,6 +213,7 @@ private:
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
+  bool head_request_;
 };
 
 } // namespace Compressors

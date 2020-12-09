@@ -139,7 +139,7 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
 }
 
 CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
-    : config_(std::move(config)) {}
+    : config_(std::move(config)), head_request_{false} {}
 
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                           bool end_stream) {
@@ -153,6 +153,11 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   const auto& response_config = config_->responseDirectionConfig();
   if (response_config.compressionEnabled() && response_config.removeAcceptEncodingHeader()) {
     headers.removeInline(accept_encoding_handle.handle());
+  }
+
+  if (headers.Method() &&
+      headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Head) {
+    head_request_ = true;
   }
 
   const auto& request_config = config_->requestDirectionConfig();
@@ -224,7 +229,8 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   const bool isCompressible = isEnabledAndContentLengthBigEnough &&
                               config.isContentTypeAllowed(headers) &&
                               !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
-                              !headers.getInline(response_content_encoding_handle.handle());
+                              !headers.getInline(response_content_encoding_handle.handle()) &&
+                              isResponseWithContent(headers);
   if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
@@ -484,6 +490,14 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
   return true;
 }
 
+bool CompressorFilter::isResponseWithContent(Http::ResponseHeaderMap& headers) const {
+  const auto status = headers.Status();
+  if ((status != nullptr && status->value().getStringView() == "204") || head_request_) {
+    return false;
+  }
+  return true;
+}
+
 bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
   const bool is_etag_allowed = !(config_->responseDirectionConfig().disableOnEtagHeader() &&
                                  headers.getInline(etag_handle.handle()));
@@ -507,8 +521,7 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     return is_minimum_content_length;
   }
 
-  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
-                                   Http::Headers::get().TransferEncodingValues.Chunked);
+  return true;
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const {
