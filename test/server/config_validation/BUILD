@@ -6,19 +6,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
-    name = "async_client_test",
-    srcs = ["async_client_test.cc"],
-    deps = [
-        "//include/envoy/http:message_interface",
-        "//source/common/http:message_lib",
-        "//source/server/config_validation:async_client_lib",
-        "//source/server/config_validation:dns_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/test_common:simulated_time_system_lib",
-    ],
-)
-
 filegroup(
     name = "server_test_data",
     srcs = glob(["test_data/**"]),

@@ -8,8 +8,6 @@
 #include "common/http/context_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
-#include "server/config_validation/async_client.h"
-
 namespace Envoy {
 namespace Upstream {
 
