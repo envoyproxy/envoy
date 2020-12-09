@@ -17,7 +17,7 @@ template <typename T1, typename T2> inline void safeMemcpy(T1* dst, T2* src) {
  * @note  Sizes are not compared, so ensure the src is of size sizeof(*(dst)) before proceeding to
  * call safeMemcpyUnsafeSrc
  */
-template <typename T1> inline void safeMemcpyUnsafeSrc(T1* dst, void* src) {
+template <typename T1, typename T2> inline void safeMemcpyUnsafeSrc(T1* dst, T2* src) {
   memcpy(dst, src, sizeof(T1));
 }
 /**
@@ -25,7 +25,7 @@ template <typename T1> inline void safeMemcpyUnsafeSrc(T1* dst, void* src) {
  * @note  Sizes are not compared, so ensure the dst is of size sizeof(*(src)) before proceeding to
  * call safeMemcpyUnsafeDst
  */
-template <typename T2> inline void safeMemcpyUnsafeDst(void* dst, T2* src) {
+template <typename T1, typename T2> inline void safeMemcpyUnsafeDst(T1* dst, T2* src) {
   memcpy(dst, src, sizeof(T2));
 }
 
