@@ -56,7 +56,8 @@ void FilterChainUtility::buildUdpFilterChain(
 
 StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   if (bootstrap.has_stats_flush_interval() &&
-      bootstrap.stats_flush_case() != envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
+      bootstrap.stats_flush_case() !=
+          envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
     throw EnvoyException("Only one of stats_flush_interval or stats_flush_on_admin should be set!");
   }
 
@@ -101,7 +102,8 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   initializeStatsConfig(bootstrap, server);
 }
 
-void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server) {
+void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server) {
   ENVOY_LOG(info, "loading stats configuration");
   stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
 
@@ -111,7 +113,8 @@ void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstr
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
-    stats_config_->sinks().emplace_back(factory.createStatsSink(*message, server.serverFactoryContext()));
+    stats_config_->sinks().emplace_back(
+        factory.createStatsSink(*message, server.serverFactoryContext()));
   }
 }
 

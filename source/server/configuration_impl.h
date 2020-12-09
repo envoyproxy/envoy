@@ -125,7 +125,8 @@ private:
   /**
    * Initialize stats configuration.
    */
-  void initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server);
+  void initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                             Instance& server);
 
   /**
    * Initialize watchdog(s). Call before accessing any watchdog configuration.
