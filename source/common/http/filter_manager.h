@@ -10,7 +10,6 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
-#include "common/http/filter_manager.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
@@ -33,7 +32,7 @@ public:
     response_headers_ = &response_headers;
   }
 
-  Http::RequestHeaderMapOptConstRef requestHeaders() const {
+  Http::RequestHeaderMapOptConstRef requestHeaders() const override {
     if (request_headers_) {
       return absl::make_optional(std::cref(*request_headers_));
     }
@@ -41,7 +40,7 @@ public:
     return absl::nullopt;
   }
 
-  Http::ResponseHeaderMapOptConstRef responseHeaders() const {
+  Http::ResponseHeaderMapOptConstRef responseHeaders() const override {
     if (response_headers_) {
       return absl::make_optional(std::cref(*response_headers_));
     }
