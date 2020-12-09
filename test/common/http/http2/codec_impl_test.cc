@@ -360,6 +360,24 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   response_encoder_->encodeHeaders(response_headers, true);
 }
 
+TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
+  initialize();
+  EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  EXPECT_CALL(client_callbacks_, onGoAway(Http::GoAwayErrorCode::Other));
+
+  // We have to dynamic cast because protocolErrorForTest() is intentionally not on the
+  // Connection API.
+  ServerConnectionImpl* raw_server = dynamic_cast<ServerConnectionImpl*>(server_.get());
+  ASSERT(raw_server != nullptr);
+  EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(raw_server->protocolErrorForTest()));
+}
+
 // 100 response followed by 200 results in a [decode100ContinueHeaders, decodeHeaders] sequence.
 TEST_P(Http2CodecImplTest, ContinueHeaders) {
   initialize();
