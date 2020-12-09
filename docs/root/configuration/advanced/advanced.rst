@@ -1,5 +1,5 @@
-Advanced
-========
+高级配置
+=========
 
 .. toctree::
   :maxdepth: 2
