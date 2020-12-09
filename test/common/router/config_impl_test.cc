@@ -648,11 +648,13 @@ virtual_hosts:
     route:
       cluster: ats
       host_rewrite_header: x-rewrite-host
+      append_x_forwarded_host: true
   - match:
       path: "/do-not-rewrite-host-with-header-value"
     route:
       cluster: ats
       host_rewrite_header: x-rewrite-host
+      append_x_forwarded_host: true
   - match:
       path: "/rewrite-host-with-path-regex/envoyproxy.io"
     route:
@@ -662,6 +664,7 @@ virtual_hosts:
           google_re2: {}
           regex: "^/.+/(.+)$"
         substitution: \1
+      append_x_forwarded_host: true
   - match:
       prefix: "/"
     route:
@@ -935,6 +938,9 @@ virtual_hosts:
     EXPECT_FALSE(route->currentUrlPathAfterRewrite(headers).has_value());
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
+    // Config setting append_x_forwarded_host is false (by default). Expect empty x-forwarded-host
+    // header value.
+    EXPECT_EQ("", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
   // Rewrites host using supplied header.
@@ -945,6 +951,7 @@ virtual_hosts:
     EXPECT_FALSE(route->currentUrlPathAfterRewrite(headers).has_value());
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("rewrote", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
   // Does not rewrite host because of missing header.
@@ -955,6 +962,7 @@ virtual_hosts:
     EXPECT_FALSE(route->currentUrlPathAfterRewrite(headers).has_value());
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
   // Rewrites host using path.
@@ -965,6 +973,7 @@ virtual_hosts:
     EXPECT_FALSE(route->currentUrlPathAfterRewrite(headers).has_value());
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
   // Rewrites host using path, removes query parameters
@@ -975,6 +984,7 @@ virtual_hosts:
     EXPECT_FALSE(route->currentUrlPathAfterRewrite(headers).has_value());
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
   // Case sensitive rewrite matching test.
