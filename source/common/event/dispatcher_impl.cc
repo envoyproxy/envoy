@@ -25,6 +25,7 @@
 #include "common/runtime/runtime_features.h"
 
 #include "event2/event.h"
+#include "fmt/chrono.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
@@ -99,6 +100,8 @@ void DispatcherImpl::clearDeferredDeleteList() {
 
   deferred_deleting_ = true;
 
+  auto start_time = api_.timeSource().systemTime();
+
   // Calling clear() on the vector does not specify which order destructors run in. We want to
   // destroy in FIFO order so just do it manually. This required 2 passes over the vector which is
   // not optimal but can be cleaned up later if needed.
@@ -108,6 +111,11 @@ void DispatcherImpl::clearDeferredDeleteList() {
 
   to_delete->clear();
   deferred_deleting_ = false;
+
+  auto duration = api_.timeSource().systemTime() - start_time;
+  if (duration > std::chrono::milliseconds(50)) {
+    ENVOY_LOG(debug, "Deferred deletion of {} items took {}", num_to_delete, duration);
+  }
 }
 
 Network::ServerConnectionPtr
@@ -273,6 +281,10 @@ void DispatcherImpl::runPostCallbacks() {
     // post_callbacks_ should be empty after the move.
     ASSERT(post_callbacks_.empty());
   }
+
+  auto start_time = api_.timeSource().systemTime();
+  size_t num_callbacks = callbacks.size();
+
   // It is important that the execution and deletion of the callback happen while post_lock_ is not
   // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
   while (!callbacks.empty()) {
@@ -281,6 +293,11 @@ void DispatcherImpl::runPostCallbacks() {
     // Pop the front so that the destructor of the callback that just executed runs before the next
     // callback executes.
     callbacks.pop_front();
+  }
+
+  auto duration = api_.timeSource().systemTime() - start_time;
+  if (duration > std::chrono::milliseconds(50)) {
+    ENVOY_LOG(debug, "Execution of {} callbacks took {}", num_callbacks, duration);
   }
 }
 
