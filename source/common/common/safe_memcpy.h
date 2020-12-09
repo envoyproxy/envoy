@@ -18,7 +18,7 @@ template <typename T1, typename T2> inline void safeMemcpy(T1* dst, T2* src) {
  * call safeMemcpyUnsafeSrc
  */
 template <typename T1> inline void safeMemcpyUnsafeSrc(T1* dst, void* src) {
-  memcpy(dst, src, sizeof(T1);
+  memcpy(dst, src, sizeof(T1));
 }
 /**
  * @brief Copies src to dst based on the size of src
