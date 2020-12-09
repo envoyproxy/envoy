@@ -1315,7 +1315,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityNoOpenStreams) {
   // this is debatable and needs to be revisited.
 
   // The `floodClient` method sends request headers to open upstream connection, but upstream does
-  // send any response. In this case the number of streams tracked by the upstream protocol
+  // not send any response. In this case the number of streams tracked by the upstream protocol
   // constraints checker is still 0.
   floodClient(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(1),
                                             Http2Frame::makeClientStreamId(2)),
