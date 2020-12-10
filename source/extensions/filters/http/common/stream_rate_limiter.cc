@@ -98,13 +98,14 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
   buffer_.move(incoming_buffer);
   saw_end_stream_ = end_stream;
   if (!token_timer_->enabled()) {
-    ENVOY_LOG(trace, "stream limiter: token timer enabled.");
     // TODO(mattklein123): In an optimal world we would be able to continue iteration with the data
     // we want in the buffer, but have a way to clear end_stream in case we can't send it all.
     // The filter API does not currently support that and it will not be a trivial change to add.
     // Instead we cheat here by scheduling the token timer to run immediately after the stack is
     // unwound, at which point we can directly called encode/decodeData.
     token_timer_->enableTimer(std::chrono::milliseconds(0), &scope_);
+    ENVOY_LOG(trace, "stream limiter: token timer is{}enabled.",
+              token_timer_->enabled() ? " " : " not ");
   }
 }
 

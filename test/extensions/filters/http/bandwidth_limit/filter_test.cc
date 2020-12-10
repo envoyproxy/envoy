@@ -32,7 +32,7 @@ public:
   void setup(const std::string& yaml) {
     envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, stats_, runtime_, time_system_);
+    config_ = std::make_shared<FilterConfig>(config, stats_, runtime_, time_system_, true);
     filter_ = std::make_shared<BandwidthLimiter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -53,7 +53,6 @@ public:
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   Buffer::OwnedImpl data_;
   Event::SimulatedTimeSystem time_system_;
 };
@@ -78,7 +77,85 @@ TEST_F(FilterTest, Disabled) {
   EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.enabled"));
 }
 
-TEST_F(FilterTest, BandwidthLimitOnEncodeFlow) {
+TEST_F(FilterTest, BandwidthLimitOnDecode) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  enable_mode: Ingress
+  limit_kbps: 1
+  )";
+  setup(fmt::format(config_yaml, "1"));
+  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
+
+  ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1100));
+  Event::MockTimer* token_timer =
+      new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_EQ(1UL, config_->limit());
+  EXPECT_EQ(16UL, config_->fill_rate());
+
+  // Send a small amount of data which should be within limit.
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data1, false));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual("hello"), false));
+  token_timer->invokeCallback();
+
+  // Advance time by 1s which should refill all tokens.
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+
+  // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
+  EXPECT_CALL(decoder_filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  Buffer::OwnedImpl data2(std::string(1152, 'a'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data2, false));
+
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  EXPECT_CALL(decoder_filter_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
+  token_timer->invokeCallback();
+
+  // Fire timer, also advance time.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
+  token_timer->invokeCallback();
+
+  // Get new data with current data buffered, not end_stream.
+  Buffer::OwnedImpl data3(std::string(64, 'b'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data3, false));
+
+  // Fire timer, also advance time.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
+  token_timer->invokeCallback();
+
+  // Fire timer, also advance time. No time enable because there is nothing buffered.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(63));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(64, 'b')), false));
+  token_timer->invokeCallback();
+
+  // Advance time by 1s for a full refill.
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+
+  // Now send 1024 in one shot with end_stream true which should go through and end the stream.
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  Buffer::OwnedImpl data4(std::string(1024, 'c'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data4, true));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
+  token_timer->invokeCallback();
+
+  filter_->onDestroy();
+}
+
+TEST_F(FilterTest, BandwidthLimitOnEncode) {
   const std::string config_yaml = R"(
   stat_prefix: test
   enable_mode: Egress
@@ -89,8 +166,7 @@ TEST_F(FilterTest, BandwidthLimitOnEncodeFlow) {
   ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
-  EXPECT_CALL(encoder_filter_callbacks_.dispatcher_, createTimer_(_)).Times(AnyNumber());
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  EXPECT_CALL(encoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
 
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(16UL, config_->fill_rate());

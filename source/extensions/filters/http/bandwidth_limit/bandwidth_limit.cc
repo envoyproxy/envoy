@@ -65,6 +65,8 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
         decoder_callbacks_->dispatcher(), decoder_callbacks_->scope(), config_->tokenBucket(),
         config_->fill_rate());
   }
+  ENVOY_LOG(trace, "BandwidthLimiter: decode headers: ingress_limiter_={}",
+            ingress_limiter_ ? true : false);
 
   return Http::FilterHeadersStatus::Continue;
 }
@@ -74,6 +76,7 @@ Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool
     ingress_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
+  ENVOY_LOG(trace, "BandwidthLimiter: decode data: ingress_limiter_ not set");
   return Http::FilterDataStatus::Continue;
 }
 
