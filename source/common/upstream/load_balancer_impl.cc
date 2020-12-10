@@ -707,6 +707,11 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
                                                                   slow_start_window, 0)
                                 : 0) *
                         1000),
+      time_bias_runtime_(
+          common_config.has_slow_start_config() && common_config.slow_start_config().has_time_bias()
+              ? std::make_unique<Runtime::Double>(common_config.slow_start_config().time_bias(),
+                                                  runtime)
+              : nullptr),
       time_source_(time_source) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
@@ -730,7 +735,7 @@ void EdfLoadBalancerBase::initialize() {
   }
 }
 
-// todo (nezdolik) do we need to purge hosts that are out of the window?
+// TODO(nezdolik) do we need to purge hosts that are out of the window?
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_added,
                                                       const HostVector& hosts_removed) {
   // Host exits slow start mode when it leaves the cluster.
@@ -750,7 +755,7 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_ad
         break;
       case envoy::config::cluster::v3::Cluster::CommonLbConfig::WAIT_FOR_FIRST_PASSING_HC:
         // Check health status of host. It should be marked as healthy and have first passed
-        // healthcheck. todo(nezdolik) is this equivalent to "host has passed first HC" ?
+        // healthcheck. TODO(nezdolik) is this equivalent to "host has passed first HC" ?
         if (host->health() == Upstream::Host::Health::Healthy &&
             !host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
           hosts_in_slow_start_.insert(host);
@@ -789,11 +794,17 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       auto host_weight = hostWeight(*host);
       auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           time_source_.monotonicTime() - host->creationTime());
-      // todo(nezdolik) Store a collection of hosts that adhere to EP warming policy and are in slow
+      // TODO(nezdolik) Store a collection of hosts that adhere to EP warming policy and are in slow
       // start window and check if host is there.
       if (host_create_duration <= slow_start_window) {
-        // todo(nezdolik) parametrize this, default should be 1.
-        host_weight *= 0.1;
+        time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
+
+        if (time_bias_ < 0.0) {
+          ENVOY_LOG(warn, "upstream: invalid time bias supplied (runtime key {}), using 1.0",
+                    time_bias_runtime_->runtimeKey());
+          time_bias_ = 1.0;
+        }
+        host_weight *= time_bias_;
       }
 
       // We use a fixed weight here. While the weight may change without

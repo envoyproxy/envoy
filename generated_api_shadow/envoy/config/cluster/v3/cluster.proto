@@ -519,9 +519,12 @@ message Cluster {
 
     // Configuration for slow start mode.
     message SlowStartConfig {
-      google.protobuf.UInt32Value slow_start_window = 1;
+      google.protobuf.UInt32Value slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
 
-      EndpointWarmingPolicy endpoint_warming_policy = 2;
+      EndpointWarmingPolicy endpoint_warming_policy = 2
+          [(validate.rules).enum = {defined_only: true}];
+
+      core.v3.RuntimeDouble time_bias = 3;
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.

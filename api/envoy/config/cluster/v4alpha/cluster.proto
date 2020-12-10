@@ -528,9 +528,12 @@ message Cluster {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.cluster.v3.Cluster.CommonLbConfig.SlowStartConfig";
 
-      google.protobuf.UInt32Value slow_start_window = 1;
+      google.protobuf.UInt32Value slow_start_window = 1 [(validate.rules).uint32 = {gte: 0}];
 
-      EndpointWarmingPolicy endpoint_warming_policy = 2;
+      EndpointWarmingPolicy endpoint_warming_policy = 2
+          [(validate.rules).enum = {defined_only: true}];
+
+      core.v4alpha.RuntimeDouble time_bias = 3;
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
