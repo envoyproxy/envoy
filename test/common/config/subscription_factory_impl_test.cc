@@ -16,11 +16,11 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -40,7 +40,7 @@ public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
-        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, runtime_) {
+        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_) {
   }
 
   SubscriptionPtr
@@ -338,11 +338,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
       envoy::config::core::v3::ApiVersion::V2);
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
       "static_cluster");
-  NiceMock<Runtime::MockSnapshot> snapshot;
-  EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(false));
-  EXPECT_CALL(runtime_, countDeprecatedFeatureUse());
 
+  TestScopedRuntime scoped_runtime;
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
@@ -363,11 +360,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
       envoy::config::core::v3::ApiVersion::AUTO);
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
       "static_cluster");
-  NiceMock<Runtime::MockSnapshot> snapshot;
-  EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(false));
-  EXPECT_CALL(runtime_, countDeprecatedFeatureUse());
 
+  TestScopedRuntime scoped_runtime;
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));

@@ -26,6 +26,7 @@
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
@@ -181,6 +182,34 @@ public:
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterSet& primary_clusters,
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
+
+  /**
+   * Access transport_api_version field in ApiConfigSource, while validating version
+   * compatibility.
+   * @param api_config_source the config source to extract transport API version from.
+   * @return envoy::config::core::v3::ApiVersion transport API version
+   * @throws DeprecateDMajorVersion when the transport version is disabled.
+   */
+  template <class Proto>
+  static envoy::config::core::v3::ApiVersion
+  getAndCheckTransportVersion(const Proto& api_config_source) {
+    const auto transport_api_version = api_config_source.transport_api_version();
+    if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
+        transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
+      Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
+      const std::string& warning = fmt::format(
+          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
+          "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
+          "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
+          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
+          api_config_source.DebugString());
+      ENVOY_LOG_MISC(warn, warning);
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+        throw DeprecatedMajorVersionException(warning);
+      }
+    }
+    return transport_api_version;
+  }
 
   /**
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to

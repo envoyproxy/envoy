@@ -589,10 +589,10 @@ void InstanceImpl::onRuntimeReady() {
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                        stats_store_, false)
             ->create(),
-        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, info_factory_, access_log_manager_,
-        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
-        messageValidationContext().dynamicValidationVisitor(), *api_);
+        Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
+        Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
+        access_log_manager_, *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_,
+        thread_local_, messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 
   // If there is no global limit to the number of active connections, warn on startup.

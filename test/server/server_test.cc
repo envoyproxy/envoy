@@ -667,6 +667,24 @@ TEST_P(ServerInstanceImplTest,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
 }
 
+// Validate that bootstrap with v2 ADS transport is rejected when --bootstrap-version is not
+// set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2AdsTransportWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/ads_v2.yaml"),
+                          DeprecatedMajorVersionException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+}
+
+// Validate that bootstrap with v2 HDS transport is rejected when --bootstrap-version is not
+// set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/hds_v2.yaml"),
+                          DeprecatedMajorVersionException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+}
+
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
 TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapWithoutExplicitVersion)) {
@@ -802,6 +820,18 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3S
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2TransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/dynamic_v2.yaml");
+}
+
+// Validate that bootstrap with v2 ADS transport loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2AdsTransportWithoutExplicitVersion)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/ads_v2.yaml");
+}
+
+// Validate that bootstrap with v2 HDS transport loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2HdsTransportWithoutExplicitVersion)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/hds_v2.yaml");
 }
 
 // Validate that bootstrap pb_text loads.
