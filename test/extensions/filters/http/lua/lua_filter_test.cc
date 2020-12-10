@@ -106,7 +106,7 @@ public:
   void setupSecureConnection(const bool secure) {
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
     EXPECT_CALL(decoder_callbacks_, connection()).WillOnce(Return(&connection_));
-    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? ssl_ : nullptr));
+    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
   }
 
   void setupMetadata(const std::string& yaml) {

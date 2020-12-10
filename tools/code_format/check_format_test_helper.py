@@ -303,6 +303,8 @@ def runChecks():
   errors += checkAndFixError(
       "cpp_std.cc",
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
+  errors += checkAndFixError("code_conventions.cc",
+                             "term .Times(1); should be replaced with preferred term ;")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("duration_value_zero.cc")

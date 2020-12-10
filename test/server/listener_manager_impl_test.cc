@@ -856,11 +856,11 @@ dynamic_listeners:
         seconds: 1001001001
         nanos: 1000000
 )EOF");
-    EXPECT_CALL(listener_foo->target_, initialize()).Times(1);
+    EXPECT_CALL(listener_foo->target_, initialize());
     server_init_mgr.initialize(server_init_watcher);
     // Since listener_foo->target_ is not ready, the listener's listener_init_target will not be
     // ready until the destruction happens.
-    server_init_watcher.expectReady().Times(1);
+    server_init_watcher.expectReady();
     EXPECT_CALL(*listener_foo, onDestroy());
     EXPECT_TRUE(manager_->removeListener("foo"));
   }
@@ -884,7 +884,7 @@ static_listeners:
     ListenerHandle* listener_foo2 = expectListenerCreate(true, true);
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
     // Version 2 listener will be initialized by listener manager directly.
-    EXPECT_CALL(listener_foo2->target_, initialize()).Times(1);
+    EXPECT_CALL(listener_foo2->target_, initialize());
     EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml),
                                               "version2", true));
     // Version2 is in warming list as listener_foo2->target_ is not ready yet.
@@ -1844,8 +1844,8 @@ filter_chains:
   EXPECT_EQ(2UL, manager_->listeners().size());
 
   // Validate that stop listener is only called once - for inbound listeners.
-  EXPECT_CALL(*worker_, stopListener(_, _)).Times(1);
-  EXPECT_CALL(*listener_factory_.socket_, close()).Times(1);
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 

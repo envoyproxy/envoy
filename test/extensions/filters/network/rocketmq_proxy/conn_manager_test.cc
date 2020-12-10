@@ -233,7 +233,7 @@ TEST_F(RocketmqConnectionManagerTest, OnHeartbeatWithDownstreamConnecitonClosed)
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::HeartBeat);
   NiceMock<Network::MockConnection> connection;
-  EXPECT_CALL(connection, state()).Times(1).WillOnce(Invoke([&]() -> Network::Connection::State {
+  EXPECT_CALL(connection, state()).WillOnce(Invoke([&]() -> Network::Connection::State {
     return Network::Connection::State::Closed;
   }));
   EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(Invoke([&]() -> Network::Connection& {

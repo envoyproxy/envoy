@@ -635,11 +635,9 @@ TEST_F(DynamoFilterTest, PartitionIdStats) {
           Property(&Stats::Metric::name, "prefix.dynamodb.table.locations.upstream_rq_time"), _));
 
   EXPECT_CALL(stats_,
-              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_1"))
-      .Times(1);
+              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_1"));
   EXPECT_CALL(stats_,
-              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_2"))
-      .Times(1);
+              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_2"));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -812,12 +810,10 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
 
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_1"))
-      .Times(1);
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_1"));
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_2"))
-      .Times(1);
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_2"));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

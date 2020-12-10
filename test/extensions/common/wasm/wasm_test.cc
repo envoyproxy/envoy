@@ -615,8 +615,8 @@ TEST_P(WasmCommonTest, WASI) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
-        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(1);
-        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("WASI write to stderr"))).Times(1);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("WASI write to stderr")));
         return root_context;
       });
   wasm->start(plugin);

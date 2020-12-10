@@ -1793,7 +1793,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersInvokeResetStream) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(63 * 1024, 'q');
   request_headers.addCopy("big", long_string);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(1);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 }
 
@@ -1836,7 +1836,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejectedByDefault) {
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(1);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   EXPECT_EQ(
       1,
@@ -1887,7 +1887,7 @@ TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
   for (int i = 0; i < 100; i++) {
     request_headers.addCopy(std::to_string(i), "");
   }
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(1);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 }
 
@@ -1956,7 +1956,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersOverDefaultCodecLibraryLimit) {
   std::string long_string = std::string(65 * 1024, 'q');
   request_headers.addCopy("big", long_string);
 
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 }
@@ -1992,7 +1992,7 @@ TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
     request_headers.addCopy(std::to_string(i), long_string);
   }
 
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 }
@@ -2010,7 +2010,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
     request_headers.addCopy(std::to_string(i), long_string);
   }
 
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 }
@@ -2233,7 +2233,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
   // +2 is to account for HEADERS and PING ACK, that is used to trigger mitigation
   EXPECT_CALL(server_connection_, write(_, _))
       .Times(CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 2);
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false)).Times(1);
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder_, decodeData(_, false))
       .Times(CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};

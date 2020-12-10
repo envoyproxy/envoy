@@ -413,7 +413,7 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(1).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 

@@ -125,7 +125,7 @@ TEST_F(HandshakerTest, NormalOperation) {
   ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Closed));
 
   NiceMock<MockHandshakeCallbacks> handshake_callbacks;
-  EXPECT_CALL(handshake_callbacks, onSuccess).Times(1);
+  EXPECT_CALL(handshake_callbacks, onSuccess);
   ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
@@ -153,7 +153,7 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   SSL_set_bio(client_ssl_.get(), bio, bio);
 
   StrictMock<MockHandshakeCallbacks> handshake_callbacks;
-  EXPECT_CALL(handshake_callbacks, onFailure).Times(1);
+  EXPECT_CALL(handshake_callbacks, onFailure);
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
 
@@ -222,7 +222,7 @@ TEST_F(HandshakerTest, NormalOperationWithSslHandshakerImplForTest) {
   ::testing::MockFunction<void()> requested_cert_cb;
 
   StrictMock<MockHandshakeCallbacks> handshake_callbacks;
-  EXPECT_CALL(handshake_callbacks, onSuccess).Times(1);
+  EXPECT_CALL(handshake_callbacks, onSuccess);
 
   SslHandshakerImplForTest handshaker(std::move(server_ssl_), &handshake_callbacks,
                                       requested_cert_cb.AsStdFunction());

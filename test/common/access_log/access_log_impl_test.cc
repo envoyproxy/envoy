@@ -1311,7 +1311,7 @@ typed_config:
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
   fields_c["c"].set_bool_value(false);
@@ -1397,7 +1397,7 @@ typed_config:
 
   const InstanceSharedPtr default_true_log =
       AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_true_yaml), context_);
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
 
   default_true_log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }

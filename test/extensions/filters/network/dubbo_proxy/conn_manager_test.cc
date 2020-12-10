@@ -446,7 +446,7 @@ TEST_F(ConnectionManagerTest, OnDataHandlesProtocolErrorOnWrite) {
 
   callbacks->startUpstreamResponse();
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_NE(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
@@ -506,7 +506,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
   EXPECT_EQ(callbacks->connection(), &(filter_callbacks_.connection_));
   EXPECT_GE(callbacks->streamId(), 0);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -540,7 +540,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseContainExceptionInfo) {
 
   callbacks->startUpstreamResponse();
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -574,7 +574,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseError) {
 
   callbacks->startUpstreamResponse();
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -605,7 +605,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponseException) {
 
   callbacks->startUpstreamResponse();
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -759,7 +759,7 @@ TEST_F(ConnectionManagerTest, OnEvent) {
     writePartialHessianRequestMessage(buffer_, false, false, 1, true);
     EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -772,7 +772,7 @@ TEST_F(ConnectionManagerTest, OnEvent) {
     writePartialHessianRequestMessage(buffer_, false, false, 1, true);
     EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     conn_manager_->onEvent(Network::ConnectionEvent::LocalClose);
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -787,7 +787,7 @@ TEST_F(ConnectionManagerTest, OnEvent) {
     writeHessianRequestMessage(buffer_, false, false, 1);
     EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -802,7 +802,7 @@ TEST_F(ConnectionManagerTest, OnEvent) {
     writeHessianRequestMessage(buffer_, false, false, 1);
     EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     conn_manager_->onEvent(Network::ConnectionEvent::LocalClose);
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -867,7 +867,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
         EXPECT_EQ(fake_response, buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(SerializationType::Hessian2, callbacks->serializationType());
   EXPECT_EQ(ProtocolType::Dubbo, callbacks->protocolType());
@@ -912,7 +912,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
         EXPECT_EQ(fake_response, buffer.toString());
       }));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -935,9 +935,8 @@ TEST_F(ConnectionManagerTest, TwoWayRequestWithEndStream) {
         return FilterStatus::StopIteration;
       }));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
-      .Times(1);
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, true), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
@@ -954,9 +953,8 @@ TEST_F(ConnectionManagerTest, OneWayRequestWithEndStream) {
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         return FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
-      .Times(1);
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, true), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
@@ -1017,8 +1015,7 @@ TEST_F(ConnectionManagerTest, SendsLocalReplyWithCloseConnection) {
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::ErrorReply;
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
-      .Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   MessageMetadata metadata;
   conn_manager_->sendLocalReply(metadata, direct_response, true);
@@ -1041,9 +1038,8 @@ TEST_F(ConnectionManagerTest, ContinueDecodingWithHalfClose) {
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         return FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
-      .Times(1);
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, true), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 
@@ -1106,7 +1102,7 @@ TEST_F(ConnectionManagerTest, ResetStream) {
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->resetStream();
 }
 
@@ -1289,7 +1285,7 @@ TEST_F(ConnectionManagerTest, SendLocalReplyInMessageDecoded) {
       }));
 
   // The sendLocalReply is called, the ActiveMessage object should be destroyed.
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   writeHessianRequestMessage(buffer_, false, false, 1);
 
@@ -1316,9 +1312,9 @@ TEST_F(ConnectionManagerTest, HandleResponseWithEncoderFilter) {
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
       .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
-  EXPECT_CALL(*encoder_filter, setEncoderFilterCallbacks(_)).Times(1);
+  EXPECT_CALL(*encoder_filter, setEncoderFilterCallbacks(_));
 
-  EXPECT_CALL(*decoder_filter, onDestroy()).Times(1);
+  EXPECT_CALL(*decoder_filter, onDestroy());
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -1341,9 +1337,9 @@ TEST_F(ConnectionManagerTest, HandleResponseWithEncoderFilter) {
             return FilterStatus::Continue;
           }));
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
-  EXPECT_CALL(*encoder_filter, onDestroy()).Times(1);
+  EXPECT_CALL(*encoder_filter, onDestroy());
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(1U, store_.counter("test.response").value());
@@ -1368,7 +1364,7 @@ TEST_F(ConnectionManagerTest, HandleResponseWithCodecFilter) {
         return FilterStatus::Continue;
       }));
 
-  EXPECT_CALL(*mock_codec_filter, setEncoderFilterCallbacks(_)).Times(1);
+  EXPECT_CALL(*mock_codec_filter, setEncoderFilterCallbacks(_));
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -1391,9 +1387,9 @@ TEST_F(ConnectionManagerTest, HandleResponseWithCodecFilter) {
             return FilterStatus::Continue;
           }));
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
-  EXPECT_CALL(*mock_codec_filter, onDestroy()).Times(1);
+  EXPECT_CALL(*mock_codec_filter, onDestroy());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 

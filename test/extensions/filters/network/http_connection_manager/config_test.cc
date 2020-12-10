@@ -2164,13 +2164,13 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(1);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
     EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
   }
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(1);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Buffer
     EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }

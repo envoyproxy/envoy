@@ -167,8 +167,8 @@ TEST_F(HttpRateLimitFilterTest, NoApplicableRateLimit) {
 TEST_F(HttpRateLimitFilterTest, NoDescriptor) {
   SetUpTest(filter_config_);
 
-  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _)).Times(1);
-  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _)).Times(1);
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _));
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _));
   EXPECT_CALL(*client_, limit(_, _, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -199,15 +199,13 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   SetUpTest(filter_config_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
-      .Times(1);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -246,15 +244,13 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
   SetUpTest(filter_config_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
-      .Times(1);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -304,15 +300,13 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
   SetUpTest(enable_x_ratelimit_headers_config_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
-      .Times(1);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -830,15 +824,13 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
-      .Times(1);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -876,15 +868,13 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "false"}};
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
-      .Times(1);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -1037,8 +1027,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
       .WillOnce(Return(true));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));
@@ -1086,8 +1075,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_two_));
@@ -1137,8 +1125,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
-      .Times(1);
+              getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_two_));

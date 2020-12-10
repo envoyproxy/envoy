@@ -19,9 +19,9 @@ TEST(CompressorFilterConfigTests, MakeCompressorTest) {
   NiceMock<Runtime::MockLoader> runtime;
   Stats::TestUtil::TestStore stats;
   auto compressor_factory(std::make_unique<Compression::Compressor::MockCompressorFactory>());
-  EXPECT_CALL(*compressor_factory, createCompressor()).Times(1);
-  EXPECT_CALL(*compressor_factory, statsPrefix()).Times(1);
-  EXPECT_CALL(*compressor_factory, contentEncoding()).Times(1);
+  EXPECT_CALL(*compressor_factory, createCompressor());
+  EXPECT_CALL(*compressor_factory, statsPrefix());
+  EXPECT_CALL(*compressor_factory, contentEncoding());
   CompressorFilterConfig config(compressor_cfg, "test.compressor.", stats, runtime,
                                 std::move(compressor_factory));
   Envoy::Compression::Compressor::CompressorPtr compressor = config.makeCompressor();

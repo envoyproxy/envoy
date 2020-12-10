@@ -367,17 +367,16 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
 
   Buffer::OwnedImpl data1("hello");
   bufferedBody.add(data1);
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello")))).Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
 
   Buffer::OwnedImpl data2(" again ");
   bufferedBody.add(data2);
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))))
-      .Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data2, false));
 
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again hello"))))
-      .Times(1);
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::err, Eq(absl::string_view("onBody hello again hello"))));
   Buffer::OwnedImpl data3("hello");
   bufferedBody.add(data3);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data3, true));
@@ -452,33 +451,29 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferThenStreamBody) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().encodeHeaders(response_headers, false));
 
   Buffer::OwnedImpl data1("hello");
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello")))).Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
   bufferedBody.add(data1);
 
   Buffer::OwnedImpl data2(", there, ");
   bufferedBody.add(data2);
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, "))))
-      .Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data2, false));
 
   // Previous callbacks returned "Buffer" so we have buffered so far
   Buffer::OwnedImpl data3("world!");
   bufferedBody.add(data3);
   EXPECT_CALL(filter(),
-              log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, world!"))))
-      .Times(1);
+              log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, world!"))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data3, false));
 
   // Last callback returned "continue" so we just see individual chunks.
   Buffer::OwnedImpl data4("So it's ");
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody So it's "))))
-      .Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody So it's "))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data4, false));
 
   Buffer::OwnedImpl data5("goodbye, then!");
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody goodbye, then!"))))
-      .Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody goodbye, then!"))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data5, true));
 
   filter().onDestroy();
@@ -501,33 +496,29 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().encodeHeaders(response_headers, false));
 
   Buffer::OwnedImpl data1("hello");
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello")))).Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data1, false));
   bufferedBody.add(data1);
 
   Buffer::OwnedImpl data2(", there, ");
   bufferedBody.add(data2);
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, "))))
-      .Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data2, false));
 
   // Previous callbacks returned "Buffer" so we have buffered so far
   Buffer::OwnedImpl data3("world!");
   bufferedBody.add(data3);
   EXPECT_CALL(filter(),
-              log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, world!"))))
-      .Times(1);
+              log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, world!"))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data3, false));
 
   // Last callback returned "continue" so we just see individual chunks.
   Buffer::OwnedImpl data4("So it's ");
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody So it's "))))
-      .Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody So it's "))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data4, false));
 
   Buffer::OwnedImpl data5("goodbye, then!");
-  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody goodbye, then!"))))
-      .Times(1);
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody goodbye, then!"))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data5, true));
 
   filter().onDestroy();

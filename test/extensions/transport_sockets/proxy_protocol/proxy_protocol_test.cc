@@ -74,8 +74,8 @@ TEST_F(ProxyProtocolTest, InjectesHeaderOnlyOnce) {
 
   {
     InSequence s;
-    EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
-    EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg2), false)).Times(1);
+    EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+    EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg2), false));
   }
 
   proxy_protocol_socket_->doWrite(msg, false);
@@ -195,7 +195,7 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressWhenTransportOptionsAreNull) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -219,7 +219,7 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressesWhenHeaderOptionsAreNull) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -243,7 +243,7 @@ TEST_F(ProxyProtocolTest, V1IPV6LocalAddressesWhenHeaderOptionsAreNull) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -275,7 +275,7 @@ TEST_F(ProxyProtocolTest, V1IPV4DownstreamAddresses) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -307,7 +307,7 @@ TEST_F(ProxyProtocolTest, V1IPV6DownstreamAddresses) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -329,7 +329,7 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenTransportOptionsAreNull) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -352,7 +352,7 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenHeaderOptionsAreNull) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -384,7 +384,7 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddresses) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -416,7 +416,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
         return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
   auto msg = Buffer::OwnedImpl("some data");
-  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false)).Times(1);
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   proxy_protocol_socket_->doWrite(msg, false);
 }
@@ -438,7 +438,7 @@ TEST_F(ProxyProtocolTest, OnConnectedCallsInnerOnConnected) {
       Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080");
   initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
 
-  EXPECT_CALL(*inner_socket_, onConnected()).Times(1);
+  EXPECT_CALL(*inner_socket_, onConnected());
   proxy_protocol_socket_->onConnected();
 }
 

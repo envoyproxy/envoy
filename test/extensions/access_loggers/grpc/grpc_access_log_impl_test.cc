@@ -190,9 +190,9 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
 
   // Now allow the flush to happen. The stored log will get logged, and the next log will succeed.
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(1);
+  EXPECT_CALL(stream, sendMessageRaw_(_, _));
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(1);
+  EXPECT_CALL(stream, sendMessageRaw_(_, _));
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
   EXPECT_EQ(
       2,

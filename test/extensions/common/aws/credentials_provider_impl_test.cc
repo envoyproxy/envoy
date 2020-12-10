@@ -396,8 +396,8 @@ TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
   auto mock_provider1 = std::make_shared<MockCredentialsProvider>();
   auto mock_provider2 = std::make_shared<MockCredentialsProvider>();
 
-  EXPECT_CALL(*mock_provider1, getCredentials()).Times(1);
-  EXPECT_CALL(*mock_provider2, getCredentials()).Times(1);
+  EXPECT_CALL(*mock_provider1, getCredentials());
+  EXPECT_CALL(*mock_provider2, getCredentials());
 
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
@@ -430,7 +430,7 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
 
   const Credentials creds("access_key", "secret_key");
 
-  EXPECT_CALL(*mock_provider1, getCredentials()).Times(1);
+  EXPECT_CALL(*mock_provider1, getCredentials());
   EXPECT_CALL(*mock_provider2, getCredentials()).WillOnce(Return(creds));
 
   CredentialsProviderChain chain;

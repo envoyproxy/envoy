@@ -870,7 +870,7 @@ TEST(DecoderTest, OnData) {
         EXPECT_EQ(100U, metadata->sequenceId());
         return FilterStatus::Continue;
       }));
-  EXPECT_CALL(callbacks, passthroughEnabled()).Times(1).WillRepeatedly(Return(false));
+  EXPECT_CALL(callbacks, passthroughEnabled()).WillOnce(Return(false));
 
   EXPECT_CALL(proto, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
   EXPECT_CALL(handler, structBegin(absl::string_view())).WillOnce(Return(FilterStatus::Continue));
@@ -938,7 +938,7 @@ TEST(DecoderTest, OnDataWithProtocolHint) {
         EXPECT_EQ(100U, metadata->sequenceId());
         return FilterStatus::Continue;
       }));
-  EXPECT_CALL(callbacks, passthroughEnabled()).Times(1);
+  EXPECT_CALL(callbacks, passthroughEnabled());
 
   EXPECT_CALL(proto, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
   EXPECT_CALL(handler, structBegin(absl::string_view())).WillOnce(Return(FilterStatus::Continue));
@@ -1181,7 +1181,7 @@ TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
         EXPECT_EQ(100U, metadata->sequenceId());
         return FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(callbacks, passthroughEnabled()).Times(1).WillRepeatedly(Return(false));
+  EXPECT_CALL(callbacks, passthroughEnabled()).WillOnce(Return(false));
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
 

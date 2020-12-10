@@ -199,7 +199,7 @@ TEST_F(HttpFilterTest, StatsWithPrefix) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(1);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -399,7 +399,7 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(connection_, remoteAddress()).Times(0);
   EXPECT_CALL(connection_, localAddress()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -435,7 +435,7 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -533,7 +533,7 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -816,7 +816,7 @@ TEST_F(HttpFilterTest, ClearCache) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(filter_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -861,7 +861,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(filter_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -903,7 +903,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(filter_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -945,7 +945,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(filter_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1192,7 +1192,7 @@ TEST_F(HttpFilterTest, FilterEnabled) {
       .WillByDefault(Return(true));
 
   // Make sure check is called once.
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1259,7 +1259,7 @@ TEST_F(HttpFilterTest, MetadataEnabled) {
   prepareCheck();
 
   // Make sure check is called once.
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1394,7 +1394,7 @@ TEST_F(HttpFilterTest, FilterEnabledAndMetadataEnabled) {
   prepareCheck();
 
   // Make sure check is called once.
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1531,7 +1531,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 
   // baseline: make sure that when not disabled, check is called
   test_disable(false);
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _));
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1573,7 +1573,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   test_disable(false);
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   // When filter is not disabled, setDecoderBufferLimit is called.
-  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(connection_, remoteAddress()).Times(0);
   EXPECT_CALL(connection_, localAddress()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -2076,7 +2076,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   test_disable_request_body_buffering(false);
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   // When request body buffering is not skipped, setDecoderBufferLimit is called.
-  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(connection_, remoteAddress()).Times(0);
   EXPECT_CALL(connection_, localAddress()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -2089,7 +2089,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));

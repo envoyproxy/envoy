@@ -56,7 +56,7 @@ public:
   }
 
   virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
-    EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+    EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
     EXPECT_CALL(callbacks_, onSuccess_(_, _))
         .WillOnce(Invoke([sent_request, code](const AsyncClient::Request& request,
                                               ResponseMessage* response) -> void {
@@ -545,7 +545,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
 
   // Finish request 2.
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "503"}});
-  EXPECT_CALL(callbacks2, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks2, onBeforeFinalizeUpstreamSpan(_, _));
   EXPECT_CALL(callbacks2, onSuccess_(_, _))
       .WillOnce(Invoke(
           [request2](const AsyncClient::Request& request, ResponseMessage* response) -> void {
@@ -564,7 +564,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
 
   // Finish request 3.
   ResponseHeaderMapPtr response_headers3(new TestResponseHeaderMapImpl{{":status", "500"}});
-  EXPECT_CALL(callbacks3, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks3, onBeforeFinalizeUpstreamSpan(_, _));
   EXPECT_CALL(callbacks3, onSuccess_(_, _))
       .WillOnce(Invoke(
           [request3](const AsyncClient::Request& request, ResponseMessage* response) -> void {
@@ -912,7 +912,7 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
   auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   EXPECT_CALL(callbacks_, onFailure(_, _))
       .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
                                                 AsyncClient::FailureReason reason) {
@@ -955,7 +955,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   AsyncClient::Request* request =
       client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
   request->cancel();
@@ -1028,7 +1028,7 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveRequest) {
   EXPECT_NE(request, nullptr);
 
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   EXPECT_CALL(callbacks_, onFailure(_, _))
       .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
                                                 AsyncClient::FailureReason reason) {
@@ -1058,7 +1058,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
 
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   EXPECT_CALL(callbacks_, onFailure(_, _))
       .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
                                                 AsyncClient::FailureReason reason) {
@@ -1089,7 +1089,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
         return nullptr;
       }));
 
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   EXPECT_CALL(callbacks_, onSuccess_(_, _))
       .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
         // The callback gets called before AsyncClient::send() completes, which means that we don't
@@ -1114,7 +1114,7 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
         return nullptr;
       }));
 
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   EXPECT_CALL(callbacks_, onSuccess_(_, _))
       .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
         // The callback gets called before AsyncClient::send() completes, which means that we don't
@@ -1277,7 +1277,7 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
   AsyncClient::Request* request =
       client_.send(std::move(message_), callbacks_,
                    AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(200)));
-  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _));
   request->cancel();
 }
 
