@@ -21,7 +21,7 @@ then
   bazel test ${BAZEL_BUILD_OPTIONS} //tools/protoxform:merge_active_shadow_test
 fi
 
-# Generate //versioning:active_protos & versioning::frozen_protos.
+# Generate //versioning:active_protos and //versioning::frozen_protos.
 ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
