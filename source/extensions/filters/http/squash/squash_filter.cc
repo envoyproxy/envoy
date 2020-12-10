@@ -276,14 +276,11 @@ void SquashFilter::pollForAttachment() {
   request->headers().setReferencePath(debug_attachment_path_);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
 
-  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
-  if (thread_local_cluster != nullptr) {
-    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
-        std::move(request), check_attachment_callback_,
-        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
-  } else {
-    ASSERT(false); // fixfix
-  }
+  in_flight_request_ =
+      cm_.getThreadLocalCluster(config_->clusterName())
+          ->httpAsyncClient()
+          .send(std::move(request), check_attachment_callback_,
+                Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
   // No need to check if in_flight_request_ is null as onFailure will take care of
   // cleanup.
 }
