@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/common/matching/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -14,7 +16,6 @@
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
-#include <memory>
 
 namespace Envoy {
 namespace Http {
