@@ -1,3 +1,5 @@
+#pragma once
+
 #include <jni.h>
 
 // NOLINT(namespace-envoy)
