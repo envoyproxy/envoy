@@ -1,55 +1,47 @@
 .. _arch_overview_access_logs:
 
-Access logging
+访问日志
 ==============
 
-The :ref:`HTTP connection manager <arch_overview_http_conn_man>` and
-:ref:`tcp proxy <arch_overview_tcp_proxy>` support extensible access logging with the following
-features:
+:ref:`HTTP 连接管理<arch_overview_http_conn_man>`与 :ref:`tcp 代理<arch_overview_tcp_proxy>`支持可扩展的访问记录，并拥有以下特性：
 
-* Any number of access logs per a connection stream.
-* Customizable access log filters that allow different types of requests and responses to be written
-  to different access logs.
+* 每个连接的上游或下游允许记录任意数量的访问日志。
+* 通过自定义的访问日志过滤器可以将不同类型的请求和响应写入到不同的访问日志。
 
-Downstream connection access logging can be enabled using :ref:`listener access
-logs<envoy_v3_api_field_config.listener.v3.Listener.access_log>`. The listener access logs complement
-HTTP request access logging and can be enabled separately and independently from
-filter access logs.
+下游连接的访问日志可以通过设置 :ref:`监听器访问日志<envoy_v3_api_field_config.listener.v3.Listener.access_log>`启用。监听器访问日志可以补充 HTTP 请求访问日志，并且可以独立于过滤器访问日志启用。
 
 .. _arch_overview_access_log_filters:
 
-Access log filters
-------------------
+访问日志过滤器
+-------------
 
-Envoy supports several built-in
-:ref:`access log filters<envoy_v3_api_msg_config.accesslog.v3.AccessLogFilter>` and
-:ref:`extension filters<envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.extension_filter>`
-that are registered at runtime.
+Envoy 支持几种在运行时注册的内置日志过滤器，
+:ref:`访问日志过滤器<envoy_v3_api_msg_config.accesslog.v3.AccessLogFilter>`和
+:ref:`扩展过滤器<envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.extension_filter>`。
 
 .. _arch_overview_access_logs_sinks:
 
-Access logging sinks
---------------------
+访问日志接收器
+-------------
 
-Envoy supports pluggable access logging sinks. The currently supported sinks are:
+Envoy 支持可插拔的访问日志接收器. 当前支持的接收器包括：
 
-File
+文件
 ****
 
-* Asynchronous IO flushing architecture. Access logging will never block the main network processing
-  threads.
-* Customizable access log formats using predefined fields as well as arbitrary HTTP request and
-  response headers.
+* 采用异步 IO 刷新架构。因此访问日志永远不会阻塞网络处理的主线程。
+* 使用预定义字段以及任意 HTTP 请求和响应头的可自定义访问日志格式。
 
 gRPC
 ****
 
-* Envoy can send access log messages to a gRPC access logging service.
+* Envoy 将访问日志发送到一个支持 gRPC 格式信息的访问日志服务。
 
-Further reading
----------------
 
-* Access log :ref:`configuration <config_access_log>`.
-* File :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`.
-* gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
-  sink.
+
+进一步阅读
+---------
+
+* 访问日志 :ref:`配置 <config_access_log>`。
+* 文件 :ref:`访问日志接收器 <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`。
+* gRPC :ref:`访问日志服务 (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`接收器。
