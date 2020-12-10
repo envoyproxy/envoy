@@ -434,6 +434,7 @@ void FakeHttpConnection::encodeProtocolError() {
   } else {
     // Fall back to trying the Legacy ServerConnectionImpl which is used in certain test
     // configurations, specifically the bazel.compile_time_options tests.
+    // TODO(mpuncel) remove this "else" case when the legacy codec is no longer used.
     Http::Legacy::Http2::ServerConnectionImpl* legacy_codec =
         dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
     ASSERT(legacy_codec != nullptr);
