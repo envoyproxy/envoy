@@ -71,6 +71,15 @@ public:
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
   const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
+    return cluster_load_report_stat_names_;
+  }
+  const ClusterRequestResponseSizeStatNames& clusterRequestResponseSizeStatNames() const override {
+    return cluster_request_response_size_stat_names_;
+  }
+  const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const override {
+    return cluster_timeout_budget_stat_names_;
+  }
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -86,6 +95,9 @@ public:
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
   Stats::TestSymbolTable symbol_table_;
   ClusterStatNames cluster_stat_names_;
+  ClusterLoadReportStatNames cluster_load_report_stat_names_;
+  ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
+  ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 };
 } // namespace Upstream
 

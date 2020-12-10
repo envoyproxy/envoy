@@ -40,13 +40,19 @@ MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
       stat_names_(stats_store_.symbolTable()),
+      cluster_load_report_stat_names_(stats_store_.symbolTable()),
+      cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
+      cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
       stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
-      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
+      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_,
+                                                                  cluster_load_report_stat_names_)),
       request_response_size_stats_(std::make_unique<ClusterRequestResponseSizeStats>(
-          ClusterInfoImpl::generateRequestResponseSizeStats(request_response_size_stats_store_))),
-      timeout_budget_stats_(std::make_unique<ClusterTimeoutBudgetStats>(
-          ClusterInfoImpl::generateTimeoutBudgetStats(timeout_budget_stats_store_))),
+          ClusterInfoImpl::generateRequestResponseSizeStats(
+              request_response_size_stats_store_, cluster_request_response_size_stat_names_))),
+      timeout_budget_stats_(
+          std::make_unique<ClusterTimeoutBudgetStats>(ClusterInfoImpl::generateTimeoutBudgetStats(
+              timeout_budget_stats_store_, cluster_timeout_budget_stat_names_))),
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
       resource_manager_(new Upstream::ResourceManagerImpl(

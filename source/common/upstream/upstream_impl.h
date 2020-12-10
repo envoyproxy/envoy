@@ -528,12 +528,16 @@ public:
 
   static ClusterStats generateStats(Stats::Scope& scope,
                                     const ClusterStatNames& cluster_stat_names);
-  static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
+  static ClusterLoadReportStats
+  generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,
                                                                   bool track_remaining);
-  static ClusterRequestResponseSizeStats generateRequestResponseSizeStats(Stats::Scope&);
-  static ClusterTimeoutBudgetStats generateTimeoutBudgetStats(Stats::Scope&);
+  static ClusterRequestResponseSizeStats
+  generateRequestResponseSizeStats(Stats::Scope&,
+                                   const ClusterRequestResponseSizeStatNames& stat_names);
+  static ClusterTimeoutBudgetStats
+  generateTimeoutBudgetStats(Stats::Scope&, const ClusterTimeoutBudgetStatNames& stat_names);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -662,7 +666,7 @@ private:
 
   struct OptionalClusterStats {
     OptionalClusterStats(const envoy::config::cluster::v3::Cluster& config,
-                         Stats::Scope& stats_scope);
+                         Stats::Scope& stats_scope, const ClusterManager& manager);
     const ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
     const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   };

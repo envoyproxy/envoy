@@ -641,17 +641,21 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
   return ClusterStats(stat_names, scope);
 }
 
-ClusterRequestResponseSizeStats
-ClusterInfoImpl::generateRequestResponseSizeStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(POOL_HISTOGRAM(scope))};
+ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
+    Stats::Scope& scope, const ClusterRequestResponseSizeStatNames& stat_names) {
+  return ClusterRequestResponseSizeStats(stat_names, scope);
 }
 
-ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
+ClusterLoadReportStats
+ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope,
+                                         const ClusterLoadReportStatNames& stat_names) {
+  return ClusterLoadReportStats(stat_names, scope);
 }
 
-ClusterTimeoutBudgetStats ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_TIMEOUT_BUDGET_STATS(POOL_HISTOGRAM(scope))};
+ClusterTimeoutBudgetStats
+ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
+                                            const ClusterTimeoutBudgetStatNames& stat_names) {
+  return ClusterTimeoutBudgetStats(stat_names, scope);
 }
 
 // Implements the FactoryContext interface required by network filters.
@@ -745,9 +749,11 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
       load_report_stats_store_(stats_scope_->symbolTable()),
-      load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
+      load_report_stats_(generateLoadReportStats(
+          load_report_stats_store_, factory_context.clusterManager().clusterLoadReportStatNames())),
       optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
-                                  ? std::make_unique<OptionalClusterStats>(config, *stats_scope_)
+                                  ? std::make_unique<OptionalClusterStats>(
+                                        config, *stats_scope_, factory_context.clusterManager())
                                   : nullptr),
       features_(parseFeatures(config, http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_),
@@ -1139,15 +1145,18 @@ void ClusterImplBase::validateEndpointsForZoneAwareRouting(
 }
 
 ClusterInfoImpl::OptionalClusterStats::OptionalClusterStats(
-    const envoy::config::cluster::v3::Cluster& config, Stats::Scope& stats_scope)
+    const envoy::config::cluster::v3::Cluster& config, Stats::Scope& stats_scope,
+    const ClusterManager& manager)
     : timeout_budget_stats_(
           (config.track_cluster_stats().timeout_budgets() || config.track_timeout_budgets())
-              ? std::make_unique<ClusterTimeoutBudgetStats>(generateTimeoutBudgetStats(stats_scope))
+              ? std::make_unique<ClusterTimeoutBudgetStats>(generateTimeoutBudgetStats(
+                    stats_scope, manager.clusterTimeoutBudgetStatNames()))
               : nullptr),
-      request_response_size_stats_(config.track_cluster_stats().request_response_sizes()
-                                       ? std::make_unique<ClusterRequestResponseSizeStats>(
-                                             generateRequestResponseSizeStats(stats_scope))
-                                       : nullptr) {}
+      request_response_size_stats_(
+          (config.track_cluster_stats().request_response_sizes()
+               ? std::make_unique<ClusterRequestResponseSizeStats>(generateRequestResponseSizeStats(
+                     stats_scope, manager.clusterRequestResponseSizeStatNames()))
+               : nullptr)) {}
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
