@@ -119,7 +119,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
 class TestClientConnectionImpl : public Network::ClientConnectionImpl {
 public:
   using ClientConnectionImpl::ClientConnectionImpl;
-  Buffer::WatermarkBuffer& readBuffer() { return read_buffer_; }
+  Buffer::Instance& readBuffer() { return *read_buffer_; }
 };
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
