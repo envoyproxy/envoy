@@ -1,6 +1,6 @@
 .. _config_listener_filters_tls_inspector:
 
-TLS检查器
+TLS 检查器
 =============
 
 TLS 检查器监听器过滤器可以检测传输是 TLS 还是纯文本，如果是 TLS，它检查来自客户端的 `服务器名称指示 <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ 和/或者 `应用层协议谈判 <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_。它可以用来通过 :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` 的 :ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` 和/或者 :ref:`application_protocols <envoy_v3_api_field_config.listener.v3.FilterChainMatch.application_protocols>` 来选择一个 :ref:`FilterChain <envoy_v3_api_msg_config.listener.v3.FilterChain>` 。
