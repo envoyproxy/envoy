@@ -92,6 +92,25 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
+// Test TLS upstream.
+TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
+  upstream_tls_ = true;
+  config_helper_.configureUpstreamTls();
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+
+  EXPECT_EQ("world", tcp_client->data());
+}
+
 // Test proxying data in both directions, and that all data is flushed properly
 // when there is an upstream disconnect.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
