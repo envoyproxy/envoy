@@ -608,6 +608,10 @@ void InstanceImpl::onRuntimeReady() {
 void InstanceImpl::startWorkers() {
   // The callback will be called after workers are started.
   listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
+    if (isShutdown()) {
+      return;
+    }
+
     initialization_timer_->complete();
     // Update server stats as soon as initialization is done.
     updateServerStats();

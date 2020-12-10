@@ -915,6 +915,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
   }
   if (active_listeners_.empty()) {
     stats_.workers_started_.set(1);
+    callback();
   }
 }
 
