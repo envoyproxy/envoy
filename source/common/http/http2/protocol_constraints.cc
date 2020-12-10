@@ -63,6 +63,10 @@ Status ProtocolConstraints::trackInboundFrames(const nghttp2_frame_hd* hd,
   case NGHTTP2_HEADERS:
   case NGHTTP2_CONTINUATION:
     // Track new streams.
+
+    // TODO(yanavlasov): The protocol constraint tracker for upstream connections considers the
+    // stream to be in the OPEN state after the server sends complete response headers. The
+    // correctness of this is debatable and needs to be revisited.
     if (hd->flags & NGHTTP2_FLAG_END_HEADERS) {
       inbound_streams_++;
     }
