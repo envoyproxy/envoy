@@ -6,6 +6,34 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test(
+    name = "cluster_manager_test",
+    srcs = ["cluster_manager_test.cc"],
+    deps = [
+        "//include/envoy/upstream:resource_manager_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/server/config_validation:cluster_manager_lib",
+        "//source/server/config_validation:dns_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
 filegroup(
     name = "server_test_data",
     srcs = glob(["test_data/**"]),

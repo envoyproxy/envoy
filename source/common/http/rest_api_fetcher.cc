@@ -60,10 +60,13 @@ void RestApiFetcher::refresh() {
   RequestMessagePtr message(new RequestMessageImpl());
   createRequest(*message);
   message->headers().setHost(remote_cluster_name_);
-  active_request_ = cm_.getThreadLocalCluster(remote_cluster_name_)
-                        ->httpAsyncClient()
-                        .send(std::move(message), *this,
-                              AsyncClient::RequestOptions().setTimeout(request_timeout_));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(remote_cluster_name_);
+  if (thread_local_cluster != nullptr) {
+    active_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(message), *this, AsyncClient::RequestOptions().setTimeout(request_timeout_));
+  } else {
+    ASSERT(false); // fixfix
+  }
 }
 
 void RestApiFetcher::requestComplete() {

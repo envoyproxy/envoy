@@ -39,8 +39,7 @@ public:
    * callers do not need to worry about per thread synchronization. The load balancing policy that
    * is used is the one defined on the cluster when it was created.
    *
-   * Can return nullptr if there is no host available in the cluster or if the cluster does not
-   * exist.
+   * Can return nullptr if there is no host available in the cluster.
    *
    * To resolve the protocol to use, we provide the downstream protocol (if one exists).
    */
@@ -53,8 +52,7 @@ public:
    * callers do not need to worry about per thread synchronization. The load balancing policy that
    * is used is the one defined on the cluster when it was created.
    *
-   * Can return nullptr if there is no host available in the cluster or if the cluster does not
-   * exist.
+   * Can return nullptr if there is no host available in the cluster.
    */
   virtual Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                      LoadBalancerContext* context) PURE;

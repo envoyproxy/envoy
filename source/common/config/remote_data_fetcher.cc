@@ -33,11 +33,15 @@ void RemoteDataFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   ENVOY_LOG(debug, "fetch remote data from [uri = {}]: start", uri_.uri());
-  request_ = cm_.getThreadLocalCluster(uri_.cluster())
-                 ->httpAsyncClient()
-                 .send(std::move(message), *this,
-                       Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
-                           DurationUtil::durationToMilliseconds(uri_.timeout()))));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
+  if (thread_local_cluster != nullptr) {
+    request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(
+            std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri_.timeout()))));
+  } else {
+    ASSERT(false); // fixfix
+  }
 }
 
 void RemoteDataFetcher::onSuccess(const Http::AsyncClient::Request&,
