@@ -16,7 +16,10 @@ using ::testing::ReturnRef;
 
 MockClusterManager::MockClusterManager(TimeSource&) : MockClusterManager() {}
 
-MockClusterManager::MockClusterManager() : cluster_stat_names_(*symbol_table_) {
+MockClusterManager::MockClusterManager()
+    : cluster_stat_names_(*symbol_table_), cluster_load_report_stat_names_(*symbol_table_),
+      cluster_request_response_size_stat_names_(*symbol_table_),
+      cluster_timeout_budget_stat_names_(*symbol_table_) {
   ON_CALL(*this, bindConfig()).WillByDefault(ReturnRef(bind_config_));
   ON_CALL(*this, adsMux()).WillByDefault(Return(ads_mux_));
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));

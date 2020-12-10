@@ -299,6 +299,10 @@ public:
    * @return the stat names.
    */
   virtual const ClusterStatNames& clusterStatNames() const PURE;
+  virtual const ClusterLoadReportStatNames& clusterLoadReportStatNames() const PURE;
+  virtual const ClusterRequestResponseSizeStatNames&
+  clusterRequestResponseSizeStatNames() const PURE;
+  virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;

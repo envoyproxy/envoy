@@ -287,6 +287,15 @@ public:
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
+    return cluster_load_report_stat_names_;
+  }
+  const ClusterRequestResponseSizeStatNames& clusterRequestResponseSizeStatNames() const override {
+    return cluster_request_response_size_stat_names_;
+  }
+  const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const override {
+    return cluster_timeout_budget_stat_names_;
+  }
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
@@ -582,6 +591,10 @@ private:
   Http::Context& http_context_;
   Router::Context& router_context_;
   ClusterStatNames cluster_stat_names_;
+  ClusterLoadReportStatNames cluster_load_report_stat_names_;
+  ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
+  ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
 };
