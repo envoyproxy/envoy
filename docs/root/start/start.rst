@@ -1,27 +1,20 @@
 .. _start:
 
 开始
-===============
+====
 
-This section gets you started with a very simple configuration and provides some example configurations.
+本节让你从一个非常简单的配置开始，并提供了一些配置示例。
 
-The fastest way to get started using Envoy is :ref:`installing pre-built binaries <install_binaries>`.
-You can also :ref:`build it <building>` from source.
+开始使用 Envoy 的最快速方式就是 :ref:`安装预制的二进制文件 <install_binaries>`。你也可以选择从源码进行 :ref:`构建 <building>`。
 
-These examples use the :ref:`v3 Envoy API <envoy_api_reference>`, but use only the static configuration
-feature of the API, which is most useful for simple requirements. For more complex requirements
-:ref:`Dynamic Configuration <arch_overview_dynamic_config>` is supported.
+这些示例使用 :ref:`v3 Envoy API <envoy_api_reference>`，但是仅仅使用了 API 的静态配置特性，这些对于简单需求来讲是最有用的。:ref:`动态配置 <arch_overview_dynamic_config>` 支持更多的复杂需求。
 
-快速开始运行简单样例
----------------------------------
+快速开始运行简单示例
+---------------------
 
-These instructions run from files in the Envoy repo. The sections below give a
-more detailed explanation of the configuration file and execution steps for
-the same configuration.
+这些指导说明使用 Envoy 仓库中的文件来运行示例。下面的章节对配置文件和相同配置下的执行步骤做了更详细的解释。
 
-A very minimal Envoy configuration that can be used to validate basic plain HTTP
-proxying is available in :repo:`configs/google_com_proxy.v2.yaml`. This is not
-intended to represent a realistic Envoy deployment:
+在 :repo:`configs/google_com_proxy.v2.yaml`  中提供了一个非常简单的 Envoy 配置，可以用来验证基本的纯 HTTP 代理。但这并不代表真实的 Envoy 部署：
 
 .. substitution-code-block:: none
 
@@ -29,19 +22,14 @@ intended to represent a realistic Envoy deployment:
   $ docker run --rm -d -p 10000:10000 envoyproxy/|envoy_docker_image|
   $ curl -v localhost:10000
 
-The Docker image used will contain the latest version of Envoy
-and a basic Envoy configuration. This basic configuration tells
-Envoy to route incoming requests to \*.google.com.
+使用的 Docker 镜像将包含最新版本的 Envoy 和一个基本的 Envoy 配置。这个基本的配置告诉 Envoy 将传入请求路由到 \*.google.com。
 
-Simple Configuration
---------------------
+简单配置
+--------
 
-Envoy can be configured using a single YAML file passed in as an argument on the command line.
+可以在命令行中以参数的形式传入一个简单的 YAML 文件来配置 Envoy。
 
-The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to configure
-the administration server. The `address` key specifies the
-listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
-which in this case is simply `0.0.0.0:9901`.
+需要 :ref:`管理信息 <envoy_v3_api_msg_config.bootstrap.v3.Admin>` 来配置管理服务器。`address` 键指定了监听 :ref:`地址 <envoy_v3_api_file_envoy/config/core/v3/address.proto>`，在这个例子中是 `0.0.0.0:9901`。
 
 .. code-block:: yaml
 
@@ -50,15 +38,13 @@ which in this case is simply `0.0.0.0:9901`.
     address:
       socket_address: { address: 0.0.0.0, port_value: 9901 }
 
-The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
-as opposed to the means of configuring resources dynamically when Envoy is running.
-The :ref:`v2 API Overview <config_overview>` describes this.
+:ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` 包含了当 Envoy 启动时静态配置的一切资源，与之相反的是当 Envoy 运行时动态配置的资源。:ref:`v2 API 概览 <config_overview>` 描述了这些。
 
 .. code-block:: yaml
 
     static_resources:
 
-The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
+:ref:`监听器 <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` 说明。
 
 .. code-block:: yaml
 
@@ -84,7 +70,7 @@ The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listene
               http_filters:
               - name: envoy.filters.http.router
 
-The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`.
+:ref:`集群 <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>` 说明。
 
 .. code-block:: yaml
 
@@ -111,31 +97,29 @@ The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster
             sni: www.google.com
 
 
-Using the Envoy Docker Image
-----------------------------
+使用 Envoy Docker 镜像
+----------------------
 
-Create a simple Dockerfile to execute Envoy, which assumes that envoy.yaml (described above) is in your local directory.
-You can refer to the :ref:`Command line options <operations_cli>`.
+创建一个简单的 Dockerfile 运行 Envoy，这需要假定在你本地的目录中有 envoy.yaml （如上描述）文件。
 
 .. substitution-code-block:: none
 
   FROM envoyproxy/|envoy_docker_image|
   COPY envoy.yaml /etc/envoy/envoy.yaml
 
-Build the Docker image that runs your configuration using::
+使用你的配置并用如下命令构建 Docker 镜像::
 
   $ docker build -t envoy:v1 .
 
-And now you can execute it with::
+现在，你可以用如下命令启动 Envoy 容器了::
 
   $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-And finally, test it using::
+最后，你可以用如下命令来进行测试::
 
   $ curl -v localhost:10000
 
-If you would like to use Envoy with docker-compose you can overwrite the provided configuration file
-by using a volume.
+如果你想用 docker-compose 来使用 Envoy，你可以用一个 volume 来覆写提供的配置文件。
 
 .. substitution-code-block: yaml
 
@@ -148,26 +132,21 @@ by using a volume.
       volumes:
         - ./envoy.yaml:/etc/envoy/envoy.yaml
 
-By default the Docker image will run as the ``envoy`` user created at build time.
+默认情况下，Docker 镜像将以构建时创建的 ``envoy`` 用户来运行。
 
-The ``uid`` and ``gid`` of this user can be set at runtime using the ``ENVOY_UID`` and ``ENVOY_GID``
-environment variables. This can be done, for example, on the Docker command line::
+``envoy`` 用户的 ``uid`` 和 ``gid`` 可以在运行时使用 ``ENVOY_UID`` 和 ``ENVOY_GID`` 这两个环境变量来设定。这也可以在 Docker 命令行中来完成设定，比如::
 
   $ docker run -d --name envoy -e ENVOY_UID=777 -e ENVOY_GID=777 -p 9901:9901 -p 10000:10000 envoy:v1
 
-This can be useful if you wish to restrict or provide access to ``unix`` sockets inside the container, or
-for controlling access to an ``envoy`` socket from outside of the container.
+如果你想对容器内部的 ``unix`` 套接字进行限制或者提供访问，抑或从容器外部控制 ``envoy`` 套接字的访问，这种方式是非常有用的。
 
-If you wish to run the container as the ``root`` user you can set ``ENVOY_UID`` to ``0``.
+如果你想以 ``root`` 用户来运行容器，你可以将 ``ENVOY_UID`` 设置为 ``0``。
 
-The ``envoy`` image sends application logs to ``/dev/stdout`` and ``/dev/stderr`` by default, and these
-can be viewed in the container log.
+默认情况下，``envoy`` 镜像会把应用程序的日志发送到 ``/dev/stdout`` 和 ``/dev/stderr`` ，这样就可以在容器日志中看到了。
 
-If you send application, admin or access logs to a file output, the ``envoy`` user will require the
-necessary permissions to write to this file. This can be achieved by setting the ``ENVOY_UID`` and/or
-by making the file writeable by the envoy user.
+如果你把应用程序日志、管理和访问日志输出到一个文件，``envoy`` 用户将需要足够的权限来写这个文件。这个可以通过设置 ``ENVOY_UID`` 和/或者通过将文件变成 envoy 用户可写的方法来实现。
 
-For example, to mount a log folder from the host and make it writable, you can:
+例如，在主机上挂载一个日志文件夹并且让它是可写的，你可以采取如下操作：
 
 .. substitution-code-block:: none
 
@@ -177,30 +156,25 @@ For example, to mount a log folder from the host and make it writable, you can:
 
 You can then configure ``envoy`` to log to files in ``/var/log``
 
-The default ``envoy`` ``uid`` and ``gid`` are ``101``.
+随后，你可以配置 ``envoy`` 将日志文件输出在 ``/var/log`` 文件里。
 
-The ``envoy`` user also needs to have permission to access any required configuration files mounted
-into the container.
+``envoy`` ``uid`` 和 ``gid`` 的默认值都是 ``101`` 。
 
-If you are running in an environment with a strict ``umask`` setting, you may need to provide envoy with
-access either by setting the ``uid`` or ``gid`` of the file, or by making the configuration file readable
-by the envoy user.
+``envoy`` 用户还需要权限能够去访问被挂载到容器内部的任何需要的配置文件。
 
-One method of doing this without changing any file permissions or running as root inside the container
-is to start the container with the host user's ``uid``, for example:
+如果你运行的环境中有一个严格的 ``umask`` 设置，你可能需要通过设置文件的 ``uid`` 或 ``gid`` 来给 envoy 提供访问权限，或者将配置文件设置为对 envoy 用户可读的。
+
+有一种可以不用改变任何文件的权限或者在容器内部使用 root 用户的方法就是在启动容器的时候使用宿主机用户的 ``uid`` ，例如：
 
 .. substitution-code-block:: none
 
   $ docker run -d --name envoy -e ENVOY_UID=`id -u` -p 9901:9901 -p 10000:10000 envoy:v1
 
 
-Sandboxes
----------
+沙盒
+----
 
-We've created a number of sandboxes using Docker Compose that set up different
-environments to test out Envoy's features and show sample configurations. As we
-gauge peoples' interests we will add more sandboxes demonstrating different
-features. The following sandboxes are available:
+我们已经创建了一些使用 Docker 组件的沙盒环境，来设定不同的环境以进行 Envoy 特性的测试和示例配置的展示。随着我们对人们兴趣的判定，我们将添加更多的沙盒来验证不同的特性，如下是一些可用的沙盒：
 
 .. toctree::
     :maxdepth: 2
