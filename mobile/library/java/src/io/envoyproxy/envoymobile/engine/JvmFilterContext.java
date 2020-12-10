@@ -117,7 +117,13 @@ class JvmFilterContext {
   }
 
   /**
+   * Invokes onResumeRequest callback with pending HTTP entities.
    *
+   * @param headerCount,  total pending headers included in the header block.
+   * @param data,         buffered body data.
+   * @param trailerCount, total pending trailers included in the trailer block.
+   * @param endStream,    whether the stream is closed at this point.
+   * @return Object[],    tuple of status with updated entities to be forwarded.
    */
   public Object onResumeRequest(long headerCount, byte[] data, long trailerCount,
                                 boolean endStream) {
@@ -139,7 +145,13 @@ class JvmFilterContext {
   }
 
   /**
+   * Invokes onResumeResponse callback with pending HTTP entities.
    *
+   * @param headerCount,  total pending headers included in the header block.
+   * @param data,         buffered body data.
+   * @param trailerCount, total pending trailers included in the trailer block.
+   * @param endStream,    whether the stream is closed at this point.
+   * @return Object[],    tuple of status with updated entities to be forwarded.
    */
   public Object onResumeResponse(long headerCount, byte[] data, long trailerCount,
                                  boolean endStream) {
@@ -161,14 +173,18 @@ class JvmFilterContext {
   }
 
   /**
+   * Sets request filter callbacks with memory-managed wrapper around native implementation.
    *
+   * @param callbackHandle, native identifier for resource management.
    */
   public void setRequestFilterCallbacks(long callbackHandle) {
     filter.setRequestFilterCallbacks(EnvoyHTTPFilterCallbacksImpl.create(callbackHandle));
   }
 
   /**
+   * Sets response filter callbacks with memory-managed wrapper around native implementation.
    *
+   * @param callbackHandle, native identifier for resource management.
    */
   public void setResponseFilterCallbacks(long callbackHandle) {
     filter.setResponseFilterCallbacks(EnvoyHTTPFilterCallbacksImpl.create(callbackHandle));
