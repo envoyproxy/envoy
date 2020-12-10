@@ -139,7 +139,7 @@ public:
         EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes())
             .Times(num_clients)
             .WillRepeatedly(Return(*buffer_limits));
-        EXPECT_CALL(*test_client.connection_, setBufferLimits(*buffer_limits)).Times(1);
+        EXPECT_CALL(*test_client.connection_, setBufferLimits(*buffer_limits));
       }
     }
     // Finally (for InSequence tests) set up createCodecClient and make sure the

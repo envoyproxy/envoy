@@ -85,7 +85,7 @@ protected:
 
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
   auto stream = client_->start(*this, 200ms);
-  EXPECT_CALL(stream_, closeStream()).Times(1);
+  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
@@ -95,13 +95,13 @@ TEST_F(ExtProcStreamTest, SendToStream) {
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
   stream->send(std::move(req), false);
-  EXPECT_CALL(stream_, closeStream()).Times(1);
+  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
   auto stream = client_->start(*this, 200ms);
-  EXPECT_CALL(stream_, sendMessageRaw_(_, true)).Times(1);
+  EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
   stream->send(std::move(req), true);
 }
@@ -131,7 +131,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
   auto empty_response_trailers = Http::ResponseTrailerMapImpl::create();
   stream_callbacks_->onReceiveTrailingMetadata(std::move(empty_response_trailers));
 
-  EXPECT_CALL(stream_, closeStream()).Times(1);
+  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
@@ -146,7 +146,7 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
   EXPECT_TRUE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
 
-  EXPECT_CALL(stream_, closeStream()).Times(1);
+  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
@@ -161,7 +161,7 @@ TEST_F(ExtProcStreamTest, StreamError) {
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 123);
 
-  EXPECT_CALL(stream_, closeStream()).Times(1);
+  EXPECT_CALL(stream_, closeStream());
   stream->close();
 }
 
