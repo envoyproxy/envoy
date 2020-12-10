@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
@@ -229,22 +230,20 @@ private:
     }
     void chargeStats(const ResponseHeaderMap& headers) override;
 
-    // TODO(snowp): Create shared OptRef/OptConstRef helpers
     Http::RequestHeaderMapOptRef requestHeaders() override {
-      return request_headers_ ? absl::make_optional(std::ref(*request_headers_)) : absl::nullopt;
+      return makeOptRef(request_headers_.get());
     }
     Http::RequestTrailerMapOptRef requestTrailers() override {
-      return request_trailers_ ? absl::make_optional(std::ref(*request_trailers_)) : absl::nullopt;
+      return makeOptRef(request_trailers_.get());
     }
     Http::ResponseHeaderMapOptRef continueHeaders() override {
-      return continue_headers_ ? absl::make_optional(std::ref(*continue_headers_)) : absl::nullopt;
+      return makeOptRef(continue_headers_.get());
     }
     Http::ResponseHeaderMapOptRef responseHeaders() override {
-      return response_headers_ ? absl::make_optional(std::ref(*response_headers_)) : absl::nullopt;
+      return makeOptRef(response_headers_.get());
     }
     Http::ResponseTrailerMapOptRef responseTrailers() override {
-      return response_trailers_ ? absl::make_optional(std::ref(*response_trailers_))
-                                : absl::nullopt;
+      return makeOptRef(response_trailers_.get());
     }
 
     void endStream() override {

@@ -508,10 +508,10 @@ public:
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_) << "\n";
 
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseHeaders());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseTrailers());
+    DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
+    DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
+    DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
+    DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
     DUMP_DETAILS(&stream_info_);
   }
 
@@ -531,15 +531,15 @@ public:
   void log() {
     RequestHeaderMap* request_headers = nullptr;
     if (filter_manager_callbacks_.requestHeaders()) {
-      request_headers = &filter_manager_callbacks_.requestHeaders()->get();
+      request_headers = filter_manager_callbacks_.requestHeaders().ptr();
     }
     ResponseHeaderMap* response_headers = nullptr;
     if (filter_manager_callbacks_.responseHeaders()) {
-      response_headers = &filter_manager_callbacks_.responseHeaders()->get();
+      response_headers = filter_manager_callbacks_.responseHeaders().ptr();
     }
     ResponseTrailerMap* response_trailers = nullptr;
     if (filter_manager_callbacks_.responseTrailers()) {
-      response_trailers = &filter_manager_callbacks_.responseTrailers()->get();
+      response_trailers = filter_manager_callbacks_.responseTrailers().ptr();
     }
 
     for (const auto& log_handler : access_log_handlers_) {
@@ -660,11 +660,11 @@ public:
 
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
-        filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
+        filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
       state_.is_head_request_ = true;
     }
     state_.is_grpc_request_ =
-        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders()->get());
+        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders().ref());
   }
 
   /**

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/optref.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -748,14 +749,14 @@ public:
   INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER)
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
-using RequestHeaderMapOptRef = absl::optional<std::reference_wrapper<RequestHeaderMap>>;
+using RequestHeaderMapOptRef = OptRef<RequestHeaderMap>;
 
 // Request trailers.
 class RequestTrailerMap
     : public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
-using RequestTrailerMapOptRef = absl::optional<std::reference_wrapper<RequestTrailerMap>>;
+using RequestTrailerMapOptRef = OptRef<RequestTrailerMap>;
 
 // Base class for both response headers and trailers.
 class ResponseHeaderOrTrailerMap {
@@ -774,7 +775,7 @@ public:
   INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
-using ResponseHeaderMapOptRef = absl::optional<std::reference_wrapper<ResponseHeaderMap>>;
+using ResponseHeaderMapOptRef = OptRef<ResponseHeaderMap>;
 
 // Response trailers.
 class ResponseTrailerMap
@@ -782,7 +783,7 @@ class ResponseTrailerMap
       public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
-using ResponseTrailerMapOptRef = absl::optional<std::reference_wrapper<ResponseTrailerMap>>;
+using ResponseTrailerMapOptRef = OptRef<ResponseTrailerMap>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.

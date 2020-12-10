@@ -61,7 +61,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -123,7 +123,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
