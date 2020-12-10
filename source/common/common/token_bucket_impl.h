@@ -4,6 +4,7 @@
 #include "envoy/common/token_bucket.h"
 
 #include "common/common/utility.h"
+
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {

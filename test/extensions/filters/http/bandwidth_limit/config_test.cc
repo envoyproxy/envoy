@@ -1,5 +1,5 @@
-#include "extensions/filters/http/bandwidth_limit/config.h"
 #include "extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
+#include "extensions/filters/http/bandwidth_limit/config.h"
 
 #include "test/mocks/server/mocks.h"
 

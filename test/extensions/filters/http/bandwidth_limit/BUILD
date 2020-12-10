@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -9,6 +7,8 @@ load(
     "envoy_extension_cc_test",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_extension_cc_test(
@@ -16,12 +16,12 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.bandwidth_limit",
     deps = [
-        "//source/extensions/filters/http/bandwidth_limit:bandwidth_limit_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/filters/http/bandwidth_limit:bandwidth_limit_lib",
         "//test/mocks/server:server_mocks",
     ],
 )

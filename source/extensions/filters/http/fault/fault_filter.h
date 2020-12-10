@@ -18,8 +18,8 @@
 #include "common/http/header_utility.h"
 #include "common/stats/symbol_table_impl.h"
 
-#include "extensions/filters/http/common/stream_rate_limiter.h"
 #include "extensions/filters/common/fault/fault_config.h"
+#include "extensions/filters/http/common/stream_rate_limiter.h"
 
 namespace Envoy {
 namespace Extensions {
