@@ -116,14 +116,14 @@ protected:
 };
 
 TEST_F(AllowFailedInSingleRequirementTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, BadJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -131,7 +131,7 @@ TEST_F(AllowFailedInSingleRequirementTest, BadJwt) {
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, MissingIssToken) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ES256WithoutIssToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -139,7 +139,7 @@ TEST_F(AllowFailedInSingleRequirementTest, MissingIssToken) {
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, OneGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -147,7 +147,7 @@ TEST_F(AllowFailedInSingleRequirementTest, OneGoodJwt) {
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, TwoGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -157,7 +157,7 @@ TEST_F(AllowFailedInSingleRequirementTest, TwoGoodJwts) {
 }
 
 TEST_F(AllowFailedInSingleRequirementTest, GoodAndBadJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -182,14 +182,14 @@ requires_any:
 };
 
 TEST_F(SingleAllowMissingInOrListTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
 
 TEST_F(SingleAllowMissingInOrListTest, BadJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -197,7 +197,7 @@ TEST_F(SingleAllowMissingInOrListTest, BadJwt) {
 }
 
 TEST_F(SingleAllowMissingInOrListTest, MissingIssToken) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ES256WithoutIssToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -205,7 +205,7 @@ TEST_F(SingleAllowMissingInOrListTest, MissingIssToken) {
 }
 
 TEST_F(SingleAllowMissingInOrListTest, OneGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -213,7 +213,7 @@ TEST_F(SingleAllowMissingInOrListTest, OneGoodJwt) {
 }
 
 TEST_F(SingleAllowMissingInOrListTest, TwoGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -223,7 +223,7 @@ TEST_F(SingleAllowMissingInOrListTest, TwoGoodJwts) {
 }
 
 TEST_F(SingleAllowMissingInOrListTest, GoodAndBadJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -249,14 +249,14 @@ requires_any:
 };
 
 TEST_F(AllowFailedInOrListTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
 
 TEST_F(AllowFailedInOrListTest, BadJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -264,7 +264,7 @@ TEST_F(AllowFailedInOrListTest, BadJwt) {
 }
 
 TEST_F(AllowFailedInOrListTest, GoodAndBadJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -274,7 +274,7 @@ TEST_F(AllowFailedInOrListTest, GoodAndBadJwt) {
 }
 
 TEST_F(AllowFailedInOrListTest, TwoGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -286,7 +286,7 @@ TEST_F(AllowFailedInOrListTest, TwoGoodJwts) {
 }
 
 TEST_F(AllowFailedInOrListTest, BadAndGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken},
                                                 {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -313,14 +313,14 @@ requires_all:
 };
 
 TEST_F(AllowFailedInAndListTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
 
 TEST_F(AllowFailedInAndListTest, BadJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -328,7 +328,7 @@ TEST_F(AllowFailedInAndListTest, BadJwt) {
 }
 
 TEST_F(AllowFailedInAndListTest, OneGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{
       {kExampleHeader, GoodToken},
   };
@@ -338,7 +338,7 @@ TEST_F(AllowFailedInAndListTest, OneGoodJwt) {
 }
 
 TEST_F(AllowFailedInAndListTest, GoodAndBadJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -349,7 +349,7 @@ TEST_F(AllowFailedInAndListTest, GoodAndBadJwts) {
 }
 
 TEST_F(AllowFailedInAndListTest, TwoGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -380,14 +380,14 @@ requires_all:
 };
 
 TEST_F(AllowFailedInAndOfOrListTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, BadJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -395,7 +395,7 @@ TEST_F(AllowFailedInAndOfOrListTest, BadJwt) {
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, OneGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -403,7 +403,7 @@ TEST_F(AllowFailedInAndOfOrListTest, OneGoodJwt) {
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, OtherGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -411,7 +411,7 @@ TEST_F(AllowFailedInAndOfOrListTest, OtherGoodJwt) {
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, BadAndGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken},
                                                 {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -421,7 +421,7 @@ TEST_F(AllowFailedInAndOfOrListTest, BadAndGoodJwt) {
 }
 
 TEST_F(AllowFailedInAndOfOrListTest, TwoGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -447,7 +447,7 @@ requires_any:
 };
 
 TEST_F(AllowMissingInOrListTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -455,7 +455,7 @@ TEST_F(AllowMissingInOrListTest, NoJwt) {
 
 TEST_F(AllowMissingInOrListTest, BadJwt) {
   // Bad JWT should fail.
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -463,7 +463,7 @@ TEST_F(AllowMissingInOrListTest, BadJwt) {
 }
 
 TEST_F(AllowMissingInOrListTest, OtherGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -472,7 +472,7 @@ TEST_F(AllowMissingInOrListTest, OtherGoodJwt) {
 }
 
 TEST_F(AllowMissingInOrListTest, BadAndGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken},
                                                 {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -498,7 +498,7 @@ requires_all:
 };
 
 TEST_F(AllowMissingInAndListTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -506,7 +506,7 @@ TEST_F(AllowMissingInAndListTest, NoJwt) {
 
 TEST_F(AllowMissingInAndListTest, BadJwt) {
   // Bad JWT should fail.
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -515,7 +515,7 @@ TEST_F(AllowMissingInAndListTest, BadJwt) {
 
 TEST_F(AllowMissingInAndListTest, GoodJwt) {
   // Bad JWT should fail.
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -524,7 +524,7 @@ TEST_F(AllowMissingInAndListTest, GoodJwt) {
 
 TEST_F(AllowMissingInAndListTest, TwoGoodJwts) {
   // Bad JWT should fail.
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -555,7 +555,7 @@ requires_all:
 };
 
 TEST_F(AllowMissingInAndOfOrListTest, NoJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -563,7 +563,7 @@ TEST_F(AllowMissingInAndOfOrListTest, NoJwt) {
 
 TEST_F(AllowMissingInAndOfOrListTest, BadJwt) {
   // Bad JWT should fail.
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -571,7 +571,7 @@ TEST_F(AllowMissingInAndOfOrListTest, BadJwt) {
 }
 
 TEST_F(AllowMissingInAndOfOrListTest, OneGoodJwt) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -579,7 +579,7 @@ TEST_F(AllowMissingInAndOfOrListTest, OneGoodJwt) {
 }
 
 TEST_F(AllowMissingInAndOfOrListTest, TwoGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -589,7 +589,7 @@ TEST_F(AllowMissingInAndOfOrListTest, TwoGoodJwts) {
 }
 
 TEST_F(AllowMissingInAndOfOrListTest, GoodAndBadJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   // Use the token with example.com issuer for x-other.
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, GoodToken}};
@@ -600,7 +600,7 @@ TEST_F(AllowMissingInAndOfOrListTest, GoodAndBadJwts) {
 }
 
 TEST_F(AllowMissingInAndOfOrListTest, BadAndGoodJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken},
                                                 {kOtherHeader, OtherGoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);

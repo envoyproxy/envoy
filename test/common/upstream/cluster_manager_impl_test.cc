@@ -1455,7 +1455,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
@@ -1484,7 +1484,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         // Test inline init.
         initialize_callback();
       }));
-  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->getThreadLocalCluster("fake_cluster")->info());
@@ -1513,7 +1513,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   // tcp connections.
   Http::ConnectionPool::Instance::DrainedCb drained_cb;
   Tcp::ConnectionPool::Instance::DrainedCb drained_cb2;
-  EXPECT_CALL(*callbacks, onClusterRemoval(_)).Times(1);
+  EXPECT_CALL(*callbacks, onClusterRemoval(_));
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_CALL(*cp2, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb2));
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
@@ -3052,7 +3052,7 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
   create(parseBootstrapFromV3Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
-  EXPECT_CALL(*connection, addWriteFilter(_)).Times(1);
+  EXPECT_CALL(*connection, addWriteFilter(_));
   EXPECT_CALL(*connection, addFilter(_)).Times(0);
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));

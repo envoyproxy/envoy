@@ -292,7 +292,7 @@ public:
 
   void sendRequest(bool end_stream = true) {
     if (end_stream) {
-      EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
+      EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_));
     }
     EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
@@ -1892,7 +1892,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   test_time_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(1);
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   per_try_timeout_->invokeCallback();
@@ -3375,8 +3375,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 
   // Now trigger global timeout, expect everything to be reset
-  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(1);
-  EXPECT_CALL(encoder2.stream_, resetStream(_)).Times(1);
+  EXPECT_CALL(encoder1.stream_, resetStream(_));
+  EXPECT_CALL(encoder2.stream_, resetStream(_));
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
@@ -3411,8 +3411,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
-      .Times(1);
+                        absl::optional<uint64_t>(absl::nullopt)));
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
@@ -3445,8 +3444,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
-      .Times(1);
+                        absl::optional<uint64_t>(absl::nullopt)));
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -3504,8 +3502,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
           }));
   // First is reset
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
-      .Times(1);
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
@@ -3594,8 +3591,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
-      .Times(1);
+                        absl::optional<uint64_t>(absl::nullopt)));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3605,7 +3601,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
   Buffer::OwnedImpl body("test body");
-  EXPECT_CALL(encoder, encodeData(_, _)).Times(1);
+  EXPECT_CALL(encoder, encodeData(_, _));
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, true));
@@ -3717,7 +3713,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, addDecodedData(_, _));
   Buffer::OwnedImpl body("test body");
   router_.decodeData(body, true);
   EXPECT_EQ(1U,
@@ -4877,7 +4873,7 @@ TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
 
   redirect_headers_->setLocation("https://www.foo.com");
 
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
@@ -4897,8 +4893,8 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 
   auto mock_predicate = std::make_shared<NiceMock<MockInternalRedirectPredicate>>();
 
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  EXPECT_CALL(callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
@@ -4924,9 +4920,9 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4949,10 +4945,10 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   sendRequest();
 
   redirect_headers_->setLocation("https://www.foo.com");
-  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -4970,13 +4966,13 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   sendRequest();
 
   redirect_headers_->setLocation("http://www.foo.com");
-  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
+  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
               isCrossSchemeRedirectAllowed())
       .WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, clearRouteCache()).Times(1);
-  EXPECT_CALL(callbacks_, recreateStream(_)).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_succeeded_total")
@@ -6537,7 +6533,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data("1234567890123");
-  EXPECT_CALL(*router_.retry_state_, enabled()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).Times(0);
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
   // This will result in retry_state_ being deleted.

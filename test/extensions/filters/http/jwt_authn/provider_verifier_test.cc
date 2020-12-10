@@ -62,7 +62,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
     EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
   }));
 
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
@@ -84,15 +84,14 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
     EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
   }));
 
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 
   auto options = Http::AsyncClient::RequestOptions()
                      .setTimeout(std::chrono::milliseconds(5 * 1000))
                      .setParentSpan(parent_span_)
                      .setChildSpanName("JWT Remote PubKey Fetch");
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
-              send_(_, _, Eq(options)))
-      .Times(1);
+              send_(_, _, Eq(options)));
 
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
@@ -106,7 +105,7 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   createVerifier();
 
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed));
 
   auto headers = Http::TestRequestHeaderMapImpl{{"sec-istio-auth-userinfo", ""}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -141,7 +140,7 @@ rules:
   TestUtility::loadFromYaml(config, proto_config_);
   createVerifier();
 
-  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
 
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
