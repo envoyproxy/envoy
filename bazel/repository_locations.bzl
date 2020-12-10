@@ -860,7 +860,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2020-12-08",
+        release_date = "2020-12-07",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
