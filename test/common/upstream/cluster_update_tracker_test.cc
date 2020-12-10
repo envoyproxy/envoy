@@ -61,7 +61,7 @@ TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
     // Simulate addition of the relevant cluster.
     cluster_tracker.onClusterAddOrUpdate(expected_);
 
-    EXPECT_TRUE(cluster_tracker.threadLocalCluster().has_value());
+    ASSERT_TRUE(cluster_tracker.threadLocalCluster().has_value());
     EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
   }
 
@@ -69,7 +69,7 @@ TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
     // Simulate removal of an irrelevant cluster.
     cluster_tracker.onClusterRemoval(irrelevant_.cluster_.info_->name_);
 
-    EXPECT_TRUE(cluster_tracker.threadLocalCluster().has_value());
+    ASSERT_TRUE(cluster_tracker.threadLocalCluster().has_value());
     EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);
   }
 

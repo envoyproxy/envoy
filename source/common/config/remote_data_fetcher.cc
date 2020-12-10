@@ -40,7 +40,8 @@ void RemoteDataFetcher::fetch() {
         Http::AsyncClient::RequestOptions().setTimeout(
             std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri_.timeout()))));
   } else {
-    ASSERT(false); // fixfix
+    ENVOY_LOG(debug, "fetch remote data [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
+    callback_.onFailure(FailureReason::Network);
   }
 }
 

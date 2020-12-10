@@ -24,6 +24,7 @@ namespace Oauth2 {
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 
 class MockCallbacks : public FilterCallbacks {
 public:
@@ -199,6 +200,14 @@ TEST_F(OAuth2ClientTest, NetworkError) {
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
   }));
+}
+
+TEST_F(OAuth2ClientTest, NoCluster) {
+  ON_CALL(cm_, getThreadLocalCluster("auth")).WillByDefault(Return(nullptr));
+  client_->setCallbacks(*mock_callbacks_);
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+  EXPECT_EQ(0, callbacks_.size());
 }
 
 } // namespace Oauth2

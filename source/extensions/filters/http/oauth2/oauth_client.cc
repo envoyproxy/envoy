@@ -55,7 +55,7 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
         Http::AsyncClient::RequestOptions().setTimeout(
             std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
   } else {
-    ASSERT(false); // fixfix
+    parent_->sendUnauthorizedResponse();
   }
 }
 

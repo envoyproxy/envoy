@@ -65,7 +65,8 @@ void RestApiFetcher::refresh() {
     active_request_ = thread_local_cluster->httpAsyncClient().send(
         std::move(message), *this, AsyncClient::RequestOptions().setTimeout(request_timeout_));
   } else {
-    ASSERT(false); // fixfix
+    onFetchFailure(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
+    requestComplete();
   }
 }
 

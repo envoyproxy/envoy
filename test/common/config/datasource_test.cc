@@ -53,11 +53,15 @@ protected:
       return retry_timer_;
     }));
 
+    EXPECT_CALL(*retry_timer_, disableTimer());
+    if (!func) {
+      return;
+    }
+
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .Times(AtLeast(1))
         .WillRepeatedly(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
-    EXPECT_CALL(*retry_timer_, disableTimer());
     if (num_retries == 1) {
       EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(AtLeast(1))
@@ -99,6 +103,42 @@ TEST_F(AsyncDataSourceTest, LoadLocalDataSource) {
 
   init_target_handle_->initialize(init_watcher_);
   EXPECT_EQ(async_data, "xxxxxx");
+}
+
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
+  AsyncDataSourcePb config;
+
+  std::string yaml = R"EOF(
+    remote:
+      http_uri:
+        uri: https://example.com/data
+        cluster: cluster_1
+        timeout: 1s
+      sha256:
+        xxxxxx
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  EXPECT_TRUE(config.has_remote());
+
+  initialize(nullptr);
+
+  std::string async_data = "non-empty";
+  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
+      [&](const std::string& data) {
+        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+        EXPECT_EQ(data, EMPTY_STRING);
+        async_data = data;
+      });
+
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
+      .WillOnce(Invoke(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+  init_target_handle_->initialize(init_watcher_);
+
+  EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
 TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
