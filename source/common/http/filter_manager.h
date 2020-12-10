@@ -14,6 +14,7 @@
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
+#include <memory>
 
 namespace Envoy {
 namespace Http {
@@ -637,18 +638,26 @@ public:
   }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
-    auto matching_data = match_tree ? std::make_shared<HttpMatchingDataImpl>() : nullptr;
+    if (match_tree) {
+      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
+      addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+      return;
+    }
 
-    addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
     addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
-    auto matching_data = match_tree ? std::make_shared<HttpMatchingDataImpl>() : nullptr;
+    if (match_tree) {
+      addStreamEncoderFilterWorker(filter, std::move(match_tree),
+                                   std::make_shared<HttpMatchingDataImpl>(), false);
+      return;
+    }
 
-    addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
@@ -660,10 +669,15 @@ public:
     // matching on both request and response data.
     // TODO(snowp): The match tree might be fully evaluated twice, ideally we should expose
     // the result to both filters after the first match evaluation.
-    auto matching_data = match_tree ? std::make_shared<HttpMatchingDataImpl>() : nullptr;
+    if (match_tree) {
+      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
+      addStreamDecoderFilterWorker(filter, match_tree, matching_data, true);
+      addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+      return;
+    }
 
-    addStreamDecoderFilterWorker(filter, match_tree, matching_data, true);
-    addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
