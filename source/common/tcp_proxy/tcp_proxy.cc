@@ -642,10 +642,14 @@ void Filter::onUpstreamConnection() {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
     resetIdleTimer();
-    read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
+    read_callbacks_->connection().addBytesSentCallback([this](uint64_t) {
+      resetIdleTimer();
+      return true;
+    });
     if (upstream_) {
       upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) {
         upstream_callbacks->onBytesSent();
+        return true;
       });
     }
   }

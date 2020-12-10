@@ -92,7 +92,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
-  connection->enableHalfClose(enable_half_close_);
+  connection->enableHalfClose(enableHalfClose());
   return connection;
 }
 
@@ -121,9 +121,9 @@ common_tls_context:
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
   TestUtility::loadFromYaml(yaml, tls_context);
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
-  } else if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
@@ -135,15 +135,12 @@ common_tls_context:
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
-
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      ASSERT(!enable_half_close_);
-      fake_upstreams_.emplace_back(new AutonomousUpstream(
-          endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
+      fake_upstreams_.emplace_back(
+          new AutonomousUpstream(endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
-                                                    enable_half_close_, udp_fake_upstream_));
+      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstreamConfig()));
     }
   }
 }
@@ -162,6 +159,8 @@ void BaseIntegrationTest::createEnvoy() {
     std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     config_helper_.addConfigModifier(
         [lds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_resource_api_version(
+              envoy::config::core::v3::V3);
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
         });
   }
@@ -204,8 +203,8 @@ void BaseIntegrationTest::createEnvoy() {
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
-  upstream_protocol_ = protocol;
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  upstream_config_.upstream_protocol_ = protocol;
+  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
@@ -224,7 +223,7 @@ BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                                        Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options, source_address);
+                                                enableHalfClose(), options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

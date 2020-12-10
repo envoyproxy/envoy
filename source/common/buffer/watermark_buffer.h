@@ -42,12 +42,12 @@ public:
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
 
-  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
+  void setWatermarks(uint32_t watermark) override { setWatermarks(watermark / 2, watermark); }
   void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
-  uint32_t highWatermark() const { return high_watermark_; }
+  uint32_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently
   // than the low watermark callbacks.
-  bool highWatermarkTriggered() const { return above_high_watermark_called_; }
+  bool highWatermarkTriggered() const override { return above_high_watermark_called_; }
 
 private:
   void checkHighAndOverflowWatermarks();

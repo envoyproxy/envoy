@@ -909,7 +909,7 @@ TEST_F(OwnedImplTest, ReserveReuse) {
   // That one was for a different size and was not committed.
   const void* second_slice;
   {
-    auto reservation = buffer.reserveSingleSlice(OwnedSlice::default_slice_size_);
+    auto reservation = buffer.reserveSingleSlice(Slice::default_slice_size_);
     EXPECT_EQ(1, reservation.numSlices());
     EXPECT_NE(first_slice, reservation.slices()[0].mem_);
     second_slice = reservation.slices()[0].mem_;
@@ -918,22 +918,22 @@ TEST_F(OwnedImplTest, ReserveReuse) {
   // Repeat the last reservation and verify that it yields the same slices. Both slices
   // are for the default size, so the previous one should get re-used.
   {
-    auto reservation = buffer.reserveSingleSlice(OwnedSlice::default_slice_size_);
+    auto reservation = buffer.reserveSingleSlice(Slice::default_slice_size_);
     EXPECT_EQ(1, reservation.numSlices());
     EXPECT_EQ(second_slice, reservation.slices()[0].mem_);
 
     // Commit the most recent reservation and verify the representation.
-    reservation.commit(OwnedSlice::default_slice_size_);
+    reservation.commit(Slice::default_slice_size_);
     expectSlices({{16384, 0, 16384}}, buffer);
   }
 
   // Do another reservation.
   {
-    auto reservation = buffer.reserveSingleSlice(OwnedSlice::default_slice_size_);
+    auto reservation = buffer.reserveSingleSlice(Slice::default_slice_size_);
     expectSlices({{16384, 0, 16384}}, buffer);
 
     // And commit.
-    reservation.commit(OwnedSlice::default_slice_size_);
+    reservation.commit(Slice::default_slice_size_);
     expectSlices({{16384, 0, 16384}, {16384, 0, 16384}}, buffer);
   }
 }
