@@ -1,7 +1,10 @@
-// NOLINT(namespace-envoy)
+#pragma once
+
 #include "envoy/http/filter.h"
 
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
+
+// NOLINT(namespace-envoy)
 
 const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusContinue =
     static_cast<envoy_filter_headers_status_t>(Envoy::Http::FilterHeadersStatus::Continue);

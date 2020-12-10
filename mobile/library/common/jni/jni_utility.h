@@ -1,3 +1,5 @@
+#pragma once
+
 #include <jni.h>
 
 #include "library/common/types/c_types.h"

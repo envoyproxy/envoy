@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 #include "extensions/filters/http/common/factory_base.h"
