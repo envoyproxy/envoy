@@ -74,13 +74,13 @@ cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
 tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_DELIVERY_DIR}" envoy.exe
 
 # Test invocations of known-working tests on Windows
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/extensions/access_loggers/wasm/... //test/extensions/bootstrap/wasm/... //test/extensions/common/wasm/... //test/extensions/filters/http/wasm/... //test/extensions/filters/network/wasm/... //test/extensions/stats_sinks/wasm/... --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only
 
 echo "running flaky test reporting script"
 "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
 
 # Build tests that are known-flaky or known-failing to ensure no compilation regressions
-bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/extensions/access_loggers/wasm/... //test/extensions/bootstrap/wasm/... //test/extensions/common/wasm/... //test/extensions/filters/http/wasm/... //test/extensions/filters/network/wasm/... //test/extensions/stats_sinks/wasm/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
 
 # Summarize tests bypasssed to monitor the progress of porting to Windows
 echo "Tests bypassed as skip_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
