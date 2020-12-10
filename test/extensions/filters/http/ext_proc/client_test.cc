@@ -1,0 +1,172 @@
+#include "envoy/config/core/v3/grpc_service.pb.h"
+
+#include "common/grpc/common.h"
+#include "common/http/header_map_impl.h"
+
+#include "extensions/filters/http/ext_proc/client_impl.h"
+
+#include "test/mocks/grpc/mocks.h"
+#include "test/mocks/stats/mocks.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using envoy::service::ext_proc::v3alpha::ProcessingRequest;
+using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+
+using testing::Invoke;
+using testing::Unused;
+
+using namespace std::chrono_literals;
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExternalProcessing {
+namespace {
+
+class ExtProcStreamTest : public testing::Test, public ExternalProcessorCallbacks {
+public:
+  ~ExtProcStreamTest() override = default;
+
+protected:
+  void SetUp() override {
+    envoy::config::core::v3::GrpcService service;
+    auto grpc = service.mutable_envoy_grpc();
+    grpc->set_cluster_name("test");
+
+    EXPECT_CALL(client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
+
+    client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, service, stats_store_);
+  }
+
+  Grpc::AsyncClientFactoryPtr doFactory(Unused, Unused, Unused) {
+    auto factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+    EXPECT_CALL(*factory, create()).WillOnce(Invoke(this, &ExtProcStreamTest::doCreate));
+    return factory;
+  }
+
+  Grpc::RawAsyncClientPtr doCreate() {
+    auto async_client = std::make_unique<Grpc::MockAsyncClient>();
+    EXPECT_CALL(*async_client,
+                startRaw("envoy.service.ext_proc.v3alpha.ExternalProcessor", "Process", _, _))
+        .WillOnce(Invoke(this, &ExtProcStreamTest::doStartRaw));
+    return async_client;
+  }
+
+  Grpc::RawAsyncStream* doStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
+                                   const Http::AsyncClient::StreamOptions& options) {
+    EXPECT_GT(*options.timeout, 0ms);
+    stream_callbacks_ = &callbacks;
+    return &stream_;
+  }
+
+  // ExternalProcessorCallbacks
+  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) override {
+    last_response_ = std::move(response);
+  }
+
+  void onGrpcError(Grpc::Status::GrpcStatus status) override { grpc_status_ = status; }
+
+  void onGrpcClose() override { grpc_closed_ = true; }
+
+  std::unique_ptr<ProcessingResponse> last_response_;
+  Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
+  bool grpc_closed_ = false;
+
+  ExternalProcessorClientPtr client_;
+  Grpc::MockAsyncClientManager client_manager_;
+  Grpc::MockAsyncStream stream_;
+  Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
+
+  testing::NiceMock<Stats::MockStore> stats_store_;
+};
+
+TEST_F(ExtProcStreamTest, OpenCloseStream) {
+  auto stream = client_->start(*this, 200ms);
+  EXPECT_CALL(stream_, closeStream()).Times(1);
+  stream->close();
+}
+
+TEST_F(ExtProcStreamTest, SendToStream) {
+  auto stream = client_->start(*this, 200ms);
+  // Send something and ensure that we get it. Doesn't really matter what.
+  EXPECT_CALL(stream_, sendMessageRaw_(_, false));
+  ProcessingRequest req;
+  stream->send(std::move(req), false);
+  EXPECT_CALL(stream_, closeStream()).Times(1);
+  stream->close();
+}
+
+TEST_F(ExtProcStreamTest, SendAndClose) {
+  auto stream = client_->start(*this, 200ms);
+  EXPECT_CALL(stream_, sendMessageRaw_(_, true)).Times(1);
+  ProcessingRequest req;
+  stream->send(std::move(req), true);
+}
+
+TEST_F(ExtProcStreamTest, ReceiveFromStream) {
+  auto stream = client_->start(*this, 200ms);
+  ASSERT_NE(stream_callbacks_, nullptr);
+  // Send something and ensure that we get it. Doesn't really matter what.
+  ProcessingResponse resp;
+
+  // These do nothing at the moment
+  auto empty_request_headers = Http::RequestHeaderMapImpl::create();
+  stream_callbacks_->onCreateInitialMetadata(*empty_request_headers);
+
+  auto empty_response_headers = Http::ResponseHeaderMapImpl::create();
+  stream_callbacks_->onReceiveInitialMetadata(std::move(empty_response_headers));
+
+  auto response_buf = Grpc::Common::serializeMessage(resp);
+  EXPECT_FALSE(last_response_);
+  EXPECT_FALSE(grpc_closed_);
+  EXPECT_EQ(grpc_status_, 0);
+  EXPECT_TRUE(stream_callbacks_->onReceiveMessageRaw(std::move(response_buf)));
+  EXPECT_TRUE(last_response_);
+  EXPECT_FALSE(grpc_closed_);
+  EXPECT_EQ(grpc_status_, 0);
+
+  auto empty_response_trailers = Http::ResponseTrailerMapImpl::create();
+  stream_callbacks_->onReceiveTrailingMetadata(std::move(empty_response_trailers));
+
+  EXPECT_CALL(stream_, closeStream()).Times(1);
+  stream->close();
+}
+
+TEST_F(ExtProcStreamTest, StreamClosed) {
+  auto stream = client_->start(*this, 200ms);
+  ASSERT_NE(stream_callbacks_, nullptr);
+  EXPECT_FALSE(last_response_);
+  EXPECT_FALSE(grpc_closed_);
+  EXPECT_EQ(grpc_status_, 0);
+  stream_callbacks_->onRemoteClose(0, "");
+  EXPECT_FALSE(last_response_);
+  EXPECT_TRUE(grpc_closed_);
+  EXPECT_EQ(grpc_status_, 0);
+
+  EXPECT_CALL(stream_, closeStream()).Times(1);
+  stream->close();
+}
+
+TEST_F(ExtProcStreamTest, StreamError) {
+  auto stream = client_->start(*this, 200ms);
+  ASSERT_NE(stream_callbacks_, nullptr);
+  EXPECT_FALSE(last_response_);
+  EXPECT_FALSE(grpc_closed_);
+  EXPECT_EQ(grpc_status_, 0);
+  stream_callbacks_->onRemoteClose(123, "Some sort of gRPC error");
+  EXPECT_FALSE(last_response_);
+  EXPECT_FALSE(grpc_closed_);
+  EXPECT_EQ(grpc_status_, 123);
+
+  EXPECT_CALL(stream_, closeStream()).Times(1);
+  stream->close();
+}
+
+} // namespace
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
