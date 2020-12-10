@@ -7,7 +7,7 @@ TLS 检查器监听器过滤器可以检测传输是 TLS 还是纯文本，如�
 
 * :ref:`SNI <faq_how_to_setup_sni>`
 * :ref:`v2 API 参考 <envoy_v3_api_field_config.listener.v3.ListenerFilter.name>`
-* 这个过滤器应该使用名字 *envoy.filters.listener.tls_inspector* 来配置.
+* 这个过滤器应该使用名字 *envoy.filters.listener.tls_inspector* 来配置。
 
 示例
 -------
