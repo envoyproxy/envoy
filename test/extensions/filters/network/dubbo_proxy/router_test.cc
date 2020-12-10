@@ -331,7 +331,7 @@ TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
   EXPECT_CALL(callbacks_, protocolType()).WillOnce(Return(ProtocolType::Dubbo));
   EXPECT_CALL(callbacks_, serializationType()).WillOnce(Return(SerializationType::Hessian2));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
-  EXPECT_CALL(callbacks_, resetStream()).Times(1);
+  EXPECT_CALL(callbacks_, resetStream());
   EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
@@ -443,8 +443,8 @@ TEST_F(DubboRouterTest, DecoderFilterCallbacks) {
   initializeMetadata(MessageType::Request);
 
   EXPECT_CALL(upstream_connection_, write(_, false));
-  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(1);
-  EXPECT_CALL(callbacks_, upstreamData(_)).Times(1);
+  EXPECT_CALL(callbacks_, startUpstreamResponse());
+  EXPECT_CALL(callbacks_, upstreamData(_));
 
   startRequest(MessageType::Request);
   connectUpstream();
@@ -460,7 +460,7 @@ TEST_F(DubboRouterTest, UpstreamDataReset) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(1);
+  EXPECT_CALL(callbacks_, startUpstreamResponse());
   EXPECT_CALL(callbacks_, upstreamData(_))
       .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Reset));
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -506,7 +506,7 @@ TEST_F(DubboRouterTest, LocalClosedWhileResponseComplete) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(1);
+  EXPECT_CALL(callbacks_, startUpstreamResponse());
   EXPECT_CALL(callbacks_, upstreamData(_))
       .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Complete));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);

@@ -42,11 +42,11 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   EXPECT_CALL(context, getServerFactoryContext())
       .Times(1)
       .WillOnce(testing::ReturnRef(server_context));
-  EXPECT_CALL(server_context, singletonManager()).Times(1);
-  EXPECT_CALL(context, threadLocal()).Times(1);
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, clusterManager()).Times(1);
-  EXPECT_CALL(context, runtime()).Times(1);
+  EXPECT_CALL(server_context, singletonManager());
+  EXPECT_CALL(context, threadLocal());
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, runtime());
   EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
@@ -115,10 +115,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, clusterManager()).Times(1);
-  EXPECT_CALL(context, runtime()).Times(1);
-  EXPECT_CALL(context, scope()).Times(1);
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, runtime());
+  EXPECT_CALL(context, scope());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
