@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/pure.h"
 #include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"

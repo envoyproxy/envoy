@@ -843,8 +843,8 @@ void FilterManager::sendDirectLocalReply(
           },
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(),
-                                 response_headers, stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 stream_info_, code, body, content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
             // Move the response headers into the FilterManager to make sure they're visible to
