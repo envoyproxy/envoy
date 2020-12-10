@@ -123,7 +123,7 @@ public:
 };
 
 namespace Configuration {
-class MockStatsConfig: public virtual StatsConfig {
+class MockStatsConfig : public virtual StatsConfig {
 public:
   ~MockStatsConfig() override;
 
