@@ -195,18 +195,29 @@ public:
 
   /**
    * Reserve space in the buffer.
-   * @param length supplies the amount of space to reserve.
-   * @param iovecs supplies the slices to fill with reserved memory.
-   * @param num_iovecs supplies the size of the slices array.
-   * @return the number of iovecs used to reserve the space.
+   * @param preferred_length the suggested length to reserve. The actual
+   *   reserved size may be differ based on heuristics to maximize performance.
+   * @return a `Reservation`, on which `commit()` can be called, or which can
+   *   be destructed to discard any resources in the `Reservation`.
    */
-  // virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
-
   virtual Reservation reserve(uint64_t preferred_length) PURE;
+
+  /**
+   * Reserve space in the buffer in a single slice.
+   * @param length the exact length of the reservation.
+   * @param separate_slice specifies whether the reserved space must be in a separate slice
+   *   from any other data in this buffer.
+   * @return a `Reservation` which has exactly one slice in it.
+   */
   virtual Reservation reserveSingleSlice(uint64_t length, bool separate_slice = false) PURE;
 
 private:
   friend Reservation;
+
+  /**
+   * Called by a `Reservation` to commit `length` bytes of the
+   * reservation.
+   */
   virtual void commit(Reservation& reservation, uint64_t length) PURE;
 
 public:
@@ -449,14 +460,31 @@ using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
 class Reservation final {
 public:
   Reservation(Reservation&&) = default;
+
   ~Reservation() {
     if (!slices_.empty()) {
       buffer_.commit(*this, 0);
     }
   }
+
+  /**
+   * @return an array of `RawSlice` of length `numSlices()`.
+   */
   RawSlice* slices() { return slices_.data(); }
   const RawSlice* slices() const { return slices_.data(); }
+
+  /**
+   * @return the number of slices present.
+   */
   uint64_t numSlices() const { return slices_.size(); }
+
+  /**
+   * Commits some or all of the data in the reservation.
+   * @param length supplies the number of bytes to commit. This must be
+   *   less than or equal to the size of the `Reservation`.
+   *
+   * @note No other methods should be called on the object after `commit()` is called.
+   */
   void commit(uint64_t length) {
     buffer_.commit(*this, length);
     slices_.clear();
@@ -469,8 +497,16 @@ public:
 
 private:
   Reservation(Instance& buffer) : buffer_(buffer) {}
+
+  // The buffer that created this `Reservation`.
   Instance& buffer_;
+
+  // The RawSlices in the reservation, usable by operations such as `::readv()`.
   absl::InlinedVector<RawSlice, NUM_ELEMENTS_> slices_;
+
+  // An array of the same length as `slices_`, in which each element is either nullptr
+  // if no operation needs to be performed to transfer ownership during commit/destructor,
+  // or a pointer to the object that needs to be moved/deleted.
   absl::InlinedVector<SliceDataPtr, NUM_ELEMENTS_> owned_slices_;
 
 public:

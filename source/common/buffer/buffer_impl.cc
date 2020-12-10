@@ -83,47 +83,6 @@ void OwnedImpl::prepend(Instance& data) {
   other.postProcess();
 }
 
-/*void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
-  if (num_iovecs == 0) {
-    return;
-  }
-  if (slices_.empty()) {
-    return;
-  }
-  // Find the slices in the buffer that correspond to the iovecs:
-  // First, scan backward from the end of the buffer to find the last slice containing
-  // any content. Reservations are made from the end of the buffer, and out-of-order commits
-  // aren't supported, so any slices before this point cannot match the iovecs being committed.
-  ssize_t slice_index = static_cast<ssize_t>(slices_.size()) - 1;
-  while (slice_index >= 0 && slices_[slice_index].dataSize() == 0) {
-    slice_index--;
-  }
-  if (slice_index < 0) {
-    // There was no slice containing any data, so rewind the iterator at the first slice.
-    slice_index = 0;
-  }
-
-  // Next, scan forward and attempt to match the slices against iovecs.
-  uint64_t num_slices_committed = 0;
-  while (num_slices_committed < num_iovecs) {
-    if (slices_[slice_index].commit(iovecs[num_slices_committed])) {
-      length_ += iovecs[num_slices_committed].len_;
-      num_slices_committed++;
-    }
-    slice_index++;
-    if (slice_index == static_cast<ssize_t>(slices_.size())) {
-      break;
-    }
-  }
-
-  // In case an extra slice was reserved, remove empty slices from the end of the buffer.
-  while (!slices_.empty() && slices_.back().dataSize() == 0) {
-    slices_.pop_back();
-  }
-
-  ASSERT(num_slices_committed > 0);
-  }*/
-
 void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   uint64_t bytes_to_skip = start;
   uint8_t* dest = static_cast<uint8_t*>(data);
@@ -339,57 +298,6 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   }
   other.postProcess();
 }
-
-/*uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  if (num_iovecs == 0 || length == 0) {
-    return 0;
-  }
-  // Check whether there are any empty slices with reservable space at the end of the buffer.
-  size_t first_reservable_slice = slices_.size();
-  while (first_reservable_slice > 0) {
-    if (slices_[first_reservable_slice - 1].reservableSize() == 0) {
-      break;
-    }
-    first_reservable_slice--;
-    if (slices_[first_reservable_slice].dataSize() != 0) {
-      // There is some content in this slice, so anything in front of it is non-reservable.
-      break;
-    }
-  }
-
-  // Having found the sequence of reservable slices at the back of the buffer, reserve
-  // as much space as possible from each one.
-  uint64_t num_slices_used = 0;
-  uint64_t bytes_remaining = length;
-  size_t slice_index = first_reservable_slice;
-  while (slice_index < slices_.size() && bytes_remaining != 0 && num_slices_used < num_iovecs) {
-    auto& slice = slices_[slice_index];
-    const uint64_t reservation_size = std::min(slice.reservableSize(), bytes_remaining);
-    if (num_slices_used + 1 == num_iovecs && reservation_size < bytes_remaining) {
-      // There is only one iovec left, and this next slice does not have enough space to
-      // complete the reservation. Stop iterating, with last one iovec still unpopulated,
-      // so the code following this loop can allocate a new slice to hold the rest of the
-      // reservation.
-      break;
-    }
-    iovecs[num_slices_used] = slice.reserve(reservation_size);
-    bytes_remaining -= iovecs[num_slices_used].len_;
-    num_slices_used++;
-    slice_index++;
-  }
-
-  // If needed, allocate one more slice at the end to provide the remainder of the reservation.
-  if (bytes_remaining != 0) {
-    slices_.emplace_back(bytes_remaining);
-    iovecs[num_slices_used] = slices_.back().reserve(bytes_remaining);
-    bytes_remaining -= iovecs[num_slices_used].len_;
-    num_slices_used++;
-  }
-
-  ASSERT(num_slices_used <= num_iovecs);
-  ASSERT(bytes_remaining == 0);
-  return num_slices_used;
-  }*/
 
 Reservation OwnedImpl::reserve(uint64_t length) {
   Reservation reservation = Reservation::bufferImplUseOnlyConstruct(*this);

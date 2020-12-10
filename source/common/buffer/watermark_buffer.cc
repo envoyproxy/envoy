@@ -84,12 +84,6 @@ Reservation WatermarkBuffer::reserve(uint64_t preferred_length) {
   return OwnedImpl::reserve(adjusted_length);
 }
 
-/*uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  uint64_t bytes_reserved = OwnedImpl::reserve(length, iovecs, num_iovecs);
-  checkHighAndOverflowWatermarks();
-  return bytes_reserved;
-  }*/
-
 void WatermarkBuffer::appendSliceForTest(const void* data, uint64_t size) {
   OwnedImpl::appendSliceForTest(data, size);
   checkHighAndOverflowWatermarks();

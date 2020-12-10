@@ -30,12 +30,10 @@ public:
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
-  // void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   SliceDataPtr extractMutableFrontSlice() override;
-  // uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
   Reservation reserve(uint64_t preferred_length) override;
   void commit(Reservation& reservation, uint64_t length) override;
   void postProcess() override { checkLowWatermark(); }
