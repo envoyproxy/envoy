@@ -100,7 +100,7 @@
 使用 Envoy Docker 镜像
 ----------------------
 
-创建一个简单的 Dockerfile 来构建 Envoy镜像，这需要假定在你本地的目录中有 envoy.yaml （如上描述）文件。
+创建一个简单的 Dockerfile 运行 Envoy，这需要假定在你本地的目录中有 envoy.yaml （如上描述）文件。
 
 .. substitution-code-block:: none
 
