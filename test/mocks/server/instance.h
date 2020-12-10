@@ -123,6 +123,15 @@ public:
 };
 
 namespace Configuration {
+class MockStatsConfig: public virtual StatsConfig {
+public:
+  ~MockStatsConfig() override;
+
+  MOCK_METHOD(std::list<Stats::SinkPtr>&, sinks, (), (override));
+  MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const, override));
+  MOCK_METHOD(bool, flushOnAdmin, (), (const, override));
+};
+
 class MockServerFactoryContext : public virtual ServerFactoryContext {
 public:
   MockServerFactoryContext();
@@ -156,12 +165,14 @@ public:
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  testing::NiceMock<MockStatsConfig> stats_config_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Api::MockApi> api_;
   Grpc::ContextImpl grpc_context_;
 };
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
