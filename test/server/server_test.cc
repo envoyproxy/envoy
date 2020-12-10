@@ -358,8 +358,10 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
-  bool startup = false, post_init = false, shutdown = false, shutdown_with_completion = false;
-  absl::Notification started, post_init_fired, shutdown_begin, completion_block, completion_done;
+  bool startup = false, post_init = false, worker_started = false, shutdown = false,
+       shutdown_with_completion = false;
+  absl::Notification started, post_init_fired, worker_started_fired, shutdown_begin,
+      completion_block, completion_done;
 
   // Run the server in a separate thread so we can test different lifecycle stages.
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
@@ -372,11 +374,15 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::WorkerStarted, [&] {
+      worker_started = true;
+      worker_started_fired.Notify();
+    });
+    auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
       shutdown_begin.Notify();
     });
-    auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    auto handle5 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
@@ -384,17 +390,18 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                                server_->dispatcher().post(completion_cb);
                                                completion_done.Notify();
                                              });
-    auto handle5 =
+    auto handle6 =
         server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] { FAIL(); });
-    handle5 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    handle6 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                         [&](Event::PostCb) { FAIL(); });
-    handle5 = nullptr;
+    handle6 = nullptr;
 
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
     handle3 = nullptr;
     handle4 = nullptr;
+    handle5 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
   });
@@ -407,6 +414,10 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
 
   post_init_fired.WaitForNotification();
   EXPECT_TRUE(post_init);
+  EXPECT_FALSE(shutdown);
+
+  worker_started_fired.WaitForNotification();
+  EXPECT_TRUE(worker_started);
   EXPECT_FALSE(shutdown);
 
   server_->dispatcher().post([&] { server_->shutdown(); });

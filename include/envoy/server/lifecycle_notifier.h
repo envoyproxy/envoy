@@ -27,6 +27,11 @@ public:
     PostInit,
 
     /**
+     * All workers have started.
+     */
+    WorkerStarted,
+
+    /**
      * The server instance is being shutdown and the dispatcher is about to exit.
      * This provides listeners a last chance to run a callback on the main dispatcher.
      * Note: the server will wait for callbacks that registered to take a completion
