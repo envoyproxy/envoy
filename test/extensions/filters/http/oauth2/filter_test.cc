@@ -75,7 +75,10 @@ public:
 
 class OAuth2Test : public testing::Test {
 public:
-  OAuth2Test() : request_(&cm_.async_client_) { init(); }
+  OAuth2Test() : request_(&cm_.async_client_) {
+    factory_context_.cluster_manager_.initializeClusters({"auth.example.com"}, {});
+    init();
+  }
 
   void init() { init(getConfig()); }
 
@@ -151,7 +154,8 @@ public:
 
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
-  ON_CALL(factory_context_.cluster_manager_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(factory_context_.cluster_manager_, clusters())
+      .WillByDefault(Return(Upstream::ClusterManager::ClusterInfoMaps()));
 
   EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
                             "OAuth2 filter: unknown cluster 'auth.example.com' in config. Please "

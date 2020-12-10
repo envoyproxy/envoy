@@ -96,6 +96,7 @@ public:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
 
+    cm_.initializeThreadLocalClusters({"ext_authz"});
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
@@ -510,7 +511,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   InSequence s;
 
-  EXPECT_CALL(cm_, get(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("ext_authz")).Times(0);
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));

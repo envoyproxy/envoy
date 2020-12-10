@@ -16,7 +16,7 @@ class OauthIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   OauthIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   envoy::service::discovery::v3::DiscoveryResponse genericSecretResponse(absl::string_view name,

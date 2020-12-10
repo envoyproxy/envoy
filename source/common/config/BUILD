@@ -67,7 +67,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
-        "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -320,8 +320,8 @@ envoy_cc_library(
         ":http_subscription_lib",
         ":new_grpc_mux_lib",
         ":type_to_endpoint_lib",
-        ":udpa_resource_lib",
         ":utility_lib",
+        ":xds_resource_lib",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -345,24 +345,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "udpa_context_params_lib",
-    srcs = ["udpa_context_params.cc"],
-    hdrs = ["udpa_context_params.h"],
+    name = "xds_context_params_lib",
+    srcs = ["xds_context_params.cc"],
+    hdrs = ["xds_context_params.h"],
     deps = [
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
-        "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_library(
-    name = "udpa_resource_lib",
-    srcs = ["udpa_resource.cc"],
-    hdrs = ["udpa_resource.h"],
+    name = "xds_resource_lib",
+    srcs = ["xds_resource.cc"],
+    hdrs = ["xds_resource.h"],
     deps = [
         "//source/common/http:utility_lib",
-        "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
     ],
 )
 

@@ -19,8 +19,8 @@ sources of latency. Envoy supports three features related to system wide tracing
   providers, that are divided into two subgroups:
 
   - External tracers which are part of the Envoy code base, like `LightStep <https://lightstep.com/>`_,
-    `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
-    `Datadog <https://datadoghq.com>`_.
+    `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_),
+    `Datadog <https://datadoghq.com>`_ and `SkyWalking <http://skywalking.apache.org/>`_.
   - External tracers which come as a third party plugin, like `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_.
 
 Support for other tracing providers would not be difficult to add.
@@ -81,6 +81,10 @@ Alternatively the trace context can be manually propagated by the service:
   :ref:`config_http_conn_man_headers_x-datadog-trace-id`,
   :ref:`config_http_conn_man_headers_x-datadog-parent-id`,
   :ref:`config_http_conn_man_headers_x-datadog-sampling-priority`).
+
+* When using the SkyWalking tracer, Envoy relies on the service to propagate the
+  SkyWalking-specific HTTP headers (
+  :ref:`config_http_conn_man_headers_sw8`).
 
 What data each trace contains
 -----------------------------
