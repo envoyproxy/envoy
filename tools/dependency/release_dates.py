@@ -65,22 +65,26 @@ def VerifyAndPrintReleaseDate(dep, github_release_date, metadata_release_date):
 def GetReleaseDate(dep, repo, metadata_version, github_release):
   if github_release.tagged:
 
+    # Not all Github repositories with releases have a latest release
     try:
       latest = repo.get_latest_release()
     except github.UnknownObjectException:
-      latest = ""
+      latest = None
 
-    if latest and (github_release.version <= latest.tag_name):
-      release = repo.get_release(github_release.version)
-      return release.published_at
+    # When the repository does have a latest release, compare the metadata version with the latest
+    # tag. In cases where a repository has a release that is later than the latest release (eg.
+    # census-instrumentation/opencensus-proto), the get_release API call will fail so we check to
+    # ensure the metadata release version is less than or equal to the repository tag name
+    if latest and version.parse(github_release.version) <= version.parse(latest.tag_name):
+      return repo.get_release(github_release.version).published_at
     else:
       tags = repo.get_tags()
-      current_metadata_tag_commit_date = ""
+      current_metadata_tag_commit_date = None
       for tag in tags.reversed:
         if tag.name == github_release.version:
-          # return tag.commit.commit.committer.date
           current_metadata_tag_commit_date = tag.commit.commit.committer.date
-        if not (version.parse(tag.name).is_prerelease) and version.parse(tag.name) > version.parse(
+        # Exclude pre-releases like release candidates (eg. apache/kafka)
+        if not version.parse(tag.name).is_prerelease and version.parse(tag.name) > version.parse(
             github_release.version):
           Colorize(
               "YELLOW",
@@ -98,9 +102,6 @@ def GetReleaseDate(dep, repo, metadata_version, github_release):
           "YELLOW",
           f'*WARNING* {dep} has had {count} commits since {github_release.version}@<{commit.commit.committer.date}>'
       )
-    # for stuff in commits:
-    #   if github_release.version != stuff.sha:
-    #     print(stuff)
     return commit.commit.committer.date
 
 
