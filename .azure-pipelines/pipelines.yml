@@ -377,6 +377,7 @@ stages:
               BUILD_URI: $(Build.BuildUri)
 
   - stage: windows
+    dependsOn: ["precheck"]
     jobs:
       - job: release
         timeoutInMinutes: 120
