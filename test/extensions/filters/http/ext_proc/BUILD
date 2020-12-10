@@ -32,3 +32,17 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "client_test",
+    srcs = ["client_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/ext_proc:client_lib",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
