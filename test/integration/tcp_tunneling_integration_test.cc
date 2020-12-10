@@ -186,11 +186,13 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
+  setUpstreamProtocol(upstreamProtocol());
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     protocol_options.mutable_common_http_protocol_options()
         ->mutable_max_stream_duration()
         ->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });

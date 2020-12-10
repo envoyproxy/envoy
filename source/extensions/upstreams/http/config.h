@@ -14,6 +14,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
+#include "common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,6 +50,7 @@ public:
                               Server::Configuration::ProtocolOptionsFactoryContext&) override {
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& typed_config =
         *dynamic_cast<const envoy::extensions::upstreams::http::v3::HttpProtocolOptions*>(&config);
+    MessageUtil::validate(typed_config, ProtobufMessage::getStrictValidationVisitor());
     return std::make_shared<ProtocolOptionsConfigImpl>(typed_config);
   }
   std::string category() const override { return "envoy.upstream_options"; }

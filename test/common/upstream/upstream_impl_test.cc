@@ -2570,6 +2570,14 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
           idle_timeout: 1s
   )EOF";
 
+  const std::string explicit_timeout_bad = R"EOF(
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
+
   {
     auto cluster2 = makeCluster(yaml + explicit_timeout);
     ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
@@ -2579,6 +2587,11 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
     auto cluster2 = makeCluster(yaml + explicit_timeout_new);
     ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
     EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  }
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout_new);
+    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_timeout_bad, false), EnvoyException,
+                            ".*Proto constraint validation failed.*");
   }
   const std::string no_timeout = R"EOF(
     common_http_protocol_options:
