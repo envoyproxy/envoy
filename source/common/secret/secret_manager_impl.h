@@ -92,6 +92,7 @@ private:
                                              config_name, unregister_secret_provider);
         dynamic_secret_providers_[map_key] = secret_provider;
       }
+      secret_provider_context.initManager().add(*secret_provider->initTarget());
       return secret_provider;
     }
 

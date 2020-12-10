@@ -143,7 +143,6 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
 
@@ -228,7 +227,6 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -323,7 +321,6 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
 
@@ -396,7 +393,6 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
 
