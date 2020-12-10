@@ -2564,6 +2564,8 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http_protocol_options: {}
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";
@@ -2587,6 +2589,8 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http_protocol_options: {}
         common_http_protocol_options:
           idle_timeout: 0s
   )EOF";
