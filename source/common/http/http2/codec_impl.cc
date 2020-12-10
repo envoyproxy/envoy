@@ -864,7 +864,6 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   case NGHTTP2_GOAWAY: {
     ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
     if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
-
       // TODO(mattklein123): Returning this error code abandons standard nghttp2 frame accounting.
       // As such, it is not reliable to call sendPendingFrames() again after this and we assume
       // that the connection is going to get torn down immediately. One byproduct of this is that
