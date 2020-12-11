@@ -425,7 +425,7 @@ void FakeHttpConnection::encodeProtocolError() {
   Http::Http2::ServerConnectionImpl* codec =
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
   if (codec != nullptr) {
-    shared_connection_.connection().dispatcher().post([this, codec]() {
+    shared_connection_.connection().dispatcher().post([codec]() {
       Http::Status status = codec->protocolErrorForTest();
       ASSERT(Http::getStatusCode(status) == Http::StatusCode::CodecProtocolError);
     });
@@ -438,7 +438,7 @@ void FakeHttpConnection::encodeProtocolError() {
     ASSERT(legacy_codec != nullptr);
 
     shared_connection_.connection().dispatcher().post(
-        [this, legacy_codec]() { legacy_codec->protocolErrorForTest(); });
+        [legacy_codec]() { legacy_codec->protocolErrorForTest(); });
   }
 }
 
