@@ -1,35 +1,14 @@
 .. _best_practices_level2:
 
-Configuring Envoy as a level two proxy
-======================================
+将 Envoy 配置为一个二级代理
+===========================
 
-Envoy is a production-ready proxy, however, the default settings that are tailored for the
-edge use case may need to be adjusted when using Envoy in a multi-level deployment as a
-"level two" proxy.
+Envoy 是一个生产就绪的代理，然而，默认配置是为边缘代理用例定制的，当需要在多级部署中将 Envoy 当作一个“二级”代理使用时，需要做一些调整。
 
 .. image:: /_static/multilevel_deployment.svg
 
-**In summary, if you run level two Envoy version 1.11.1 or greater which terminates 
-HTTP/2, we strongly advise you to change the HttpConnectionManager configuration of your level
-two Envoy, by setting its downstream**
-:ref:`validation of HTTP messaging option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
-**to true.**
+**总而言之，如果你运行的是能够终止 HTTP/2 的 1.11.1 或者更高版本的二级 Envoy，我们强烈建议你通过将下游** :ref:`HTTP 消息选项验证 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>` 的值**设置为 true** 来改变你二级 Envoy 的 HttpConnectionManager 配置。
 
-If there is an invalid HTTP/2 request and this option is not set, the Envoy in 
-question will reset the entire connection. This behavior was changed as part of 
-the 1.11.1 security release, to increase the security of Edge Envoys. Unfortunately, 
-because there are no guarantees that edge proxies will enforce HTTP/1 or HTTP/2 
-standards compliance as rigorously as Envoy’s HTTP/2 stack does, this can result 
-in a problem as follows. If one client sends a request that for example passes 
-level one proxy's validation checks, and it is forwarded over an upstream multiplexed 
-HTTP/2 connection (potentially shared with other clients) the strict enforcement on 
-the level two Envoy HTTP/2 will reset all the streams on that connection, causing 
-a service disruption to the clients sharing that L1-L2 connection. If a malicious 
-user has insight into what traffic will bypass level one checks, they could spray
-“bad” traffic across the level one fleet, causing serious disruption to other users’ 
-traffic.
+如果有一个无效的 HTTP/2 请求且此选项没有进行设置，Envoy 会重置整个连接。作为 1.11.1 安全版本的一部分，这种行为已经发生了改变，目的是为了增强 Envoy 作为边缘代理时的安全性。不幸的是，由于无法保证边缘代理能够像 Envoy HTTP/2 协议栈一样严格遵守 HTTP/1 或 HTTP/2 的合规标准，这可能导致如下问题。如果一个客户端发送了一个通过了一级 Envoy 代理验证检查的请求，且请求通过 HTTP/2 连接（和其他潜在客户端共享）的多路复用进行转发，在二级 Envoy 上严格执行 HTTP/2 将会重置连接上的所有流，这会引起对于共享 L1-L2 连接的客户端会造成服务中断。如果一个恶意用户了解哪些流量可以绕过一级 Envoy 代理检查，他们就会把“恶意”流量引向一级 Envoy 代理，这就会对其他用户的流量造成严重的中断。
 
-This configuration option also has implications for invalid HTTP/1.1 though slightly less
-severe ones. For Envoy L1s, invalid HTTP/1 requests will also result in connection
-reset. If the option is set to true, and the request is completely read, the connection
-will persist and can be reused for a subsequent request.
+这种配置选项也会对无效的 HTTP/1.1 产生影响，但是影响不是那么严重。对于 Envoy L1 ，无效的 HTTP/1 请求也会导致连接重置。如果将选项设置为 true，则请求会被完全读取，连接将保持并且在后续的请求中被重用。
