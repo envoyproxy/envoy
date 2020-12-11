@@ -708,9 +708,11 @@ def _com_googlesource_googleurl():
         actual = "@com_googlesource_googleurl//url:url",
     )
 
+# The local repository for the shimmed ICU.
 def _org_unicode_icuuc():
-    external_http_archive(
+    native.local_repository(
         name = "org_unicode_icuuc",
+        path = "bazel/external/icu/shim",
     )
 
 def _org_llvm_releases_compiler_rt():
