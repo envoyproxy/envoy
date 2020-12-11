@@ -134,11 +134,11 @@ protected:
     EXPECT_EQ(strategy, config_->compressionStrategy());
     EXPECT_EQ(level, config_->compressionLevel());
     EXPECT_EQ(5, config_->memoryLevel());
-    EXPECT_EQ(30, config_->minimumLength());
+    EXPECT_EQ(30, config_->responseDirectionConfig().minimumLength());
     EXPECT_EQ(28, config_->windowBits());
-    EXPECT_EQ(false, config_->disableOnEtagHeader());
-    EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
-    EXPECT_EQ(18, config_->contentTypeValues().size());
+    EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
+    EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
+    EXPECT_EQ(18, config_->responseDirectionConfig().contentTypeValues().size());
   }
 
   void doResponseNoCompression(Http::TestResponseHeaderMapImpl&& headers) {
@@ -193,15 +193,15 @@ TEST_F(GzipFilterTest, RuntimeDisabled) {
 // Default config values.
 TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(5, config_->memoryLevel());
-  EXPECT_EQ(30, config_->minimumLength());
+  EXPECT_EQ(30, config_->responseDirectionConfig().minimumLength());
   EXPECT_EQ(28, config_->windowBits());
-  EXPECT_EQ(false, config_->disableOnEtagHeader());
-  EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
+  EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
+  EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
   EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             config_->compressionStrategy());
   EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
-  EXPECT_EQ(18, config_->contentTypeValues().size());
+  EXPECT_EQ(18, config_->responseDirectionConfig().contentTypeValues().size());
 }
 
 TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
