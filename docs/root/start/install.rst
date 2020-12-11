@@ -134,7 +134,7 @@ Install Envoy using Docker
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can run Envoy using the official Docker images, or by
-using images provided by `Get Envoy <https://www.getenvoy.io/envoy/install/docker/>`__.
+using images provided by `Get Envoy <https://www.getenvoy.io/install/envoy/docker/>`__.
 
 The following commands will pull and show the Envoy version of current images.
 
