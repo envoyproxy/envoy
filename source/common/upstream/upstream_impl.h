@@ -530,9 +530,9 @@ public:
                                     const ClusterStatNames& cluster_stat_names);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
-  static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
-                                                                  const std::string& stat_prefix,
-                                                                  bool track_remaining);
+  static ClusterCircuitBreakersStats
+  generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatName prefix, bool track_remaining,
+                               const ClusterCircuitBreakersStatNames& stat_names);
   static ClusterRequestResponseSizeStats
   generateRequestResponseSizeStats(Stats::Scope&,
                                    const ClusterRequestResponseSizeStatNames& stat_names);
@@ -653,7 +653,8 @@ public:
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name, Stats::Scope& stats_scope);
+                     const std::string& cluster_name, Stats::Scope& stats_scope,
+                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
     ResourceManagerImplPtr load(const envoy::config::cluster::v3::Cluster& config,
                                 Runtime::Loader& runtime, const std::string& cluster_name,
                                 Stats::Scope& stats_scope,
@@ -662,6 +663,7 @@ private:
     using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
     Managers managers_;
+    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names_;
   };
 
   struct OptionalClusterStats {
