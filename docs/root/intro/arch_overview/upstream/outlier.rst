@@ -48,6 +48,8 @@ It is important to understand that a cluster may be shared among several filter 
 ejects a host based on its outlier detection type, other filter chains will be also affected even though their
 outlier detection type would not have ejected that host.
 
+.. _arch_overview_outlier_detection_algorithm:
+
 Ejection algorithm
 ------------------
 
