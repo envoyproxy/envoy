@@ -346,6 +346,7 @@ public:
    */
   virtual const ClusterStatNames& clusterStatNames() const PURE;
   virtual const ClusterLoadReportStatNames& clusterLoadReportStatNames() const PURE;
+  virtual const ClusterCircuitBreakersStatNames& clusterCircuitBreakersStatNames() const PURE;
   virtual const ClusterRequestResponseSizeStatNames&
   clusterRequestResponseSizeStatNames() const PURE;
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;

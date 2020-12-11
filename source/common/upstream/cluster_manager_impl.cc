@@ -261,6 +261,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       http_context_(http_context), router_context_(router_context),
       cluster_stat_names_(stats.symbolTable()),
       cluster_load_report_stat_names_(stats.symbolTable()),
+      cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
