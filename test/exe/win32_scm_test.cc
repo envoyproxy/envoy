@@ -42,7 +42,7 @@ protected:
     EXPECT_TRUE(ChangeServiceConfigA(service_handle_, SERVICE_NO_CHANGE, SERVICE_NO_CHANGE,
                                      SERVICE_NO_CHANGE, new_binpath.c_str(), NULL, NULL, NULL, NULL,
                                      NULL, NULL))
-        << fmt::format("Failed  to change service configuration, error {}", ::GetLastError());
+        << fmt::format("Failed to change service configuration, error {}", ::GetLastError());
   }
 
   DWORD getServiceStatus() {

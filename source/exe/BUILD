@@ -183,11 +183,20 @@ envoy_cc_library(
         "//bazel:windows_x86_64": [
             "win32/service_base.h",
         ],
+        "//conditions:default": [],
     }),
     strip_include_prefix = select({
         "//bazel:windows_x86_64": "win32",
+        "//conditions:default": "",
     }),
     deps = envoy_cc_platform_dep("scm_impl_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "scm_impl_lib",
+    srcs = [],
+    hdrs = [],
+    deps = []
 )
 
 envoy_cc_win32_library(
