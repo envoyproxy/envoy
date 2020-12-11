@@ -48,11 +48,15 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 }
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
-  in_flight_request_ =
-      cm_.httpAsyncClientForCluster(uri_.cluster())
-          .send(std::move(msg), *this,
-                Http::AsyncClient::RequestOptions().setTimeout(
-                    std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(msg), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(
+            std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
+  } else {
+    parent_->sendUnauthorizedResponse();
+  }
 }
 
 void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,

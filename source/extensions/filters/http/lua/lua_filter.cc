@@ -120,7 +120,8 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
     luaL_error(state, "http call timeout must be >= 0");
   }
 
-  if (filter.clusterManager().getThreadLocalCluster(cluster) == nullptr) {
+  const auto thread_local_cluster = filter.clusterManager().getThreadLocalCluster(cluster);
+  if (thread_local_cluster == nullptr) {
     luaL_error(state, "http call cluster invalid. Must be configured");
   }
 
@@ -145,8 +146,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   }
 
   auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout).setParentSpan(parent_span);
-  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(std::move(message),
-                                                                         callbacks, options);
+  return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 } // namespace
 

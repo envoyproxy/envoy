@@ -24,8 +24,9 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     UNREFERENCED_PARAMETER(end_stream);
 
-    Tcp::ConnectionPool::Instance* pool = cluster_manager_.tcpConnPoolForCluster(
-        "cluster_0", Upstream::ResourcePriority::Default, nullptr);
+    Tcp::ConnectionPool::Instance* pool =
+        cluster_manager_.getThreadLocalCluster("cluster_0")
+            ->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
     ASSERT(pool != nullptr);
 
     requests_.emplace_back(*this, data);

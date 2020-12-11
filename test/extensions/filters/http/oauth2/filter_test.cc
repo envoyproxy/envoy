@@ -73,7 +73,7 @@ public:
 
 class OAuth2Test : public testing::Test {
 public:
-  OAuth2Test() : request_(&cm_.async_client_) {
+  OAuth2Test() : request_(&cm_.thread_local_cluster_.async_client_) {
     factory_context_.cluster_manager_.initializeClusters({"auth.example.com"}, {});
     init();
   }

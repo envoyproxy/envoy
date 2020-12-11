@@ -106,8 +106,8 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
     return;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
+  Tcp::ConnectionPool::Instance* conn_pool =
+      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     ENVOY_LOG(warn, "No host available for cluster {}. Opaque: {}", cluster_name, opaque);
     active_message.onError("No host available");

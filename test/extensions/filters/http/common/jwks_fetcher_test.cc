@@ -132,7 +132,8 @@ TEST_F(JwksFetcherTest, TestHttpFailure) {
 
 TEST_F(JwksFetcherTest, TestCancel) {
   // Setup
-  Http::MockAsyncClientRequest request(&(mock_factory_ctx_.cluster_manager_.async_client_));
+  Http::MockAsyncClientRequest request(
+      &(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_));
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, &request);
   MockJwksReceiver receiver;
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
@@ -156,7 +157,8 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
 
   // Expectations for span
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, _))
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _, _))
       .WillOnce(Invoke(
           [this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
                  const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {

@@ -46,6 +46,7 @@
 #include "test/test_common/utility.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -290,30 +291,28 @@ public:
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr);
-    ON_CALL(*mock_cluster_info_, connectTimeout())
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
-    EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
-    EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillRepeatedly(Return(&thread_local_cluster_));
-    EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
+    EXPECT_CALL(cm_, getThreadLocalCluster("fake_cluster")).Times(AtLeast(1));
     Upstream::MockHost::MockCreateConnectionData connection_data{client_connection_.release(),
                                                                  host_description_ptr_};
     EXPECT_CALL(*mock_host_, createConnection_(_, _)).WillRepeatedly(Return(connection_data));
-    EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
+    EXPECT_CALL(*mock_host_, cluster())
+        .WillRepeatedly(ReturnRef(*cm_.thread_local_cluster_.cluster_.info_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
     http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, random_, host_ptr_,
                                                     Upstream::ResourcePriority::Default, nullptr,
                                                     nullptr, state_);
-    EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_ptr_, *stats_store_, *dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_), http_context_, router_context_);
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
+        cm_.thread_local_cluster_.cluster_.info_, *stats_store_, *dispatcher_, local_info_, cm_,
+        runtime_, random_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    EXPECT_CALL(cm_, getThreadLocalCluster(Eq(fake_cluster_name_)))
-        .WillRepeatedly(Return(&thread_local_cluster_));
     envoy::config::core::v3::GrpcService config;
-    config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
+    config.mutable_envoy_grpc()->set_cluster_name("fake_cluster");
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
@@ -376,7 +375,7 @@ public:
     EXPECT_CALL(active_span, spawnChild_(_, "async fake_cluster egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
-                setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(fake_cluster_name_)));
+                setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
     EXPECT_CALL(*request->child_span_,
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));
@@ -462,11 +461,7 @@ public:
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
   Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
-  const std::string fake_cluster_name_{"fake_cluster"};
   Upstream::MockClusterManager cm_;
-  Upstream::MockClusterInfo* mock_cluster_info_ = new NiceMock<Upstream::MockClusterInfo>();
-  Upstream::ClusterInfoConstSharedPtr cluster_info_ptr_{mock_cluster_info_};
-  Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{test_time_.timeSystem()};

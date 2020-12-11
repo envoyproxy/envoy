@@ -99,13 +99,11 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
-    if (collector_cluster_.exists()) {
+    if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          driver_.clusterManager()
-              .httpAsyncClientForCluster(collector_cluster_.info()->name())
-              .send(
-                  std::move(message), *this,
-                  Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
+          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+              std::move(message), *this,
+              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000U)));
       if (request) {
         active_requests_.add(*request);
       }

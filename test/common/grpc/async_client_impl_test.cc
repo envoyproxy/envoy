@@ -35,7 +35,7 @@ public:
 
     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
     cm_.initializeThreadLocalClusters({"test_cluster"});
-    ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
@@ -77,8 +77,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   config.mutable_envoy_grpc()->set_authority("demo.com");
 
   grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("test_cluster"))
-      .WillRepeatedly(ReturnRef(http_client_));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;

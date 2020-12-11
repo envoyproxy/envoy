@@ -210,6 +210,9 @@ envoy_cc_mock(
     hdrs = ["thread_local_cluster.h"],
     deps = [
         "//include/envoy/upstream:thread_local_cluster_interface",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:load_balancer_mocks",
     ],
