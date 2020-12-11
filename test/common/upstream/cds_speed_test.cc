@@ -11,6 +11,7 @@
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/singleton/manager_impl.h"
+#include "common/stats/thread_local_store.h"
 #include "common/upstream/static_cluster.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -118,7 +119,9 @@ public:
   const std::string type_url_;
   uint64_t version_{};
   bool initialized_{};
-  Stats::TestUtil::TestStore stats_;
+  Stats::TestSymbolTable symbol_table_{};
+  Stats::AllocatorImpl stats_allocator_{*symbol_table_};
+  Stats::ThreadLocalStoreImpl stats_{stats_allocator_};
   Config::SubscriptionStats subscription_stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster static_cluster_;
