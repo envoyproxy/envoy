@@ -75,8 +75,8 @@ public:
 
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
     cm_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillByDefault(ReturnRef(cm_.async_client_));
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
@@ -196,8 +196,8 @@ TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
   opts->access_token = "sample_token";
   opts->component_name = "component";
 
-  ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-      .WillByDefault(ReturnRef(cm_.async_client_));
+  ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+      .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
   auto propagation_mode = Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
 
@@ -228,11 +228,11 @@ TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   setupValidDriver(2);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -297,8 +297,8 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("fake_cluster");
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -320,8 +320,8 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -341,11 +341,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -369,11 +369,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -398,11 +398,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 TEST_F(LightStepDriverTest, FlushOneFailure) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -445,11 +445,11 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 TEST_F(LightStepDriverTest, FlushWithActiveReport) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -490,11 +490,11 @@ TEST_F(LightStepDriverTest, FlushWithActiveReport) {
 TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -538,11 +538,11 @@ TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
 TEST_F(LightStepDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
 
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
@@ -575,11 +575,11 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
 TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,

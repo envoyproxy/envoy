@@ -435,7 +435,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (!maybeTunnel(*thread_local_cluster, cluster_name)) {
-    // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
+    // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);

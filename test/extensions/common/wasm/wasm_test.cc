@@ -758,9 +758,10 @@ TEST_P(WasmCommonTest, RemoteCode) {
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
 
-  EXPECT_CALL(cluster_manager, httpAsyncClientForCluster("example_com"))
-      .WillOnce(ReturnRef(cluster_manager.async_client_));
-  EXPECT_CALL(cluster_manager.async_client_, send_(_, _, _))
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -866,9 +867,10 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
 
-  EXPECT_CALL(cluster_manager, httpAsyncClientForCluster("example_com"))
-      .WillRepeatedly(ReturnRef(cluster_manager.async_client_));
-  EXPECT_CALL(cluster_manager.async_client_, send_(_, _, _))
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(Invoke([&, retry = num_retries](
                                  Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                                  const Http::AsyncClient::RequestOptions&) mutable

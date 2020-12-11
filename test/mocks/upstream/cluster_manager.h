@@ -26,12 +26,6 @@ public:
     return ClusterUpdateCallbacksHandlePtr{addThreadLocalClusterUpdateCallbacks_(callbacks)};
   }
 
-  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                               LoadBalancerContext* context) override {
-    MockHost::MockCreateConnectionData data = tcpConnForCluster_(cluster, context);
-    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
-  }
-
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
   void initializeClusters(const std::vector<std::string>& active_cluster_names,
@@ -51,15 +45,6 @@ public:
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
-  MOCK_METHOD(Http::ConnectionPool::Instance*, httpConnPoolForCluster,
-              (const std::string& cluster, ResourcePriority priority,
-               absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
-  MOCK_METHOD(Tcp::ConnectionPool::Instance*, tcpConnPoolForCluster,
-              (const std::string& cluster, ResourcePriority priority,
-               LoadBalancerContext* context));
-  MOCK_METHOD(MockHost::MockCreateConnectionData, tcpConnForCluster_,
-              (const std::string& cluster, LoadBalancerContext* context));
-  MOCK_METHOD(Http::AsyncClient&, httpAsyncClientForCluster, (const std::string& cluster));
   MOCK_METHOD(bool, removeCluster, (const std::string& cluster));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(const envoy::config::core::v3::BindConfig&, bindConfig, (), (const));
@@ -81,9 +66,6 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
-  NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
-  NiceMock<Http::MockAsyncClient> async_client_;
-  NiceMock<Tcp::ConnectionPool::MockInstance> tcp_conn_pool_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::config::core::v3::BindConfig bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;

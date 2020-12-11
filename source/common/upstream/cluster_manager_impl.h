@@ -254,18 +254,6 @@ public:
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
-  using ClusterManager::httpConnPoolForCluster;
-
-  Http::ConnectionPool::Instance*
-  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                         absl::optional<Http::Protocol> downstream_protocol,
-                         LoadBalancerContext* context) override;
-  Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
-                                                       ResourcePriority priority,
-                                                       LoadBalancerContext* context) override;
-  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                               LoadBalancerContext* context) override;
-  Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
     if (resume_cds_ != nullptr) {
@@ -409,6 +397,13 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
+      Http::ConnectionPool::Instance*
+      httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+                   LoadBalancerContext* context) override;
+      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
+                                                 LoadBalancerContext* context) override;
+      Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
+      Http::AsyncClient& httpAsyncClient() override;
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
@@ -562,7 +557,7 @@ private:
                                               ThreadLocalClusterUpdateParams&& params);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
-  static void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+  static void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
                             std::function<ConnectionPool::Instance*()> prefetch_pool);
 
   ClusterManagerFactory& factory_;
