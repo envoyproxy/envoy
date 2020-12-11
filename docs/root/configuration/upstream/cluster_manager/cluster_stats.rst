@@ -119,7 +119,7 @@ If health check is configured, the cluster has an additional statistics tree roo
   network_failure, Counter, Number of health check failures due to network error
   verify_cluster, Counter, Number of health checks that attempted cluster name verification
   healthy, Gauge, Number of healthy members
-  goaway_error, Counter, Number of health check failures due to a GOAWAY with a code other than NO_ERROR from an http/2 upstream (subset of network_failure)
+  goaway_error, Counter, Number of health check failures due to a HTTP/2 GOAWAY frame with a code other than NO_ERROR from the upstream (subset of network_failure)
 
 .. _config_cluster_manager_cluster_stats_outlier_detection:
 
