@@ -2628,7 +2628,7 @@ TEST_P(Http1ClientConnectionImplTest, ConnectResponseWithEarlyData) {
   // Send response headers and payload
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n12345abcd");
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
