@@ -270,7 +270,6 @@ If you are visiting this section because you saw a message like:
 [...][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure:
 decode_search != decode_map_.end(). Details: Please see 
 https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#debugging-symbol-table-asserts
-for hints on how to fix
 ```
 then you have come to the right place.
 

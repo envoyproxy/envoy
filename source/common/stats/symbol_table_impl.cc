@@ -246,7 +246,7 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
     static const char assert_help[] =
         "Please see "
         "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
-        "debugging-symbol-table-asserts for hints on how to fix";
+        "debugging-symbol-table-asserts";
 
     ASSERT(decode_search != decode_map_.end(), assert_help);
     auto encode_search = encode_map_.find(decode_search->second->toStringView());
