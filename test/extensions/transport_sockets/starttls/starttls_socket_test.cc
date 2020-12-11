@@ -70,9 +70,9 @@ TEST(StartTlsTest, BasicSwitch) {
   socket->doWrite(buf, true);
 
   // Now switch to Tls. During the switch, the new socket should register for callbacks
-  // and connect/
-  EXPECT_CALL(*ssl_socket, setTransportSocketCallbacks(_)).Times(1);
-  EXPECT_CALL(*ssl_socket, onConnected).Times(1);
+  // and connect.
+  EXPECT_CALL(*ssl_socket, setTransportSocketCallbacks(_));
+  EXPECT_CALL(*ssl_socket, onConnected);
   // Make sure that raw socket is destructed.
   EXPECT_CALL(*raw_socket, Die);
   socket->startSecureTransport();

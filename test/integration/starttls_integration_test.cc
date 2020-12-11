@@ -61,7 +61,6 @@ Network::FilterStatus StartTlsSwitchFilter::onCommand(Buffer::Instance& buf, boo
   // Skip empty messages.
   if (message.empty()) {
     return Network::FilterStatus::Continue;
-    ;
   }
 
   // Stop processing if unrecognized message has been received.
