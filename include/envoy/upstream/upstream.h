@@ -610,11 +610,13 @@ public:
   COUNTER(upstream_rq_dropped)
 
 /**
- * Cluster circuit breakers gauges. We define these just as StatNames because
- * depending on flags, we will use null gauges for the remaining_* ones. Note
- * that the instantiation of the stats struct in
- * ClusterInfoImpl::generateCircuitBreakersStats is hand-coded and must be
- * changed if we change the set of gauges in this macro.
+ * Cluster circuit breakers gauges. Note that we do not generate a stats
+ * structure from this macro. This is because depending on flags, we want to use
+ * null gauges for all the "remaining" ones. This is hard to automate with the
+ * 2-phase macros, so ClusterInfoImpl::generateCircuitBreakersStats is
+ * hand-coded and must be changed if we alter the set of gauges in this macro.
+ * We also include stat-names in this structure that are used when composing
+ * the circuit breaker names, depending on priority settings.
  */
 #define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)      \
   GAUGE(cx_open, Accumulate)                                                                       \
@@ -657,6 +659,9 @@ MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
                   ALL_CLUSTER_LOAD_REPORT_STATS);
 
+// We can't use macros to make the Stats class for circuit breakers due to
+// the conditional inclusion of 'remaining' gauges. But we do auto-generate
+// the StatNames struct.
 MAKE_STAT_NAMES_STRUCT(ClusterCircuitBreakersStatNames, ALL_CLUSTER_CIRCUIT_BREAKERS_STATS);
 
 MAKE_STAT_NAMES_STRUCT(ClusterRequestResponseSizeStatNames,

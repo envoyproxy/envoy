@@ -1194,6 +1194,8 @@ ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatNa
       REMAINING_GAUGE(stat_names.remaining_retries_),
       REMAINING_GAUGE(stat_names.remaining_rq_),
   };
+
+#undef REMAINING_GAUGE
 }
 
 Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
