@@ -37,6 +37,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 class MockServerFactoryContext;
+class MockStatsConfig;
 } // namespace Configuration
 
 class MockInstance : public Instance {
@@ -116,6 +117,7 @@ public:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  std::shared_ptr<testing::NiceMock<Configuration::MockStatsConfig>> stats_config_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
       server_factory_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>

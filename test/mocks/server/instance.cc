@@ -16,6 +16,7 @@ MockInstance::MockInstance()
       cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
+      stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
       transport_socket_factory_context_(
@@ -43,6 +44,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
+  ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(*stats_config_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
