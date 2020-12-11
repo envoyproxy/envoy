@@ -311,6 +311,8 @@ Reservation OwnedImpl::reserve(uint64_t length) {
   }
 
   uint64_t bytes_remaining = length;
+  auto& reservation_slices = reservation.bufferImplUseOnlySlices();
+  auto& reservation_owned_slices = reservation.bufferImplUseOnlyOwnedSlices();
 
   // Check whether there are any empty slices with reservable space at the end of the buffer.
   uint64_t reservable_size = slices_.empty() ? 0 : slices_.back().reservableSize();
@@ -318,28 +320,25 @@ Reservation OwnedImpl::reserve(uint64_t length) {
     auto& last_slice = slices_.back();
     const uint64_t reservation_size = std::min(last_slice.reservableSize(), bytes_remaining);
     auto slice = last_slice.reserve(reservation_size);
-    reservation.bufferImplUseOnlySlices().push_back(slice);
-    reservation.bufferImplUseOnlyOwnedSlices().push_back(nullptr);
+    reservation_slices.push_back(slice);
+    reservation_owned_slices.push_back(nullptr);
     bytes_remaining -= slice.len_;
   }
 
   while (bytes_remaining != 0) {
     uint64_t size = Slice::default_slice_size_;
-    if (bytes_remaining > size &&
-        (reservation.bufferImplUseOnlySlices().size() + 1) == reservation.NUM_ELEMENTS_) {
+    if (bytes_remaining > size && (reservation_slices.size() + 1) == reservation.NUM_ELEMENTS_) {
       size = bytes_remaining;
     }
     Slice slice(size);
-    reservation.bufferImplUseOnlySlices().push_back(slice.reserve(size));
-    reservation.bufferImplUseOnlyOwnedSlices().emplace_back(
-        std::make_unique<SliceDataImpl>(std::move(slice)));
-    bytes_remaining -= std::min(reservation.bufferImplUseOnlySlices().back().len_, bytes_remaining);
+    reservation_slices.push_back(slice.reserve(size));
+    reservation_owned_slices.emplace_back(std::make_unique<SliceDataImpl>(std::move(slice)));
+    bytes_remaining -= std::min(reservation_slices.back().len_, bytes_remaining);
   }
 
-  ASSERT(reservation.bufferImplUseOnlySlices().size() <= reservation.NUM_ELEMENTS_,
+  ASSERT(reservation_slices.size() <= reservation.NUM_ELEMENTS_,
          "The absl::InlineVector should be sized so that out-of-line storage isn't needed.");
-  ASSERT(reservation.bufferImplUseOnlySlices().size() ==
-         reservation.bufferImplUseOnlyOwnedSlices().size());
+  ASSERT(reservation_slices.size() == reservation_owned_slices.size());
   return reservation;
 }
 
@@ -354,19 +353,21 @@ Reservation OwnedImpl::reserveSingleSlice(uint64_t length, bool separate_slice) 
     slices_.pop_back();
   }
 
+  auto& reservation_slices = reservation.bufferImplUseOnlySlices();
+  auto& reservation_owned_slices = reservation.bufferImplUseOnlyOwnedSlices();
+
   // Check whether there are any empty slices with reservable space at the end of the buffer.
   uint64_t reservable_size =
       (separate_slice || slices_.empty()) ? 0 : slices_.back().reservableSize();
   if (reservable_size >= length) {
     auto& last_slice = slices_.back();
     auto slice = last_slice.reserve(length);
-    reservation.bufferImplUseOnlySlices().push_back(slice);
-    reservation.bufferImplUseOnlyOwnedSlices().push_back(nullptr);
+    reservation_slices.push_back(slice);
+    reservation_owned_slices.push_back(nullptr);
   } else {
     Slice slice(length);
-    reservation.bufferImplUseOnlySlices().push_back(slice.reserve(length));
-    reservation.bufferImplUseOnlyOwnedSlices().emplace_back(
-        std::make_unique<SliceDataImpl>(std::move(slice)));
+    reservation_slices.push_back(slice.reserve(length));
+    reservation_owned_slices.emplace_back(std::make_unique<SliceDataImpl>(std::move(slice)));
   }
 
   return reservation;
