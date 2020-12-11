@@ -72,7 +72,7 @@ def GetReleaseDate(dep, repo, metadata_version, github_release):
       latest = None
 
     # When the repository does have a latest release, compare the metadata version with the latest
-    # tag. In cases where a repository has a release that is later than the latest release (eg.
+    # tag. In cases where a repository has a tag that is later than the latest release (eg.
     # census-instrumentation/opencensus-proto), the get_release API call will fail so we check to
     # ensure the metadata release version is less than or equal to the repository tag name
     if latest and version.parse(github_release.version) <= version.parse(latest.tag_name):
