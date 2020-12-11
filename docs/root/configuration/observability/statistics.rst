@@ -29,7 +29,7 @@
   hot_restart_epoch, Gauge, 当前热重启的代数 -- 通常由命令行参数 `--restart-epoch` 传递的整数值生成。
   hot_restart_generation, Gauge, 但前热重启的代数 -- 类似 hot_restart_epoch 但是通过递增上一代自动计算得来的。
   initialization_time_ms, Histogram, Envoy 初始化花费的全部时间，以毫秒为单位。 它是从服务器启动直到工作线程准备好接受新连接的时间
-  debug_assertion_failures, Counter, 如果带了编译参数 `--define log_debug_assert_in_release=enabled` 则表示在一个发布版本中检测到调试断言失败的次数，否则为0
+  debug_assertion_failures, Counter, 如果带了编译参数 `--define log_debug_assert_in_release=enabled` 则表示在一个发布版本中检测到调试断言失败的次数，否则为 0
   envoy_bug_failures, Counter, 在一个发布版本中检测到的 Envoy bug 故障的数目。如果这是一个严重的问题请提交或报告这个 issue。
   static_unknown_fields, Counter, 静态配置中具有未知字段的消息数
   dynamic_unknown_fields, Counter, 动态配置中具有未知字段的消息数
