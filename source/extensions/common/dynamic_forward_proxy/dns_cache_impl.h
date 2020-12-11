@@ -51,7 +51,7 @@ public:
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
-  absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hostMapCopy() override;
+  void iterateHostMap(IterateHostMapCb cb) override;
   absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
   Upstream::ResourceAutoIncDecPtr
   canCreateDnsRequest(ResourceLimitOptRef pending_requests) override;

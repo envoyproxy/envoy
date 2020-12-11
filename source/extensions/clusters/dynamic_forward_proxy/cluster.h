@@ -88,13 +88,14 @@ private:
   };
 
   void
-  addOrUpdateHost(const std::string& host,
+  addOrUpdateHost(absl::string_view host,
                   const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
                   std::unique_ptr<Upstream::HostVector>& hosts_added)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(host_map_lock_);
+      ABSL_LOCKS_EXCLUDED(host_map_lock_);
+
   void updatePriorityState(const Upstream::HostVector& hosts_added,
                            const Upstream::HostVector& hosts_removed)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(host_map_lock_);
+      ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;

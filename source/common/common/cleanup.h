@@ -55,6 +55,9 @@ private:
   bool cancelled_;
 };
 
+// RAII helper class to add an element to a std::list held inside an absl::flat_hash_map on
+// construction and erase it on destruction, unless the cancel method has been called. If the list
+// is empty after removal of the element, the destructor will also remove the list from the map.
 template <class Key, class Value> class RaiiMapOfListElement {
 public:
   using MapOfList = absl::flat_hash_map<Key, std::list<Value>>;

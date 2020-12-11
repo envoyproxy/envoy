@@ -43,24 +43,22 @@ Cluster::Cluster(
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
-  // TODO: Can we just loop over the actual DNS cache map here rather than a copy?
-  auto existing_hosts = dns_cache_->hostMapCopy();
-  if (!existing_hosts.empty()) {
-    absl::WriterMutexLock lock{&host_map_lock_};
-    std::unique_ptr<Upstream::HostVector> hosts_added;
-    for (const auto& existing_host : existing_hosts) {
-      addOrUpdateHost(existing_host.first, existing_host.second, hosts_added);
-    }
+  std::unique_ptr<Upstream::HostVector> hosts_added;
+  dns_cache_->iterateHostMap(
+      [&](absl::string_view host, const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
+        addOrUpdateHost(host, info, hosts_added);
+      });
+  if (hosts_added) {
     updatePriorityState(*hosts_added, {});
   }
-
   onPreInitComplete();
 }
 
 void Cluster::addOrUpdateHost(
-    const std::string& host,
+    absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
     std::unique_ptr<Upstream::HostVector>& hosts_added) {
+  absl::WriterMutexLock lock{&host_map_lock_};
   // We should never get a host with no address from the cache.
   ASSERT(host_info->address() != nullptr);
 
@@ -97,11 +95,11 @@ void Cluster::addOrUpdateHost(
 
   ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
 
-  const auto emplaced =
-      host_map_.try_emplace(host, host_info,
-                            std::make_shared<Upstream::LogicalHost>(
-                                info(), host, host_info->address(), dummy_locality_lb_endpoint_,
-                                dummy_lb_endpoint_, nullptr, time_source_));
+  const auto emplaced = host_map_.try_emplace(
+      host, host_info,
+      std::make_shared<Upstream::LogicalHost>(info(), std::string{host}, host_info->address(),
+                                              dummy_locality_lb_endpoint_, dummy_lb_endpoint_,
+                                              nullptr, time_source_));
   if (hosts_added == nullptr) {
     hosts_added = std::make_unique<Upstream::HostVector>();
   }
@@ -112,14 +110,11 @@ void Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "Adding host info for {}", host);
-  absl::WriterMutexLock lock{&host_map_lock_};
+
   std::unique_ptr<Upstream::HostVector> hosts_added;
   addOrUpdateHost(host, host_info, hosts_added);
   if (hosts_added != nullptr) {
-    ASSERT(!host_map_.empty());
     ASSERT(!hosts_added->empty());
-    // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
-    // the host set update.
     updatePriorityState(*hosts_added, {});
   }
 }
@@ -128,9 +123,12 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
                                   const Upstream::HostVector& hosts_removed) {
   Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   priority_state_manager.initializePriorityFor(dummy_locality_lb_endpoint_);
-  for (const auto& host : host_map_) {
-    priority_state_manager.registerHostForPriority(host.second.logical_host_,
-                                                   dummy_locality_lb_endpoint_);
+  {
+    absl::ReaderMutexLock lock{&host_map_lock_};
+    for (const auto& host : host_map_) {
+      priority_state_manager.registerHostForPriority(host.second.logical_host_,
+                                                     dummy_locality_lb_endpoint_);
+    }
   }
   priority_state_manager.updateClusterPrioritySet(
       0, std::move(priority_state_manager.priorityState()[0].first), hosts_added, hosts_removed,
@@ -138,13 +136,15 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
 }
 
 void Cluster::onDnsHostRemove(const std::string& host) {
-  absl::WriterMutexLock lock{&host_map_lock_};
-  const auto host_map_it = host_map_.find(host);
-  ASSERT(host_map_it != host_map_.end());
   Upstream::HostVector hosts_removed;
-  hosts_removed.emplace_back(host_map_it->second.logical_host_);
-  host_map_.erase(host);
-  ENVOY_LOG(debug, "removing dfproxy cluster host '{}'", host);
+  {
+    absl::WriterMutexLock lock{&host_map_lock_};
+    const auto host_map_it = host_map_.find(host);
+    ASSERT(host_map_it != host_map_.end());
+    hosts_removed.emplace_back(host_map_it->second.logical_host_);
+    host_map_.erase(host);
+    ENVOY_LOG(debug, "removing dfproxy cluster host '{}'", host);
+  }
   updatePriorityState({}, hosts_removed);
 }
 
@@ -164,14 +164,15 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (host.empty()) {
     return nullptr;
   }
-
-  absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
-  const auto host_it = cluster_.host_map_.find(host);
-  if (host_it == cluster_.host_map_.end()) {
-    return nullptr;
-  } else {
-    host_it->second.shared_host_info_->touch();
-    return host_it->second.logical_host_;
+  {
+    absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
+    const auto host_it = cluster_.host_map_.find(host);
+    if (host_it == cluster_.host_map_.end()) {
+      return nullptr;
+    } else {
+      host_it->second.shared_host_info_->touch();
+      return host_it->second.logical_host_;
+    }
   }
 }
 

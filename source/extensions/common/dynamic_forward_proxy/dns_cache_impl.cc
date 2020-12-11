@@ -57,7 +57,7 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;
 
   auto [cache_hit, is_overflow] = [&]() {
-    // TODO: Consider returning the looked-up host
+    // TODO(chradcliffe): Consider returning the looked-up host
     absl::ReaderMutexLock read_lock{&primary_hosts_lock_};
     auto tls_host = primary_hosts_.find(host);
     bool cache_hit =
@@ -97,16 +97,14 @@ DnsCacheImpl::canCreateDnsRequest(ResourceLimitOptRef pending_requests) {
   return std::make_unique<Upstream::ResourceAutoIncDec>(current_pending_requests);
 }
 
-absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hostMapCopy() {
-  absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> ret;
+void DnsCacheImpl::iterateHostMap(IterateHostMapCb iterate_callback) {
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   for (const auto& host : primary_hosts_) {
     // Only include hosts that have ever resolved to an address.
     if (host.second->host_info_->address() != nullptr) {
-      ret.emplace(host.first, host.second->host_info_);
+      iterate_callback(host.first, host.second->host_info_);
     }
   }
-  return ret;
 }
 
 absl::optional<const DnsHostInfoSharedPtr> DnsCacheImpl::getHost(absl::string_view host_name) {

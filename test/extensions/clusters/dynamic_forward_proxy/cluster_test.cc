@@ -70,7 +70,11 @@ public:
     for (const auto& host : host_map_) {
       existing_hosts.emplace(host.first, host.second);
     }
-    EXPECT_CALL(*dns_cache_manager_->dns_cache_, hostMapCopy()).WillOnce(Return(existing_hosts));
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, iterateHostMap(_)).WillOnce(Invoke([&](auto cb) {
+      for (const auto& host : host_map_) {
+        cb(host.first, host.second);
+      }
+    }));
     if (!existing_hosts.empty()) {
       EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
     }

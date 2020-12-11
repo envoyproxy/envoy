@@ -172,10 +172,14 @@ public:
    */
   virtual AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) PURE;
 
+  using IterateHostMapCb = std::function<void(absl::string_view, const DnsHostInfoSharedPtr&)>;
+
   /**
-   * @return all hosts currently stored in the cache.
+   * Iterates over all entries in the cache, calling a callback for each entry
+   *
+   * @param iterate_callback the callback to invoke for each entry in the cache
    */
-  virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hostMapCopy() PURE;
+  virtual void iterateHostMap(IterateHostMapCb iterate_callback) PURE;
 
   /**
    * Retrieve the DNS host info of a given host currently stored in the cache.
