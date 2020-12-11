@@ -91,8 +91,15 @@ message ScaleTimersOverloadActionConfig {
     UNSPECIFIED = 0;
 
     // Adjusts the idle timer for downstream HTTP connections that takes effect when there are no active streams.
-    // This affects the value of :ref:`RouteAction.idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`.
+    // This affects the value of :ref:`HttpConnectionManager.common_http_protocol_options.idle_timeout
+    // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
     HTTP_DOWNSTREAM_CONNECTION_IDLE = 1;
+
+    // Adjusts the idle timer for HTTP streams initiated by downstream clients.
+    // This affects the value of :ref:`RouteAction.idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>` and
+    // :ref:`HttpConnectionManager.stream_idle_timeout
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
+    HTTP_DOWNSTREAM_STREAM_IDLE = 2;
   }
 
   message ScaleTimer {
