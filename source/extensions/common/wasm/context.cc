@@ -58,6 +58,7 @@ const absl::string_view CelStateKeyPrefix = "wasm.";
 
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using CelState = Filters::Common::Expr::CelState;
+using CelStatePrototype = Filters::Common::Expr::CelStatePrototype;
 
 Http::RequestTrailerMapPtr buildRequestTrailerMapFromPairs(const Pairs& pairs) {
   auto map = Http::RequestTrailerMapImpl::create();
@@ -1120,9 +1121,10 @@ WasmResult Context::setProperty(absl::string_view path, absl::string_view value)
     state = &stream_info->filterState()->getDataMutable<CelState>(key);
   } else {
     const auto& it = rootContext()->state_prototypes_.find(path);
-    const CelStatePrototype& prototype = it == rootContext()->state_prototypes_.end()
-                                              ? Filters::Common::Expr::DefaultCelStatePrototype::get()
-                                              : *it->second.get(); // NOLINT
+    const CelStatePrototype& prototype =
+        it == rootContext()->state_prototypes_.end()
+            ? Filters::Common::Expr::DefaultCelStatePrototype::get()
+            : *it->second.get(); // NOLINT
     auto state_ptr = std::make_unique<CelState>(prototype);
     state = state_ptr.get();
     stream_info->filterState()->setData(key, std::move(state_ptr),

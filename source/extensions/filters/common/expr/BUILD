@@ -28,6 +28,7 @@ envoy_cc_library(
     srcs = ["context.cc"],
     hdrs = ["context.h"],
     deps = [
+        ":cel_state_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
@@ -58,4 +59,3 @@ envoy_cc_library(
         "@com_google_cel_cpp//tools:flatbuffers_backed_impl",
     ],
 )
-

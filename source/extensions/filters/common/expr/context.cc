@@ -4,6 +4,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 
+#include "extensions/filters/common/expr/cel_state.h"
+
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
 
@@ -271,6 +273,10 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (filter_state_.hasDataWithName(value)) {
     const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
+    const CelState* cel_state = dynamic_cast<const CelState*>(object);
+    if (cel_state) {
+      return cel_state->exprValue(arena_, false);
+    }
     absl::optional<std::string> serialized = object->serializeAsString();
     if (serialized.has_value()) {
       std::string* out = ProtobufWkt::Arena::Create<std::string>(arena_, serialized.value());

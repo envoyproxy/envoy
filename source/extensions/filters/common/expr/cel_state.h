@@ -31,7 +31,7 @@ enum class CelStateType {
 class CelStatePrototype {
 public:
   CelStatePrototype(bool readonly, CelStateType type, absl::string_view schema,
-                     StreamInfo::FilterState::LifeSpan life_span)
+                    StreamInfo::FilterState::LifeSpan life_span)
       : readonly_(readonly), type_(type), schema_(schema), life_span_(life_span) {}
   CelStatePrototype() = default;
   const bool readonly_{false};

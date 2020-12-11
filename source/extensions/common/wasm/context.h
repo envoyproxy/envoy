@@ -215,8 +215,9 @@ public:
   // State accessors
   WasmResult getProperty(absl::string_view path, std::string* result) override;
   WasmResult setProperty(absl::string_view path, absl::string_view value) override;
-  WasmResult declareProperty(absl::string_view path,
-                             std::unique_ptr<const CelStatePrototype> state_prototype);
+  WasmResult
+  declareProperty(absl::string_view path,
+                  std::unique_ptr<const Filters::Common::Expr::CelStatePrototype> state_prototype);
 
   // Continue
   WasmResult continueStream(WasmStreamType stream_type) override;
@@ -475,7 +476,8 @@ protected:
   bool tcp_connection_closed_ = false;
 
   // Filter state prototype declaration.
-  absl::flat_hash_map<std::string, std::unique_ptr<const CelStatePrototype>> state_prototypes_;
+  absl::flat_hash_map<std::string, std::unique_ptr<const Filters::Common::Expr::CelStatePrototype>>
+      state_prototypes_;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 
