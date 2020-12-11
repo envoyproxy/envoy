@@ -159,6 +159,7 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
               domain: envoy_service_to_service
               rate_limit_service:
+                 transport_api_version: V3
                  grpc_service:
                     envoy_grpc:
                        cluster_name: ratelimit
@@ -182,8 +183,10 @@ static_resources:
           stat_prefix: egress_http
           rds:
             config_source:
+               resource_api_version: V3
                api_config_source:
                  api_type: GRPC
+                 transport_api_version: V3
                  grpc_services:
                    envoy_grpc:
                      cluster_name: "rds"
@@ -220,6 +223,7 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
               domain: envoy_service_to_service
               rate_limit_service:
+                 transport_api_version: V3
                  grpc_service:
                     envoy_grpc:
                        cluster_name: ratelimit
@@ -437,7 +441,11 @@ static_resources:
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
     load_assignment:
       cluster_name: local_service_grpc
       endpoints:
@@ -456,10 +464,14 @@ static_resources:
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    http2_protocol_options:
-      connection_keepalive:
-        interval: 30s
-        timeout: 5s
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            connection_keepalive:
+              interval: 30s
+              timeout: 5s
     load_assignment:
       cluster_name: rds
       endpoints:
@@ -500,8 +512,12 @@ static_resources:
                 address: collector-grpc.lightstep.com
                 port_value: 443
                 protocol: TCP
-    http2_protocol_options:
-      max_concurrent_streams: 100
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            max_concurrent_streams: 100
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
@@ -542,8 +558,10 @@ static_resources:
                 protocol: TCP
 dynamic_resources:
   cds_config:
+    resource_api_version: V3
     api_config_source:
       api_type: REST
+      transport_api_version: V3
       cluster_names:
       - cds_cluster
       refresh_delay: 30s

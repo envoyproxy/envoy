@@ -48,6 +48,7 @@ public:
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.test_key.thrift_filter_enabled", 100))
         .WillByDefault(Return(true));
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
   void setupTest(const std::string& yaml) {
@@ -167,7 +168,7 @@ TEST_F(ThriftRateLimitFilterTest, NoRoute) {
 TEST_F(ThriftRateLimitFilterTest, NoCluster) {
   setupTest(filter_config_);
 
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(request_metadata_));
 }
@@ -184,7 +185,7 @@ TEST_F(ThriftRateLimitFilterTest, NoApplicableRateLimit) {
 TEST_F(ThriftRateLimitFilterTest, NoDescriptor) {
   setupTest(filter_config_);
 
-  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _)).Times(1);
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _));
   EXPECT_CALL(*client_, limit(_, _, _, _, _)).Times(0);
 
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(request_metadata_));
@@ -203,8 +204,7 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
   setupTest(filter_config_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
-      .Times(1);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
       .WillOnce(SetArgReferee<1>(descriptor_));

@@ -88,7 +88,7 @@ public:
 
   void exit() override { impl_.exit(); }
 
-  SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override {
+  SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
     return impl_.listenForSignal(signal_num, std::move(cb));
   }
 

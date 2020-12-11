@@ -127,7 +127,8 @@ void UberFilterFuzzer::perFilterSetup() {
   ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
   ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
   ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
-  ON_CALL(cluster_manager_.async_client_, send_(_, _, _)).WillByDefault(Return(&async_request_));
+  ON_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillByDefault(Return(&async_request_));
 
   ON_CALL(decoder_callbacks_, connection()).WillByDefault(testing::Return(&connection_));
   ON_CALL(decoder_callbacks_, activeSpan())

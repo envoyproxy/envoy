@@ -40,6 +40,7 @@ admin:
       port_value: 0
 dynamic_resources:
   lds_config:
+    resource_api_version: V3
     path: {}
 static_resources:
   secrets:
@@ -260,6 +261,7 @@ dynamic_resources:
     resource_api_version: V3
     api_config_source:
       api_type: {}
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
@@ -267,7 +269,11 @@ dynamic_resources:
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_cds_cluster
       endpoints:
@@ -342,7 +348,11 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 0
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
 admin:
   access_log_path: {2}
   address:
@@ -371,7 +381,11 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                   address: {}
                   port_value: {}
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {{}}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {{}}
     )EOF",
                                                                                  name, name,
                                                                                  address, port));
@@ -390,7 +404,11 @@ ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy
           resource_api_version: {}
           ads: {{}}
       lb_policy: {}
-      http2_protocol_options: {{}}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {{}}
     )EOF",
                                         name, apiVersionStr(api_version), lb_policy),
                             cluster, shouldBoost(api_version));
@@ -419,7 +437,11 @@ ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_pol
               trusted_ca:
                 filename: {}
       lb_policy: {}
-      http2_protocol_options: {{}}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {{}}
     )EOF",
                   name, apiVersionStr(api_version),
                   TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"),
@@ -603,6 +625,24 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
+void ConfigHelper::configureUpstreamTls() {
+  addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    auto* validation_context =
+        tls_context.mutable_common_tls_context()->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+    cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+  });
+}
+
 void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
   if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
     auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
@@ -624,6 +664,26 @@ void ConfigHelper::enableDeprecatedV2Api() {
 
 void ConfigHelper::setNewCodecs() {
   addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "true");
+}
+
+void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
+                                      HttpProtocolOptions& protocol_options) {
+  if (cluster.typed_extension_protocol_options().contains(
+          "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+    HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+        (*cluster.mutable_typed_extension_protocol_options())
+            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    protocol_options.MergeFrom(old_options);
+  }
+  (*cluster.mutable_typed_extension_protocol_options())
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+          .PackFrom(protocol_options);
+}
+
+void ConfigHelper::setHttp2(envoy::config::cluster::v3::Cluster& cluster) {
+  HttpProtocolOptions protocol_options;
+  protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+  setProtocolOptions(cluster, protocol_options);
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
@@ -1046,25 +1106,17 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
 
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_filter = getFilterFromListener("http");
-  if (hcm_filter) {
-    auto* config = hcm_filter->mutable_typed_config();
-    hcm = MessageUtil::anyConvert<
-        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
-        *config);
-    return true;
-  }
-  return false;
+  return loadFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::storeHttpConnectionManager(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         hcm) {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_config_any = getFilterFromListener("http")->mutable_typed_config();
-
-  hcm_config_any->PackFrom(hcm);
+  return storeFilter<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+      "http", hcm);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
@@ -1119,11 +1171,13 @@ void ConfigHelper::setUpstreamOutboundFramesLimits(uint32_t max_all_frames,
                                                    uint32_t max_control_frames) {
   addConfigModifier(
       [max_all_frames, max_control_frames](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        auto* static_resources = bootstrap.mutable_static_resources();
-        auto* cluster = static_resources->mutable_clusters(0);
-        auto* http_protocol_options = cluster->mutable_http2_protocol_options();
+        ConfigHelper::HttpProtocolOptions protocol_options;
+        auto* http_protocol_options =
+            protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
         http_protocol_options->mutable_max_outbound_frames()->set_value(max_all_frames);
         http_protocol_options->mutable_max_outbound_control_frames()->set_value(max_control_frames);
+        ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                         protocol_options);
       });
 }
 

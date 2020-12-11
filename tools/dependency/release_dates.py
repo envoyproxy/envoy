@@ -105,3 +105,4 @@ if __name__ == '__main__':
   except ReleaseDateError as e:
     print(f'An error occurred while processing {path}, please verify the correctness of the '
           f'metadata: {e}')
+    sys.exit(1)

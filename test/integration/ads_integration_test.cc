@@ -311,6 +311,24 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
 }
 
+// Validate that the use of V2 transport version is rejected by default.
+TEST_P(AdsIntegrationTest, DEPRECATED_FEATURE_TEST(RejectV2TransportConfigByDefault)) {
+  initialize();
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  auto cluster = buildCluster("cluster_0");
+  auto* api_config_source =
+      cluster.mutable_eds_cluster_config()->mutable_eds_config()->mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V2);
+  envoy::config::core::v3::GrpcService* grpc_service = api_config_source->add_grpc_services();
+  setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "1");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  EXPECT_GE(test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value(), 1);
+}
+
 // Regression test for the use-after-free crash when processing RDS update (#3953).
 TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
   initialize();
@@ -1021,6 +1039,7 @@ public:
       ads_eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
       auto* eds_cluster_config = ads_eds_cluster->mutable_eds_cluster_config();
       auto* eds_config = eds_cluster_config->mutable_eds_config();
+      eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       eds_config->mutable_ads();
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -1176,7 +1195,7 @@ public:
       // Define ADS cluster
       auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ads_cluster->set_name("ads_cluster");
-      ads_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ads_cluster);
       ads_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
       auto* ads_cluster_config = ads_cluster->mutable_eds_cluster_config();
       auto* ads_cluster_eds_config = ads_cluster_config->mutable_eds_config();
@@ -1187,6 +1206,7 @@ public:
       const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
           "test/config/integration/server_xds.eds.ads_cluster.yaml", port_map_, version_);
       ads_cluster_eds_config->set_path(eds_path);
+      ads_cluster_eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       // Add EDS static Cluster that uses ADS as config Source.
       auto* ads_eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -1353,13 +1373,21 @@ TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
 class AdsClusterV2Test : public AdsIntegrationTest {
 public:
   AdsClusterV2Test() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2) {}
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster0->mutable_typed_extension_protocol_options()->clear();
+      cluster0->mutable_http2_protocol_options();
+    });
+    AdsIntegrationTest::initialize();
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterV2Test,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Basic CDS/EDS update that warms and makes active a single cluster (v2 API).
-TEST_P(AdsClusterV2Test, BasicClusterInitialWarming) {
+TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(BasicClusterInitialWarming)) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V2);
@@ -1380,7 +1408,7 @@ TEST_P(AdsClusterV2Test, BasicClusterInitialWarming) {
 }
 
 // If we attempt to use v2 APIs by default, the configuration should be rejected.
-TEST_P(AdsClusterV2Test, RejectV2ConfigByDefault) {
+TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(RejectV2ConfigByDefault)) {
   fatal_by_default_v2_override_ = true;
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
@@ -1390,10 +1418,11 @@ TEST_P(AdsClusterV2Test, RejectV2ConfigByDefault) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", true);
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  EXPECT_EQ(1, test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value());
 }
 
 // Verify CDS is paused during cluster warming.
-TEST_P(AdsClusterV2Test, CdsPausedDuringWarming) {
+TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(CdsPausedDuringWarming)) {
   initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
@@ -1480,7 +1509,7 @@ TEST_P(AdsClusterV2Test, CdsPausedDuringWarming) {
 }
 
 // Validates that the initial xDS request batches all resources referred to in static config
-TEST_P(AdsClusterV2Test, XdsBatching) {
+TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(XdsBatching)) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
     bootstrap.mutable_dynamic_resources()->clear_lds_config();
@@ -1527,7 +1556,7 @@ TEST_P(AdsClusterV2Test, XdsBatching) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13681.
-TEST_P(AdsClusterV2Test, TypeUrlAnnotationRegression) {
+TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(TypeUrlAnnotationRegression)) {
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
       envoy::config::core::v3::ApiVersion::V2);

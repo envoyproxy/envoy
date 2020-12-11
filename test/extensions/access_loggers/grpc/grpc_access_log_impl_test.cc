@@ -77,7 +77,7 @@ public:
   Event::MockTimer* timer_ = nullptr;
   Event::MockDispatcher dispatcher_;
   Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
-  GrpcAccessLoggerImplPtr logger_;
+  std::unique_ptr<GrpcAccessLoggerImpl> logger_;
 };
 
 // Test basic stream logging flow.
@@ -88,8 +88,8 @@ TEST_F(GrpcAccessLoggerImplTest, BasicFlow) {
   // Start a stream for the first log.
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;
-  expectStreamStart(stream, &callbacks);
   EXPECT_CALL(local_info_, node());
+  expectStreamStart(stream, &callbacks);
   expectStreamMessage(stream, R"EOF(
 identifier:
   node:
@@ -128,8 +128,9 @@ http_logs:
 
   // Close the stream and make sure we make a new one.
   callbacks->onRemoteClose(Grpc::Status::Internal, "bad");
-  expectStreamStart(stream, &callbacks);
+
   EXPECT_CALL(local_info_, node());
+  expectStreamStart(stream, &callbacks);
   expectStreamMessage(stream, R"EOF(
 identifier:
   node:
@@ -160,8 +161,8 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
   // Start a stream for the first log.
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;
-  expectStreamStart(stream, &callbacks);
   EXPECT_CALL(local_info_, node());
+  expectStreamStart(stream, &callbacks);
 
   // Fail to flush, so the log stays buffered up.
   envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
@@ -189,9 +190,9 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
 
   // Now allow the flush to happen. The stored log will get logged, and the next log will succeed.
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(1);
+  EXPECT_CALL(stream, sendMessageRaw_(_, _));
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(1);
+  EXPECT_CALL(stream, sendMessageRaw_(_, _));
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
   EXPECT_EQ(
       2,
@@ -213,8 +214,8 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksLegacy) {
   // Start a stream for the first log.
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;
-  expectStreamStart(stream, &callbacks);
   EXPECT_CALL(local_info_, node());
+  expectStreamStart(stream, &callbacks);
 
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark())
       .Times(AnyNumber())
@@ -247,6 +248,7 @@ TEST_F(GrpcAccessLoggerImplTest, StreamFailure) {
   InSequence s;
   initLogger(FlushInterval, 0);
 
+  EXPECT_CALL(local_info_, node());
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
       .WillOnce(
           Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
@@ -254,7 +256,6 @@ TEST_F(GrpcAccessLoggerImplTest, StreamFailure) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));
-  EXPECT_CALL(local_info_, node());
   envoy::data::accesslog::v3::HTTPAccessLogEntry entry;
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
 }
@@ -266,8 +267,8 @@ TEST_F(GrpcAccessLoggerImplTest, Batching) {
 
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;
-  expectStreamStart(stream, &callbacks);
   EXPECT_CALL(local_info_, node());
+  expectStreamStart(stream, &callbacks);
   const std::string path1(30, '1');
   const std::string path2(30, '2');
   const std::string path3(80, '3');
@@ -325,8 +326,8 @@ TEST_F(GrpcAccessLoggerImplTest, Flushing) {
 
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;
-  expectStreamStart(stream, &callbacks);
   EXPECT_CALL(local_info_, node());
+  expectStreamStart(stream, &callbacks);
   expectStreamMessage(stream, fmt::format(R"EOF(
   identifier:
     node:
@@ -350,10 +351,8 @@ TEST_F(GrpcAccessLoggerImplTest, Flushing) {
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
 public:
-  GrpcAccessLoggerCacheImplTest() {
-    logger_cache_ = std::make_unique<GrpcAccessLoggerCacheImpl>(async_client_manager_, scope_, tls_,
-                                                                local_info_);
-  }
+  GrpcAccessLoggerCacheImplTest()
+      : logger_cache_(async_client_manager_, scope_, tls_, local_info_) {}
 
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
@@ -372,7 +371,7 @@ public:
   Grpc::MockAsyncClientManager async_client_manager_;
   Grpc::MockAsyncClient* async_client_ = nullptr;
   Grpc::MockAsyncClientFactory* factory_ = nullptr;
-  GrpcAccessLoggerCacheImplPtr logger_cache_;
+  GrpcAccessLoggerCacheImpl logger_cache_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
@@ -386,25 +385,30 @@ TEST_F(GrpcAccessLoggerCacheImplTest, Deduplication) {
 
   expectClientCreation();
   GrpcAccessLoggerSharedPtr logger1 =
-      logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP, scope);
-  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP, scope));
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope);
+  EXPECT_EQ(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Do not deduplicate different types of logger
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::TCP, scope));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP, scope));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP, scope));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 
   config.set_log_name("log-1");
-  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP, scope));
+  EXPECT_EQ(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP, scope));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 }
 
 } // namespace

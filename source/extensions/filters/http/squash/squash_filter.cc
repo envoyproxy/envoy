@@ -41,7 +41,7 @@ SquashFilterConfig::SquashFilterConfig(
           PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_poll_period, 1000)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, request_timeout, 1000)) {
 
-  if (!cluster_manager.get(cluster_name_)) {
+  if (!cluster_manager.clusters().hasCluster(cluster_name_)) {
     throw EnvoyException(
         fmt::format("squash filter: unknown cluster '{}' in squash config", cluster_name_));
   }
@@ -152,10 +152,12 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
   request->body().add(config_->attachmentJson());
 
   is_squashing_ = true;
-  in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
-          .send(std::move(request), create_attachment_callback_,
-                Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(request), create_attachment_callback_,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  }
 
   if (in_flight_request_ == nullptr) {
     ENVOY_LOG(debug, "Squash: can't create request for squash server");
@@ -274,8 +276,12 @@ void SquashFilter::pollForAttachment() {
   request->headers().setReferencePath(debug_attachment_path_);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
 
+  // TODO(mattklein123): The following code should check to see if the cluster has been removed
+  // by CDS. This is a preexisting bug so was not fixed in my recent refactor because testing is
+  // non-trivial.
   in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
+      cm_.getThreadLocalCluster(config_->clusterName())
+          ->httpAsyncClient()
           .send(std::move(request), check_attachment_callback_,
                 Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
   // No need to check if in_flight_request_ is null as onFailure will take care of
