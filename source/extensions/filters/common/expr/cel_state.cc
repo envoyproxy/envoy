@@ -1,4 +1,4 @@
-#include "extensions/common/wasm/wasm_state.h"
+#include "extensions/filters/common/expr/cel_state.h"
 
 #include "eval/public/structs/cel_proto_wrapper.h"
 #include "flatbuffers/reflection.h"
@@ -6,19 +6,20 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace Filters {
 namespace Common {
-namespace Wasm {
+namespace Expr {
 
 using google::api::expr::runtime::CelValue;
 
-CelValue WasmState::exprValue(Protobuf::Arena* arena, bool last) const {
+CelValue CelState::exprValue(Protobuf::Arena* arena, bool last) const {
   if (initialized_) {
     switch (type_) {
-    case WasmType::String:
+    case CelStateType::String:
       return CelValue::CreateString(&value_);
-    case WasmType::Bytes:
+    case CelStateType::Bytes:
       return CelValue::CreateBytes(&value_);
-    case WasmType::Protobuf: {
+    case CelStateType::Protobuf: {
       if (last) {
         return CelValue::CreateBytes(&value_);
       }
@@ -26,7 +27,7 @@ CelValue WasmState::exprValue(Protobuf::Arena* arena, bool last) const {
       const auto any = serializeAsProto();
       return google::api::expr::runtime::CelProtoWrapper::CreateMessage(any.get(), arena);
     }
-    case WasmType::FlatBuffers:
+    case CelStateType::FlatBuffers:
       if (last) {
         return CelValue::CreateBytes(&value_);
       }
@@ -38,10 +39,10 @@ CelValue WasmState::exprValue(Protobuf::Arena* arena, bool last) const {
   return CelValue::CreateNull();
 }
 
-ProtobufTypes::MessagePtr WasmState::serializeAsProto() const {
+ProtobufTypes::MessagePtr CelState::serializeAsProto() const {
   auto any = std::make_unique<ProtobufWkt::Any>();
 
-  if (type_ != WasmType::Protobuf) {
+  if (type_ != CelStateType::Protobuf) {
     ProtobufWkt::BytesValue value;
     value.set_value(value_);
     any->PackFrom(value);
@@ -54,7 +55,8 @@ ProtobufTypes::MessagePtr WasmState::serializeAsProto() const {
   return any;
 }
 
-} // namespace Wasm
+} // namespace Expr
 } // namespace Common
+} // namespace Filters
 } // namespace Extensions
 } // namespace Envoy

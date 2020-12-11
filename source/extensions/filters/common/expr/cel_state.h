@@ -1,7 +1,3 @@
-/*
- * Wasm State Class available to Wasm/Non-Wasm modules.
- */
-
 #pragma once
 
 #include <string>
@@ -17,14 +13,12 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace Filters {
 namespace Common {
-namespace Wasm {
+namespace Expr {
 
-// FilterState prefix for WasmState values.
-const absl::string_view WasmStateKeyPrefix = "wasm.";
-
-// WasmState content declaration.
-enum class WasmType {
+// CelState content declaration.
+enum class CelStateType {
   Bytes,
   String,
   // Schema contains the reflection flatbuffer
@@ -33,26 +27,26 @@ enum class WasmType {
   Protobuf,
 };
 
-// WasmState type declaration.
-class WasmStatePrototype {
+// CelState type declaration.
+class CelStatePrototype {
 public:
-  WasmStatePrototype(bool readonly, WasmType type, absl::string_view schema,
+  CelStatePrototype(bool readonly, CelStateType type, absl::string_view schema,
                      StreamInfo::FilterState::LifeSpan life_span)
       : readonly_(readonly), type_(type), schema_(schema), life_span_(life_span) {}
-  WasmStatePrototype() = default;
+  CelStatePrototype() = default;
   const bool readonly_{false};
-  const WasmType type_{WasmType::Bytes};
+  const CelStateType type_{CelStateType::Bytes};
   const std::string schema_{""};
   const StreamInfo::FilterState::LifeSpan life_span_{
       StreamInfo::FilterState::LifeSpan::FilterChain};
 };
 
-using DefaultWasmStatePrototype = ConstSingleton<WasmStatePrototype>;
+using DefaultCelStatePrototype = ConstSingleton<CelStatePrototype>;
 
 // A simple wrapper around generic values
-class WasmState : public StreamInfo::FilterState::Object {
+class CelState : public StreamInfo::FilterState::Object {
 public:
-  explicit WasmState(const WasmStatePrototype& proto)
+  explicit CelState(const CelStatePrototype& proto)
       : readonly_(proto.readonly_), type_(proto.type_), schema_(proto.schema_) {}
 
   const std::string& value() const { return value_; }
@@ -75,13 +69,14 @@ public:
 
 private:
   const bool readonly_;
-  const WasmType type_;
+  const CelStateType type_;
   absl::string_view schema_;
   std::string value_{};
   bool initialized_{false};
 };
 
-} // namespace Wasm
+} // namespace Expr
 } // namespace Common
+} // namespace Filters
 } // namespace Extensions
 } // namespace Envoy

@@ -260,7 +260,7 @@ public:
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->declareProperty(
             args.name(),
-            std::make_unique<const WasmStatePrototype>(args.readonly(), type, args.schema(), span));
+            std::make_unique<const Filters::Common::Expr::WasmStatePrototype>(args.readonly(), type, args.schema(), span));
       }
       return WasmResult::BadArgument;
     };
