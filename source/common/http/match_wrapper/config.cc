@@ -1,11 +1,10 @@
-#include "extensions/filters/http/match_wrapper/config.h"
+#include "common/http/match_wrapper/config.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 
 #include "common/matcher/matcher.h"
-#include "include/envoy/matcher/_virtual_includes/matcher_interface/envoy/matcher/matcher.h"
-#include <stdexcept>
+#include "envoy/matcher/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,8 +56,12 @@ Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyped(
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             proto_config.extension_config());
 
+    auto message = factory.createEmptyConfigProto();
+    proto_config.extension_config().typed_config();
+    Config::Utility::translateOpaqueConfig(proto_config.extension_config().typed_config(), ProtobufWkt::Struct(),
+                                           context.messageValidationVisitor(), *message);
     auto filter_factory =
-        factory.createFilterFactoryFromProto(proto_config.extension_config().typed_config(), prefix, context);
+        factory.createFilterFactoryFromProto(*message, prefix, context);
 
     auto match_tree =
         Matcher::MatchTreeFactory<Http::HttpMatchingData>(context.messageValidationVisitor())

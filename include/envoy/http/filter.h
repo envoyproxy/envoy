@@ -867,6 +867,8 @@ using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
 class HttpMatchingData {
 public:
+  static absl::string_view name() { return "http"; }
+
   virtual ~HttpMatchingData() = default;
 
   virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;

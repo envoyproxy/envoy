@@ -1,4 +1,5 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/common/matching/v3/extension_matcher.pb.h"
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -16,6 +17,32 @@ std::string denyPrivateConfig() {
     prefix: "/private"
     code: 403
 )EOF";
+}
+
+std::string denyPrivateConfigWithMatcher() {
+  return R"EOF(
+    "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+    extension_config:
+      name: response-filter-config
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+        prefix: "/private"
+        code: 403
+    matcher:
+      matcher_tree:
+        input:
+          name: request-headers
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpRequestHeaderMatchInput
+            header_name: some-header
+        exact_match_map:
+          map:
+            match:
+              action:
+                name: skip
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.common.matching.v3.SkipFilterMatchAction
+  )EOF";
 }
 
 std::string allowAllConfig() { return "code: 200"; }
@@ -39,6 +66,8 @@ public:
           auto* discovery = filter->mutable_config_discovery();
           discovery->add_type_urls(
               "type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig");
+          discovery->add_type_urls(
+              "type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher");
           if (set_default_config) {
             const auto default_configuration =
                 TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
@@ -123,6 +152,19 @@ public:
     ecds_stream_->sendGrpcMessage(response);
   }
 
+  void sendXdsResponseWithFullYaml(const std::string& name, const std::string& version,
+                       const std::string& full_yaml) {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info(version);
+    response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+    const auto configuration = TestUtility::parseYaml<ProtobufWkt::Any>(full_yaml);
+    envoy::config::core::v3::TypedExtensionConfig typed_config;
+    typed_config.set_name(name);
+    typed_config.mutable_typed_config()->MergeFrom(configuration);
+    response.add_resources()->PackFrom(typed_config);
+    ecds_stream_->sendGrpcMessage(response);
+  }
+
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
 
   FakeHttpConnectionPtr ecds_connection_{nullptr};
@@ -167,6 +209,46 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
     sendXdsResponse("foo", "2", allowAllConfig());
     test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
                                    2);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+}
+
+TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithMatcher) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({"http"});
+  sendXdsResponseWithFullYaml("foo", "1", denyPrivateConfigWithMatcher());
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
+                                 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  Http::TestRequestHeaderMapImpl banned_request_headers{
+      {":method", "GET"}, {":path", "/private/key"}, {":scheme", "http"}, {":authority", "host"}};
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+  Http::TestRequestHeaderMapImpl banned_request_headers_skipped{
+      {":method", "GET"}, {":path", "/private/key"}, {"some-header", "match"}, {":scheme", "http"}, {":authority", "host"}};
+  {
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());

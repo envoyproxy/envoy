@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/matcher/matcher.h"
 #include "envoy/extensions/filters/common/matching/v3/skip_action.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -102,6 +104,23 @@ public:
   }
 };
 
+class HttpRequestHeadersDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  std::string name() const override { return "request-headers"; }
+  Matcher::DataInputPtr<HttpMatchingData>
+  createDataInput(const Protobuf::Message& config) override {
+    const auto& typed_config =
+        dynamic_cast<const envoy::extensions::filters::network::http_connection_manager::v3::
+                         HttpRequestHeaderMatchInput&>(config);
+
+    return std::make_unique<HttpRequestHeadersDataInput>(typed_config.header_name());
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpRequestHeaderMatchInput>();
+  }
+};
+
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
@@ -112,9 +131,37 @@ public:
   }
 };
 
+class HttpResponseHeadersDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  std::string name() const override { return "response-headers"; }
+  Matcher::DataInputPtr<HttpMatchingData>
+  createDataInput(const Protobuf::Message& config) override {
+    const auto& typed_config =
+        dynamic_cast<const envoy::extensions::filters::network::http_connection_manager::v3::
+                         HttpResponseHeaderMatchInput&>(config);
+
+    return std::make_unique<HttpResponseHeadersDataInput>(typed_config.header_name());
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::network::http_connection_manager::v3::
+                                HttpResponseHeaderMatchInput>();
+  }
+};
+
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matching::v3::SkipFilterMatchAction> {};
 
+class SkipActionFactory : public Matcher::ActionFactory {
+public:
+  std::string name() const override { return "skip"; }
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&) override {
+    return []() { return std::make_unique<SkipAction>(); };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::filters::common::matching::v3::SkipFilterMatchAction>();
+  }
+};
 /**
  * Base class wrapper for both stream encoder and decoder filters.
  */
@@ -431,20 +478,20 @@ public:
   virtual void setRequestTrailers(RequestTrailerMapPtr&& request_trailers) PURE;
 
   /**
-   * Passes ownership of received continue headers to the parent. This may be called multiple times
-   * in the case of multiple upstream calls.
+   * Passes ownership of received continue headers to the parent. This may be called multiple
+   * times in the case of multiple upstream calls.
    */
   virtual void setContinueHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
-   * Passes ownership of received response headers to the parent. This may be called multiple times
-   * in the case of multiple upstream calls.
+   * Passes ownership of received response headers to the parent. This may be called multiple
+   * times in the case of multiple upstream calls.
    */
   virtual void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
-   * Passes ownership of received response trailers to the parent. This may be called multiple times
-   * in the case of multiple upstream calls.
+   * Passes ownership of received response trailers to the parent. This may be called multiple
+   * times in the case of multiple upstream calls.
    */
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
@@ -474,15 +521,15 @@ public:
   /**
    * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.
    * Note that response headers might be set multiple times (e.g. if a local reply is issued after
-   * headers have been received but before headers have been encoded), so it is not safe in general
-   * to assume that any set of headers will be valid for the duration of a stream.
+   * headers have been received but before headers have been encoded), so it is not safe in
+   * general to assume that any set of headers will be valid for the duration of a stream.
    */
   virtual ResponseHeaderMapOptRef responseHeaders() PURE;
 
   /**
    * Retrieves a pointer to the last response trailers set via setResponseTrailers.
-   * Note that response trailers might be set multiple times, so it is not safe in general to assume
-   * that any set of trailers will be valid for the duration of the stream.
+   * Note that response trailers might be set multiple times, so it is not safe in general to
+   * assume that any set of trailers will be valid for the duration of the stream.
    */
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 
