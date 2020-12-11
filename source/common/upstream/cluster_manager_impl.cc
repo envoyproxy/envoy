@@ -914,8 +914,8 @@ void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
   });
 }
 
-void ClusterManagerImpl::postThreadLocalClusterUpdateNonVirtual(
-    ClusterManagerCluster& cm_cluster, ThreadLocalClusterUpdateParams&& params) {
+void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
+                                                      ThreadLocalClusterUpdateParams&& params) {
   bool add_or_update_cluster = false;
   if (!cm_cluster.addedOrUpdated()) {
     add_or_update_cluster = true;

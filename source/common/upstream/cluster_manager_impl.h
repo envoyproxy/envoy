@@ -327,9 +327,7 @@ protected:
   };
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
-                                            ThreadLocalClusterUpdateParams&& params) {
-    return postThreadLocalClusterUpdateNonVirtual(cm_cluster, std::move(params));
-  }
+                                            ThreadLocalClusterUpdateParams&& params);
 
 private:
   /**
@@ -562,8 +560,6 @@ private:
                              ClusterMap& cluster_map);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
-  void postThreadLocalClusterUpdateNonVirtual(ClusterManagerCluster& cm_cluster,
-                                              ThreadLocalClusterUpdateParams&& params);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
   static void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
