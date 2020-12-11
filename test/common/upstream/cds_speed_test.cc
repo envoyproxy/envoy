@@ -17,7 +17,6 @@
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
-#include "test/config/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -57,7 +56,7 @@ public:
 
   void resetCluster() {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
-    static_cluster_ = ConfigHelper::buildStaticCluster("staticcluster", 1024, "127.0.0.1");
+    static_cluster_ = buildStaticCluster("staticcluster", 1024, "127.0.0.1");
     Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", static_cluster_.alt_stat_name().empty() ? static_cluster_.name()
                                                                : static_cluster_.alt_stat_name()));
@@ -80,7 +79,7 @@ public:
 
     // make a pile of static clusters and add them to the response
     for (size_t i = 0; i < num_clusters; ++i) {
-      envoy::config::cluster::v3::Cluster cluster = ConfigHelper::buildStaticCluster(
+      envoy::config::cluster::v3::Cluster cluster = buildStaticCluster(
           "cluster_" + std::to_string(i), i % 60000, "10.0.1." + std::to_string(i / 60000));
 
       auto* resource = response->mutable_resources()->Add();
@@ -95,6 +94,24 @@ public:
     state_.ResumeTiming();
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     state_.PauseTiming();
+  }
+
+  // this is ConfigHelper::buildStaticCluster, but without YAML, in the interest of efficiency.
+  envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, const int port,
+                                                         const std::string& address) {
+    envoy::config::cluster::v3::Cluster cluster;
+    cluster.set_name(name);
+    cluster.mutable_connect_timeout()->set_seconds(5);
+    cluster.set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+    auto* load_assignment = cluster.mutable_load_assignment();
+    load_assignment->set_cluster_name(name);
+    auto* endpoint = load_assignment->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+    socket_address->set_address(address);
+    socket_address->set_port_value(port);
+
+    return cluster;
   }
 
   State& state_;
