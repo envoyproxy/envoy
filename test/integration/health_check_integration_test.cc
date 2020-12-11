@@ -319,6 +319,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.goaway_error", 1);
 
   // Advance time to cause another health check.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(500));

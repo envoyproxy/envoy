@@ -340,8 +340,7 @@ FakeHttpConnection::FakeHttpConnection(
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : FakeConnectionBase(shared_connection, time_system), type_(type),
-      expect_protocol_error_(false) {
+    : FakeConnectionBase(shared_connection, time_system), type_(type) {
   if (type == Type::HTTP1) {
     Http::Http1Settings http1_settings;
     // For the purpose of testing, we always have the upstream encode the trailers if any
@@ -427,7 +426,6 @@ void FakeHttpConnection::encodeProtocolError() {
       dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
   if (codec != nullptr) {
     shared_connection_.connection().dispatcher().post([this, codec]() {
-      expect_protocol_error_ = true;
       Http::Status status = codec->protocolErrorForTest();
       ASSERT(Http::getStatusCode(status) == Http::StatusCode::CodecProtocolError);
     });
@@ -439,10 +437,8 @@ void FakeHttpConnection::encodeProtocolError() {
         dynamic_cast<Http::Legacy::Http2::ServerConnectionImpl*>(codec_.get());
     ASSERT(legacy_codec != nullptr);
 
-    shared_connection_.connection().dispatcher().post([this, legacy_codec]() {
-      expect_protocol_error_ = true;
-      legacy_codec->protocolErrorForTest();
-    });
+    shared_connection_.connection().dispatcher().post(
+        [this, legacy_codec]() { legacy_codec->protocolErrorForTest(); });
   }
 }
 

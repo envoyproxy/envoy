@@ -443,17 +443,11 @@ private:
       Http::Status status = parent_.codec_->dispatch(data);
 
       if (Http::isCodecProtocolError(status)) {
-        if (!parent_.expect_protocol_error_) {
-          ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
-          // We don't do a full stream shutdown like HCM, but just shutdown the
-          // connection for now.
-          read_filter_callbacks_->connection().close(
-              Network::ConnectionCloseType::FlushWriteAndDelay);
-        } else {
-          // We only want to allow a single protocol error when this is set, so return it to the
-          // false state after seeing the error.
-          parent_.expect_protocol_error_ = false;
-        }
+        ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", status.message());
+        // We don't do a full stream shutdown like HCM, but just shutdown the
+        // connection for now.
+        read_filter_callbacks_->connection().close(
+            Network::ConnectionCloseType::FlushWriteAndDelay);
       }
       return Network::FilterStatus::StopIteration;
     }
@@ -469,7 +463,6 @@ private:
 
   const Type type_;
   Http::ServerConnectionPtr codec_;
-  bool expect_protocol_error_ : 1;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };
