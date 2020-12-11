@@ -77,6 +77,7 @@ Remote JWKS config example
         http_uri:
           uri: https://example.com/jwks.json
           cluster: example_jwks_cluster
+          timeout: 1s
         cache_duration:
           seconds: 300
 
@@ -97,7 +98,9 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
             address:
               socket_address:
                 address: example.com
-                port_value: 80
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
 
 
 Inline JWKS config example
