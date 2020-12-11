@@ -69,8 +69,16 @@ void FakeStream::postToConnectionThread(std::function<void()> cb) {
 void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
-  parent_.connection().dispatcher().post(
-      [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
+  parent_.connection().dispatcher().post([this, headers_copy]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
+    encoder_.encode100ContinueHeaders(*headers_copy);
+  });
 }
 
 void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
@@ -82,12 +90,26 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
   }
 
   parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
     encoder_.encodeHeaders(*headers_copy, end_stream);
   });
 }
 
 void FakeStream::encodeData(absl::string_view data, bool end_stream) {
   parent_.connection().dispatcher().post([this, data, end_stream]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
     Buffer::OwnedImpl fake_data(data.data(), data.size());
     encoder_.encodeData(fake_data, end_stream);
   });
@@ -95,6 +117,13 @@ void FakeStream::encodeData(absl::string_view data, bool end_stream) {
 
 void FakeStream::encodeData(uint64_t size, bool end_stream) {
   parent_.connection().dispatcher().post([this, size, end_stream]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
     Buffer::OwnedImpl data(std::string(size, 'a'));
     encoder_.encodeData(data, end_stream);
   });
@@ -102,30 +131,70 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
   std::shared_ptr<Buffer::Instance> data_copy = std::make_shared<Buffer::OwnedImpl>(data);
-  parent_.connection().dispatcher().post(
-      [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
+  parent_.connection().dispatcher().post([this, data_copy, end_stream]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
+    encoder_.encodeData(*data_copy, end_stream);
+  });
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
   std::shared_ptr<Http::ResponseTrailerMap> trailers_copy(
       Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers));
-  parent_.connection().dispatcher().post(
-      [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });
+  parent_.connection().dispatcher().post([this, trailers_copy]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
+    encoder_.encodeTrailers(*trailers_copy);
+  });
 }
 
 void FakeStream::encodeResetStream() {
-  parent_.connection().dispatcher().post(
-      [this]() -> void { encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset); });
+  parent_.connection().dispatcher().post([this]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
+    encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+  });
 }
 
 void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) {
-  parent_.connection().dispatcher().post(
-      [this, &metadata_map_vector]() -> void { encoder_.encodeMetadata(metadata_map_vector); });
+  parent_.connection().dispatcher().post([this, &metadata_map_vector]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
+    encoder_.encodeMetadata(metadata_map_vector);
+  });
 }
 
 void FakeStream::readDisable(bool disable) {
-  parent_.connection().dispatcher().post(
-      [this, disable]() -> void { encoder_.getStream().readDisable(disable); });
+  parent_.connection().dispatcher().post([this, disable]() -> void {
+    {
+      absl::MutexLock lock(&lock_);
+      if (saw_reset_) {
+        // Encoded already deleted.
+        return;
+      }
+    }
+    encoder_.getStream().readDisable(disable);
+  });
 }
 
 void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
@@ -430,11 +499,24 @@ FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           const FakeUpstreamConfig& config)
+    : FakeUpstream(std::move(transport_socket_factory),
+                   config.udp_fake_upstream_ ? makeUdpListenSocket(address)
+                                             : makeTcpListenSocket(address),
+                   config) {
+  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
+            address->ip()->addressAsString(), address->ip()->port(),
+            Network::Test::addressVersionAsString(address->ip()->version()),
+            config.udp_fake_upstream_);
+}
+
+FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version),
                    config) {
-  ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
+  ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 

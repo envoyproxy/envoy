@@ -904,7 +904,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
     return WasmResult::BadArgument;
   }
   auto cluster_string = std::string(cluster);
-  if (clusterManager().getThreadLocalCluster(cluster_string) == nullptr) {
+  const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_string);
+  if (thread_local_cluster == nullptr) {
     return WasmResult::BadArgument;
   }
 
@@ -940,9 +941,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
-  auto http_request = clusterManager()
-                          .httpAsyncClientForCluster(cluster_string)
-                          .send(std::move(message), handler, options);
+  auto http_request =
+      thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
     http_request_.erase(token);
     return WasmResult::InternalFailure;

@@ -29,7 +29,7 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrat
 public:
   TcpGrpcAccessLogIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   void createUpstreams() override {
