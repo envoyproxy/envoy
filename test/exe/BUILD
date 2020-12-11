@@ -100,7 +100,7 @@ envoy_cc_test(
     data = [
         "//source/exe:envoy-static",
         "//test/config/integration:google_com_proxy_port_0",
-    ],   
+    ],
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:main_common_lib",

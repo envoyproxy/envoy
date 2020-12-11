@@ -1,5 +1,4 @@
 #include "exe/main_common.h"
-
 #include "exe/service_base.h"
 
 // NOLINT(namespace-envoy)

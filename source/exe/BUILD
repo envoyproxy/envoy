@@ -182,7 +182,8 @@ envoy_cc_library(
     hdrs = select({
         "//bazel:windows_x86_64": [
             "win32/service_base.h",
-        ]}),
+        ],
+    }),
     strip_include_prefix = select({
         "//bazel:windows_x86_64": "win32",
     }),
