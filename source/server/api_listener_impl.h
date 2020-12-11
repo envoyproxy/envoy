@@ -99,6 +99,7 @@ protected:
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
       }
       void enableHalfClose(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      bool isHalfCloseEnabled() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void close(Network::ConnectionCloseType) override {}
       Event::Dispatcher& dispatcher() override {
         return parent_.parent_.factory_context_.dispatcher();

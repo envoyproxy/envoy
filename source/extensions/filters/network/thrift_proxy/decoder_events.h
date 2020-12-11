@@ -36,6 +36,14 @@ public:
   virtual FilterStatus transportEnd() PURE;
 
   /**
+   * Indicates raw bytes after metadata in a Thrift transport frame was detected.
+   * Filters should not modify data except for the router.
+   * @param data data to send as passthrough
+   * @return FilterStatus to indicate if filter chain iteration should continue
+   */
+  virtual FilterStatus passthroughData(Buffer::Instance& data) PURE;
+
+  /**
    * Indicates that the start of a Thrift protocol message was detected.
    * @param metadata MessageMetadataSharedPtr describing the message
    * @return FilterStatus to indicate if filter chain iteration should continue

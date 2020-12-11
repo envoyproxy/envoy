@@ -251,7 +251,7 @@ We can ``curl`` it to gain useful information:
 - :ref:`/server_info <operations_admin_interface_server_info>` provides information about the Envoy version you are running.
 - :ref:`/stats <operations_admin_interface_stats>` provides statistics about the  Envoy server.
 
-In the example we can we can enter the ``front-envoy`` container to query admin:
+In the example we can enter the ``front-envoy`` container to query admin:
 
 .. code-block:: console
 

@@ -15,6 +15,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
@@ -115,6 +116,11 @@ public:
    * @return the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
+
+  /**
+   * @return Router::Context& a reference to the router context.
+   */
+  virtual Router::Context& routerContext() PURE;
 
   /**
    * @return DrainManager& the server-wide drain manager.
@@ -223,6 +229,11 @@ public:
    * @return Grpc::Context& a reference to the grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
+
+  /**
+   * @return Router::Context& a reference to the router context.
+   */
+  virtual Router::Context& routerContext() PURE;
 
   /**
    * @return ProcessContextOptRef an optional reference to the

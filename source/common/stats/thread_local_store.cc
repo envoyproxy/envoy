@@ -349,9 +349,8 @@ public:
       : pool_(tls.symbolTable()), stat_name_tags_(stat_name_tags.value_or(StatNameTagVector())) {
     if (!stat_name_tags) {
       TagVector tags;
-      tls.symbolTable().callWithStringView(name, [&tags, &tls, this](absl::string_view name_str) {
-        tag_extracted_name_ = pool_.add(tls.tagProducer().produceTags(name_str, tags));
-      });
+      tag_extracted_name_ =
+          pool_.add(tls.tagProducer().produceTags(tls.symbolTable().toString(name), tags));
       StatName empty;
       for (const auto& tag : tags) {
         StatName tag_name = tls.wellKnownTags().getBuiltin(tag.name_, empty);
@@ -603,10 +602,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
     StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), stat_name_tags);
 
     ConstSupportedBuckets* buckets = nullptr;
-    symbolTable().callWithStringView(final_stat_name,
-                                     [&buckets, this](absl::string_view stat_name) {
-                                       buckets = &parent_.histogram_settings_->buckets(stat_name);
-                                     });
+    buckets = &parent_.histogram_settings_->buckets(symbolTable().toString(final_stat_name));
 
     RefcountPtr<ParentHistogramImpl> stat;
     {

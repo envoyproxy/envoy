@@ -45,7 +45,7 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               GrpcCommon::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
+               Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -59,9 +59,9 @@ public:
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   GrpcCommon::GrpcAccessLoggerType logger_type, Stats::Scope&) {
+                   Common::GrpcAccessLoggerType logger_type, Stats::Scope&) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
-              EXPECT_EQ(GrpcCommon::GrpcAccessLoggerType::HTTP, logger_type);
+              EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,

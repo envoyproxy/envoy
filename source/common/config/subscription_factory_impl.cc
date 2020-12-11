@@ -8,8 +8,8 @@
 #include "common/config/http_subscription_impl.h"
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/type_to_endpoint.h"
-#include "common/config/udpa_resource.h"
 #include "common/config/utility.h"
+#include "common/config/xds_resource.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -30,16 +30,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
-  auto& runtime_snapshot = runtime_.snapshot();
-
-  const auto transport_api_version = config.api_config_source().transport_api_version();
-  if (transport_api_version == envoy::config::core::v3::ApiVersion::V2 &&
-      runtime_snapshot.runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_deprecated_v2_api_warning")) {
-    runtime_.countDeprecatedFeatureUse();
-    ENVOY_LOG(warn,
-              "xDS of version v2 has been deprecated and will be removed in subsequent versions");
-  }
 
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
@@ -51,6 +41,23 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
+    const auto transport_api_version = api_config_source.transport_api_version();
+    if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
+        transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
+      runtime_.countDeprecatedFeatureUse();
+      const std::string& warning = fmt::format(
+          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
+          "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
+          "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
+          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
+          config.DebugString());
+      ENVOY_LOG(warn, warning);
+      auto& runtime_snapshot = runtime_.snapshot();
+      if (!runtime_snapshot.runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_deprecated_v2_api")) {
+        throw DeprecatedMajorVersionException(warning);
+      }
+    }
 
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:
@@ -109,7 +116,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 }
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
-    const udpa::core::v1::ResourceLocator& collection_locator,
+    const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& /*config*/, absl::string_view /*type_url*/,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
@@ -117,16 +124,15 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (collection_locator.scheme()) {
-  case udpa::core::v1::ResourceLocator::FILE: {
-    const std::string path =
-        Http::Utility::localPathFromFilePath(absl::StrJoin(collection_locator.id(), "/"));
+  case xds::core::v3::ResourceLocator::FILE: {
+    const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
   }
   default:
     throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",
-                                     UdpaResourceIdentifier::encodeUrl(collection_locator)));
+                                     XdsResourceIdentifier::encodeUrl(collection_locator)));
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

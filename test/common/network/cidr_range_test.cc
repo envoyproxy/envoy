@@ -68,7 +68,6 @@ TEST(TruncateIpAddressAndLength, Various) {
       {{"ffff::ffff", 128}, {"ffff::ffff", 128}},
       {{"ffff::ffff", 999}, {"ffff::ffff", 128}},
   };
-  test_cases.size();
   for (const auto& kv : test_cases) {
     InstanceConstSharedPtr inPtr = Utility::parseInternetAddress(kv.first.first);
     EXPECT_NE(inPtr, nullptr) << kv.first.first;

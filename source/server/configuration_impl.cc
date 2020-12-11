@@ -188,7 +188,9 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   actions_ = watchdog.actions();
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                         const Options& options)
+    : enable_deprecated_v2_api_(options.bootstrapVersion() == 2) {
   const auto& admin = bootstrap.admin();
   admin_.access_log_path_ = admin.access_log_path();
   admin_.profile_path_ =
@@ -214,6 +216,14 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     }
   } else {
     Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
+  }
+  if (enable_deprecated_v2_api_) {
+    auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();
+    enabled_deprecated_v2_api_layer->set_name("enabled_deprecated_v2_api (auto-injected)");
+    auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
+    ProtobufWkt::Value val;
+    val.set_bool_value(true);
+    (*static_layer->mutable_fields())["envoy.reloadable_features.enable_deprecated_v2_api"] = val;
   }
 }
 

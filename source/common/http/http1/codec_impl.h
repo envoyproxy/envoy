@@ -87,6 +87,7 @@ protected:
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
   bool chunk_encoding_ : 1;
+  bool connect_request_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
 
@@ -162,7 +163,6 @@ public:
 private:
   bool upgrade_request_{};
   bool head_request_{};
-  bool connect_request_{};
 };
 
 /**
@@ -197,7 +197,7 @@ public:
   void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
-  Buffer::WatermarkBuffer& buffer() { return output_buffer_; }
+  Buffer::Instance& buffer() { return *output_buffer_; }
   uint64_t bufferRemainingSize();
   void copyToBuffer(const char* data, uint64_t length);
   void reserveBuffer(uint64_t size);
@@ -209,7 +209,7 @@ public:
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supportsHttp10() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
-  virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
+  virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
 
@@ -275,6 +275,7 @@ protected:
   CodecStats& stats_;
   const Http1Settings codec_settings_;
   http_parser parser_;
+  Buffer::Instance* current_dispatching_buffer_{};
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
   HeaderString current_header_field_;
@@ -288,6 +289,7 @@ protected:
   bool deferred_end_stream_headers_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
+  bool dispatching_slice_already_drained_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -446,7 +448,9 @@ private:
   // is pushed through the filter pipeline either at the end of the current dispatch call, or when
   // the last byte of the body is processed (whichever happens first).
   Buffer::OwnedImpl buffered_body_;
-  Buffer::WatermarkBuffer output_buffer_;
+  // Buffer used to encode the HTTP message before moving it to the network connection's output
+  // buffer. This buffer is always allocated, never nullptr.
+  Buffer::InstancePtr output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
@@ -533,7 +537,7 @@ private:
   void sendProtocolErrorOld(absl::string_view details);
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
-  void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
+  void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
 

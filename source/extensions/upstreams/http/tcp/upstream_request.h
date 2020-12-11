@@ -24,8 +24,13 @@ public:
   TcpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
               absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx) {
     ASSERT(is_connect);
-    conn_pool_ = cm.tcpConnPoolForCluster(route_entry.clusterName(),
-                                          Upstream::ResourcePriority::Default, ctx);
+    // TODO(mattklein123): Pass thread local cluster into this function, removing an additional
+    // map lookup and moving the error handling closer to the source (where it is likely already
+    // done).
+    const auto thread_local_cluster = cm.getThreadLocalCluster(route_entry.clusterName());
+    if (thread_local_cluster != nullptr) {
+      conn_pool_ = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, ctx);
+    }
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
@@ -40,7 +45,6 @@ public:
     }
     return false;
   }
-  absl::optional<Envoy::Http::Protocol> protocol() const override { return absl::nullopt; }
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   bool valid() { return conn_pool_ != nullptr; }

@@ -34,7 +34,8 @@ public:
     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
 
     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
-    ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
+    cm_.initializeThreadLocalClusters({"test_cluster"});
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
@@ -76,8 +77,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   config.mutable_envoy_grpc()->set_authority("demo.com");
 
   grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("test_cluster"))
-      .WillRepeatedly(ReturnRef(http_client_));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
@@ -247,7 +247,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
 // status UNAVAILABLE and error message "Cluster not available"
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available"));
   auto grpc_stream =

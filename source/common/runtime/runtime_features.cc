@@ -65,7 +65,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disallow_unbounded_access_logs",
     "envoy.reloadable_features.early_errors_via_hcm",
-    "envoy.reloadable_features.enable_deprecated_v2_api_warning",
     "envoy.reloadable_features.enable_dns_cache_circuit_breakers",
     "envoy.reloadable_features.fix_upgrade_response",
     "envoy.reloadable_features.fix_wildcard_matching",
@@ -111,9 +110,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // gRPC Timeout header is missing (#13580)
-    "envoy.reloadable_features.ext_authz_measure_timeout_on_check_created",
-
 };
 
 RuntimeFeatures::RuntimeFeatures() {

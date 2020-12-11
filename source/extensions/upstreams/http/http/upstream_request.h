@@ -24,28 +24,33 @@ public:
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
     ASSERT(!is_connect);
-    conn_pool_ = cm.httpConnPoolForCluster(route_entry.clusterName(), route_entry.priority(),
-                                           downstream_protocol, ctx);
+    // TODO(mattklein123): Pass thread local cluster into this function, removing an additional
+    // map lookup and moving the error handling closer to the source (where it is likely already
+    // done).
+    const auto thread_local_cluster = cm.getThreadLocalCluster(route_entry.clusterName());
+    if (thread_local_cluster != nullptr) {
+      conn_pool_ =
+          thread_local_cluster->httpConnPool(route_entry.priority(), downstream_protocol, ctx);
+    }
   }
   ~HttpConnPool() override {
     ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;
-  absl::optional<Envoy::Http::Protocol> protocol() const override;
 
   // Http::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo& info) override;
+                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   absl::optional<Envoy::Http::Protocol> protocol) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   bool valid() { return conn_pool_ != nullptr; }
 
-private:
+protected:
   // Points to the actual connection pool to create streams from.
   Envoy::Http::ConnectionPool::Instance* conn_pool_{};
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};

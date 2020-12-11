@@ -150,9 +150,9 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
       cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
           Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
-  Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
-                                            local_info);
-  cluster_info_ = cluster_manager.get(cluster_name)->info();
+  const auto cluster = Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name,
+                                                                 cluster_manager, local_info);
+  cluster_info_ = cluster->get().info();
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });
@@ -283,8 +283,12 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   }
 
   if (!connection_) {
-    Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr);
+    const auto thread_local_cluster =
+        parent_.cluster_manager_.getThreadLocalCluster(parent_.cluster_info_->name());
+    Upstream::Host::CreateConnectionData info;
+    if (thread_local_cluster != nullptr) {
+      info = thread_local_cluster->tcpConn(nullptr);
+    }
     if (!info.connection_) {
       buffer.drain(buffer.length());
       return;

@@ -21,10 +21,7 @@ namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-
-  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(
-          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   const std::string yaml_string = R"EOF(
   http:
@@ -48,10 +45,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-
-  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(
-          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   const std::string yaml_string = R"EOF(
   http:

@@ -168,7 +168,7 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -191,6 +191,7 @@ private:
     Network::Socket::OptionsSharedPtr socket_options_;
   };
 
+  const bool enable_deprecated_v2_api_;
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
   envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;

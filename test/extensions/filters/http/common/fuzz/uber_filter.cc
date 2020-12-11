@@ -13,7 +13,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 
-UberFilterFuzzer::UberFilterFuzzer() : async_request_{&cluster_manager_.async_client_} {
+UberFilterFuzzer::UberFilterFuzzer()
+    : async_request_{&cluster_manager_.thread_local_cluster_.async_client_} {
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {

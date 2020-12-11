@@ -515,7 +515,7 @@ public:
 /**
  * All cluster stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                               \
+#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
   COUNTER(bind_errors)                                                                             \
@@ -606,7 +606,8 @@ public:
  * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
  * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
-#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER) COUNTER(upstream_rq_dropped)
+#define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
+  COUNTER(upstream_rq_dropped)
 
 /**
  * Cluster circuit breakers stats. Open circuit breaker stats and remaining resource stats
@@ -627,7 +628,7 @@ public:
 /**
  * All stats tracking request/response headers and body sizes. Not used by default.
  */
-#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(HISTOGRAM)                                         \
+#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
   HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
@@ -636,23 +637,28 @@ public:
 /**
  * All stats around timeout budgets. Not used by default.
  */
-#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(HISTOGRAM)                                                \
+#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)        \
   HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
   HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
 
 /**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
-struct ClusterStats {
-  ALL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(ClusterStatNames, ALL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(ClusterStats, ClusterStatNames, ALL_CLUSTER_STATS);
 
-/**
- * Struct definition for all cluster load report stats. @see stats_macros.h
- */
-struct ClusterLoadReportStats {
-  ALL_CLUSTER_LOAD_REPORT_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
+MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
+                  ALL_CLUSTER_LOAD_REPORT_STATS);
+
+MAKE_STAT_NAMES_STRUCT(ClusterRequestResponseSizeStatNames,
+                       ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS);
+MAKE_STATS_STRUCT(ClusterRequestResponseSizeStats, ClusterRequestResponseSizeStatNames,
+                  ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS);
+
+MAKE_STAT_NAMES_STRUCT(ClusterTimeoutBudgetStatNames, ALL_CLUSTER_TIMEOUT_BUDGET_STATS);
+MAKE_STATS_STRUCT(ClusterTimeoutBudgetStats, ClusterTimeoutBudgetStatNames,
+                  ALL_CLUSTER_TIMEOUT_BUDGET_STATS);
 
 /**
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
@@ -661,23 +667,9 @@ struct ClusterCircuitBreakersStats {
   ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-/**
- * Struct definition for cluster timeout budget stats. @see stats_macros.h
- */
-struct ClusterRequestResponseSizeStats {
-  ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(GENERATE_HISTOGRAM_STRUCT)
-};
-
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
 using ClusterRequestResponseSizeStatsOptRef =
     absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
-
-/**
- * Struct definition for cluster timeout budget stats. @see stats_macros.h
- */
-struct ClusterTimeoutBudgetStats {
-  ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
-};
 
 using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
 using ClusterTimeoutBudgetStatsOptRef =
@@ -778,8 +770,7 @@ public:
    *         and contains extension-specific protocol options for upstream connections.
    */
   template <class Derived>
-  const std::shared_ptr<const Derived>
-  extensionProtocolOptionsTyped(const std::string& name) const {
+  std::shared_ptr<const Derived> extensionProtocolOptionsTyped(const std::string& name) const {
     return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
   }
 
@@ -1055,6 +1046,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
+using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream
 } // namespace Envoy

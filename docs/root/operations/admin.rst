@@ -513,9 +513,6 @@ modify different aspects of the server:
   but in response to user requests on high core-count machines, this
   can cause performance issues due to mutex contention.
 
-  This admin endpoint requires Envoy to be started with option
-  `--use-fake-symbol-table 0`.
-
   See :repo:`source/docs/stats.md` for more details.
 
   Note also that actual mutex contention can be tracked via :http:get:`/contention`.

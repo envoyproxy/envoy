@@ -4,6 +4,7 @@
 
 #include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
+#include "common/router/context_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -76,6 +77,7 @@ public:
   MOCK_METHOD(Stats::Store&, stats, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Http::Context&, httpContext, ());
+  MOCK_METHOD(Router::Context&, routerContext, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
@@ -116,6 +118,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockStatsConfig>> stats_config_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
@@ -154,6 +157,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
+  Router::Context& routerContext() override { return router_context_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
@@ -173,6 +177,7 @@ public:
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Api::MockApi> api_;
   Grpc::ContextImpl grpc_context_;
+  Router::ContextImpl router_context_;
 };
 
 } // namespace Configuration

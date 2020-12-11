@@ -12,9 +12,11 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -229,11 +231,12 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
   if (!test_new_connection_pool_) {
     dynamic_cast<OriginalConnPoolImplForTest*>(conn_pool_.get())->expectEnableUpstreamReady(run);
   } else {
-    Event::PostCb& post_cb = dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->post_cb_;
     if (run) {
-      post_cb();
+      mock_upstream_ready_cb_->invokeCallback();
     } else {
-      EXPECT_CALL(mock_dispatcher_, post(_)).WillOnce(testing::SaveArg<0>(&post_cb));
+      EXPECT_CALL(*mock_upstream_ready_cb_, scheduleCallbackCurrentIteration())
+          .Times(1)
+          .RetiresOnSaturation();
     }
   }
 }
@@ -241,14 +244,13 @@ void ConnPoolBase::expectEnableUpstreamReady(bool run) {
 /**
  * Test fixture for connection pool tests.
  */
-class TcpConnPoolImplTest : public testing::TestWithParam<bool> {
+class TcpConnPoolImplTest : public Event::TestUsingSimulatedTime,
+                            public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_cb_(test_new_connection_pool_
-                               ? nullptr
-                               : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")),
+        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime())),
         conn_pool_(dispatcher_, host_, upstream_ready_cb_, test_new_connection_pool_) {}
 
   ~TcpConnPoolImplTest() override {
@@ -268,14 +270,13 @@ public:
 /**
  * Test fixture for connection pool destructor tests.
  */
-class TcpConnPoolImplDestructorTest : public testing::TestWithParam<bool> {
+class TcpConnPoolImplDestructorTest : public Event::TestUsingSimulatedTime,
+                                      public testing::TestWithParam<bool> {
 public:
   TcpConnPoolImplDestructorTest()
       : test_new_connection_pool_(GetParam()),
-        upstream_ready_cb_(test_new_connection_pool_
-                               ? nullptr
-                               : new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
-    host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
+        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
+    host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime());
     if (test_new_connection_pool_) {
       conn_pool_ = std::make_unique<ConnPoolImpl>(
           dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);
@@ -283,6 +284,7 @@ public:
       conn_pool_ = std::make_unique<OriginalConnPoolImpl>(
           dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr);
     }
+    ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
   ~TcpConnPoolImplDestructorTest() override = default;
 
@@ -298,13 +300,16 @@ public:
 
     EXPECT_CALL(*connect_timer_, disableTimer());
     EXPECT_CALL(callbacks_->pool_ready_, ready());
+    EXPECT_CALL(*connection_, ssl()).WillOnce(Return(ssl_));
     connection_->raiseEvent(Network::ConnectionEvent::Connected);
+    EXPECT_EQ(connection_->streamInfo().downstreamSslConnection(), ssl_);
   }
 
   bool test_new_connection_pool_;
   Upstream::ClusterConnectivityState state_;
   Upstream::HostConstSharedPtr host_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Event::MockTimer>* connect_timer_;

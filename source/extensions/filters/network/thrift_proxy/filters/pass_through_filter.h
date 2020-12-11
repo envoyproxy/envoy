@@ -30,6 +30,12 @@ public:
 
   ThriftProxy::FilterStatus transportEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
+  bool passthroughSupported() const override { return true; }
+
+  ThriftProxy::FilterStatus passthroughData(Buffer::Instance&) override {
+    return ThriftProxy::FilterStatus::Continue;
+  }
+
   ThriftProxy::FilterStatus messageBegin(ThriftProxy::MessageMetadataSharedPtr) override {
     return ThriftProxy::FilterStatus::Continue;
   }
