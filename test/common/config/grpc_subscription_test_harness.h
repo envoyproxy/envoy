@@ -47,7 +47,6 @@ public:
     node_.set_cluster("cluster_name");
     node_.mutable_locality()->set_zone("zone_name");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
-    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
 
@@ -104,6 +103,7 @@ public:
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "", true);
+    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     subscription_->start(cluster_names);
   }
 

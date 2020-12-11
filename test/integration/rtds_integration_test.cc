@@ -147,7 +147,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}));
+      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}, false));
   some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:

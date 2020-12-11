@@ -68,25 +68,33 @@ UpdateAck SotwSubscriptionState::handleResponse(const void* response_proto_ptr) 
 
 void SotwSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DiscoveryResponse& message) {
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> non_heartbeat_resources;
+  std::vector<envoy::service::discovery::v3::Resource> resources_with_ttl(message.resources().size());
 
-  for (const auto& resource : message.resources()) {
-    if (isHeartbeatResource(resource)) {
-      continue;
-    }
-    non_heartbeat_resources.Add()->CopyFrom(resource);
-    if (!resource.Is<envoy::service::discovery::v3::Resource>() && 
-		    resource.type_url() != message.type_url()) {
+  for (const auto& any : message.resources()) {
+    if (!any.Is<envoy::service::discovery::v3::Resource>() &&
+                    any.type_url() != message.type_url()) {
       throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
                                        "the message-wide type URL {} in DiscoveryResponse {}",
-                                       resource.type_url(), message.type_url(),
+                                       any.type_url(), message.type_url(),
                                        message.DebugString()));
     }
+
+    // ttl changes (including removing of the ttl timer) are only done when an Any is wrapped in a Resource (which contains ttl duration).
+    if (any.Is<envoy::service::discovery::v3::Resource>()) {
+      resources_with_ttl.emplace(resources_with_ttl.end());
+      MessageUtil::unpackTo(any, resources_with_ttl.back());
+    
+      if (isHeartbeatResource(resources_with_ttl.back(), message.version_info())) {
+        continue;
+      }
+    }
+    non_heartbeat_resources.Add()->CopyFrom(any);
   }
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
-    for (const auto& resource : message.resources()) {
+    for (auto& resource : resources_with_ttl) {
       setResourceTtl(resource);
     }
   }
@@ -162,9 +170,9 @@ void SotwSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& ex
   callbacks().onConfigUpdate({}, removed_resources, "");
 }
 
-bool SotwSubscriptionState::isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) {
-    return !resource.hasResource() && last_good_version_info_.has_value() &&
-           resource.version() == last_good_version_info_.value();
+bool SotwSubscriptionState::isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource, const std::string& version) {
+  return !resource.has_resource() && last_good_version_info_.has_value() &&
+           version == last_good_version_info_.value();
 }
 
 } // namespace Config

@@ -6,7 +6,6 @@
 #include "common/common/logger.h"
 #include "common/config/api_version.h"
 #include "common/config/subscription_state.h"
-#include "common/config/ttl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -44,7 +43,7 @@ public:
   // Returns a new'd pointer, meant to be owned by the caller.
   void* getNextRequestWithAck(const UpdateAck& ack);
 
-  void ttlExpiryCallback(const std::string& type_url) override;
+  void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 
   DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
   DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
@@ -78,8 +77,6 @@ private:
   private:
     absl::optional<std::string> version_;
   };
-
-  void addResourceState(const envoy::service::discovery::v3::Resource& resource);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have

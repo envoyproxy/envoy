@@ -21,6 +21,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
       .Times(0);
   EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer_, enableTimer(_, _));
+  ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   subscription_->start({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
   // Ensure this doesn't cause an issue by sending a request, since we don't
@@ -63,7 +64,6 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
 // Validate that when the management server gets multiple requests for the same version, it can
 // ignore later ones. This allows the nonce to be used.
 TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
-  InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
   // First with the initial, empty version update to "0".
@@ -83,7 +83,6 @@ TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
 }
 
 TEST_F(GrpcSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
-  InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
   deliverConfigUpdate({"cluster0", "cluster2"}, "0", false);
@@ -91,7 +90,6 @@ TEST_F(GrpcSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
 }
 
 TEST_F(GrpcSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
-  InSequence s;
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
   deliverConfigUpdate({"cluster0", "cluster2"}, "0", true);

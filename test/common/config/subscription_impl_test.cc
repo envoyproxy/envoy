@@ -157,6 +157,7 @@ TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
   if (GetParam() == SubscriptionType::Filesystem) {
     return; // initial_fetch_timeout not implemented for filesystem.
   }
+
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));

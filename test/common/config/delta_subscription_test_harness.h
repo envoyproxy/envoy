@@ -40,7 +40,7 @@ public:
         async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(1);
     grpc_mux_ = std::make_shared<GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
@@ -78,6 +78,7 @@ public:
     subscription_started_ = true;
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
+    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     subscription_->start(cluster_names);
   }
 
@@ -204,6 +205,7 @@ public:
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
+  Event::MockTimer* ttl_timer_;
   Event::MockTimer* init_timeout_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;

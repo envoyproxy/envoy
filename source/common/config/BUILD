@@ -94,7 +94,6 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//source/common/protobuf:utility_lib",
-        "@com_github_cncf_udpa//udpa/core/v1:pkg_cc_proto",
     ],
 )
 

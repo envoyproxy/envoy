@@ -6,7 +6,7 @@ namespace Config {
 TtlManager::TtlManager(std::function<void(const std::vector<std::string>&)> callback,
                        Event::Dispatcher& dispatcher, TimeSource& time_source)
     : callback_(callback), dispatcher_(dispatcher), time_source_(time_source) {
-  timer_ = dispatcher_.createTimer([this]() {
+    timer_ = dispatcher_.createTimer([this]() {
     ScopedTtlUpdate scoped_update(*this);
 
     std::vector<std::string> expired;

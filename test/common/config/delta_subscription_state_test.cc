@@ -30,16 +30,16 @@ class DeltaSubscriptionStateTestBase : public testing::Test {
 protected:
   DeltaSubscriptionStateTestBase(const std::string& type_url)
       : timer_(new Event::MockTimer(&dispatcher_)),
-        state_(TypeUrl, callbacks_, std::chrono::milliseconds(0U), dispatcher_) {
+        state_(type_url, callbacks_, std::chrono::milliseconds(0U), dispatcher_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDeltaDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre("name1", "name2", "name3"));
   }
 
-  std::unique_ptr<envoy::api::v2::DeltaDiscoveryRequest> getNextDeltaDiscoveryRequestAckless() {
-    auto* ptr = static_cast<envoy::api::v2::DeltaDiscoveryRequest*>(state_.getNextRequestAckless());
-    return std::unique_ptr<envoy::api::v2::DeltaDiscoveryRequest>(ptr);
+  std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest> getNextDeltaDiscoveryRequestAckless() {
+    auto* ptr = static_cast<envoy::service::discovery::v3::DeltaDiscoveryRequest*>(state_.getNextRequestAckless());
+    return std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>(ptr);
   }
 
   UpdateAck deliverDiscoveryResponse(
@@ -61,7 +61,7 @@ protected:
             EXPECT_EQ(added.size(), *updated_resources);
           }
         }));
-    return state_.handleResponse(message);
+    return state_.handleResponse(&message);
   }
 
   UpdateAck deliverBadDiscoveryResponse(

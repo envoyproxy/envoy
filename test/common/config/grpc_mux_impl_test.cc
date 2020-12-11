@@ -350,6 +350,13 @@ resourceWithTtl(std::chrono::milliseconds ttl,
 
   return resource;
 }
+envoy::service::discovery::v3::Resource
+resourceWithEmptyTtl(envoy::config::endpoint::v3::ClusterLoadAssignment& cla) {
+  envoy::service::discovery::v3::Resource resource;
+  resource.mutable_resource()->PackFrom(cla);
+  resource.set_name(cla.cluster_name());
+  return resource;
+}
 // Validates the behavior when the TTL timer expires.
 TEST_F(GrpcMuxImplTest, ResourceTTL) {
   setup();
@@ -361,7 +368,7 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto* ttl_timer = new Event::MockTimer(&dispatcher_);
-  makeWatch(type_url, {"x"}, callbacks_, resource_decoder);
+  FakeGrpcSubscription eds_sub = makeWatch(type_url, {"x"}, callbacks_, resource_decoder);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x"}, "", true);
@@ -377,12 +384,12 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(1000), load_assignment);
     response->add_resources()->PackFrom(wrapped_resource);
 
+    EXPECT_CALL(*ttl_timer, enabled());
+    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1000), _));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
-    EXPECT_CALL(*ttl_timer, enabled());
-    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1000), _));
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -397,12 +404,12 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(10000), load_assignment);
     response->add_resources()->PackFrom(wrapped_resource);
 
+    EXPECT_CALL(*ttl_timer, enabled());
+    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
-    EXPECT_CALL(*ttl_timer, enabled());
-    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
@@ -417,6 +424,10 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     response->add_resources()->PackFrom(wrapped_resource);
 
     EXPECT_CALL(*ttl_timer, enabled());
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+          EXPECT_TRUE(resources.empty());
+        }));
 
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
@@ -430,13 +441,13 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    response->add_resources()->PackFrom(resourceWithEmptyTtl(load_assignment));
 
+    EXPECT_CALL(*ttl_timer, disableTimer());
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
-    EXPECT_CALL(*ttl_timer, disableTimer());
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -451,12 +462,12 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
     auto wrapped_resource = resourceWithTtl(std::chrono::milliseconds(10000), load_assignment);
     response->add_resources()->PackFrom(wrapped_resource);
 
+    EXPECT_CALL(*ttl_timer, enabled());
+    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
         }));
-    EXPECT_CALL(*ttl_timer, enabled());
-    EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);

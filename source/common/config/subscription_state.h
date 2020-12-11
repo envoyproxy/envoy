@@ -10,6 +10,7 @@
 
 #include "common/config/update_ack.h"
 #include "common/protobuf/protobuf.h"
+#include "common/config/ttl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -55,7 +56,7 @@ public:
 
   void disableInitFetchTimeoutTimer();
 
-  virtual void ttlExpiryCallback(const std::string& type_url) PURE;
+  virtual void ttlExpiryCallback(const std::vector<std::string>& type_url) PURE;
 
 protected:
   std::string type_url() const { return type_url_; }

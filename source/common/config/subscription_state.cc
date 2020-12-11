@@ -16,7 +16,7 @@ SubscriptionState::SubscriptionState(std::string type_url, UntypedConfigUpdateCa
       // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
       // empty resources as updates.
       : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"), 
-	ttl_([this](const std::string& expired) {
+	ttl_([this](const std::vector<std::string>& expired) {
 	  ttlExpiryCallback(expired);
         }, dispatcher, dispatcher.timeSource()), 
 	type_url_(std::move(type_url)), callbacks_(callbacks), dispatcher_(dispatcher) {
