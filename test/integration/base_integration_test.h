@@ -80,7 +80,6 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
-  void setNewCodecs() { config_helper_.setNewCodecs(); }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 

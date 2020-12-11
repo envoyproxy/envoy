@@ -663,10 +663,6 @@ void ConfigHelper::enableDeprecatedV2Api() {
   addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
-void ConfigHelper::setNewCodecs() {
-  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "true");
-}
-
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                       HttpProtocolOptions& protocol_options) {
   if (cluster.typed_extension_protocol_options().contains(

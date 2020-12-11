@@ -27,7 +27,7 @@ class RequestFrameCommentTest : public ::testing::Test {};
 class ResponseFrameCommentTest : public ::testing::Test {};
 
 // Creates and sets up a stream to reply to.
-void setupStream(ClientCodecFrameInjector& codec, TestClientConnectionImplNew& connection) {
+void setupStream(ClientCodecFrameInjector& codec, TestClientConnectionImpl& connection) {
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
   codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
   // Setup a single stream to inject frames as a reply to.
@@ -57,7 +57,7 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
-  TestServerConnectionImplNew connection(
+  TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -90,7 +90,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
-  TestClientConnectionImplNew connection(
+  TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       ProdNghttp2SessionFactory::get());
@@ -135,7 +135,7 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
-  TestServerConnectionImplNew connection(
+  TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -170,7 +170,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ClientCodecFrameInjector codec;
-  TestClientConnectionImplNew connection(
+  TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       ProdNghttp2SessionFactory::get());
@@ -200,7 +200,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
-      TestServerConnectionImplNew connection(
+      TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
           envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -233,7 +233,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
-      TestClientConnectionImplNew connection(
+      TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
           ProdNghttp2SessionFactory::get());
@@ -268,7 +268,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
-      TestServerConnectionImplNew connection(
+      TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
           envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -306,7 +306,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ClientCodecFrameInjector codec;
-      TestClientConnectionImplNew connection(
+      TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
           ProdNghttp2SessionFactory::get());
