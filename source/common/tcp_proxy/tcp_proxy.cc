@@ -435,7 +435,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (!maybeTunnel(*thread_local_cluster, cluster_name)) {
-    // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
+    // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
@@ -632,8 +632,8 @@ void Filter::onUpstreamConnection() {
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
   getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
-  ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-            getStreamInfo().requestedServerName());
+  ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
+                 read_callbacks_->connection(), getStreamInfo().requestedServerName());
 
   if (config_->idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into

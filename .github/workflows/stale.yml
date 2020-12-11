@@ -1,7 +1,7 @@
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 */4 * * *'
 
 jobs:
   prune_stale:
@@ -38,3 +38,5 @@ jobs:
         exempt-issue-labels: 'no stalebot,help wanted'
         stale-pr-label: 'stale'
         exempt-pr-labels: 'no stalebot'
+        operations-per-run: 500
+        ascending: true
