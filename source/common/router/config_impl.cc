@@ -464,9 +464,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (route.redirect().has_regex_rewrite()) {
-    if (!prefix_rewrite_redirect_.empty()) {
-      throw EnvoyException("Cannot specify both prefix_rewrite and regex_rewrite for redirects");
-    }
+    ASSERT(prefix_rewrite_redirect_.empty());
     auto rewrite_spec = route.redirect().regex_rewrite();
     regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
     regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
@@ -615,22 +613,20 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
 const std::string&
 RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
                                    absl::optional<std::string>& container) const {
-  // Just use the prefix rewrite  if this isn't a redirect.
+  // Just use the prefix rewrite if this isn't a redirect.
   if (!isRedirect()) {
     return prefix_rewrite_;
   }
 
   // Return the regex rewrite substitution for redirects, if set.
   if (regex_rewrite_redirect_ != nullptr) {
-    std::string path(headers.getPathValue());
-
-    // Replace the entire path, but preserve the query parameters
-    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
-
+    // Copy just the path and rewrite it using the regex.
+    //
     // Store the result in the output container, and return a reference to the underlying string.
-    container = std::move(path.replace(
-        0, just_path.size(),
-        regex_rewrite_redirect_->replaceAll(just_path, regex_rewrite_redirect_substitution_)));
+    auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
+    container =
+        regex_rewrite_redirect_->replaceAll(just_path, regex_rewrite_redirect_substitution_);
+
     return container.value();
   }
 

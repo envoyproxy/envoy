@@ -1353,9 +1353,6 @@ message RedirectAction {
     // rewritten in a way that is aware of segments with variable content like
     // identifiers.
     //
-    // Only one of :ref:`prefix_rewrite <envoy_api_field_config.route.v4alpha.RedirectAction.prefix_rewrite>`
-    // or *regex_rewrite* may be specified.
-    //
     // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
     //
     // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution

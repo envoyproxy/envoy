@@ -564,9 +564,10 @@ protected:
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
   /**
-   * returns the correct path rewrite string for this route. the provided container may be used
-   * to store memory that backs the returned path, and so the lifetime of the container must
-   * outlive any use of the returned path.
+   * Returns the correct path rewrite string for this route.
+   *
+   * The provided container may be used to store memory backing the return value
+   * therefore it must outlive any use of the return value.
    */
   const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
                                     absl::optional<std::string>& container) const;
