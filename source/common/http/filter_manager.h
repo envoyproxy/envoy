@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/common/matching/v3/skip_action.pb.h"
+#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -114,7 +114,7 @@ public:
 };
 
 class SkipAction : public Matcher::ActionBase<
-                       envoy::extensions::filters::common::matching::v3::SkipFilterMatchAction> {};
+                       envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
