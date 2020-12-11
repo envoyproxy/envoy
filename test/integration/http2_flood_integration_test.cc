@@ -119,10 +119,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          TestUtility::ipTestParamsToString);
 
 bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-    // Upstream flood checks are not implemented in the old codec based on exceptions
-    return false;
-  }
   config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
                                     "true");
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
