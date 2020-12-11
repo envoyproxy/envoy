@@ -610,20 +610,28 @@ public:
   COUNTER(upstream_rq_dropped)
 
 /**
- * Cluster circuit breakers stats. Open circuit breaker stats and remaining resource stats
- * can be handled differently by passing in different macros.
+ * Cluster circuit breakers gauges. Note that we do not generate a stats
+ * structure from this macro. This is because depending on flags, we want to use
+ * null gauges for all the "remaining" ones. This is hard to automate with the
+ * 2-phase macros, so ClusterInfoImpl::generateCircuitBreakersStats is
+ * hand-coded and must be changed if we alter the set of gauges in this macro.
+ * We also include stat-names in this structure that are used when composing
+ * the circuit breaker names, depending on priority settings.
  */
-#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                            \
-  OPEN_GAUGE(cx_open, Accumulate)                                                                  \
-  OPEN_GAUGE(cx_pool_open, Accumulate)                                                             \
-  OPEN_GAUGE(rq_open, Accumulate)                                                                  \
-  OPEN_GAUGE(rq_pending_open, Accumulate)                                                          \
-  OPEN_GAUGE(rq_retry_open, Accumulate)                                                            \
-  REMAINING_GAUGE(remaining_cx, Accumulate)                                                        \
-  REMAINING_GAUGE(remaining_cx_pools, Accumulate)                                                  \
-  REMAINING_GAUGE(remaining_pending, Accumulate)                                                   \
-  REMAINING_GAUGE(remaining_retries, Accumulate)                                                   \
-  REMAINING_GAUGE(remaining_rq, Accumulate)
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)      \
+  GAUGE(cx_open, Accumulate)                                                                       \
+  GAUGE(cx_pool_open, Accumulate)                                                                  \
+  GAUGE(rq_open, Accumulate)                                                                       \
+  GAUGE(rq_pending_open, Accumulate)                                                               \
+  GAUGE(rq_retry_open, Accumulate)                                                                 \
+  GAUGE(remaining_cx, Accumulate)                                                                  \
+  GAUGE(remaining_cx_pools, Accumulate)                                                            \
+  GAUGE(remaining_pending, Accumulate)                                                             \
+  GAUGE(remaining_retries, Accumulate)                                                             \
+  GAUGE(remaining_rq, Accumulate)                                                                  \
+  STATNAME(circuit_breakers)                                                                       \
+  STATNAME(default)                                                                                \
+  STATNAME(high)
 
 /**
  * All stats tracking request/response headers and body sizes. Not used by default.
@@ -651,6 +659,11 @@ MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
                   ALL_CLUSTER_LOAD_REPORT_STATS);
 
+// We can't use macros to make the Stats class for circuit breakers due to
+// the conditional inclusion of 'remaining' gauges. But we do auto-generate
+// the StatNames struct.
+MAKE_STAT_NAMES_STRUCT(ClusterCircuitBreakersStatNames, ALL_CLUSTER_CIRCUIT_BREAKERS_STATS);
+
 MAKE_STAT_NAMES_STRUCT(ClusterRequestResponseSizeStatNames,
                        ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS);
 MAKE_STATS_STRUCT(ClusterRequestResponseSizeStats, ClusterRequestResponseSizeStatNames,
@@ -664,7 +677,7 @@ MAKE_STATS_STRUCT(ClusterTimeoutBudgetStats, ClusterTimeoutBudgetStatNames,
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
  */
 struct ClusterCircuitBreakersStats {
-  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(c, GENERATE_GAUGE_STRUCT, h, tr, GENERATE_STATNAME_STRUCT)
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
