@@ -141,7 +141,7 @@ private:
 
   // Hold PrimaryHostInfo by shared_ptr to avoid having to hold the map mutex while updating
   // individual entries.
-  using PrimaryHostInfoPtr = std::shared_ptr<PrimaryHostInfo>;
+  using PrimaryHostInfoPtr = std::unique_ptr<PrimaryHostInfo>;
 
   struct AddUpdateCallbacksHandleImpl : public AddUpdateCallbacksHandle,
                                         RaiiListElement<AddUpdateCallbacksHandleImpl*> {

@@ -30,6 +30,8 @@ public:
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
 
+    EXPECT_CALL(dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
+
     EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
     dns_cache_ =
         std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, loader_, store_, config_);

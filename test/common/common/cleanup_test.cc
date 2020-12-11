@@ -91,18 +91,6 @@ TEST(RaiiMapOfListElementTest, CancelDelete) {
   EXPECT_EQ(it->second.size(), 1);
 }
 
-TEST(RaiiMapOfListElementTest, DeleteOnErase) {
-  absl::flat_hash_map<int, std::list<int>> map;
-
-  {
-    EXPECT_EQ(map.size(), 0);
-    RaiiMapOfListElement<int, int> element(map, 1, 1);
-    element.erase();
-    EXPECT_EQ(map.size(), 0);
-  }
-  EXPECT_EQ(map.size(), 0);
-}
-
 TEST(RaiiMapOfListElement, MultipleEntriesSameKey) {
   absl::flat_hash_map<int, std::list<int>> map;
   {

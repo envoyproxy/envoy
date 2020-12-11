@@ -129,14 +129,18 @@ DnsCacheImpl::addUpdateCallbacks(UpdateCallbacks& callbacks) {
 }
 
 void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port) {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+
   // It's possible for multiple requests to race trying to start a resolution. If a host is
   // already in the map it's either in the process of being resolved or the resolution is already
   // heading out to the worker threads. Either way the pending resolution will be completed.
 
-  auto primary_host = [&]() {
+  // Functions like this one that modify primary_hosts_ are only called in the main thread so we
+  // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
+  auto* primary_host = [&]() {
     absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
     auto host_it = primary_hosts_.find(host);
-    return host_it != primary_hosts_.end() ? host_it->second : nullptr;
+    return host_it != primary_hosts_.end() ? host_it->second.get() : nullptr;
   }();
 
   if (primary_host) {
@@ -153,23 +157,27 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     absl::WriterMutexLock writer_lock{&primary_hosts_lock_};
     primary_host = primary_hosts_
                        // try_emplace() is used here for direct argument forwarding.
-                       .try_emplace(host, std::make_shared<PrimaryHostInfo>(
+                       .try_emplace(host, std::make_unique<PrimaryHostInfo>(
                                               *this, std::string(host_attributes.host_),
                                               host_attributes.port_.value_or(default_port),
                                               host_attributes.is_ip_address_,
                                               [this, host]() { onReResolve(host); }))
-                       .first->second;
+                       .first->second.get();
   }
 
   startResolve(host, *primary_host);
 }
 
 void DnsCacheImpl::onReResolve(const std::string& host) {
-  auto primary_host = [&]() {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+
+  // Functions like this one that modify primary_hosts_ are only called in the main thread so we
+  // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
+  auto* primary_host = [&]() {
     absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
     const auto primary_host_it = primary_hosts_.find(host);
     ASSERT(primary_host_it != primary_hosts_.end());
-    return primary_host_it->second;
+    return primary_host_it->second.get();
   }();
 
   const std::chrono::steady_clock::duration now_duration =
@@ -213,12 +221,16 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
 void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
                                  std::list<Network::DnsResponse>&& response) {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
   ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
-  auto primary_host_info = [&]() {
+
+  // Functions like this one that modify primary_hosts_ are only called in the main thread so we
+  // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
+  auto* primary_host_info = [&]() {
     absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
     const auto primary_host_it = primary_hosts_.find(host);
     ASSERT(primary_host_it != primary_hosts_.end());
-    return primary_host_it->second;
+    return primary_host_it->second.get();
   }();
 
   const bool first_resolve = !primary_host_info->host_info_->firstResolveComplete();

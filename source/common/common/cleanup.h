@@ -76,6 +76,7 @@ public:
 
   void cancel() { cancelled_ = true; }
 
+private:
   void erase() {
     ASSERT(!cancelled_);
     list_.erase(it_);
@@ -85,7 +86,6 @@ public:
     cancelled_ = true;
   }
 
-private:
   MapOfList& map_;
   std::list<Value>& list_;
   // Because of absl::flat_hash_map iterator instability we have to keep a copy of the key
