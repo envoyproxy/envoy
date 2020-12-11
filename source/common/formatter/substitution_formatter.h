@@ -136,10 +136,11 @@ private:
     StructFormatMapPtr value_;
   };
 
-  bool omit_empty_values_;
-  bool preserve_types_;
-  const StructFormatMapWrapper struct_output_format_;
   StructFormatMapWrapper toFormatMap(const ProtobufWkt::Struct& struct_format) const;
+
+  const bool omit_empty_values_;
+  const bool preserve_types_;
+  const StructFormatMapWrapper struct_output_format_;
 };
 
 class JsonFormatterImpl : public Formatter {
@@ -156,7 +157,7 @@ public:
                      absl::string_view local_reply_body) const override;
 
 private:
-  StructFormatter struct_formatter_;
+  const StructFormatter struct_formatter_;
 };
 
 /**
