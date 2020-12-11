@@ -106,7 +106,7 @@ void GrpcClientImpl::onSuccess(
   DescriptorStatusListPtr descriptor_statuses = std::make_unique<DescriptorStatusList>(
       response->statuses().begin(), response->statuses().end());
   callbacks_->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
-                       std::move(request_headers_to_add), response->body());
+                       std::move(request_headers_to_add), response->body_bytes());
   callbacks_ = nullptr;
 }
 
