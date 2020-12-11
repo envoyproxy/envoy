@@ -33,11 +33,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "xDS API Working Group (xDS-WG)",
         project_url = "https://github.com/cncf/udpa",
         # During the UDPA -> xDS migration, we aren't working with releases.
-        version = "5459f2c994033b0afed7e4a70ac7e90c90c1ffee",
-        sha256 = "c1f5c2438cf725b5f66aa4210dbc4bb691020c5ed4f64d2bc6638b06a11482f1",
+        version = "cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f",
+        sha256 = "822a007cf155855d0c08a2e753a39e222e5816b904436196244066a818a8a230",
         strip_prefix = "udpa-{version}",
         urls = ["https://github.com/cncf/udpa/archive/{version}.tar.gz"],
-        release_date = "2020-11-20",
+        release_date = "2020-12-11",
         use_category = ["api"],
     ),
     com_github_openzipkin_zipkinapi = dict(
