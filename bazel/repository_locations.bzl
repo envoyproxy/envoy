@@ -938,4 +938,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2018-12-18",
         cpe = "N/A",
     ),
+    org_unicode_icuuc = dict(
+        project_name = "Shimmed ICU",
+        project_desc = "Shimed ICU (International Components for Unicode)",
+        project_url = "https://github.com/dio/envoy-icu-shim",
+        version = "e3d0a11c31495c4eb1a8291a3b0549bbac135ace",
+        sha256 = "e0e26fbfba161d1b10b6117fed40c6e143dfc25337009c172d5d2f3cb3ca90af",
+        strip_prefix = "envoy-icu-shim-{version}",
+        urls = ["https://github.com/dio/envoy-icu-shim/archive/{version}.tar.gz"],
+        use_category = ["test_only"],
+        release_date = "2020-12-11",
+        cpe = "N/A",
+    ),
 )
