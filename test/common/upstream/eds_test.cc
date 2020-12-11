@@ -1791,7 +1791,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
       Protobuf::util::TimeUtil::SecondsToDuration(1));
 
   EXPECT_CALL(*interval_timer_, enableTimer(_, _)).Times(2); // Timer enabled twice.
-  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1);    // Timer disabled once.
+  EXPECT_CALL(*interval_timer_, disableTimer());             // Timer disabled once.
   EXPECT_CALL(*interval_timer_, enabled()).Times(6);         // Includes calls by test.
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_lease);
   // Check that the timer is enabled.

@@ -23,6 +23,7 @@ namespace {
 
 void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   std::string yaml = R"EOF(
+  transport_api_version: V3
   grpc_service:
     google_grpc:
       target_uri: ext_authz_server
@@ -41,11 +42,11 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   EXPECT_CALL(context, getServerFactoryContext())
       .Times(1)
       .WillOnce(testing::ReturnRef(server_context));
-  EXPECT_CALL(server_context, singletonManager()).Times(1);
-  EXPECT_CALL(context, threadLocal()).Times(1);
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, clusterManager()).Times(1);
-  EXPECT_CALL(context, runtime()).Times(1);
+  EXPECT_CALL(server_context, singletonManager());
+  EXPECT_CALL(context, threadLocal());
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, runtime());
   EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
@@ -60,14 +61,17 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
 } // namespace
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO);
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V2);
+#endif
   expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3);
 }
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   std::string yaml = R"EOF(
   stat_prefix: "wall"
+  transport_api_version: V3
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -111,10 +115,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
-  EXPECT_CALL(context, clusterManager()).Times(1);
-  EXPECT_CALL(context, runtime()).Times(1);
-  EXPECT_CALL(context, scope()).Times(1);
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, runtime());
+  EXPECT_CALL(context, scope());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -150,6 +154,7 @@ TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupp
     auto google_grpc = new envoy::config::core::v3::GrpcService_GoogleGrpc();
     google_grpc->set_stat_prefix("grpc");
     google_grpc->set_target_uri("http://example.com");
+    proto_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     proto_config.mutable_grpc_service()->set_allocated_google_grpc(google_grpc);
 
     testing::StrictMock<Server::Configuration::MockFactoryContext> context;

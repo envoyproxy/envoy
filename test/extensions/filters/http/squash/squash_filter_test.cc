@@ -51,7 +51,7 @@ void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
 
 } // namespace
 
-TEST(SoloFilterConfigTest, V2ApiConversion) {
+TEST(SquashFilterConfigTest, V2ApiConversion) {
   const std::string yaml = R"EOF(
   cluster: fake_cluster
   attachment_template:
@@ -62,7 +62,7 @@ TEST(SoloFilterConfigTest, V2ApiConversion) {
   )EOF";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).Times(1);
+  factory_context.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_EQ("fake_cluster", config.clusterName());
@@ -72,22 +72,19 @@ TEST(SoloFilterConfigTest, V2ApiConversion) {
   EXPECT_EQ(std::chrono::milliseconds(3003), config.attachmentTimeout());
 }
 
-TEST(SoloFilterConfigTest, NoCluster) {
+TEST(SquashFilterConfigTest, NoCluster) {
   const std::string yaml = R"EOF(
   cluster: fake_cluster
   attachment_template: {}
   )EOF";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-
-  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
-
   EXPECT_THROW_WITH_MESSAGE(constructSquashFilterConfigFromYaml(yaml, factory_context),
                             Envoy::EnvoyException,
                             "squash filter: unknown cluster 'fake_cluster' in squash config");
 }
 
-TEST(SoloFilterConfigTest, ParsesEnvironment) {
+TEST(SquashFilterConfigTest, ParsesEnvironment) {
   const std::string yaml = R"EOF(
   cluster: squash
   attachment_template:
@@ -97,13 +94,13 @@ TEST(SoloFilterConfigTest, ParsesEnvironment) {
   const std::string expected_json = "{\"a\":\"\"}";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
+  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
 
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
+TEST(SquashFilterConfigTest, ParsesAndEscapesEnvironment) {
   TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
   const std::string yaml = R"EOF(
@@ -115,11 +112,12 @@ TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   const std::string expected_json = "{\"a\":\"\\\"\"}";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
+  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
-TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
+
+TEST(SquashFilterConfigTest, TwoEnvironmentVariables) {
   TestEnvironment::setEnvVar("ENV1", "1", 1);
   TestEnvironment::setEnvVar("ENV2", "2", 1);
 
@@ -132,11 +130,12 @@ TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
   const std::string expected_json = "{\"a\":\"1-2\"}";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
   auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
-TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
+TEST(SquashFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
   const std::string yaml = R"EOF(
@@ -150,14 +149,15 @@ TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   const std::string expected_json = R"EOF({"a":[{"e": "some-config-value"},{"c":"d"}]})EOF";
 
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
+  factory_context.cluster_manager_.initializeClusters({"squash"}, {});
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 class SquashFilterTest : public testing::Test {
 public:
-  SquashFilterTest() : request_(&cm_.async_client_) {}
+  SquashFilterTest()
+      : request_(&factory_context_.cluster_manager_.thread_local_cluster_.async_client_) {}
 
 protected:
   void SetUp() override {}
@@ -165,9 +165,11 @@ protected:
   void initFilter() {
     envoy::extensions::filters::http::squash::v3::Squash p;
     p.set_cluster("squash");
+    factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"squash"});
     config_ = std::make_shared<SquashFilterConfig>(p, factory_context_.cluster_manager_);
 
-    filter_ = std::make_shared<SquashFilter>(config_, cm_);
+    filter_ = std::make_shared<SquashFilter>(config_, factory_context_.cluster_manager_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
@@ -181,8 +183,9 @@ protected:
     attachmentTimeout_timer_ =
         new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("squash"))
-        .WillRepeatedly(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
+        .WillRepeatedly(
+            ReturnRef(factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
 
     expectAsyncClientSend();
 
@@ -210,7 +213,8 @@ protected:
   }
 
   void expectAsyncClientSend() {
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+                send_(_, _, _))
         .WillOnce(Invoke(
             [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
                 const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
@@ -249,7 +253,6 @@ protected:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Envoy::Event::MockTimer>* attachmentTimeout_timer_{};
-  NiceMock<Envoy::Upstream::MockClusterManager> cm_;
   Envoy::Http::MockAsyncClientRequest request_;
   SquashFilterConfigSharedPtr config_;
   std::shared_ptr<SquashFilter> filter_;
@@ -259,9 +262,10 @@ protected:
 TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
   initFilter();
 
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("squash")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
           [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
@@ -298,7 +302,7 @@ TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
 
 TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
   initFilter();
-  EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
@@ -447,7 +451,7 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
         attachmentTimeout_timer_->invokeCallback();
       }));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
                            const Http::AsyncClient::RequestOptions&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));

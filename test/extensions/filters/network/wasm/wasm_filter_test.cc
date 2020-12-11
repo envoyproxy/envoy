@@ -39,7 +39,7 @@ public:
   MOCK_CONTEXT_LOG_;
 };
 
-class WasmNetworkFilterTest : public Common::Wasm::WasmNetworkFilterTestBase<
+class WasmNetworkFilterTest : public Extensions::Common::Wasm::WasmNetworkFilterTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmNetworkFilterTest() = default;
