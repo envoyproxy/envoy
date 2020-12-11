@@ -980,7 +980,7 @@ message RouteAction {
   //
   // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
   // is configured, this timeout is scaled according to the value for
-  // :ref:`HTTP_DOWNSTREAM_CONNECTION_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE>`.
+  // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
   google.protobuf.Duration idle_timeout = 24;
 
   // Indicates that the route has a retry policy. Note that if this is set,
