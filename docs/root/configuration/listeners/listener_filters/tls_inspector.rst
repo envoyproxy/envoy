@@ -1,27 +1,18 @@
 .. _config_listener_filters_tls_inspector:
 
-TLS Inspector
+TLS 检查器
 =============
 
-TLS Inspector listener filter allows detecting whether the transport appears to be
-TLS or plaintext, and if it is TLS, it detects the
-`Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_
-and/or `Application-Layer Protocol Negotiation
-<https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_
-from the client. This can be used to select a
-:ref:`FilterChain <envoy_v3_api_msg_config.listener.v3.FilterChain>` via the
-:ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` and/or
-:ref:`application_protocols <envoy_v3_api_field_config.listener.v3.FilterChainMatch.application_protocols>`
-of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`.
+TLS 检查器监听器过滤器（TLS Inspector listener filter）可以检测传输是 TLS 还是纯文本，如果是 TLS，它检查来自客户端的 `服务器名称指示 <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ 和/或者 `应用层协议谈判 <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_。它可以用来通过 :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` 的 :ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` 和/或者 :ref:`application_protocols <envoy_v3_api_field_config.listener.v3.FilterChainMatch.application_protocols>` 来选择一个 :ref:`FilterChain <envoy_v3_api_msg_config.listener.v3.FilterChain>` 。
 
 * :ref:`SNI <faq_how_to_setup_sni>`
-* :ref:`v2 API reference <envoy_v3_api_field_config.listener.v3.ListenerFilter.name>`
-* This filter should be configured with the name *envoy.filters.listener.tls_inspector*.
+* :ref:`v2 API 参考 <envoy_v3_api_field_config.listener.v3.ListenerFilter.name>`
+* 这个过滤器应该使用名字 *envoy.filters.listener.tls_inspector* 来配置。
 
-Example
+示例
 -------
 
-A sample filter configuration could be:
+过滤器示例配置可以是：
 
 .. code-block:: yaml
 
@@ -29,22 +20,20 @@ A sample filter configuration could be:
   - name: "envoy.filters.listener.tls_inspector"
     typed_config: {}
 
-Statistics
+统计
 ----------
 
-This filter has a statistics tree rooted at *tls_inspector* with the following statistics: 
+该过滤器有一个统计树，其根为 *tls_inspector* 并具有如下统计信息：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  connection_closed, Counter, Total connections closed
-  client_hello_too_large, Counter, Total unreasonably large Client Hello received
-  read_error, Counter, Total read errors
-  tls_found, Counter, Total number of times TLS was found
-  tls_not_found, Counter, Total number of times TLS was not found
-  alpn_found, Counter, Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ was successful
-  alpn_not_found, Counter, Total number of times `Application-Layer Protocol Negotiation <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ has failed
-  sni_found, Counter, Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was found
-  sni_not_found, Counter, Total number of times `Server Name Indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ was not found
-
+  connection_closed, 计数器, 关闭的连接总数
+  client_hello_too_large, 计数器, 收到的不合理的大 Client Hello 总数
+  read_error, 计数器, 读错误的总数
+  tls_found, 计数器, 发现 TLS 的总次数
+  tls_not_found, 计数器, 未发现 TLS 的总次数
+  alpn_found, 计数器, `应用层协议谈判 <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ 成功的总次数
+  sni_found, 计数器, `应用层协议谈判 <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ 失败的总次数
+  sni_not_found, 计数器, 未发现 `服务器名称指示 <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ 的总次数
