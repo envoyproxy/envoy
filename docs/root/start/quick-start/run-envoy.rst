@@ -104,6 +104,45 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
                    -c /envoy-custom.yaml
          ...
 
+   .. tab:: Win32: Windows Service
+
+      You can start Envoy as Windows Service that is managed under `Windows Service Control Manager <https://docs.microsoft.com/en-us/windows/win32/services/using-services/>`. 
+
+      First, you need to create the service. Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``. After you create the service you
+      can start it.
+      
+      From an **administrator** prompt run the following commands:
+
+      .. substitution-code-block:: console
+         > sc create EnvoyProxy binpath="envoy-static.exe --config-path envoy-demo.yaml"
+            [SC] CreateService SUCCESS
+         > sc start EnvoyProxy
+            SERVICE_NAME: envoyproxy
+               TYPE               : 10  WIN32_OWN_PROCESS
+               STATE              : 2  START_PENDING
+                                       (NOT_STOPPABLE, NOT_PAUSABLE, IGNORES_SHUTDOWN)
+               WIN32_EXIT_CODE    : 0  (0x0)
+               SERVICE_EXIT_CODE  : 0  (0x0)
+               CHECKPOINT         : 0x0
+               WAIT_HINT          : 0x7d0
+               PID                : 3924
+               FLAGS              :
+         > sc query EnvoyProxy
+            SERVICE_NAME: envoyproxy
+               TYPE               : 10  WIN32_OWN_PROCESS
+               STATE              : 4  RUNNING
+                                       (STOPPABLE, PAUSABLE, ACCEPTS_SHUTDOWN)
+               WIN32_EXIT_CODE    : 0  (0x0)
+               SERVICE_EXIT_CODE  : 0  (0x0)
+               CHECKPOINT         : 0x0
+               WAIT_HINT          : 0x0
+      ...
+
+      Use `sc.exe <https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/sc-create/>` to configure the service startup and error handling.
+      
+      .. tip::
+         The output of``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``.
+
 Check Envoy is proxying on http://localhost:10000.
 
 .. code-block:: console
