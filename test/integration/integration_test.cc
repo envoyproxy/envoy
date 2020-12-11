@@ -1550,7 +1550,9 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   EXPECT_EQ("Hello World", response->body());
 }
 
-TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailer) {
+// Expect that if an upgrade was not expected, the HCM correctly removes upgrade headers from the
+// response and the response encoder does not drop trailers.
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   initialize();
