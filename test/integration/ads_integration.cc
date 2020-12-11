@@ -224,8 +224,8 @@ void AdsIntegrationTest::testBasicFlow() {
                                       {"route_config_2", "route_config_1"}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}, {}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2",
-                                      {"route_config_2", "route_config_1"}, {},
-                                      {"route_config_0"}, false));
+                                      {"route_config_2", "route_config_1"}, {}, {"route_config_0"},
+                                      false));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_1", "cluster_1"),

@@ -550,7 +550,8 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}, false));
+                                      {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"},
+                                      false));
 
   // Send the second warming cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
@@ -631,7 +632,8 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}, false));
+                                      {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"},
+                                      false));
 
   // Send the second warming cluster and remove the first cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
@@ -660,11 +662,11 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
   // CDS is resumed and EDS response was acknowledged.
   // TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
   //  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
-    // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
-    // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
-    // ACK goes out, they're both acknowledging version 3.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
-//  }
+  // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
+  // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
+  // ACK goes out, they're both acknowledging version 3.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
+  //  }
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"warming_cluster_2"}, {}, {}, false));
@@ -775,7 +777,8 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}, false));
+                                      {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"},
+                                      false));
 
   // Send the second warming cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
@@ -923,8 +926,8 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
-                                      {"route_config_1", "route_config_0"}, {"route_config_1"},
-                                      {}, false));
+                                      {"route_config_1", "route_config_0"}, {"route_config_1"}, {},
+                                      false));
 
   // STEP 3: "New listener, who dis?"
   // --------------------------------

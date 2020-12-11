@@ -37,8 +37,10 @@ protected:
                 UnorderedElementsAre("name1", "name2", "name3"));
   }
 
-  std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest> getNextDeltaDiscoveryRequestAckless() {
-    auto* ptr = static_cast<envoy::service::discovery::v3::DeltaDiscoveryRequest*>(state_.getNextRequestAckless());
+  std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>
+  getNextDeltaDiscoveryRequestAckless() {
+    auto* ptr = static_cast<envoy::service::discovery::v3::DeltaDiscoveryRequest*>(
+        state_.getNextRequestAckless());
     return std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>(ptr);
   }
 

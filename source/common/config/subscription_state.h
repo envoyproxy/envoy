@@ -8,9 +8,9 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 
+#include "common/config/ttl.h"
 #include "common/config/update_ack.h"
 #include "common/protobuf/protobuf.h"
-#include "common/config/ttl.h"
 
 #include "absl/strings/string_view.h"
 

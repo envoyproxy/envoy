@@ -11,7 +11,7 @@ SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              UntypedConfigUpdateCallbacks& callbacks,
                                              std::chrono::milliseconds init_fetch_timeout,
                                              Event::Dispatcher& dispatcher)
-    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {} 
+    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {}
 
 SotwSubscriptionState::~SotwSubscriptionState() = default;
 
@@ -69,22 +69,23 @@ UpdateAck SotwSubscriptionState::handleResponse(const void* response_proto_ptr) 
 void SotwSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DiscoveryResponse& message) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> non_heartbeat_resources;
-  std::vector<envoy::service::discovery::v3::Resource> resources_with_ttl(message.resources().size());
+  std::vector<envoy::service::discovery::v3::Resource> resources_with_ttl(
+      message.resources().size());
 
   for (const auto& any : message.resources()) {
     if (!any.Is<envoy::service::discovery::v3::Resource>() &&
-                    any.type_url() != message.type_url()) {
+        any.type_url() != message.type_url()) {
       throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
                                        "the message-wide type URL {} in DiscoveryResponse {}",
-                                       any.type_url(), message.type_url(),
-                                       message.DebugString()));
+                                       any.type_url(), message.type_url(), message.DebugString()));
     }
 
-    // ttl changes (including removing of the ttl timer) are only done when an Any is wrapped in a Resource (which contains ttl duration).
+    // ttl changes (including removing of the ttl timer) are only done when an Any is wrapped in a
+    // Resource (which contains ttl duration).
     if (any.Is<envoy::service::discovery::v3::Resource>()) {
       resources_with_ttl.emplace(resources_with_ttl.end());
       MessageUtil::unpackTo(any, resources_with_ttl.back());
-    
+
       if (isHeartbeatResource(resources_with_ttl.back(), message.version_info())) {
         continue;
       }
@@ -153,7 +154,8 @@ void* SotwSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   return request;
 }
 
-void SotwSubscriptionState::setResourceTtl(const envoy::service::discovery::v3::Resource& resource) {
+void SotwSubscriptionState::setResourceTtl(
+    const envoy::service::discovery::v3::Resource& resource) {
   if (resource.has_ttl()) {
     ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
              resource.name());
@@ -170,9 +172,10 @@ void SotwSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& ex
   callbacks().onConfigUpdate({}, removed_resources, "");
 }
 
-bool SotwSubscriptionState::isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource, const std::string& version) {
+bool SotwSubscriptionState::isHeartbeatResource(
+    const envoy::service::discovery::v3::Resource& resource, const std::string& version) {
   return !resource.has_resource() && last_good_version_info_.has_value() &&
-           version == last_good_version_info_.value();
+         version == last_good_version_info_.value();
 }
 
 } // namespace Config

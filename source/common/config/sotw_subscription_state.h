@@ -55,7 +55,8 @@ private:
   void handleGoodResponse(const envoy::service::discovery::v3::DiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
 
-  bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource, const std::string& version);
+  bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource,
+                           const std::string& version);
   void setResourceTtl(const envoy::service::discovery::v3::Resource& resource);
 
   // The version_info carried by the last accepted DiscoveryResponse.

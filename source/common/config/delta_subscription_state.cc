@@ -15,7 +15,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                std::chrono::milliseconds init_fetch_timeout,
                                                Event::Dispatcher& dispatcher)
-    : SubscriptionState(std::move(type_url), watch_map, init_fetch_timeout, dispatcher) {} 
+    : SubscriptionState(std::move(type_url), watch_map, init_fetch_timeout, dispatcher) {}
 
 DeltaSubscriptionState::~DeltaSubscriptionState() = default;
 
@@ -206,7 +206,8 @@ void* DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   return request;
 }
 
-void DeltaSubscriptionState::addResourceState(const envoy::service::discovery::v3::Resource& resource) {
+void DeltaSubscriptionState::addResourceState(
+    const envoy::service::discovery::v3::Resource& resource) {
   if (resource.has_ttl()) {
     ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
              resource.name());
