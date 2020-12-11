@@ -1,14 +1,13 @@
-#include "exe/service_base.h"
 
 #include <codecvt>
 #include <locale>
-#include <processenv.h>
-#include <shellapi.h>
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/event/signal_impl.h"
+
 #include "exe/main_common.h"
+#include "exe/service_base.h"
 
 #include "absl/debugging/symbolize.h"
 
@@ -32,7 +31,7 @@ ServiceBase::ServiceBase(DWORD controlsAccepted) : handle_(0) {
 bool ServiceBase::TryRunAsService(ServiceBase& service) {
   // We need to be extremely defensive when programming between the start of the program until
   // `main_common` starts because the loggers have not been initialized
-  //  so we dont have a good way to know what is happening if the program fails.
+  //  so we do not have a good way to know what is happening if the program fails.
   service_static = &service;
   RELEASE_ASSERT(service_static != nullptr, "Global pointer to service should not be null");
 
@@ -124,7 +123,7 @@ void ServiceBase::SetServiceStatus() {
 
 void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
   RELEASE_ASSERT(service_static != nullptr, "Global pointer to service should not be null");
-  if (argc != 1 || argv == 0 || argv[0] == 0) {
+  if (argc < 1 || argv == 0 || argv[0] == 0) {
     service_static->UpdateState(SERVICE_STOPPED, E_INVALIDARG, true);
   }
 

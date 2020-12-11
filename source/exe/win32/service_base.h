@@ -3,8 +3,9 @@
 #include <functional>
 #include <string>
 
-#include "exe/service_status.h"
 #include "envoy/event/signal.h"
+
+#include "exe/service_status.h"
 
 namespace Envoy {
 class ServiceBase {

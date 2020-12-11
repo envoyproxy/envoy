@@ -214,13 +214,13 @@ int MainCommon::main(int argc, char** argv, PostServerHook hook) {
   // handling, such as running in a chroot jail.
   absl::InitializeSymbolizer(argv[0]);
 #endif
-  std::shared_ptr<Envoy::MainCommon> main_common;
+  std::unique_ptr<Envoy::MainCommon> main_common;
 
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
   try {
-    main_common = std::make_shared<Envoy::MainCommon>(argc, argv);
+    main_common = std::make_unique<Envoy::MainCommon>(argc, argv);
     Envoy::Server::Instance* server = main_common->server();
     if (server != nullptr && hook != nullptr) {
       hook(*server);
@@ -234,6 +234,9 @@ int MainCommon::main(int argc, char** argv, PostServerHook hook) {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
+
+  // Run the server listener loop outside try/catch blocks, so that unexpected exceptions
+  // show up as a core-dumps for easier diagnostics.
   return main_common->run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

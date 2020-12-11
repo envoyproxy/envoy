@@ -1,7 +1,7 @@
 #pragma once
 
+
 #include "envoy/common/platform.h"
-#include <winsvc.h>
 
 namespace Envoy {
 class ServiceStatus : public SERVICE_STATUS {

@@ -179,7 +179,6 @@ envoy_cc_win32_library(
 
 envoy_cc_library(
     name = "scm_impl_lib",
-    deps = envoy_cc_platform_dep("scm_impl_lib"),
     hdrs = select({
         "//bazel:windows_x86_64": [
             "win32/service_base.h",
@@ -187,6 +186,7 @@ envoy_cc_library(
     strip_include_prefix = select({
         "//bazel:windows_x86_64": "win32",
     }),
+    deps = envoy_cc_platform_dep("scm_impl_lib"),
 )
 
 envoy_cc_win32_library(
@@ -194,7 +194,8 @@ envoy_cc_win32_library(
     srcs = ["win32/service_base.cc"],
     hdrs = [
         "win32/service_base.h",
-        "win32/service_status.h",],
+        "win32/service_status.h",
+    ],
     strip_include_prefix = "win32",
     deps = [
         ":main_common_lib",
