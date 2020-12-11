@@ -329,8 +329,8 @@ public:
   virtual absl::string_view transportFailureReason() const PURE;
 
   /**
-   * Instructs a transport socket to start using secure transport.
-   * Note: Not all transport sockets support such operation.
+   * Instructs the connection to start using secure transport.
+   * Note: Not all underlying transport sockets support such operation.
    * @return boolean telling if underlying transport socket was able to
              start secure transport.
    */

@@ -18,33 +18,33 @@ class StartTlsSocket : public Network::TransportSocket, Logger::Loggable<Logger:
 public:
   StartTlsSocket(const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&,
                  Network::TransportSocketPtr raw_socket, // RawBufferSocket
-                 Network::TransportSocketPtr ssl_socket, // SslSocket
+                 Network::TransportSocketPtr tls_socket, // TlsSocket
                  const Network::TransportSocketOptionsSharedPtr&)
-      : oper_socket_(std::move(raw_socket)), ssl_socket_(std::move(ssl_socket)) {}
+      : active_socket_(std::move(raw_socket)), tls_socket_(std::move(tls_socket)) {}
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
-    oper_socket_->setTransportSocketCallbacks(callbacks);
+    active_socket_->setTransportSocketCallbacks(callbacks);
     callbacks_ = &callbacks;
   }
 
   std::string protocol() const override { return TransportProtocolNames::get().StartTls; }
 
-  absl::string_view failureReason() const override { return oper_socket_->failureReason(); }
+  absl::string_view failureReason() const override { return active_socket_->failureReason(); }
 
-  void onConnected() override { oper_socket_->onConnected(); }
-  bool canFlushClose() override { return oper_socket_->canFlushClose(); }
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return oper_socket_->ssl(); }
+  void onConnected() override { active_socket_->onConnected(); }
+  bool canFlushClose() override { return active_socket_->canFlushClose(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return active_socket_->ssl(); }
 
   void closeSocket(Network::ConnectionEvent event) override {
-    return oper_socket_->closeSocket(event);
+    return active_socket_->closeSocket(event);
   }
 
   Network::IoResult doRead(Buffer::Instance& buffer) override {
-    return oper_socket_->doRead(buffer);
+    return active_socket_->doRead(buffer);
   }
 
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override {
-    return oper_socket_->doWrite(buffer, end_stream);
+    return active_socket_->doWrite(buffer, end_stream);
   }
 
   // Method to enable TLS.
@@ -53,15 +53,15 @@ public:
 private:
   // Socket used in all transport socket operations.
   // initially it is set to use raw buffer socket but
-  // can be converted to use ssl.
-  Network::TransportSocketPtr oper_socket_;
+  // can be converted to use tls.
+  Network::TransportSocketPtr active_socket_;
   // Secure transport socket. It will replace raw buffer socket
   //  when startSecureTransport is called.
-  Network::TransportSocketPtr ssl_socket_;
+  Network::TransportSocketPtr tls_socket_;
 
   Network::TransportSocketCallbacks* callbacks_{};
 
-  bool using_ssl_{false};
+  bool using_tls_{false};
 };
 
 class ServerStartTlsSocketFactory : public Network::TransportSocketFactory,

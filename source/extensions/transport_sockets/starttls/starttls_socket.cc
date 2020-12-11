@@ -9,11 +9,17 @@ namespace StartTls {
 
 // Switch clear-text to secure transport.
 bool StartTlsSocket::startSecureTransport() {
-  if (!using_ssl_) {
-    ssl_socket_->setTransportSocketCallbacks(*callbacks_);
-    ssl_socket_->onConnected();
-    oper_socket_ = std::move(ssl_socket_);
-    using_ssl_ = true;
+  if (!using_tls_) {
+    tls_socket_->setTransportSocketCallbacks(*callbacks_);
+    tls_socket_->onConnected();
+    // TODO(cpakulski): deleting active_socket_ assumes
+    // that active_socket_ does not contain any buffered data.
+    // Currently, active_socket_ is initialized to raw_buffer, which does not
+    // buffer. If active_socket_ is initialized to a transport socket which
+    // does buffering, it should be flushed before destroying or
+    // flush should be called from destructor.
+    active_socket_ = std::move(tls_socket_);
+    using_tls_ = true;
   }
   return true;
 }
