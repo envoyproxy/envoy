@@ -360,8 +360,10 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   bool startup = false, post_init = false, worker_started = false, shutdown = false,
        shutdown_with_completion = false;
-  absl::Notification started, post_init_fired, worker_started_fired, shutdown_begin,
-      completion_block, completion_done;
+  absl::Notification started, post_init_fired, worker_started_fired, worker_started_block,
+      shutdown_begin, completion_block, completion_done;
+  // Expect drainParentListeners not to be called before workers start.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
 
   // Run the server in a separate thread so we can test different lifecycle stages.
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
@@ -377,6 +379,7 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
     auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::WorkerStarted, [&] {
       worker_started = true;
       worker_started_fired.Notify();
+      worker_started_block.WaitForNotification();
     });
     auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
@@ -409,8 +412,8 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   started.WaitForNotification();
   EXPECT_TRUE(startup);
   EXPECT_FALSE(shutdown);
-  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
-  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+  // The first flushing is after workers start.
+  EXPECT_FALSE(TestUtility::findGauge(stats_store_, "server.state")->used());
 
   post_init_fired.WaitForNotification();
   EXPECT_TRUE(post_init);
@@ -419,6 +422,11 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   worker_started_fired.WaitForNotification();
   EXPECT_TRUE(worker_started);
   EXPECT_FALSE(shutdown);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+
+  EXPECT_CALL(restart_, drainParentListeners);
+  worker_started_block.Notify();
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   shutdown_begin.WaitForNotification();

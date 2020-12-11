@@ -373,6 +373,9 @@ private:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
+
+  // startup_ is true means Startup notifications have been called.
+  bool startup_{};
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

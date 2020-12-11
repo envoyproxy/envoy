@@ -717,6 +717,11 @@ void InstanceImpl::run() {
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
                                     access_log_manager_, init_manager_, overloadManager(), [this] {
+                                      if (!startup_) {
+                                        notifyCallbacksForStage(Stage::Startup);
+                                        startup_ = true;
+                                      }
+
                                       notifyCallbacksForStage(Stage::PostInit);
                                       startWorkers();
                                     });
@@ -725,7 +730,12 @@ void InstanceImpl::run() {
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                          "main_thread", *dispatcher_);
-  dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
+  dispatcher_->post([this] {
+    if (!startup_) {
+      notifyCallbacksForStage(Stage::Startup);
+      startup_ = true;
+    }
+  });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
   main_thread_guard_dog_->stopWatching(watchdog);
