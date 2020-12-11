@@ -547,6 +547,11 @@ public:
   FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+               const Network::Address::InstanceConstSharedPtr& address,
+               const FakeUpstreamConfig& config);
+
+  // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 

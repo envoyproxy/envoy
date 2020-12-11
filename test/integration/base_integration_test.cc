@@ -135,12 +135,15 @@ common_tls_context:
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    Network::TransportSocketFactoryPtr factory =
+        upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(
-          new AutonomousUpstream(endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
+      fake_upstreams_.emplace_back(new AutonomousUpstream(
+          std::move(factory), endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstreamConfig()));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(std::move(factory), endpoint, upstreamConfig()));
     }
   }
 }
