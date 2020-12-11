@@ -25,7 +25,7 @@ using testing::_;
 using testing::AllOf;
 using testing::AnyNumber;
 using testing::ByMove;
-using testing::DoubleNear;
+using testing::FloatNear;
 using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
@@ -504,7 +504,7 @@ TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
 
   // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
   // a timer scale factor of 0.8 (1 - 0.2).
-  EXPECT_CALL(*scaled_timer_manager, setScaleFactor(DoubleNear(0.8, 0.00001)));
+  EXPECT_CALL(*scaled_timer_manager, setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
   factory1_.monitor_->setPressure(0.6);
 
   timer_cb_();

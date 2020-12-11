@@ -60,7 +60,7 @@ public:
   void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
     actions_[action.index()] = state;
     if (scaled_timer_action_.has_value() && scaled_timer_action_.value() == action) {
-      scaled_timer_manager_->setScaleFactor(1 - state.value());
+      scaled_timer_manager_->setScaleFactor(UnitFloat(1 - state.value()));
     }
   }
 
