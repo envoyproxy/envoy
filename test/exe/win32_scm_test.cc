@@ -160,6 +160,7 @@ TEST_P(ScmTest, EnvoyMergesArgumentsFromCreateAndStart) {
   std::ifstream genereated_file(log_path.c_str());
   EXPECT_TRUE(genereated_file.good());
   stopService();
+  genereated_file.close();
   remove(log_path.c_str());
 }
 
