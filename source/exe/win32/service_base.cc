@@ -42,6 +42,11 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
 
   if (!::StartServiceCtrlDispatcherA(service_table)) {
     auto last_error = ::GetLastError();
+    // There are two cases:
+    // 1. The user is trying to run Envoy as a console app. In that the last error is
+    // `ERROR_FAILED_SERVICE_CONTROLLER_CONNECT`. In that case we return false and let Envoy start
+    // as normal.
+    // 2. Other programmatic errors.
     if (last_error == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
       return false;
     } else {
@@ -52,7 +57,7 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
   return true;
 }
 
-DWORD ServiceBase::Start(std::vector<std::string> args, DWORD control) {
+DWORD ServiceBase::Start(std::vector<std::string> args) {
   // Run the server listener loop outside try/catch blocks, so that unexpected exceptions
   // show up as a core-dumps for easier diagnostics.
   absl::InitializeSymbolizer(args[0].c_str());
@@ -82,7 +87,6 @@ DWORD ServiceBase::Start(std::vector<std::string> args, DWORD control) {
     return E_FAIL;
   }
 
-  main_common->run();
   return main_common->run() ? S_OK : E_FAIL;
 }
 
@@ -151,7 +155,7 @@ void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
 
   service_static->SetServiceStatus();
   service_static->UpdateState(SERVICE_RUNNING);
-  DWORD rc = service_static->Start(args, 0);
+  DWORD rc = service_static->Start(args);
   service_static->UpdateState(SERVICE_STOPPED, rc, true);
 }
 
