@@ -134,5 +134,5 @@ message RateLimitResponse {
   repeated config.core.v3.HeaderValue request_headers_to_add = 4;
 
   // A response body to send to the downstream client when the response code is not OK.
-  bytes body_bytes = 5;
+  bytes raw_body = 5;
 }

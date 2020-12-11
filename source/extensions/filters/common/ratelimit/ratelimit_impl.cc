@@ -106,14 +106,14 @@ void GrpcClientImpl::onSuccess(
   DescriptorStatusListPtr descriptor_statuses = std::make_unique<DescriptorStatusList>(
       response->statuses().begin(), response->statuses().end());
   callbacks_->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
-                       std::move(request_headers_to_add), response->body_bytes());
+                       std::move(request_headers_to_add), response->raw_body());
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
-  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr, "");
+  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING);
   callbacks_ = nullptr;
 }
 

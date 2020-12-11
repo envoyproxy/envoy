@@ -115,7 +115,7 @@ Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderM
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  populateResponseHeaders(headers, false);
+  populateResponseHeaders(headers, /*from_local_reply=*/false);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -197,7 +197,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     state_ = State::Responded;
     callbacks_->sendLocalReply(
         Http::Code::TooManyRequests, response_body,
-        [this](Http::HeaderMap& headers) { populateResponseHeaders(headers, true); },
+        [this](Http::HeaderMap& headers) {
+          populateResponseHeaders(headers, /*from_local_reply=*/true);
+        },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
