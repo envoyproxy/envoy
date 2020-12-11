@@ -11,12 +11,22 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "ext_proc",
-    srcs = ["ext_proc.cc"],
-    hdrs = ["ext_proc.h"],
+    srcs = [
+        "ext_proc.cc",
+        "headers.cc",
+    ],
+    hdrs = [
+        "ext_proc.h",
+        "headers.h",
+    ],
     deps = [
+        ":client_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/http:header_map_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -27,6 +37,7 @@ envoy_cc_extension(
     security_posture = "unknown",
     status = "alpha",
     deps = [
+        ":client_lib",
         ":ext_proc",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
