@@ -196,7 +196,7 @@ envoy_cc_posix_library(
     name = "scm_impl_lib",
     srcs = [],
     hdrs = [],
-    deps = []
+    deps = [],
 )
 
 envoy_cc_win32_library(
