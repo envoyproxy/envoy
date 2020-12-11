@@ -531,8 +531,7 @@ public:
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats
-  generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix,
-                               bool track_remaining,
+  generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatName prefix, bool track_remaining,
                                const ClusterCircuitBreakersStatNames& stat_names);
   static ClusterRequestResponseSizeStats
   generateRequestResponseSizeStats(Stats::Scope&,

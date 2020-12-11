@@ -611,7 +611,10 @@ public:
 
 /**
  * Cluster circuit breakers gauges. We define these just as StatNames because
- * depending on flags, we will use null gauges for the remaining_* ones.
+ * depending on flags, we will use null gauges for the remaining_* ones. Note
+ * that the instantiation of the stats struct in
+ * ClusterInfoImpl::generateCircuitBreakersStats is hand-coded and must be
+ * changed if we change the set of gauges in this macro.
  */
 #define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)      \
   GAUGE(cx_open, Accumulate)                                                                       \

@@ -1171,12 +1171,9 @@ ClusterInfoImpl::ResourceManagers::ResourceManagers(
 }
 
 ClusterCircuitBreakersStats
-ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix,
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatName prefix,
                                               bool track_remaining,
                                               const ClusterCircuitBreakersStatNames& stat_names) {
-  Stats::StatNameManagedStorage prefix_storage(stat_prefix, scope.symbolTable());
-  Stats::StatName prefix = prefix_storage.statName();
-
   auto make_gauge = [&stat_names, &scope, prefix](Stats::StatName stat_name) -> Stats::Gauge& {
     return Stats::Utility::gaugeFromElements(scope,
                                              {stat_names.circuit_breakers_, prefix, stat_name},
@@ -1220,12 +1217,15 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
 
   bool track_remaining = false;
 
+  Stats::StatName priority_stat_name;
   std::string priority_name;
   switch (priority) {
   case envoy::config::core::v3::DEFAULT:
+    priority_stat_name = circuit_breakers_stat_names_.default_;
     priority_name = "default";
     break;
   case envoy::config::core::v3::HIGH:
+    priority_stat_name = circuit_breakers_stat_names_.high_;
     priority_name = "high";
     break;
   default:
@@ -1270,8 +1270,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
       max_connection_pools,
-      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining,
-                                                    circuit_breakers_stat_names_),
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_stat_name,
+                                                    track_remaining, circuit_breakers_stat_names_),
       budget_percent, min_retry_concurrency);
 }
 

@@ -55,7 +55,8 @@ MockClusterInfo::MockClusterInfo()
           std::make_unique<ClusterTimeoutBudgetStats>(ClusterInfoImpl::generateTimeoutBudgetStats(
               timeout_budget_stats_store_, cluster_timeout_budget_stat_names_))),
       circuit_breakers_stats_(ClusterInfoImpl::generateCircuitBreakersStats(
-          stats_store_, "default", true, cluster_circuit_breakers_stat_names_)),
+          stats_store_, cluster_circuit_breakers_stat_names_.default_, true,
+          cluster_circuit_breakers_stat_names_)),
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
           circuit_breakers_stats_, absl::nullopt, absl::nullopt)) {
