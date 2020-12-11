@@ -262,3 +262,30 @@ Developers trying to can iterate through changes in these tests locally with:
       test/integration:stats_integration_test
 ```
 
+## Debugging Symbol Table Assertions
+
+If you are visiting this section because you saw a message like:
+
+```bash
+[2020-12-11 18:30:54.059][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure: decode_search != decode_map_.end(). Details: Please see https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#debugging-symbol-table-asserts for hints on how to fix
+
+```
+then you have come to the right place.
+
+In production, there is generally one `SymbolTable` per process, except in the 3
+or 4 places where IsolatedStoreImpl is deliberately instantiated. In those scenarios,
+we don't expect names from these stores to be joined together.
+
+In tests, however, most of the Envoy mock structures do not allow any context to
+be passed into constructors. So each mock structure instance that requires a
+symbol table must instantiate its own. This is fine if they are truly isolated,
+but in a number of scenarios, StatNames from different structures are joined
+together during stat construction. Comingling of StatNames from different symbol
+tables does not work, and the first evidence of this is usually an assertion on
+the `decode_map_` lookup in SymbolTableImpl::incRefCount.
+
+To avoid this assertion, we must ensure that the symbols being combined all come
+from the same symbol table. To facilitate this, a test-only global singleton can
+be instantiated, via either `Stats::TestUtil::TestSymbolTable` or
+`Stats::TestUtil::TestStore`. All such structures use a singleton symbol-table
+whose lifetime is a single test method. This should resolve the assertion.
