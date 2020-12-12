@@ -499,11 +499,24 @@ FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           const FakeUpstreamConfig& config)
+    : FakeUpstream(std::move(transport_socket_factory),
+                   config.udp_fake_upstream_ ? makeUdpListenSocket(address)
+                                             : makeTcpListenSocket(address),
+                   config) {
+  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
+            address->ip()->addressAsString(), address->ip()->port(),
+            Network::Test::addressVersionAsString(address->ip()->version()),
+            config.udp_fake_upstream_);
+}
+
+FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version),
                    config) {
-  ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
+  ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 

@@ -412,6 +412,7 @@ protected:
   bool create_xds_upstream_{false};
   bool tls_xds_upstream_{false};
   bool use_lds_{true}; // Use the integration framework's LDS set up.
+  bool upstream_tls_{false};
 
   Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
