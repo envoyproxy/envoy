@@ -76,7 +76,7 @@ TEST_F(SdsApiTest, BasicTest) {
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
   initialize();
 }
 
@@ -126,7 +126,7 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  EXPECT_NO_THROW(sds_api.registerInitTarget(init_manager));
+  EXPECT_NO_THROW(init_manager.add(*sds_api.initTarget()));
 }
 
 // Validate that bad ConfigSources are caught at construction time. This is a regression test for
@@ -153,7 +153,7 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
   initialize();
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -217,7 +217,7 @@ protected:
     sds_api_ = std::make_unique<TlsCertificateSdsApi>(
         config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
         []() {}, mock_dispatcher_, *api_);
-    sds_api_->registerInitTarget(init_manager_);
+    init_manager_.add(*sds_api_->initTarget());
     initialize();
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
@@ -287,7 +287,7 @@ protected:
     sds_api_ = std::make_unique<CertificateValidationContextSdsApi>(
         config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
         []() {}, mock_dispatcher_, *api_);
-    sds_api_->registerInitTarget(init_manager_);
+    init_manager_.add(*sds_api_->initTarget());
     initialize();
     handle_ = sds_api_->addUpdateCallback([this]() { secret_callback_.onAddOrUpdateSecret(); });
   }
@@ -500,7 +500,7 @@ public:
       : SdsApi(
             config_source, "abc.com", subscription_factory, time_source, validation_visitor_, stats,
             []() {}, dispatcher, api) {
-    registerInitTarget(init_manager);
+    init_manager.add(init_target_);
   }
 
   MOCK_METHOD(void, onConfigUpdate,
@@ -554,7 +554,7 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -599,7 +599,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   CertificateValidationContextSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -653,7 +653,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   CertificateValidationContextSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -741,7 +741,7 @@ TEST_F(SdsApiTest, GenericSecretSdsApiTest) {
   GenericSecretSdsApi sds_api(
       config_source, "encryption_key", subscription_factory_, time_system_, validation_visitor_,
       stats_, []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -786,7 +786,7 @@ TEST_F(SdsApiTest, EmptyResource) {
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
 
   initialize();
   EXPECT_THROW_WITH_MESSAGE(subscription_factory_.callbacks_->onConfigUpdate({}, ""),
@@ -801,7 +801,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
 
   std::string yaml =
       R"EOF(
@@ -831,7 +831,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   TlsCertificateSdsApi sds_api(
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
       []() {}, *dispatcher_, *api_);
-  sds_api.registerInitTarget(init_manager_);
+  init_manager_.add(*sds_api.initTarget());
 
   std::string yaml =
       R"EOF(

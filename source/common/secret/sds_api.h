@@ -59,18 +59,8 @@ public:
          Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api);
-  ~SdsApi() override {
-    RELEASE_ASSERT(registered_init_target_,
-                   "Init target was not registered with an init manager. registerInitTarget() must "
-                   "be called after Sds api concrete class instantiation.");
-  };
 
   SecretData secretData();
-
-  void registerInitTarget(Init::Manager& init_manager) {
-    init_manager.add(init_target_);
-    registered_init_target_ = true;
-  }
 
 protected:
   // Ordered for hash stability.
@@ -97,7 +87,7 @@ protected:
   void resolveDataSource(const FileContentMap& files,
                          envoy::config::core::v3::DataSource& data_source);
 
-  Init::TargetImpl init_target_;
+  Init::SharedTargetImpl init_target_;
   Event::Dispatcher& dispatcher_;
   Api::Api& api_;
 
@@ -124,7 +114,6 @@ private:
   TimeSource& time_source_;
   SecretData secret_data_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
-  bool registered_init_target_{false};
 };
 
 class TlsCertificateSdsApi;
@@ -154,7 +143,7 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    ret->registerInitTarget(secret_provider_context.initManager());
+    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
 
@@ -182,6 +171,7 @@ public:
     }
     return update_callback_manager_.add(callback);
   }
+  const Init::Target* initTarget() override { return &init_target_; }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
@@ -238,7 +228,7 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    ret->registerInitTarget(secret_provider_context.initManager());
+    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -262,13 +252,13 @@ public:
     }
     return update_callback_manager_.add(callback);
   }
-
   Common::CallbackHandle* addValidationCallback(
       std::function<
           void(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
           callback) override {
     return validation_callback_manager_.add(callback);
   }
+  const Init::Target* initTarget() override { return &init_target_; }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
@@ -333,7 +323,7 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    ret->registerInitTarget(secret_provider_context.initManager());
+    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
 
@@ -366,6 +356,7 @@ public:
           callback) override {
     return validation_callback_manager_.add(callback);
   }
+  const Init::Target* initTarget() override { return &init_target_; }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
@@ -405,7 +396,7 @@ public:
         secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-    ret->registerInitTarget(secret_provider_context.initManager());
+    secret_provider_context.initManager().add(*ret->initTarget());
     return ret;
   }
 
@@ -430,6 +421,7 @@ public:
           callback) override {
     return validation_callback_manager_.add(callback);
   }
+  const Init::Target* initTarget() override { return &init_target_; }
 
 protected:
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
