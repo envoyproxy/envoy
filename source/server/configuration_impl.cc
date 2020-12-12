@@ -105,7 +105,11 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
 void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                      Instance& server) {
   ENVOY_LOG(info, "loading stats configuration");
+
+  // stats_config_ should be set before populating the sinks so that it is available
+  // from the ServerFactoryContext.
   stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+  auto stats_config_impl = static_cast<StatsConfigImpl*>(stats_config_.get());
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
@@ -113,8 +117,7 @@ void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstr
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
-    stats_config_->sinks().emplace_back(
-        factory.createStatsSink(*message, server.serverFactoryContext()));
+    stats_config_impl->addSink(factory.createStatsSink(*message, server.serverFactoryContext()));
   }
 }
 

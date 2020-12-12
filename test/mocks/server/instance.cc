@@ -79,6 +79,7 @@ MockServerFactoryContext::MockServerFactoryContext()
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
+MockStatsConfig::MockStatsConfig() = default;
 MockStatsConfig::~MockStatsConfig() = default;
 
 } // namespace Configuration

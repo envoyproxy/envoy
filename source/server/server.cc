@@ -556,7 +556,7 @@ void InstanceImpl::initialize(const Options& options,
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
   auto& statsConfig = config_.statsConfig();
-  for (Stats::SinkPtr& sink : statsConfig.sinks()) {
+  for (const Stats::SinkPtr& sink : statsConfig.sinks()) {
     stats_store_.addSink(*sink);
   }
   if (!statsConfig.flushOnAdmin()) {

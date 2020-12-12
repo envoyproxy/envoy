@@ -50,9 +50,11 @@ class StatsConfigImpl : public StatsConfig {
 public:
   StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
-  std::list<Stats::SinkPtr>& sinks() override { return sinks_; }
+  const std::list<Stats::SinkPtr>& sinks() const override { return sinks_; }
   std::chrono::milliseconds flushInterval() const override { return flush_interval_; }
   bool flushOnAdmin() const override { return flush_on_admin_; }
+
+  void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
 
 private:
   std::list<Stats::SinkPtr> sinks_;

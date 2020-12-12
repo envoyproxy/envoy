@@ -130,11 +130,12 @@ public:
 namespace Configuration {
 class MockStatsConfig : public virtual StatsConfig {
 public:
+  MockStatsConfig();
   ~MockStatsConfig() override;
 
-  MOCK_METHOD(std::list<Stats::SinkPtr>&, sinks, (), (override));
-  MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const, override));
-  MOCK_METHOD(bool, flushOnAdmin, (), (const, override));
+  MOCK_METHOD(const std::list<Stats::SinkPtr>&, sinks, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const));
+  MOCK_METHOD(bool, flushOnAdmin, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {

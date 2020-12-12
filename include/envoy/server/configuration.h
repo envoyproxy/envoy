@@ -72,7 +72,7 @@ public:
   /**
    * @return std::list<Stats::SinkPtr>& the list of stats sinks initialized from the configuration.
    */
-  virtual std::list<Stats::SinkPtr>& sinks() PURE;
+  virtual const std::list<Stats::SinkPtr>& sinks() const PURE;
 
   /**
    * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.
