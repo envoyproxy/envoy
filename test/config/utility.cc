@@ -928,7 +928,8 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(absl::StrCat(format, "\n"));
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        absl::StrCat(format, "\n"));
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -943,7 +944,8 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   }
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(std::string(format));
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        std::string(format));
   }
   access_log_config.set_path(filename);
   bootstrap_.mutable_static_resources()
