@@ -736,7 +736,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
+            "envoy.filters.network.rbac",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
