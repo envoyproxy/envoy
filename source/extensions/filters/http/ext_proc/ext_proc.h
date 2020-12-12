@@ -72,7 +72,7 @@ private:
 
   FilterState request_state_ = FilterState::IDLE;
   ExternalProcessorStreamPtr stream_;
-  bool stream_closed_;
+  bool stream_closed_ = false;
 
   Http::HeaderMap* request_headers_ = nullptr;
 };

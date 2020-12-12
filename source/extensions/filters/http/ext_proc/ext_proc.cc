@@ -19,6 +19,7 @@ static const std::string kErrorPrefix = "ext_proc error";
 
 void Filter::onDestroy() {
   if (stream_ && !stream_closed_) {
+    ENVOY_LOG(debug, "Closing gRPC stream to processing server");
     stream_->close();
   }
 }
@@ -42,10 +43,12 @@ void Filter::onReceiveMessage(
     std::unique_ptr<envoy::service::ext_proc::v3alpha::ProcessingResponse>&& r) {
   auto response = std::move(r);
   bool message_valid = false;
+  ENVOY_LOG(debug, "Received gRPC message. State = {}", request_state_);
 
   // This next section will grow as we support the rest of the protocol
   if (request_state_ == FilterState::HEADERS) {
     if (response->has_request_headers()) {
+      ENVOY_LOG(debug, "applying request_headers response");
       message_valid = true;
       const auto headers_response = response->request_headers();
       if (headers_response.has_response()) {
@@ -55,6 +58,7 @@ void Filter::onReceiveMessage(
         }
       }
     }
+    request_state_ = FilterState::IDLE;
     decoder_callbacks_->continueDecoding();
   }
 
@@ -62,13 +66,13 @@ void Filter::onReceiveMessage(
     // Ignore messages received out of order. However, close the stream to
     // protect ourselves since the server is not following the protocol.
     ENVOY_LOG(warn, "Spurious response message received on gRPC stream");
-    request_state_ = FilterState::IDLE;
     stream_closed_ = true;
     stream_->close();
   }
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
+  ENVOY_LOG(debug, "Received gRPC error on stream: {}", status);
   stream_closed_ = true;
   if (config_->failureModeAllow()) {
     // Ignore this and treat as a successful close
@@ -91,6 +95,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 }
 
 void Filter::onGrpcClose() {
+  ENVOY_LOG(debug, "Received gRPC stream close");
   stream_closed_ = true;
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.

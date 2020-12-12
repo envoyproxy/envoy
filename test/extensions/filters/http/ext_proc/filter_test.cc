@@ -124,7 +124,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   // Send back a response
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
-  /*auto req_headers_response = */ resp1->mutable_request_headers();
+  resp1->mutable_request_headers();
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   data_.add("foo");
