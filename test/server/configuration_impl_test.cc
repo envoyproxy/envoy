@@ -184,9 +184,9 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException,
-                            "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
