@@ -112,7 +112,7 @@ void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstr
   auto stats_config_impl = static_cast<StatsConfigImpl*>(stats_config_.get());
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
-    // Generate factory and translate stats sink custom config
+    // Generate factory and translate stats sink custom config.
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);

@@ -163,7 +163,7 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
   EXPECT_THROW(TestUtility::validate(bootstrap), Envoy::ProtoValidationException);
 }
 
-// this should throw an proto validation exception in the v4 api with the oneof promotion
+// This should throw an proto validation exception in the v4 api with the oneof promotion.
 TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
   std::string json = R"EOF(
   {
@@ -184,7 +184,9 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
-  EXPECT_THROW(config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {

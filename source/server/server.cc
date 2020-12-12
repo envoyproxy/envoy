@@ -238,11 +238,11 @@ void InstanceImpl::updateServerStats() {
 
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
-  auto& statsConfig = config_.statsConfig();
-  InstanceUtil::flushMetricsToSinks(statsConfig.sinks(), stats_store_, timeSource());
+  auto& stats_config = config_.statsConfig();
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
-    stat_flush_timer_->enableTimer(statsConfig.flushInterval());
+    stat_flush_timer_->enableTimer(stats_config.flushInterval());
   }
 }
 
@@ -555,15 +555,15 @@ void InstanceImpl::initialize(const Options& options,
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
-  auto& statsConfig = config_.statsConfig();
-  for (const Stats::SinkPtr& sink : statsConfig.sinks()) {
+  auto& stats_config = config_.statsConfig();
+  for (const Stats::SinkPtr& sink : stats_config.sinks()) {
     stats_store_.addSink(*sink);
   }
-  if (!statsConfig.flushOnAdmin()) {
+  if (!stats_config.flushOnAdmin()) {
     // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
     // Just setup the timer.
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-    stat_flush_timer_->enableTimer(statsConfig.flushInterval());
+    stat_flush_timer_->enableTimer(stats_config.flushInterval());
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
