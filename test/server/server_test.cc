@@ -412,8 +412,6 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   started.WaitForNotification();
   EXPECT_TRUE(startup);
   EXPECT_FALSE(shutdown);
-  // The first flushing is after workers start.
-  EXPECT_FALSE(TestUtility::findGauge(stats_store_, "server.state")->used());
 
   post_init_fired.WaitForNotification();
   EXPECT_TRUE(post_init);
