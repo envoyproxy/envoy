@@ -243,14 +243,16 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
     auto decode_search = decode_map_.find(symbol);
-    static const char assert_help[] =
-        "Please see "
-        "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
-        "debugging-symbol-table-asserts";
 
-    ASSERT(decode_search != decode_map_.end(), assert_help);
+    ASSERT(decode_search != decode_map_.end(),
+           "Please see "
+           "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
+           "debugging-symbol-table-asserts");
     auto encode_search = encode_map_.find(decode_search->second->toStringView());
-    ASSERT(encode_search != encode_map_.end(), assert_help);
+    ASSERT(encode_search != encode_map_.end(),
+           "Please see "
+           "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
+           "debugging-symbol-table-asserts");
 
     ++encode_search->second.ref_count_;
   }
