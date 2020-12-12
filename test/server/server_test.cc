@@ -584,7 +584,7 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   time_system_.advanceTimeWait(std::chrono::seconds(6));
   EXPECT_EQ(0L, counter->value());
 
-  // flush via admin
+  // Flush via admin.
   Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
