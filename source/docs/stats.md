@@ -186,8 +186,8 @@ There are several ways to create hot-path contention looking up stats by name,
 and there is no bulletproof way to prevent it from occurring.
  * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
    scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
-   in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path,
-   so that we do not need to take symbol-table locks on worker threads. As an example, see
+   in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path and during
+   control-plane updates, so that we do not need to take symbol-table locks. As an example, see
    [ClusterInfoImpl::generateStats](https://github.com/envoyproxy/envoy/blob/8188e232a9e0b15111d30f4724cbc7bf77d3964a/source/common/upstream/upstream_impl.cc#L641)
    and its
    [MAKE_STAT_NAMES_STRUCT](https://github.com/envoyproxy/envoy/blob/8188e232a9e0b15111d30f4724cbc7bf77d3964a/include/envoy/upstream/upstream.h#L646).
