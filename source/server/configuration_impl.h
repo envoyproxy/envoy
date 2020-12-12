@@ -137,7 +137,7 @@ private:
                            Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
-  std::unique_ptr<StatsConfig> stats_config_;
+  std::unique_ptr<StatsConfigImpl> stats_config_;
   std::unique_ptr<Watchdog> main_thread_watchdog_;
   std::unique_ptr<Watchdog> worker_watchdog_;
 };
