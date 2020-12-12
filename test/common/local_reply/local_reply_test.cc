@@ -106,7 +106,8 @@ TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
   // Default text formatter without any mappers
   const std::string yaml = R"(
   body_format:
-     text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
+     text_format_source:
+       inline_string: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
@@ -149,7 +150,7 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
   EXPECT_TRUE(TestUtility::jsonStringEqual(body_, expected));
 }
 
-TEST_F(LocalReplyTest, TestMapperRewrite) {
+TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewrite)) {
   // Match with response_code, and rewrite the code and body.
   const std::string yaml = R"(
     mappers:
@@ -297,7 +298,8 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
       body:
         inline_string: "411 body text"
     body_format:
-      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE% default formatter"
+      text_format_source:
+        inline_string: "%LOCAL_REPLY_BODY% %RESPONSE_CODE% default formatter"
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
@@ -388,7 +390,8 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
       body:
         inline_string: "401 body text"
       body_format_override:
-        text_format: "<h1>%LOCAL_REPLY_BODY%</h1>"
+        text_format_source:
+          inline_string: "<h1>%LOCAL_REPLY_BODY%</h1>"
         content_type: "text/html; charset=UTF-8"
     - filter:
         status_code_filter:
@@ -411,9 +414,11 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
       body:
         inline_string: "421 body text"
       body_format_override:
-        text_format: "%LOCAL_REPLY_BODY%"
+        text_format_source:
+          inline_string: "%LOCAL_REPLY_BODY%"
     body_format:
-      text_format: "<h1>%LOCAL_REPLY_BODY%</h1> %RESPONSE_CODE% default formatter"
+      text_format_source:
+        inline_string: "<h1>%LOCAL_REPLY_BODY%</h1> %RESPONSE_CODE% default formatter"
       content_type: "text/html; charset=UTF-8"
 )";
   TestUtility::loadFromYaml(yaml, config_);
