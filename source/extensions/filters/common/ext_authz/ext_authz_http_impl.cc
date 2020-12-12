@@ -222,7 +222,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
   // It's possible that the cluster specified in the filter configuration no longer exists due to a
   // CDS removal.
-  if (cm_.getThreadLocalCluster(cluster) == nullptr) {
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster);
+  if (thread_local_cluster == nullptr) {
     // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
@@ -233,7 +234,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName());
 
-    request_ = cm_.httpAsyncClientForCluster(cluster).send(std::move(message), *this, options);
+    request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
 }
 
