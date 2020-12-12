@@ -41,7 +41,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestEmptyIsInvalid) {
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
   const std::string yaml = R"EOF(
-  text_format: "plain text, path=%REQ(:path)%, code=%RESPONSE_CODE%"
+  text_format_source:
+    inline_string: "plain text, path=%REQ(:path)%, code=%RESPONSE_CODE%"
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
@@ -75,19 +76,6 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
     }
 })EOF";
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
-}
-
-TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigTextSource) {
-  const std::string yaml = R"EOF(
-  text_format_source:
-    inline_string: "inline string from a DataSource"
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
-  EXPECT_EQ("inline string from a DataSource",
-            formatter->format(request_headers_, response_headers_, response_trailers_, stream_info_,
-                              body_));
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {

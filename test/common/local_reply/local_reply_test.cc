@@ -150,7 +150,7 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
   EXPECT_TRUE(TestUtility::jsonStringEqual(body_, expected));
 }
 
-TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewrite)) {
+TEST_F(LocalReplyTest, TestMapperRewrite) {
   // Match with response_code, and rewrite the code and body.
   const std::string yaml = R"(
     mappers:
@@ -173,15 +173,6 @@ TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewrite)) {
               runtime_key: key_b
       body:
         inline_string: ""
-    - filter:
-        status_code_filter:
-          comparison:
-            op: EQ
-            value:
-              default_value: 404
-              runtime_key: key_b
-      body_format_override:
-        text_format: ""
     - filter:
         status_code_filter:
           comparison:
@@ -229,17 +220,7 @@ TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewrite)) {
   EXPECT_EQ(body_, "");
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=404 matches the third filter; does not rewrite code, sets an empty body and content_type.
-  resetData(404);
-  body_ = "original body text";
-  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
-  EXPECT_EQ(code_, static_cast<Http::Code>(404));
-  EXPECT_EQ(stream_info_.response_code_, 404U);
-  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "404");
-  EXPECT_EQ(body_, "");
-  EXPECT_EQ(content_type_, "text/plain");
-
-  // code=410 matches the fourth filter; rewrite body only
+  // code=410 matches the third filter; rewrite body only
   resetData(410);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(410));
@@ -248,7 +229,7 @@ TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewrite)) {
   EXPECT_EQ(body_, "410 body text");
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=420 matches the fifth filter; rewrite code only
+  // code=420 matches the fourth filter; rewrite code only
   resetData(420);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
@@ -257,13 +238,44 @@ TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewrite)) {
   EXPECT_EQ(body_, TestInitBody);
   EXPECT_EQ(content_type_, "text/plain");
 
-  // code=430 matches the sixth filter; rewrite nothing
+  // code=430 matches the fifth filter; rewrite nothing
   resetData(430);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(430));
   EXPECT_EQ(stream_info_.response_code_, 430U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "430");
   EXPECT_EQ(body_, TestInitBody);
+  EXPECT_EQ(content_type_, "text/plain");
+}
+
+// Test that we can use the deprecated `text_format` field with an empty value,
+// which is currently the only use case that it serves until we relax the
+// size validation on `DataSource.inline_string`.
+TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewriteDeprecatedTextFormatEmpty)) {
+  // Match with response_code, and rewrite the code and body.
+  const std::string yaml = R"(
+    mappers:
+    - filter:
+        status_code_filter:
+          comparison:
+            op: EQ
+            value:
+              default_value: 404
+              runtime_key: key_b
+      body_format_override:
+        text_format: ""
+)";
+  TestUtility::loadFromYaml(yaml, config_);
+  auto local = Factory::create(config_, context_);
+
+  // code=404 matches the only filter; does not rewrite code, sets an empty body and content_type.
+  resetData(404);
+  body_ = "original body text";
+  local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
+  EXPECT_EQ(code_, static_cast<Http::Code>(404));
+  EXPECT_EQ(stream_info_.response_code_, 404U);
+  EXPECT_EQ(response_headers_.Status()->value().getStringView(), "404");
+  EXPECT_EQ(body_, "");
   EXPECT_EQ(content_type_, "text/plain");
 }
 
