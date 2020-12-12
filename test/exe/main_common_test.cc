@@ -105,6 +105,17 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
+TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInitWithVectorArgs) {
+  addArg("--disable-hot-restart");
+  initOnly();
+  std::vector<std::string> args(argv_.size());
+  for (int i = 0; i < argv_.size() - 1; ++i) {
+    args[i] = std::string(argv_[i]);
+  }
+  MainCommon main_common(args);
+  EXPECT_TRUE(main_common.run());
+}
+
 // Exercise base-id-path option.
 TEST_P(MainCommonTest, ConstructWritesBasePathId) {
 #ifdef ENVOY_HOT_RESTART
