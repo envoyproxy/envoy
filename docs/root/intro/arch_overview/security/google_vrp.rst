@@ -1,145 +1,107 @@
 .. _arch_overview_google_vrp:
 
-Google Vulnerability Reward Program (VRP)
+Google 漏洞奖励计划（VRP）
 =========================================
 
-Envoy is a participant in `Google's Vulnerability Reward Program (VRP)
-<https://www.google.com/about/appsecurity/reward-program/>`_. This is open to all security
-researchers and will provide rewards for vulnerabilities discovered and reported according to the
-rules below.
+Envoy 是 `谷歌的漏洞奖励计划（VRP） <https://www.google.com/about/appsecurity/reward-program/>`_ 的参与者。
+该奖励计划开放给所有的安全研究人员，并会根据下面的规则，为漏洞发现和报告提供奖励。
 
 .. _arch_overview_google_vrp_rules:
 
-Rules
+规则
 -----
 
-The goal of the VRP is to provide a formal process to honor contributions from external
-security researchers to Envoy's security. Vulnerabilities should meet the following conditions
-to be eligible for the program:
+VRP 的目标是提供一个正式流程来表彰那些对 Envoy 安全有贡献的外部安全人员。符合该奖励计划的漏洞应该满足以下条件：
 
-1. Vulnerabilities must meet one of the below :ref:`objectives
-   <arch_overview_google_vrp_objectives>`, demonstrated with the supplied Docker-based
-   :ref:`execution environment <arch_overview_google_vrp_ee>` and be consistent with the
-   program's :ref:`threat model <arch_overview_google_vrp_threat_model>`.
+1. 漏洞必须满足以下 :ref:`目标 <arch_overview_google_vrp_objectives>` 之一，使用提供的基于 Docker 的
+   :ref:`执行环境 <arch_overview_google_vrp_ee>` 进行演示，并且与项目中的
+   :ref:`威胁模型 <arch_overview_google_vrp_threat_model>` 保持一致。
 
-2. Vulnerabilities must be reported to envoy-security@googlegroups.com and be kept under embargo
-   while triage and potential security releases occur. Please follow the :repo:`disclosure guidance
-   <SECURITY.md#disclosures>` when submitting reports. Disclosure SLOs are documented :repo:`here
-   <SECURITY.md#fix-and-disclosure-slos>`. In general, security disclosures are subject to the
-   `Linux Foundation's privacy policy <https://www.linuxfoundation.org/privacy/>`_ with the added
-   proviso that VRP reports (including reporter e-mail address and name) may be freely shared with
-   Google for VRP purposes.
+2. 漏洞必须报告给 envoy-security@googlegroups.com，并保证具有潜在的安全问题的版本不被泄漏。提交报告时请遵循
+   :repo:`披露指南 <SECURITY.md#disclosures>` 。披露 SLO 被记录在 :repo:`这里 <SECURITY.md#fix-and-disclosure-slos>`。
+   一般而言，安全信息的披漏要遵守 `Linux 基金会的隐私政策 <https://www.linuxfoundation.org/privacy/>`_ ，
+   并附加了一个条件，即 VRP 报告（包括报告的电子邮件地址和姓名）可以基于 VRP 的目的与谷歌共享。
 
-3. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
-   CVE databases (when previously associated with Envoy), etc. Existing CVEs that have not been
-   previously associated with an Envoy vulnerability are fair game.
+3. 漏洞一定不能是公共论坛上已知的，比如，Github 的问题追踪，CVE 数据库（与 Envoy 关联的）等。
+   现有的 CVE 之前没有与 Envoy 的漏洞关联的，不受影响。
 
-4. Vulnerabilities must not be also submitted to a parallel reward program run by Google or
-   `Lyft <https://www.lyft.com/security>`_.
+4. 漏洞不能同时提交给由 Google 或 `Lyft <https://www.lyft.com/security>`_ 运营的其他奖励计划。
 
-Rewards are at the discretion of the Envoy OSS security team and Google. They will be conditioned on
-the above criteria. If multiple instances of the same vulnerability are reported at the same time by
-independent researchers or the vulnerability is already tracked under embargo by the OSS Envoy
-security team, we will aim to fairly divide the reward amongst reporters.
+奖励由 Envoy OSS 安全团队和 Google 决定。他们将以上述规则为条件。如果多个独立的研究人员同时报告了同一个漏洞的多个实例，
+或者该漏洞已经被 OSS Envoy 的安全团队跟踪，奖金将会公平地在报告提交人中进行分配。
 
 .. _arch_overview_google_vrp_threat_model:
 
-Threat model
-------------
+威胁模型
+---------
 
-The base threat model matches that of Envoy's :ref:`OSS security posture
-<arch_overview_threat_model>`. We add a number of temporary restrictions to provide a constrained
-attack surface for the initial stages of this program. We exclude any threat from:
+最基本的匹配 Envoy 的安全模型是 :ref:`OSS 安全态势 <arch_overview_threat_model>`。我们添加了一些临时的限制来约束程序初始化阶段的攻击。我们排除了来自以下的威胁：
 
-* Untrusted control planes.
-* Runtime services such as access logging, external authorization, etc.
-* Untrusted upstreams.
-* DoS attacks except as stipulated below.
-* Any filters apart from the HTTP connection manager network filter and HTTP router filter.
-* Admin console; this is disabled in the execution environment.
+* 不可信的控制平面。
+* 运行时服务，比如访问日志，外部授权等。
+* 不可信的上游。
+* 除了以下规定的 DoS 攻击。
+* 除了 HTTP 连接管理器网络过滤器和 HTTP 路由器过滤器以外的任何过滤器。
+* 管理控制台，这在执行环境中是被禁用的。
 
-We also explicitly exclude any local attacks (e.g. via local processes, shells, etc.) against
-the Envoy process. All attacks must occur via the network data plane on port 10000. Similarly,
-kernel and Docker vulnerabilities are outside the threat model.
+我们还明确地排除了针对 Envoy 的本地攻击（比如，通过本地进程，shells 等）。所有的攻击都必须通过端口 10000 上的网络数据平面进行。
+同样的，内核和 Docker 漏洞在威胁模型之外。
 
-In the future we may relax some of these restrictions as we increase the sophistication of the
-program's execution environment.
+未来，随着程序运行环境的复杂度增加，我们可能会放宽上述这些限制。
 
 .. _arch_overview_google_vrp_ee:
 
-Execution environment
+执行环境
 ---------------------
 
-We supply Docker images that act as the reference environment for this program:
+我们提供了 Docker 镜像作为漏洞奖励计划的运行参考环境：
 
-* `envoyproxy/envoy-google-vrp <https://hub.docker.com/r/envoyproxy/envoy-google-vrp/tags/>`_ images
-  are based on Envoy point releases. Only the latest point release at the time of vulnerability
-  submission is eligible for the program. The first point release available for VRP will be the
-  1.15.0 Envoy release.
+* `envoyproxy/envoy-google-vrp <https://hub.docker.com/r/envoyproxy/envoy-google-vrp/tags/>`_ 镜像是基于 Envoy 进行发布的。
+  只有提交漏洞时的最新版本才有资格参与 VRP。第一个可用于 VRP 的版本是 1.15.0 Envoy 版本。
 
 * `envoyproxy/envoy-google-vrp-dev <https://hub.docker.com/r/envoyproxy/envoy-google-vrp-dev/tags/>`_
-  images are based on Envoy master builds. Only builds within the last 5 days at the time of
-  vulnerability submission are eligible for the program. They must not be subject to any
-  publicly disclosed vulnerability at that point in time.
+  镜像是基于 Envoy 主分支构建的，只有在提交漏洞时最后 5 天内的版本才有资格参与 VRP。在该时间点上，它们不得受到任何公开披露的漏洞的影响。
 
-Two Envoy processes are available when these images are launched via `docker run`:
+当这些镜像通过 "docker run" 启动时，有两个 Envoy 进程可用:
 
-* The *edge* Envoy is listening on ports 10000 (HTTPS). It has a :repo:`static configuration
-  </configs/google-vrp/envoy-edge.yaml>` that is configured according to Envoy's :ref:`edge hardening
-  principles <faq_edge>`. It has sinkhole, direct response and request forwarding routing rules (in
-  order):
+* Envoy 的 *edge* 监听端口是 10000 （HTTPS），通过 Envoy 的 :ref:`边缘硬化原则 <faq_edge>`，有一个配置好的 :repo:`静态配置
+  </configs/google-vrp/envoy-edge.yaml>`，它具有 sinkhole，直接响应和请求转发路由规则（按顺序）
 
-  1. `/content/*`: route to the origin Envoy server.
-  2. `/*`: return 403 (denied).
+  1. `/content/*`: 路由到原始的 Envoy 服务器。
+  2. `/*`: 返回 403 （拒绝）。
 
+* *原始* Envoy 是边缘 Envoy 的上游。有一个 :repo:`静态配置 </configs/google-vrp/envoy-origin.yaml>` 只提供直接响应，
+  有效地充当 HTTP 源服务器，有两种路由规则（按顺序）：
 
-* The *origin* Envoy is an upstream of the edge Envoy. It has a :repo:`static configuration
-  </configs/google-vrp/envoy-origin.yaml>` that features only direct responses, effectively acting
-  as an HTTP origin server. There are two route rules (in order):
+  1. `/blockedz`: 返回 200 `hidden treasure`。除非存在一个限定的漏洞，否则 Envoy 边缘服务器的 10000 端口上的通信永远不可能接收到此响应。
+  2. `/*`: 返回 200 `normal`。
 
-  1. `/blockedz`: return 200 `hidden treasure`. It should never be possible to have
-     traffic on the Envoy edge server's 10000 port receive this response unless a
-     qualifying vulnerability is present.
-  2. `/*`: return 200 `normal`.
+运行 Docker 镜像，应该提供以下命令行选项：
 
-When running the Docker images, the following command line options should be supplied:
+* `-m 3g` 确保内存被限制到 3GB， 至少应该有这么多的内存可供执行环境使用。每个 Envoy 进程都有一个配置为限制在 1GB 的过载管理器。
 
-* `-m 3g` to ensure that memory is bounded to 3GB. At least this much memory should be available
-  to the execution environment. Each Envoy process has an overload manager configured to limit
-  at 1GB.
+* `-e ENVOY_EDGE_EXTRA_ARGS="<...>"` 支持边缘 Envoy 的其他 CLI 参数。这需要设置，但是可以为空。
 
-* `-e ENVOY_EDGE_EXTRA_ARGS="<...>"` supplies additional CLI args for the edge Envoy. This
-  needs to be set but can be empty.
-
-* `-e ENVOY_ORIGIN_EXTRA_ARGS="<...>"` supplies additional CLI args for the origin Envoy. This
-  needs to be set but can be empty.
+* `-e ENVOY_ORIGIN_EXTRA_ARGS="<...>"` 支持原始 Envoy 的其他 CLI 参数，这也需要设置，但是也可以为空。
 
 .. _arch_overview_google_vrp_objectives:
 
-Objectives
-----------
+目标
+-----
 
-Vulnerabilities will be evidenced by requests on 10000 that trigger a failure mode
-that falls into one of these categories:
+漏洞将在端口为 10000 的请求中被证明，这些请求触发了属于以下类别之一的故障模式：
 
-* Query-of-death: requests that cause the Envoy process to segfault or abort
-  in some immediate way.
-* OOM: requests that cause the edge Envoy process to OOM. There should be no more than
-  100 connections and streams in total involved to cause this to happen (i.e. brute force
-  connection/stream DoS is excluded).
-* Routing rule bypass: requests that are able to access `hidden treasure`.
-* TLS certificate exfiltration: requests that are able to obtain the edge Envoy's
-  `serverkey.pem`.
-* Remote code exploits: any root shell obtained via the network data plane.
-* At the discretion of the OSS Envoy security team, sufficiently interesting vulnerabilities that
-  don't fit the above categories but are likely to fall into the category of high or critical
-  vulnerabilities.
+* 死亡查询： 导致 Envoy 进程立即出错或者终止请求
+* OOM：导致边缘 Envoy 进程内存溢出的请求，连接或流总数不应该有超过 100 个，否则会导致这种情况的发生（即暴力破解，不包括连接/流 DoS）。
+* 绕过路由规则： 能够访问`隐藏宝藏`的请求。
+* TLS 证书泄漏：请求可能获取边缘 Envoy 的 `serverkey.pem`。
+* 远程代码利用：通过网络数据平面获得的任何超级管理员 shell。
+* 在 OSS Envoy 安全团队的评判后，如果足够引人关注的漏洞不属于上述类别，很可能属于高级别或关键级别的漏洞。
 
-Working with the Docker images
-------------------------------
+在 Docker 镜像下运行
+---------------------
 
-A basic invocation of the execution environment that will bring up the edge Envoy on local
-port 10000 looks like:
+执行环境的一个基本调用将在本地端口 10000 上调出边缘 Envoy，如下所示:
 
 .. code-block:: bash
 
@@ -148,8 +110,7 @@ port 10000 looks like:
      -e ENVOY_ORIGIN_EXTRA_ARGS="" \
      envoyproxy/envoy-google-vrp-dev:latest
 
-When debugging, additional args may prove useful, e.g. in order to obtain trace logs, make
-use of `wireshark` and `gdb`:
+在调试时，额外的参数可能会很有用，例如，为了获得跟踪日志，可以使用 `wireshark` 和 `gdb`：
 
 .. code-block:: bash
 
@@ -159,21 +120,22 @@ use of `wireshark` and `gdb`:
      --cap-add SYS_PTRACE --cap-add NET_RAW --cap-add NET_ADMIN \
      envoyproxy/envoy-google-vrp-dev:latest
 
-You can obtain a shell in the Docker container with:
+你可以在 Docker 容器中获取一个 shell：
 
 .. code-block:: bash
 
   docker exec -it envoy-google-vrp /bin/bash
 
-The Docker images include `gdb`, `strace`, `tshark` (feel free to contribute other
-suggestions via PRs updating the :repo:`Docker build file </ci/Dockerfile-envoy-google-vrp>`).
 
-Rebuilding the Docker image
----------------------------
+Docker 镜像包括 gdb, strace, tshark (欢迎通过 PRs 更新
+:repo:`Docker 构建文件 </ci/Dockerfile-envoy-google-vrp>` 来提供其他建议
+)。
 
-It's helpful to be able to regenerate your own Docker base image for research purposes.
-To do this without relying on CI, follow the instructions at the top of
-:repo:`ci/docker_rebuild_google-vrp.sh`. An example of this flow looks like:
+重建 Docker 镜像
+-----------------
+
+这有助于重新生成你自己的 Docker 基础镜像，来用于研究的目的。要在不依赖 CI 的情况下执行此操作，
+请按照 :repo:`ci/docker_rebuild_google-vrp.sh` 顶部的说明进行操作。示例如下：
 
 .. code-block:: bash
 
