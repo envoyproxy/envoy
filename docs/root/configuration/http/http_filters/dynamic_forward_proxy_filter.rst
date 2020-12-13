@@ -1,68 +1,66 @@
 .. _config_http_filters_dynamic_forward_proxy:
 
-Dynamic forward proxy
+动态转发代理
 =====================
 
-* HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
-* This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*
+* HTTP 动态转发代理 :ref:`架构总览 <arch_overview_http_dynamic_forward_proxy>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
+* 此过滤器的名称应该被配置为 *envoy.filters.http.dynamic_forward_proxy*
 
-The following is a complete configuration that configures both the
-:ref:`dynamic forward proxy HTTP filter
+下面是一份完整的配置，配置包含
+:ref:`动态转发代理 HTTP 过滤器
 <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
-as well as the :ref:`dynamic forward proxy cluster
-<envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`. Both filter and cluster
-must be configured together and point to the same DNS cache parameters for Envoy to operate as an
-HTTP dynamic forward proxy.
+和 :ref:`动态转发代理集群
+<envoy_v3_api_msg_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig>`。
+过滤器和集群必须一起配置，并且指向相同的 DNS 缓存参数，这样 Envoy 才能作为 HTTP 动态转发代理运作。
 
-This filter supports :ref:`host rewrite <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
-via the :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or the
-:ref:`route's typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`. This can be used to rewrite
-the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
-host when forwarding. See the example below within the configured routes.
+此过滤器支持 :ref:`主机地址重写 <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`，
+通过配置 :ref:`虚拟主机的 typed_per_filter_config 配置 <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` 或者
+:ref:`路由的 typed_per_filter_config 配置 <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` 来实现。 
+这可以被用在进行 DNS 查找前重写主机头为指定值，因此允许在转发时将流量路由到重写后的主机地址。
+参阅以下示例，其中包含已配置的路由。
 
 .. note::
 
-  Configuring a :ref:`transport_socket with name envoy.transport_sockets.tls <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>` on the cluster with
-  *trusted_ca* certificates instructs Envoy to use TLS when connecting to upstream hosts and verify
-  the certificate chain. Additionally, Envoy will automatically perform SAN verification for the
-  resolved host name as well as specify the host name via SNI.
+  使用 *trusted_ca* 证书在集群上配置一项
+  :ref:`transport_socket 和名称 envoy.transport_sockets.tls <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`，
+  可指示 Envoy 在连接上游主机和验证证书链时使用 TLS。
+  此外，Envoy 会自动地为已解析的主机名称进行 SAN 认证，并且通过 SNI 指定主机名称。
 
 .. _dns_cache_circuit_breakers:
 
-  Dynamic forward proxy uses circuit breakers built in to the DNS cache with the configuration
-  of :ref:`DNS cache circuit breakers <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>`. By default, this behavior is enabled by the runtime feature `envoy.reloadable_features.enable_dns_cache_circuit_breakers`.
-  If this runtime feature is disabled, cluster circuit breakers will be used even when setting the configuration
-  of :ref:`DNS cache circuit breakers <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>`.
+  动态转发代理对 DNS 缓存使用内置的熔断器，
+  通过配置 :ref:`DNS 缓存熔断器 <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>` 来实现。
+  默认情况下，此行为被运行时特性 `envoy.reloadable_features.enable_dns_cache_circuit_breakers` 启用。
+  如果这个运行时特性被禁用，即使对 :ref:`DNS 缓存熔断器 <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>` 进行了设置，但集群熔断器依旧会被使用。
 
 .. literalinclude:: _include/dns-cache-circuit-breaker.yaml
     :language: yaml
 
-Statistics
+统计
 ----------
 
-The dynamic forward proxy DNS cache outputs statistics in the dns_cache.<dns_cache_name>.*
-namespace.
+动态转发代理 DNS 缓存输出统计在 dns_cache.<dns_cache_name>.* 命名空间中。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  dns_query_attempt, Counter, Number of DNS query attempts.
-  dns_query_success, Counter, Number of DNS query successes.
-  dns_query_failure, Counter, Number of DNS query failures.
-  host_address_changed, Counter, Number of DNS queries that resulted in a host address change.
-  host_added, Counter, Number of hosts that have been added to the cache.
-  host_removed, Counter, Number of hosts that have been removed from the cache.
-  num_hosts, Gauge, Number of hosts that are currently in the cache.
-  dns_rq_pending_overflow, Counter, Number of dns pending request overflow.
+  dns_query_attempt, Counter, DNS 查询尝试次数。
+  dns_query_success, Counter, DNS 查询成功次数。
+  dns_query_failure, Counter, DNS 查询失败次数。
+  host_address_changed, Counter, 导致主机地址更改的 DNS 查询次数。
+  host_added, Counter, 已经被添加到缓存的主机数。
+  host_removed, Counter, 已经从缓存被删除的主机数。
+  num_hosts, Gauge, 当前在缓存中的主机数。
+  dns_rq_pending_overflow, Counter, 待处理请求溢出的 DNS 数。
 
-The dynamic forward proxy DNS cache circuit breakers outputs statistics in the dns_cache.<dns_cache_name>.circuit_breakers*
-namespace.
+动态转发代理 DNS 缓存熔断器输出统计在 *dns_cache.<dns_cache_name>.circuit_breakers*
+命名空间。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  rq_pending_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
-  rq_pending_remaining, Gauge, Number of remaining requests until the circuit breaker opens
+  rq_pending_open, Gauge, 请求熔断器是关闭 (0) 还是开启 (1)
+  rq_pending_remaining, Gauge, 直到熔断器开启，剩余的请求数
