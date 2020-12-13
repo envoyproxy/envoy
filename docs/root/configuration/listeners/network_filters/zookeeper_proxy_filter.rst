@@ -1,27 +1,20 @@
 .. _config_network_filters_zookeeper_proxy:
 
-ZooKeeper proxy
+ZooKeeper 代理
 ===============
 
-The ZooKeeper proxy filter decodes the client protocol for
-`Apache ZooKeeper <https://zookeeper.apache.org/>`_. It decodes the requests,
-responses and events in the payload. Most opcodes known in
-`ZooKeeper 3.5 <https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java>`_
-are supported. The unsupported ones are related to SASL authentication.
+ZooKeeper 代理过滤器解码 `Apache ZooKeeper <https://zookeeper.apache.org/>`_ 的客户端协议。它能够对负载中的请求、响应、事件进行解码。其中支持 `ZooKeeper 3.5 <https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java>`_  中已知的大多数操作码。不支持的那就是与 SALS 认证有关。
 
 .. attention::
 
-   The zookeeper_proxy filter is experimental and is currently under active
-   development. Capabilities will be expanded over time and the
-   configuration structures are likely to change.
+   ZooKeeper 代理过滤器目前在积极的开发中，还处于试验阶段。随着时间的推移，功能将会得到扩展，并且配置结构也可能会发生变化。
 
 .. _config_network_filters_zookeeper_proxy_config:
 
-Configuration
--------------
+配置
+------
 
-The ZooKeeper proxy filter should be chained with the TCP proxy filter as shown
-in the configuration snippet below:
+ZooKeeper 代理过滤器应该与 TCP 代理过滤器相连接，如下面的配置片段所示：
 
 .. code-block:: yaml
 
@@ -40,132 +33,130 @@ in the configuration snippet below:
 
 .. _config_network_filters_zookeeper_proxy_stats:
 
-Statistics
-----------
+统计
+------
 
-Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*. The
-following counters are available:
+每一个ZooKeeper 代理过滤器的配置都有一个基于 *<stat_prefix>.zookeeper.* 的统计信息。可用的计数器如下：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  decoder_error, Counter, Number of times a message wasn't decoded
-  request_bytes, Counter, Number of bytes in decoded request messages
-  connect_rq, Counter, Number of regular connect (non-readonly) requests
-  connect_readonly_rq, Counter, Number of connect requests with the readonly flag set
-  ping_rq, Counter, Number of ping requests
-  auth.<type>_rq, Counter, Number of auth requests for a given type
-  getdata_rq, Counter, Number of getdata requests
-  create_rq, Counter, Number of create requests
-  create2_rq, Counter, Number of create2 requests
-  setdata_rq, Counter, Number of setdata requests
-  getchildren_rq, Counter, Number of getchildren requests
-  getchildren2_rq, Counter, Number of getchildren2 requests
-  remove_rq, Counter, Number of delete requests
-  exists_rq, Counter, Number of stat requests
-  getacl_rq, Counter, Number of getacl requests
-  setacl_rq, Counter, Number of setacl requests
-  sync_rq, Counter, Number of sync requests
-  multi_rq, Counter, Number of multi transaction requests
-  reconfig_rq, Counter, Number of reconfig requests
-  close_rq, Counter, Number of close requests
-  setwatches_rq, Counter, Number of setwatches requests
-  checkwatches_rq, Counter, Number of checkwatches requests
-  removewatches_rq, Counter, Number of removewatches requests
-  check_rq, Counter, Number of check requests
-  response_bytes, Counter, Number of bytes in decoded response messages
-  connect_resp, Counter, Number of connect responses
-  ping_resp, Counter, Number of ping responses
-  auth_resp, Counter, Number of auth responses
-  watch_event, Counter, Number of watch events fired by the server
-  getdata_resp, Counter, Number of getdata responses
-  create_resp, Counter, Number of create responses
-  create2_resp, Counter, Number of create2 responses
-  createcontainer_resp, Counter, Number of createcontainer responses
-  createttl_resp, Counter, Number of createttl responses
-  setdata_resp, Counter, Number of setdata responses
-  getchildren_resp, Counter, Number of getchildren responses
-  getchildren2_resp, Counter, Number of getchildren2 responses
-  getephemerals_resp, Counter, Number of getephemerals responses
-  getallchildrennumber_resp, Counter, Number of getallchildrennumber responses
-  remove_resp, Counter, Number of remove responses
-  exists_resp, Counter, Number of exists responses
-  getacl_resp, Counter, Number of getacl responses
-  setacl_resp, Counter, Number of setacl responses
-  sync_resp, Counter, Number of sync responses
-  multi_resp, Counter, Number of multi responses
-  reconfig_resp, Counter, Number of reconfig responses
-  close_resp, Counter, Number of close responses
-  setauth_resp, Counter, Number of setauth responses
-  setwatches_resp, Counter, Number of setwatches responses
-  checkwatches_resp, Counter, Number of checkwatches responses
-  removewatches_resp, Counter, Number of removewatches responses
-  check_resp, Counter, Number of check responses
+  decoder_error, Counter, 消息未解码的次数
+  request_bytes, Counter, 解码请求信息中的字节数
+  connect_rq, Counter, 常规连接（非只读）请求数
+  connect_readonly_rq, Counter, 设置了 readonly 标志的连接请求数
+  ping_rq, Counter, Ping 请求的数量
+  auth.<type>_rq, Counter, 给定类型的身份认证的请求数量
+  getdata_rq, Counter, 获取请求数据的数量
+  create_rq, Counter, create 请求数
+  create2_rq, Counter, create2 请求数
+  setdata_rq, Counter, setdata 请求数
+  getchildren_rq, Counter, getchildren 请求数
+  getchildren2_rq, Counter, getchildren2 请求数
+  remove_rq, Counter, 删除请求数
+  exists_rq, Counter, 统计请求数
+  getacl_rq, Counter, getacl 请求数
+  setacl_rq, Counter, setacl 请求数
+  sync_rq, Counter, 同步请求数
+  multi_rq, Counter, 多笔交易请求数
+  reconfig_rq, Counter, 重新配置请求数
+  close_rq, Counter, 关闭请求数
+  setwatches_rq, Counter, setwatches 请求数
+  checkwatches_rq, Counter, checkwatches 请求数
+  removewatches_rq, Counter, removewatches 请求数
+  check_rq, Counter, 检查请求数
+  response_bytes, Counter, 解码响应消息中的字节数
+  connect_resp, Counter, 连接响应数
+  ping_resp, Counter, Ping 响应数
+  auth_resp, Counter, 认证响应数
+  watch_event, Counter, 服务器触发的监视事件的数量
+  getdata_resp, Counter, getdata 响应数
+  create_resp, Counter, create 响应数
+  create2_resp, Counter, create2 响应数
+  createcontainer_resp, Counter, createcontainer 响应数
+  createttl_resp, Counter, createttl 响应数
+  setdata_resp, Counter, setdata 响应数
+  getchildren_resp, Counter, getchildren 响应数
+  getchildren2_resp, Counter, getchildren2 响应数
+  getephemerals_resp, Counter, getephemerals 响应数
+  getallchildrennumber_resp, Counter, getallchildrennumber 响应数
+  remove_resp, Counter, 删除响应数
+  exists_resp, Counter, 存在响应数
+  getacl_resp, Counter, getacl 响应数
+  setacl_resp, Counter, setacl 响应数
+  sync_resp, Counter, 同步响应数
+  multi_resp, Counter, 多笔交易响应数
+  reconfig_resp, Counter, 重新配置响应数
+  close_resp, Counter, 关闭响应数
+  setauth_resp, Counter, setauth 响应数
+  setwatches_resp, Counter, setwatches 响应数
+  checkwatches_resp, Counter, checkwatches 响应数
+  removewatches_resp, Counter, removewatches 响应数
+  check_resp, Counter, 检查响应数
 
 
 .. _config_network_filters_zookeeper_proxy_latency_stats:
 
-Per opcode latency statistics
------------------------------
+操作码延迟统计信息
+-------------------
 
-The filter will gather latency statistics in the *<stat_prefix>.zookeeper.<opcode>_response_latency* namespace.
-Latency stats are in milliseconds:
+过滤器将在 *<stat_prefix>.zookeeper.<opcode>_response_latency* 命名空间中收集延迟统计信息。延迟统计信息以毫秒为单位：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  connect_response_latency, Histogram, Opcode execution time in milliseconds
-  ping_response_latency, Histogram, Opcode execution time in milliseconds
-  auth_response_latency, Histogram, Opcode execution time in milliseconds
-  watch_event, Histogram, Opcode execution time in milliseconds
-  getdata_response_latency, Histogram, Opcode execution time in milliseconds
-  create_response_latency, Histogram, Opcode execution time in milliseconds
-  create2_response_latency, Histogram, Opcode execution time in milliseconds
-  createcontainer_response_latency, Histogram, Opcode execution time in milliseconds
-  createttl_response_latency, Histogram, Opcode execution time in milliseconds
-  setdata_response_latency, Histogram, Opcode execution time in milliseconds
-  getchildren_response_latency, Histogram, Opcode execution time in milliseconds
-  getchildren2_response_latency, Histogram, Opcode execution time in milliseconds
-  getephemerals_response_latency, Histogram, Opcode execution time in milliseconds
-  getallchildrennumber_response_latency, Histogram, Opcode execution time in milliseconds
-  remove_response_latency, Histogram, Opcode execution time in milliseconds
-  exists_response_latency, Histogram, Opcode execution time in milliseconds
-  getacl_response_latency, Histogram, Opcode execution time in milliseconds
-  setacl_response_latency, Histogram, Opcode execution time in milliseconds
-  sync_response_latency, Histogram, Opcode execution time in milliseconds
-  multi_response_latency, Histogram, Opcode execution time in milliseconds
-  reconfig_response_latency, Histogram, Opcode execution time in milliseconds
-  close_response_latency, Histogram, Opcode execution time in milliseconds
-  setauth_response_latency, Histogram, Opcode execution time in milliseconds
-  setwatches_response_latency, Histogram, Opcode execution time in milliseconds
-  checkwatches_response_latency, Histogram, Opcode execution time in milliseconds
-  removewatches_response_latency, Histogram, Opcode execution time in milliseconds
-  check_response_latency, Histogram, Opcode execution time in milliseconds
+  connect_response_latency, Histogram, 操作码执行时间（毫秒）
+  ping_response_latency, Histogram, 操作码执行时间（毫秒）
+  auth_response_latency, Histogram, 操作码执行时间（毫秒）
+  watch_event, Histogram, 操作码执行时间（毫秒）
+  getdata_response_latency, Histogram, 操作码执行时间（毫秒）
+  create_response_latency, Histogram, 操作码执行时间（毫秒）
+  create2_response_latency, Histogram, 操作码执行时间（毫秒）
+  createcontainer_response_latency, Histogram, 操作码执行时间（毫秒）
+  createttl_response_latency, Histogram, 操作码执行时间（毫秒）
+  setdata_response_latency, Histogram, 操作码执行时间（毫秒）
+  getchildren_response_latency, Histogram, 操作码执行时间（毫秒）
+  getchildren2_response_latency, Histogram, 操作码执行时间（毫秒）
+  getephemerals_response_latency, Histogram, 操作码执行时间（毫秒）
+  getallchildrennumber_response_latency, Histogram, 操作码执行时间（毫秒）
+  remove_response_latency, Histogram, 操作码执行时间（毫秒）
+  exists_response_latency, Histogram, 操作码执行时间（毫秒）
+  getacl_response_latency, Histogram, 操作码执行时间（毫秒）
+  setacl_response_latency, Histogram, 操作码执行时间（毫秒）
+  sync_response_latency, Histogram, 操作码执行时间（毫秒）
+  multi_response_latency, Histogram, 操作码执行时间（毫秒）
+  reconfig_response_latency, Histogram, 操作码执行时间（毫秒）
+  close_response_latency, Histogram, 操作码执行时间（毫秒）
+  setauth_response_latency, Histogram, 操作码执行时间（毫秒）
+  setwatches_response_latency, Histogram, 操作码执行时间（毫秒）
+  checkwatches_response_latency, Histogram, 操作码执行时间（毫秒）
+  removewatches_response_latency, Histogram, 操作码执行时间（毫秒）
+  check_response_latency, Histogram, 操作码执行时间（毫秒）
 
 
 .. _config_network_filters_zookeeper_proxy_dynamic_metadata:
 
-Dynamic Metadata
+动态元数据
 ----------------
 
-The ZooKeeper filter emits the following dynamic metadata for each message parsed:
+ZooKeeper 过滤器分析每一个消息都会释放出以下动态元数据：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  <path>, string, "The path associated with the request, response or event"
-  <opname>, string, "The opname for the request, response or event"
-  <create_type>, string, "The string representation of the flags applied to the znode"
-  <bytes>, string, "The size of the request message in bytes"
-  <watch>, string, "True if a watch is being set, false otherwise"
-  <version>, string, "The version parameter, if any, given with the request"
-  <timeout>, string, "The timeout parameter in a connect response"
-  <protocol_version>, string, "The protocol version in a connect response"
-  <readonly>, string, "The readonly flag in a connect response"
-  <zxid>, string, "The zxid field in a response header"
-  <error>, string, "The error field in a response header"
-  <client_state>, string, "The state field in a watch event"
-  <event_type>, string, "The event type in a a watch event"
+  <path>, string, 与请求、响应和事件关联的路径
+  <opname>, string, 与请求、响应和事件关联的操作名称
+  <create_type>, string, 用于 znode 标志的字符串表示形式
+  <bytes>, string, 以字节为单位欸的请求消息的大小
+  <watch>, string, 如果设置监听则为 True，否则为 False
+  <version>, string, 请求中给定的 version 参数（如果有）
+  <timeout>, string, 连接响应中的超时参数
+  <protocol_version>, string, 连接响应中的协议版本
+  <readonly>, string, 连接响应中的 readonly 标志
+  <zxid>, string, 响应头中的 zxid 字段
+  <error>, string, 响应头中的 error 字段
+  <client_state>, string, 监听事件中的 state 字段
+  <event_type>, string, 监听事件中的事件类型
