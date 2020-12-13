@@ -16,8 +16,7 @@ public:
   EnvoyException(const std::string& message) : std::runtime_error(message) {}
 };
 
-
-static bool isMainThread() {
+bool isMainThread() {
     static std::thread::id main_thread_id = std::this_thread::get_id();
     return main_thread_id == std::this_thread::get_id(); 
 }
