@@ -1,13 +1,12 @@
-Examples
+示例
 --------
 
-Below we will use YAML representation of the config protos and a running example
-of a service proxying HTTP from 127.0.0.1:10000 to 127.0.0.2:1234.
+下面是我们将使用 YAML 表示的配置原型，以及从 127.0.0.1:10000 到 127.0.0.2:1234 的服务代理 HTTP 的运行示例。
 
-Static
+静态
 ^^^^^^
 
-A minimal fully static bootstrap config is provided below:
+下面提供了一个最小的完全静态 bootstrap 配置：
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.bootstrap.v3.Bootstrap
@@ -54,13 +53,10 @@ A minimal fully static bootstrap config is provided below:
                   address: 127.0.0.1
                   port_value: 1234
 
-Mostly static with dynamic EDS
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+大多是拥有动态 EDS 的静态配置
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A bootstrap config that continues from the above example with :ref:`dynamic endpoint
-discovery <arch_overview_dynamic_config_eds>` via an
-:ref:`EDS<envoy_v3_api_file_envoy/service/endpoint/v3/eds.proto>` gRPC management server listening
-on 127.0.0.1:5678 is provided below:
+下面提供了一个 bootstrap 配置，该配置从以上示例开始，通过监听 127.0.0.3:5678 的 :ref:`EDS <envoy_v3_api_file_envoy/service/endpoint/v3/eds.proto>` gRPC 管理服务器进行 :ref:`动态端点发现 <arch_overview_dynamic_config_eds>`：
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.bootstrap.v3.Bootstrap
@@ -126,16 +122,11 @@ on 127.0.0.1:5678 is provided below:
                   address: 127.0.0.1
                   port_value: 5678
 
-Notice above that *xds_cluster* is defined to point Envoy at the management server. Even in
-an otherwise completely dynamic configurations, some static resources need to
-be defined to point Envoy at its xDS management server(s).
+注意上面 *xds_cluster* 被定义为指向 Envoy 管理服务器。即使在完全动态的配置中，也需要定义一些静态资源，从而将 Envoy 指向其 xDS 管理服务器。
 
-It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_v3_api_msg_config.core.v3.TcpKeepalive>`
-in the `tcp_keepalive` block. This will help detect TCP half open connections to the xDS management
-server and re-establish a full connection.
+在 `tcp_keepalive` 块中设置适当的 :ref:`TCP Keep-Alive 选项 <envoy_v3_api_msg_config.core.v3.TcpKeepalive>` 非常重要。这将有助于检测与 xDS 管理服务器的 TCP 半开连接，并重新建立完整连接。
 
-In the above example, the EDS management server could then return a proto encoding of a
-:ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`:
+在上面的例子中，EDS 管理服务器可以返回一个 proto 编码的 :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`：
 
 .. code-block:: yaml
 
@@ -152,17 +143,12 @@ In the above example, the EDS management server could then return a proto encodi
               port_value: 1234
 
 
-The versioning and type URL scheme that appear above are explained in more
-detail in the :ref:`streaming gRPC subscription protocol
-<xds_protocol_streaming_grpc_subscriptions>`
-documentation.
+上面显示的版本控制和类型 URL 方案在 :ref:`流式 gRPC 订阅协议 <xds_protocol_streaming_grpc_subscriptions>` 文档中有更详细的解释。
 
-Dynamic
+动态
 ^^^^^^^
 
-A fully dynamic bootstrap configuration, in which all resources other than
-those belonging to the management server are discovered via xDS is provided
-below:
+下面提供了完全动态的 bootstrap 配置，其中除了属于管理服务器资源外的所有资源都是通过 xDS 发现的：
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.bootstrap.v3.Bootstrap
@@ -208,7 +194,7 @@ below:
                   address: 127.0.0.1
                   port_value: 5678
 
-The management server could respond to LDS requests with:
+管理服务器将如下响应 LDS 请求：
 
 .. code-block:: yaml
 
@@ -238,7 +224,7 @@ The management server could respond to LDS requests with:
           http_filters:
           - name: envoy.filters.http.router
 
-The management server could respond to RDS requests with:
+管理服务将如下响应 RDS 请求：
 
 .. code-block:: yaml
 
@@ -253,7 +239,7 @@ The management server could respond to RDS requests with:
       - match: { prefix: "/" }
         route: { cluster: some_service }
 
-The management server could respond to CDS requests with:
+管理服务器将如下响应 CDS 请求：
 
 .. code-block:: yaml
 
@@ -272,7 +258,7 @@ The management server could respond to CDS requests with:
             - envoy_grpc:
                 cluster_name: xds_cluster
 
-The management server could respond to EDS requests with:
+管理服务器将如下响应 EDS 请求：
 
 .. code-block:: yaml
 
