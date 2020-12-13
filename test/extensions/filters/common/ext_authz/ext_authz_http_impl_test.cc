@@ -457,7 +457,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
       TestCommon::makeHeaderValueOption(
-          {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}));
+          {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}),
+      TestCommon::makeHeaderValueOption({}));
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);

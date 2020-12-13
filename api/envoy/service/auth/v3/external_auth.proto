@@ -60,7 +60,7 @@ message DeniedHttpResponse {
 }
 
 // HTTP attributes for an OK response.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message OkHttpResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.OkHttpResponse";
@@ -96,6 +96,11 @@ message OkHttpResponse {
   // setting this field overrides :ref:`CheckResponse.dynamic_metadata
   // <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>`.
   google.protobuf.Struct dynamic_metadata = 3 [deprecated = true];
+
+  // This field allows the authorization service to send HTTP response headers
+  // to the downstream client on success. Note that the `append` field in `HeaderValueOption`
+  // defaults to false when used in this message.
+  repeated config.core.v3.HeaderValueOption response_headers_to_add = 6;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.
