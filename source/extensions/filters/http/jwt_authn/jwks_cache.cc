@@ -78,7 +78,8 @@ public:
                        time_source_.monotonicTime() +
                            std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
                                (jwt_provider_.token_cache_duration()))))
-            : std::min(token_exp, std::chrono::milliseconds(TokenCacheDuration));
+            : std::min(token_exp, time_source_.monotonicTime() +
+                                      std::chrono::milliseconds(TokenCacheDuration));
     token_cache_.insert(token, token_result, 1);
   }
 
