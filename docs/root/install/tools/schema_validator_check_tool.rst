@@ -1,35 +1,29 @@
 .. _install_tools_schema_validator_check_tool:
 
-Schema Validator check tool
-===========================
+Schema 验证器检查工具
+=======================
 
-The schema validator tool validates that the passed in configuration conforms to
-a given schema. The configuration may be JSON or YAML. To validate the entire
-config, please refer to the
-:ref:`config load check tool<install_tools_config_load_check_tool>`.
+Schema 验证器检查工具验证传入的配置是否符合给定的 schema。配置可以是 JSON 或者 YAML。为了验证全部的配置，可以参考 :ref:`配置加载检查工具 <install_tools_config_load_check_tool>`。
 
-Input
-  The tool expects two inputs:
+输入
+  这个工具共有两个输入：
 
-  1. The schema type to check the passed in configuration against. The supported types are:
+  1. 传入配置的 schema 类型会被检查。支持的类型有：
 
-    * `route` - for :ref:`route configuration<envoy_v3_api_msg_config.route.v3.RouteConfiguration>` validation.
-    * `discovery_response` for :ref:`discovery response<envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` validation.
+    * `route` - 用于 :ref:`路由配置 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` 验证。
+    * `discovery_response` - 用于 :ref:`发现响应 <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` 验证。
 
-  2. The path to the configuration file.
+  2. 配置文件的路径。
 
-Output
-  If the configuration conforms to the schema, the tool will exit with status
-  EXIT_SUCCESS. If the configuration does not conform to the schema, an error
-  message is outputted detailing what doesn't conform to the schema. The tool
-  will exit with status EXIT_FAILURE.
+输出
+  如果配置符合 schema，工具将以 EXIT_SUCCESS 的状态退出。如果配置不符合 schema，会输出一条错误信息，并且会详细说明不符合 schema 的内容。同时工具会以 EXIT_FAILURE 的状态退出。
 
-Building
-  The tool can be built locally using Bazel. ::
+构建
+  这个工具可以使用 Bazel 在本地构建。 ::
 
     bazel build //test/tools/schema_validator:schema_validator_tool
 
-Running
-  The tool takes a path as described above. ::
+运行中
+  这个工具会使用上面描述的路径。 ::
 
     bazel-bin/test/tools/schema_validator/schema_validator_tool  --schema-type SCHEMA_TYPE  --config-path PATH
