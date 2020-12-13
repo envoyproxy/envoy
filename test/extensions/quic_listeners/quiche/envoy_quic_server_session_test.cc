@@ -294,6 +294,10 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
       quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
   auto stream =
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
+
+  // Basic checks.
+  ASSERT_FALSE(envoy_quic_session_.startSecureTransport());
+
   // Receive a GET request on created stream.
   quic::QuicHeaderList headers;
   headers.OnHeaderBlockStart();

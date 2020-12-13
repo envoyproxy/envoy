@@ -647,7 +647,7 @@ void Filter::onUpstreamConnection() {
       return true;
     });
     if (upstream_) {
-      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) {
+      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) -> bool {
         upstream_callbacks->onBytesSent();
         return true;
       });

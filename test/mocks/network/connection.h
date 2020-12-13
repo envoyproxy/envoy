@@ -86,6 +86,7 @@ public:
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));                             \
   MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));                          \
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
+  MOCK_METHOD(bool, startSecureTransport, ());                                                     \
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const))
 
 class MockConnection : public Connection, public MockConnectionBase {
@@ -170,6 +171,7 @@ public:
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
   MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));
+  MOCK_METHOD(bool, startSecureTransport, ());
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));
 
   // Network::FilterManagerConnection

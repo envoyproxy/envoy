@@ -329,6 +329,14 @@ public:
   virtual absl::string_view transportFailureReason() const PURE;
 
   /**
+   * Instructs the connection to start using secure transport.
+   * Note: Not all underlying transport sockets support such operation.
+   * @return boolean telling if underlying transport socket was able to
+             start secure transport.
+   */
+  virtual bool startSecureTransport() PURE;
+
+  /**
    *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.

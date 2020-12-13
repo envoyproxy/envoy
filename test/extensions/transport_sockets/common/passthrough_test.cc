@@ -83,6 +83,11 @@ TEST_F(PassthroughTest, SslDefersToInnerSocket) {
   passthrough_socket_->ssl();
 }
 
+// Test invoking startSecureTransport.
+TEST_F(PassthroughTest, FailOnStartSecureTransport) {
+  EXPECT_FALSE(passthrough_socket_->startSecureTransport());
+}
+
 } // namespace
 } // namespace TransportSockets
 } // namespace Extensions
