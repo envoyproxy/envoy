@@ -284,8 +284,12 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   }
 
   if (!connection_) {
-    Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr);
+    const auto thread_local_cluster =
+        parent_.cluster_manager_.getThreadLocalCluster(parent_.cluster_info_->name());
+    Upstream::Host::CreateConnectionData info;
+    if (thread_local_cluster != nullptr) {
+      info = thread_local_cluster->tcpConn(nullptr);
+    }
     if (!info.connection_) {
       buffer.drain(buffer.length());
       return;

@@ -120,6 +120,7 @@ public:
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               hcm.mutable_rds()->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
@@ -893,7 +894,9 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
 // Test whether Rds can correctly deliver LuaPerRoute configuration.
 TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 // When the route configuration is updated dynamically via RDS and the configuration contains an
-// inline Lua code, Envoy may call lua_open in multiple threads to create new lua_State objects.
+// inline Lua code, Envoy may call `luaL_newstate`
+// (https://www.lua.org/manual/5.1/manual.html#luaL_newstate) in multiple threads to create new
+// lua_State objects.
 // During lua_State creation, 'LuaJIT' uses some static local variables shared by multiple threads
 // to aid memory allocation. Although 'LuaJIT' itself guarantees that there is no thread safety
 // issue here, the use of these static local variables by multiple threads will cause a TSAN alarm.

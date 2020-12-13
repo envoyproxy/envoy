@@ -29,7 +29,7 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrat
 public:
   TcpGrpcAccessLogIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   void createUpstreams() override {
@@ -127,6 +127,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, TcpGrpcAccessLogIntegrationTest,
 
 // Test a basic full access logging flow.
 TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));

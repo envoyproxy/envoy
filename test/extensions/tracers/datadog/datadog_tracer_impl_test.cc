@@ -50,8 +50,6 @@ public:
   void setup(envoy::config::trace::v3::DatadogConfig& datadog_config, bool init_timer) {
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
     cm_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillByDefault(ReturnRef(cm_.async_client_));
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
@@ -136,10 +134,10 @@ TEST_F(DatadogDriverTest, AllowCollectorClusterToBeAddedViaApi) {
 TEST_F(DatadogDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(1));
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -178,10 +176,10 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
 TEST_F(DatadogDriverTest, NoBody) {
   setupValidDriver();
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(1));
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -233,8 +231,8 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("fake_cluster");
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -259,8 +257,8 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -283,11 +281,11 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -314,11 +312,11 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -346,13 +344,15 @@ TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 TEST_F(DatadogDriverTest, CancelInflightRequestsOnDestruction) {
   setupValidDriver();
 
-  StrictMock<Http::MockAsyncClientRequest> request1(&cm_.async_client_),
-      request2(&cm_.async_client_), request3(&cm_.async_client_), request4(&cm_.async_client_);
+  StrictMock<Http::MockAsyncClientRequest> request1(&cm_.thread_local_cluster_.async_client_),
+      request2(&cm_.thread_local_cluster_.async_client_),
+      request3(&cm_.thread_local_cluster_.async_client_),
+      request4(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback{};
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(1));
 
   // Expect 4 separate report requests to be made.
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request1)))
       .WillOnce(Return(&request2))

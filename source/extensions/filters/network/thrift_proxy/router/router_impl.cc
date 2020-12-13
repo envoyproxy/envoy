@@ -268,8 +268,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     passthrough_supported_ = true;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
+  Tcp::ConnectionPool::Instance* conn_pool =
+      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     stats_.no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(

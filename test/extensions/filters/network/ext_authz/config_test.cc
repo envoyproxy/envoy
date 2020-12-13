@@ -22,6 +22,7 @@ namespace ExtAuthz {
 namespace {
 void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
   std::string yaml = R"EOF(
+  transport_api_version: V3
   grpc_service:
     google_grpc:
       target_uri: ext_authz_server
@@ -51,14 +52,17 @@ void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
 
 TEST(ExtAuthzFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz(), context),
+  envoy::extensions::filters::network::ext_authz::v3::ExtAuthz config;
+  config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(config, context),
                ProtoValidationException);
 }
 
 TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
   expectCorrectProto(envoy::config::core::v3::ApiVersion::AUTO);
   expectCorrectProto(envoy::config::core::v3::ApiVersion::V2);
+#endif
   expectCorrectProto(envoy::config::core::v3::ApiVersion::V3);
 }
 
