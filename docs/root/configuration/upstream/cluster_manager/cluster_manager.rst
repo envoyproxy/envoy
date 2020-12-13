@@ -1,7 +1,7 @@
 .. _config_cluster_manager:
 
-Cluster manager
-===============
+集群管理器
+===========
 
 .. toctree::
   :maxdepth: 2
