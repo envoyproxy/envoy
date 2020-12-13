@@ -1326,7 +1326,7 @@ message HedgePolicy {
   bool hedge_on_per_try_timeout = 3;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RedirectAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RedirectAction";
 
@@ -1397,6 +1397,31 @@ message RedirectAction {
     //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Indicates that during redirect, portions of the path that match the
+    // pattern should be rewritten, even allowing the substitution of capture
+    // groups from the pattern into the new path as specified by the rewrite
+    // substitution string. This is useful to allow application paths to be
+    // rewritten in a way that is aware of segments with variable content like
+    // identifiers.
+    //
+    // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
+    //
+    // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution
+    //   string of ``\2/instance/\1`` would transform ``/service/foo/v1/api``
+    //   into ``/v1/api/instance/foo``.
+    //
+    // * The pattern ``one`` paired with a substitution string of ``two`` would
+    //   transform ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/two/zzz``.
+    //
+    // * The pattern ``^(.*?)one(.*)$`` paired with a substitution string of
+    //   ``\1two\2`` would replace only the first occurrence of ``one``,
+    //   transforming path ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/one/zzz``.
+    //
+    // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
+    //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
+    //   ``/aaa/yyy/bbb``.
+    type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
   }
 
   // The HTTP status code to use in the redirect response. The default response
