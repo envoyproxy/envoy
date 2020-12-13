@@ -97,6 +97,7 @@ envoy_cc_test_library(
         "//source/common/http:utility_lib",
         "//source/common/http/http2:codec_lib",
         "//test/common/http:common_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
