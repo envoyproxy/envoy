@@ -115,6 +115,8 @@ public:
   static std::string defaultHealthCheckFilter();
   // A string for a squash filter which can be used with addFilter()
   static std::string defaultSquashFilter();
+  // A string for startTls transport socket config.
+  static std::string startTlsConfig();
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
