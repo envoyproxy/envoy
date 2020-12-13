@@ -20,7 +20,9 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
                                 added_via_api, factory_context.dispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random), tls_(tls),
-      clusters_(config.clusters().begin(), config.clusters().end()) {}
+      clusters_(config.clusters().begin(), config.clusters().end()) {
+  tls_.set([](Event::Dispatcher&) { return nullptr; });
+}
 
 PriorityContextPtr
 Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
