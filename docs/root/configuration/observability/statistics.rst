@@ -1,36 +1,36 @@
 .. _statistics:
 
-Statistics
+统计
 ==========
 
 .. _server_statistics:
 
-Server
+服务器
 ------
 
-Server related statistics are rooted at *server.* with following statistics:
+服务器相关的统计以 *server.* 为根，统计信息如下:
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名字, 类型, 描述
   :widths: 1, 1, 2
 
-  uptime, Gauge, Current server uptime in seconds
-  concurrency, Gauge, Number of worker threads
-  memory_allocated, Gauge, Current amount of allocated memory in bytes. Total of both new and old Envoy processes on hot restart.
-  memory_heap_size, Gauge, Current reserved heap size in bytes. New Envoy process heap size on hot restart.
-  memory_physical_size, Gauge, Current estimate of total bytes of the physical memory. New Envoy process physical memory size on hot restart.
-  live, Gauge, "1 if the server is not currently draining, 0 otherwise"
-  state, Gauge, Current :ref:`State <envoy_v3_api_field_admin.v3.ServerInfo.state>` of the Server.
-  parent_connections, Gauge, Total connections of the old Envoy process on hot restart
-  total_connections, Gauge, Total connections of both new and old Envoy processes
-  version, Gauge, Integer represented version number based on SCM revision or :ref:`stats_server_version_override <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_server_version_override>` if set.
-  days_until_first_cert_expiring, Gauge, Number of days until the next certificate being managed will expire
-  seconds_until_first_ocsp_response_expiring, Gauge, Number of seconds until the next OCSP response being managed will expire
-  hot_restart_epoch, Gauge, Current hot restart epoch -- an integer passed via command line flag `--restart-epoch` usually indicating generation.
-  hot_restart_generation, Gauge, Current hot restart generation -- like hot_restart_epoch but computed automatically by incrementing from parent.
-  initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections
-  debug_assertion_failures, Counter, Number of debug assertion failures detected in a release build if compiled with `--define log_debug_assert_in_release=enabled` or zero otherwise
-  envoy_bug_failures, Counter, Number of envoy bug failures detected in a release build. File or report the issue if this increments as this may be serious.
-  static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
-  dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
+  uptime, Gauge, 当前服务器运行时间，以秒为单位
+  concurrency, Gauge, 工作线程数
+  memory_allocated, Gauge, 当前分配的内存总字节。在热重启时是，新、旧两 Envoy 进程的总量。
+  memory_heap_size, Gauge, 当前预留的堆大小总字节。在热重启时是新 Envoy 进程的堆大小。
+  memory_physical_size, Gauge, 当前估计物理内存总字节。 在热重启时是新 Envoy 进程的物理内存大小。
+  live, Gauge, "1 表示当前服务器是存活状态, 否则为 0"
+  state, Gauge, 当前服务器的 :ref:`状态 <envoy_v3_api_field_admin.v3.ServerInfo.state>` 。
+  parent_connections, Gauge, 热重启时旧 Envoy 进程的全部连接数。
+  total_connections, Gauge, 新、旧 Envoy进程的全部连接数
+  version, Gauge, 一整型值表示的基于 SCM 修订的版本号或是已设置的 :ref:`stats_server_version_override <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_server_version_override>` 。
+  days_until_first_cert_expiring, Gauge, 下一个证书到期的天数
+  seconds_until_first_ocsp_response_expiring, Gauge, 下一个 OCSP 响应到期的秒数
+  hot_restart_epoch, Gauge, 当前热重启的代数 -- 通常由命令行参数 `--restart-epoch` 传递的整数值生成。
+  hot_restart_generation, Gauge, 但前热重启的代数 -- 类似 hot_restart_epoch 但是通过递增上一代自动计算得来的。
+  initialization_time_ms, Histogram, Envoy 初始化花费的全部时间，以毫秒为单位。 它是从服务器启动直到工作线程准备好接受新连接的时间
+  debug_assertion_failures, Counter, 如果带了编译参数 `--define log_debug_assert_in_release=enabled` 则表示在一个发布版本中检测到调试断言失败的次数，否则为 0
+  envoy_bug_failures, Counter, 在一个发布版本中检测到的 Envoy bug 故障的数目。如果这是一个严重的问题请提交或报告这个 issue。
+  static_unknown_fields, Counter, 静态配置中具有未知字段的消息数
+  dynamic_unknown_fields, Counter, 动态配置中具有未知字段的消息数
 
