@@ -137,7 +137,7 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
       continue;
     }
     uint64_t copy_size = std::min(size, data_size - bytes_to_skip);
-    memcpy(dest, slice->data() + bytes_to_skip, copy_size); // NOLINT(safe-memcpy)
+    memcpy(dest, slice.data() + bytes_to_skip, copy_size); // NOLINT(safe-memcpy)
     size -= copy_size;
     dest += copy_size;
     // Now that we've started copying, there are no bytes left to skip over. If there
