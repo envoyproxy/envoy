@@ -28,15 +28,15 @@ public:
   // Load the config from envoy config.
   ThreadLocalCache(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
                    TimeSource& time_source, Api::Api& api) {
-    jwks_cache_ = Cache::create(config, time_source, api);
+    jwks_cache_ = JwksCache::create(config, time_source, api);
   }
 
-  // Get the Cache object.
-  Cache& getJwksCache() { return *jwks_cache_; }
+  // Get the JwksCache object.
+  JwksCache& getJwksCache() { return *jwks_cache_; }
 
 private:
-  // The Cache object.
-  CachePtr jwks_cache_;
+  // The JwksCache object.
+  JwksCachePtr jwks_cache_;
 };
 
 /**

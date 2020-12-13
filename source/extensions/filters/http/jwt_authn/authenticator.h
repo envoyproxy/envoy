@@ -45,7 +45,7 @@ public:
   // Authenticator factory function.
   static AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
                                  const absl::optional<std::string>& provider, bool allow_failed,
-                                 bool allow_missing, Cache& jwks_cache,
+                                 bool allow_missing, JwksCache& jwks_cache,
                                  Upstream::ClusterManager& cluster_manager,
                                  CreateJwksFetcherCb create_jwks_fetcher_cb,
                                  TimeSource& time_source);

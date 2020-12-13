@@ -175,6 +175,7 @@ LHS
 LLVM
 LPT
 LRS
+LRU
 Loggable
 MB
 MD
@@ -506,6 +507,7 @@ cout
 coverity
 cplusplus
 cpuset
+cpufreq
 creds
 crypto
 cryptographic
@@ -704,6 +706,7 @@ interpretable
 intra
 ints
 invariance
+invariants
 iovec
 iovecs
 ips
@@ -979,6 +982,7 @@ repeatability
 reperform
 repicked
 repo
+representable
 reproducibility
 requirepass
 reselecting
@@ -1100,6 +1104,7 @@ subtrees
 subtype
 subtypes
 subzone
+sudo
 superclass
 superset
 symlink

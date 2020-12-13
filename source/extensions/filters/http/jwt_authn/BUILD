@@ -28,6 +28,8 @@ envoy_cc_library(
         "jwt_verify_lib",
     ],
     deps = [
+        ":simple_lru_cache",
+        ":token_cache_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
@@ -119,5 +121,26 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "simple_lru_cache",
+    hdrs = [
+        "simple_lru_cache.h",
+        "simple_lru_cache_impl.h",
+    ],
+)
+
+envoy_cc_library(
+    name = "token_cache_lib",
+    srcs = ["token_cache.cc"],
+    hdrs = ["token_cache.h"],
+    external_deps = [
+        "jwt_verify_lib",
+    ],
+    deps = [
+        ":simple_lru_cache",
+        "//source/common/protobuf:utility_lib",
     ],
 )

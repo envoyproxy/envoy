@@ -26,13 +26,13 @@ protected:
   JwksCacheTest() : api_(Api::createApiForTest()) {}
   void SetUp() override {
     TestUtility::loadFromYaml(ExampleConfig, config_);
-    cache_ = Cache::create(config_, time_system_, *api_);
+    cache_ = JwksCache::create(config_, time_system_, *api_);
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
   }
 
   Event::SimulatedTimeSystem time_system_;
   JwtAuthentication config_;
-  CachePtr cache_;
+  JwksCachePtr cache_;
   google::jwt_verify::JwksPtr jwks_;
   Api::ApiPtr api_;
 };
@@ -48,7 +48,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Set cache_duration to 1 second to test expiration
   provider0.mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
-  cache_ = Cache::create(config_, time_system_, *api_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -67,7 +67,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Clear cache_duration to use default one.
   provider0.mutable_remote_jwks()->clear_cache_duration();
-  cache_ = Cache::create(config_, time_system_, *api_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -84,7 +84,7 @@ TEST_F(JwksCacheTest, TestGoodInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string(PublicKey);
 
-  cache_ = Cache::create(config_, time_system_, *api_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
@@ -98,7 +98,7 @@ TEST_F(JwksCacheTest, TestBadInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string("BAD-JWKS");
 
-  cache_ = Cache::create(config_, time_system_, *api_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
