@@ -33,3 +33,27 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "client_interface",
+    hdrs = ["client.h"],
+    deps = [
+        "//include/envoy/grpc:status",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "client_lib",
+    srcs = ["client_impl.cc"],
+    hdrs = ["client_impl.h"],
+    deps = [
+        ":client_interface",
+        "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/grpc:typed_async_client_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)

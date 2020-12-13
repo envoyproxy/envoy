@@ -40,8 +40,8 @@ public:
     uri_ = &uri;
 
     // Check if cluster is configured, fail the request if not.
-    // Otherwise cm_.httpAsyncClientForCluster will throw exception.
-    if (cm_.getThreadLocalCluster(uri.cluster()) == nullptr) {
+    const auto thread_local_cluster = cm_.getThreadLocalCluster(uri.cluster());
+    if (thread_local_cluster == nullptr) {
       ENVOY_LOG(error, "{}: fetch pubkey [uri = {}] failed: [cluster = {}] is not configured",
                 __func__, uri.uri(), uri.cluster());
       complete_ = true;
@@ -58,8 +58,7 @@ public:
                            DurationUtil::durationToMilliseconds(uri.timeout())))
                        .setParentSpan(parent_span)
                        .setChildSpanName("JWT Remote PubKey Fetch");
-    request_ =
-        cm_.httpAsyncClientForCluster(uri.cluster()).send(std::move(message), *this, options);
+    request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
 
   // HTTP async receive methods

@@ -191,6 +191,11 @@ public:
   virtual Http::Context& httpContext() PURE;
 
   /**
+   * @return the server-wide router context.
+   */
+  virtual Router::Context& routerContext() PURE;
+
+  /**
    * @return the server-wide process context.
    */
   virtual ProcessContextOptRef processContext() PURE;

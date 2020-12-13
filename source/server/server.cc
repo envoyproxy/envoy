@@ -86,8 +86,8 @@ InstanceImpl::InstanceImpl(
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_contexts_(*this) {
+      router_context_(store.symbolTable()), process_context_(std::move(process_context)),
+      main_thread_id_(std::this_thread::get_id()), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -403,7 +403,7 @@ void InstanceImpl::initialize(const Options& options,
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
       options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  Configuration::InitialImpl initial_config(bootstrap_, options);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
@@ -524,8 +524,8 @@ void InstanceImpl::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
-      *singleton_manager_);
+      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
+      access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -648,15 +648,16 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
         }
       }) {
   // Setup signals.
+  // Since signals are not supported on Windows we have an internal definition for `SIGTERM`
+  // On POSIX it resolves as expected to SIGTERM
+  // On Windows we use it internally for all the console events that indicate that we should
+  // terminate the process.
   if (options.signalHandlingEnabled()) {
-// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
-// on Windows.
-#ifndef WIN32
-    sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
-      ENVOY_LOG(warn, "caught SIGTERM");
+    sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
+      ENVOY_LOG(warn, "caught ENVOY_SIGTERM");
       instance.shutdown();
     });
-
+#ifndef WIN32
     sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
       ENVOY_LOG(warn, "caught SIGINT");
       instance.shutdown();

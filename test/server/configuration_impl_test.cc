@@ -28,7 +28,9 @@
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
+using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
@@ -63,8 +65,8 @@ protected:
             server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
             server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
             server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
-            server_.httpContext(), server_.grpcContext(), server_.accessLogManager(),
-            server_.singletonManager()) {}
+            server_.httpContext(), server_.grpcContext(), server_.routerContext(),
+            server_.accessLogManager(), server_.singletonManager()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -441,7 +443,8 @@ TEST(InitialImplTest, LayeredRuntime) {
       admin_layer: {}
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
-  InitialImpl config(bootstrap);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -452,7 +455,8 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   )EOF";
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
-  InitialImpl config(bootstrap);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -466,7 +470,8 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
 // An empty deprecated Runtime has an empty static and admin layer injected.
 TEST(InitialImplTest, EmptyDeprecatedRuntime) {
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
-  InitialImpl config(bootstrap);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -494,7 +499,8 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
   )EOF";
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
-  InitialImpl config(bootstrap);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -508,6 +514,29 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
     disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
   - name: admin
     admin_layer: {}
+  )EOF";
+  const auto expected_runtime =
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
+  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
+}
+
+// A v2 bootstrap implies runtime override for API features.
+TEST(InitialImplTest, V2BootstrapRuntimeInjection) {
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
+  NiceMock<MockOptions> options;
+  absl::optional<uint32_t> version{2};
+  EXPECT_CALL(options, bootstrapVersion()).WillOnce(ReturnRef(version));
+  InitialImpl config(bootstrap, options);
+
+  const std::string expected_yaml = R"EOF(
+  layers:
+  - name: base
+    static_layer: {}
+  - name: admin
+    admin_layer: {}
+  - name: "enabled_deprecated_v2_api (auto-injected)"
+    static_layer:
+      envoy.reloadable_features.enable_deprecated_v2_api: true
   )EOF";
   const auto expected_runtime =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
@@ -544,7 +573,8 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
-  InitialImpl config(bootstrap);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
