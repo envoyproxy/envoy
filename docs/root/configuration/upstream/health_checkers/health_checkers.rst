@@ -1,7 +1,7 @@
 .. _config_health_checkers:
 
-Health checkers
-===============
+健康检查器
+===========
 
 .. toctree::
   :maxdepth: 2
