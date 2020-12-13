@@ -1002,7 +1002,7 @@ public:
       : Base(total_units), deleter_(deleter) {}
 
 protected:
-  virtual void removeElement(const Key& k, Value* value) { deleter_(value); }
+  virtual void removeElement([[maybe_unused]] const Key& k, Value* value) { deleter_(value); }
 
 private:
   Deleter deleter_;
