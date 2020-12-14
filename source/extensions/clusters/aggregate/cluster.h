@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -28,6 +29,8 @@ struct PriorityContext {
 
 using PriorityContextPtr = std::unique_ptr<PriorityContext>;
 
+class AggregateClusterLoadBalancer;
+
 class Cluster : public Upstream::ClusterImplBase, Upstream::ClusterUpdateCallbacks {
 public:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
@@ -36,6 +39,24 @@ public:
           Random::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
           Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api);
+
+  struct PerThreadLoadBalancer : public ThreadLocal::ThreadLocalObject {
+    AggregateClusterLoadBalancer& get() {
+      // We can refresh before the per-worker LB is created. One of these variants should hold
+      // a non-null value.
+      if (absl::holds_alternative<std::unique_ptr<AggregateClusterLoadBalancer>>(lb_)) {
+        ASSERT(absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(lb_) != nullptr);
+        return *absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(lb_);
+      } else {
+        ASSERT(absl::get<AggregateClusterLoadBalancer*>(lb_) != nullptr);
+        return *absl::get<AggregateClusterLoadBalancer*>(lb_);
+      }
+    }
+
+    // For aggregate cluster the per-thread LB is only created once. We need to own it so we
+    // can pre-populate it before the LB is created and handed to the cluster.
+    absl::variant<std::unique_ptr<AggregateClusterLoadBalancer>, AggregateClusterLoadBalancer*> lb_;
+  };
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
@@ -54,7 +75,7 @@ public:
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
-  ThreadLocal::TypedSlot<> tls_;
+  ThreadLocal::TypedSlot<PerThreadLoadBalancer> tls_;
   const std::vector<std::string> clusters_;
 
 private:
@@ -139,8 +160,14 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
   AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create() override {
-    return std::make_unique<AggregateClusterLoadBalancer>(
-        cluster_.info()->stats(), cluster_.runtime_, cluster_.random_, cluster_.info()->lbConfig());
+    // See comments in PerThreadLoadBalancer above for why the follow is done.
+    auto per_thread_local_balancer = cluster_.tls_.get();
+    ASSERT(absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(
+               per_thread_local_balancer->lb_) != nullptr);
+    auto to_return = std::move(
+        absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(per_thread_local_balancer->lb_));
+    per_thread_local_balancer->lb_ = to_return.get();
+    return to_return;
   }
 
   const Cluster& cluster_;
@@ -148,15 +175,14 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
 
 // Thread aware load balancer created by the main thread.
 struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
-  AggregateThreadAwareLoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
+  AggregateThreadAwareLoadBalancer(const Cluster& cluster)
+      : factory_(std::make_shared<AggregateLoadBalancerFactory>(cluster)) {}
 
   // Upstream::ThreadAwareLoadBalancer
-  Upstream::LoadBalancerFactorySharedPtr factory() override {
-    return std::make_shared<AggregateLoadBalancerFactory>(cluster_);
-  }
+  Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override {}
 
-  const Cluster& cluster_;
+  std::shared_ptr<AggregateLoadBalancerFactory> factory_;
 };
 
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

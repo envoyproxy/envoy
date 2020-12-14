@@ -327,9 +327,7 @@ protected:
   };
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
-                                            ThreadLocalClusterUpdateParams&& params) {
-    return postThreadLocalClusterUpdateNonVirtual(cm_cluster, std::move(params));
-  }
+                                            ThreadLocalClusterUpdateParams&& params);
 
 private:
   /**
@@ -422,7 +420,13 @@ private:
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
 
-    ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher);
+    struct LocalClusterParams {
+      LoadBalancerFactorySharedPtr load_balancer_factory_;
+      ClusterInfoConstSharedPtr info_;
+    };
+
+    ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
+                                  const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
@@ -556,8 +560,6 @@ private:
                              ClusterMap& cluster_map);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
-  void postThreadLocalClusterUpdateNonVirtual(ClusterManagerCluster& cm_cluster,
-                                              ThreadLocalClusterUpdateParams&& params);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
   static void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,

@@ -201,7 +201,7 @@ TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
 
   auto propagation_mode = Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
 
-  tls_.defer_data = true;
+  tls_.defer_data_ = true;
   cm_.initializeClusters({"fake_cluster"}, {});
   ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
