@@ -194,7 +194,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
       events |= Events::Modified;
     }
 
-    constexpr absl::string_view data{"a"};
+    char data[] = {'a'};
     for (FileWatch& watch : dir_watch->watches_) {
       if (watch.file_ == file && (watch.events_ & events)) {
         ENVOY_LOG(debug, "matched callback: file: {}", watcher->wstring_converter_.to_bytes(file));
@@ -205,9 +205,8 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
         // this tells the libevent callback to pull this callback off the active_callbacks_
         // queue. We do this so that the callbacks are executed in the main libevent loop,
         // not in this completion routine
-        Buffer::OwnedImpl buffer;
-        buffer.add(data);
-        auto result = watcher->write_handle_->write(buffer);
+        Buffer::RawSlice buffer{data, 1};
+        auto result = watcher->write_handle_->writev(&buffer, 1);
         RELEASE_ASSERT(result.rc_ == 1,
                        fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
       }
