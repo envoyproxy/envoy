@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 
@@ -18,36 +17,13 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-/**
- * Wasm host stats.
- */
-#define ALL_VM_STATS(COUNTER, GAUGE)                                                               \
-  COUNTER(created)                                                                                 \
-  COUNTER(cloned)                                                                                  \
-  GAUGE(active, NeverImport)
-
-struct VmStats {
-  ALL_VM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
-
 // Wasm VM data providing stats.
 class EnvoyWasmVmIntegration : public proxy_wasm::WasmVmIntegration,
                                Logger::Loggable<Logger::Id::wasm> {
 public:
   EnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
                          absl::string_view short_runtime)
-      : scope_(scope), runtime_(std::string(runtime)), short_runtime_(std::string(short_runtime)),
-        runtime_prefix_(absl::StrCat("wasm_vm.", short_runtime, ".")),
-        stats_(VmStats{ALL_VM_STATS(POOL_COUNTER_PREFIX(*scope_, runtime_prefix_),
-                                    POOL_GAUGE_PREFIX(*scope_, runtime_prefix_))}) {
-    stats_.created_.inc();
-    stats_.active_.inc();
-    ENVOY_LOG(debug, "WasmVm created {} now active", runtime_, stats_.active_.value());
-  }
-  ~EnvoyWasmVmIntegration() override {
-    stats_.active_.dec();
-    ENVOY_LOG(debug, "~WasmVm {} {} remaining active", runtime_, stats_.active_.value());
-  }
+      : scope_(scope), runtime_(std::string(runtime)), short_runtime_(std::string(short_runtime)) {}
 
   // proxy_wasm::WasmVmIntegration
   proxy_wasm::WasmVmIntegration* clone() override {
@@ -64,8 +40,6 @@ protected:
   const Stats::ScopeSharedPtr scope_;
   const std::string runtime_;
   const std::string short_runtime_;
-  const std::string runtime_prefix_;
-  VmStats stats_;
 }; // namespace Wasm
 
 inline EnvoyWasmVmIntegration& getEnvoyWasmIntegration(proxy_wasm::WasmVm& wasm_vm) {
