@@ -108,6 +108,12 @@ void PlatformBridgeFilter::setEncoderFilterCallbacks(
 
 void PlatformBridgeFilter::onDestroy() {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::onDestroy", filter_name_);
+  // If the filter chain is destroyed before a response is received, treat as cancellation.
+  if (!response_complete_ && platform_filter_.on_cancel) {
+    ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_cancel", filter_name_);
+    platform_filter_.on_cancel(platform_filter_.instance_context);
+  }
+
   // Allow nullptr as no-op only if nothing was initialized.
   if (platform_filter_.release_filter == nullptr) {
     ASSERT(!platform_filter_.instance_context,

@@ -125,6 +125,11 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /// 3 - NSData *, optional pending data
 @property (nonatomic, copy) NSArray * (^onResponseTrailers)(EnvoyHeaders *trailers);
 
+@property (nonatomic, copy) void (^onCancel)(void);
+
+@property (nonatomic, copy) void (^onError)
+    (uint64_t errorCode, NSString *message, int32_t attemptCount);
+
 @property (nonatomic, copy) void (^setRequestFilterCallbacks)
     (id<EnvoyHTTPFilterCallbacks> callbacks);
 

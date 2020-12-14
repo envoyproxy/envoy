@@ -134,6 +134,16 @@ typedef envoy_filter_resume_status (*envoy_filter_on_resume_f)(envoy_headers* he
                                                                const void* context);
 
 /**
+ * Function signature for on-cancellation filter invocations.
+ */
+typedef void (*envoy_filter_on_cancel_f)(const void* context);
+
+/**
+ * Function signature for on-error filter invocations.
+ */
+typedef void (*envoy_filter_on_error_f)(envoy_error error, const void* context);
+
+/**
  * Function signature to release a filter instance once the filter chain is finished with it.
  */
 typedef void (*envoy_filter_release_f)(const void* context);
@@ -175,6 +185,8 @@ typedef struct {
   envoy_filter_on_resume_f on_resume_request;
   envoy_filter_set_callbacks_f set_response_callbacks;
   envoy_filter_on_resume_f on_resume_response;
+  envoy_filter_on_cancel_f on_cancel;
+  envoy_filter_on_error_f on_error;
   envoy_filter_release_f release_filter;
   const void* static_context;
   const void* instance_context;

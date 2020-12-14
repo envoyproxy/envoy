@@ -1,6 +1,22 @@
 #include "extension_registry.h"
 
 #include "common/network/socket_interface_impl.h"
+#include "common/upstream/logical_dns_cluster.h"
+
+#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "extensions/compression/gzip/decompressor/config.h"
+#include "extensions/filters/http/buffer/config.h"
+#include "extensions/filters/http/decompressor/config.h"
+#include "extensions/filters/http/dynamic_forward_proxy/config.h"
+#include "extensions/filters/http/router/config.h"
+#include "extensions/filters/network/http_connection_manager/config.h"
+#include "extensions/stat_sinks/metrics_service/config.h"
+#include "extensions/transport_sockets/raw_buffer/config.h"
+#include "extensions/transport_sockets/tls/config.h"
+#include "extensions/upstreams/http/generic/config.h"
+
+#include "library/common/extensions/filters/http/assertion/config.h"
+#include "library/common/extensions/filters/http/platform_bridge/config.h"
 
 namespace Envoy {
 
@@ -17,6 +33,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   Envoy::Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
+  Envoy::Extensions::TransportSockets::RawBuffer::forceRegisterUpstreamRawBufferSocketFactory();
   Envoy::Extensions::TransportSockets::Tls::forceRegisterUpstreamSslSocketFactory();
   Envoy::Extensions::Upstreams::Http::Generic::forceRegisterGenericGenericConnPoolFactory();
   Envoy::Upstream::forceRegisterLogicalDnsClusterFactory();
