@@ -36,7 +36,7 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
 
   SERVICE_TABLE_ENTRYA service_table[] = {// Even though the service name is ignored for own process
                                           // services, it must be a valid string and cannot be 0.
-                                          {SVCNAME, (LPSERVICE_MAIN_FUNCTIONA)ServiceMain},
+                                          {"ENVOY", (LPSERVICE_MAIN_FUNCTIONA)ServiceMain},
                                           // Designates the end of table.
                                           {0, 0}};
 
