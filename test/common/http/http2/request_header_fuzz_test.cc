@@ -13,7 +13,7 @@ namespace Http {
 namespace Http2 {
 namespace {
 
-void Replay(const Frame& frame, ServerCodecFrameInjector& codec) {
+void replay(const Frame& frame, ServerCodecFrameInjector& codec) {
   // Create the server connection containing the nghttp2 session.
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
@@ -32,10 +32,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   Frame frame;
   frame.assign(buf, buf + len);
   // Replay with the fuzzer bytes.
-  Replay(frame, codec);
+  replay(frame, codec);
   // Try again, but fixup the HEADERS frame to make it a valid HEADERS.
   FrameUtils::fixupHeaders(frame);
-  Replay(frame, codec);
+  replay(frame, codec);
 }
 
 } // namespace
