@@ -593,6 +593,14 @@ static void* jvm_on_cancel(void* context) {
   return result;
 }
 
+static void jvm_http_filter_on_error(envoy_error error, const void* context) {
+  jvm_on_error(error, const_cast<void*>(context));
+}
+
+static void jvm_http_filter_on_cancel(const void* context) {
+  jvm_on_cancel(const_cast<void*>(context));
+}
+
 // JvmFilterFactoryContext
 
 static const void* jvm_http_filter_init(const void* context) {
@@ -692,6 +700,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
   api->on_resume_request = jvm_http_filter_on_resume_request;
   api->set_response_callbacks = jvm_http_filter_set_response_callbacks;
   api->on_resume_response = jvm_http_filter_on_resume_response;
+  api->on_cancel = jvm_http_filter_on_cancel;
+  api->on_error = jvm_http_filter_on_error;
   api->release_filter = jni_delete_const_global_ref;
   api->static_context = retained_context;
   api->instance_context = NULL;
