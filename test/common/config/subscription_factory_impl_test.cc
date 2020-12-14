@@ -38,7 +38,8 @@ namespace {
 class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
-      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_, random_)),
+      : http_request_(&cm_.thread_local_cluster_.async_client_),
+        api_(Api::createApiForTest(stats_store_, random_)),
         subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, runtime_) {
   }
 
@@ -250,9 +251,11 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
+  cm_.initializeThreadLocalClusters({"static_cluster"});
+  EXPECT_CALL(cm_, getThreadLocalCluster("static_cluster"));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(
-      cm_.async_client_,
+      cm_.thread_local_cluster_.async_client_,
       send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5000))));
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
@@ -268,8 +271,10 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  cm_.initializeThreadLocalClusters({"static_cluster"});
+  EXPECT_CALL(cm_, getThreadLocalCluster("static_cluster"));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks&,
                               const Http::AsyncClient::RequestOptions&) {
         EXPECT_EQ("POST", request->headers().getMethodValue());

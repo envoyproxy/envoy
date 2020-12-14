@@ -750,6 +750,7 @@ public:
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
 using RequestHeaderMapOptRef = OptRef<RequestHeaderMap>;
+using RequestHeaderMapOptConstRef = OptRef<const RequestHeaderMap>;
 
 // Request trailers.
 class RequestTrailerMap
@@ -776,6 +777,7 @@ public:
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
 using ResponseHeaderMapOptRef = OptRef<ResponseHeaderMap>;
+using ResponseHeaderMapOptConstRef = OptRef<const ResponseHeaderMap>;
 
 // Response trailers.
 class ResponseTrailerMap

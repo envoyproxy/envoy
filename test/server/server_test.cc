@@ -570,6 +570,33 @@ TEST_P(ServerStatsTest, FlushStats) {
   EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
 }
 
+TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  options_.bootstrap_version_ = 3;
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", true);
+  EXPECT_TRUE(server_->statsConfig().flushOnAdmin());
+  EXPECT_EQ(std::chrono::seconds(5), server_->statsConfig().flushInterval());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(0L, counter->value());
+
+  // Flush via admin.
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
+  EXPECT_EQ(1L, counter->value());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
