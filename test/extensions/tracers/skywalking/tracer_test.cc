@@ -164,7 +164,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(2, second_child_span->spanStore()->spanId());
   EXPECT_EQ(0, second_child_span->spanStore()->parentSpanId());
 
-  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(1);
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
 
   // When the child span ends, the data is not reported immediately, but the end time is set.
   first_child_span->finishSpan();

@@ -169,8 +169,20 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+
 LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
+}
+
+CODE_CONVENTION_REPLACEMENTS = {
+    # We can't just remove Times(1) everywhere, since .Times(1).WillRepeatedly
+    # is a legitimate pattern. See
+    # https://github.com/google/googletest/blob/master/googlemock/docs/for_dummies.md#cardinalities-how-many-times-will-it-be-called
+    ".Times(1);": ";",
+    # These may miss some cases, due to line breaks, but should reduce the
+    # Times(1) noise.
+    ".Times(1).WillOnce": ".WillOnce",
+    ".Times(1).WillRepeatedly": ".WillOnce",
 }
 
 UNOWNED_EXTENSIONS = {
@@ -568,6 +580,10 @@ class FormatChecker:
     for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
       line = line.replace(invalid_construct, valid_construct)
 
+    # Fix code conventions violations.
+    for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
+      line = line.replace(invalid_construct, valid_construct)
+
     return line
 
   # We want to look for a call to condvar.waitFor, but there's no strong pattern
@@ -633,6 +649,10 @@ class FormatChecker:
     for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
       if invalid_construct in line:
         reportError("term %s should be replaced with standard library term %s" %
+                    (invalid_construct, valid_construct))
+    for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
+      if invalid_construct in line:
+        reportError("term %s should be replaced with preferred term %s" %
                     (invalid_construct, valid_construct))
     # Do not include the virtual_includes headers.
     if re.search("#include.*/_virtual_includes/", line):

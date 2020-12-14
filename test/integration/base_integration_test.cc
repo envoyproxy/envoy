@@ -92,7 +92,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
-  connection->enableHalfClose(enable_half_close_);
+  connection->enableHalfClose(enableHalfClose());
   return connection;
 }
 
@@ -135,12 +135,15 @@ common_tls_context:
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    Network::TransportSocketFactoryPtr factory =
+        upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(
-          new AutonomousUpstream(endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
+      fake_upstreams_.emplace_back(new AutonomousUpstream(
+          std::move(factory), endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstreamConfig()));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(std::move(factory), endpoint, upstreamConfig()));
     }
   }
 }
@@ -231,7 +234,7 @@ BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                                        Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options, source_address);
+                                                enableHalfClose(), options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
