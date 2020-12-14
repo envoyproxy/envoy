@@ -389,7 +389,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
         cluster_info->statsScope()
             .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::NeverImport)
             .value(),
-        server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
+        server_.statsConfig().flushInterval(), time_histograms[cluster_info->name()], ss);
   }
 
   Buffer::OwnedImpl data;
