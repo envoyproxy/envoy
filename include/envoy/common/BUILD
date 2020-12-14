@@ -19,6 +19,9 @@ envoy_basic_cc_library(
     ],
     external_deps = ["abseil_optional"],
     include_prefix = "envoy/common",
+    deps = [
+        "//source/common/singleton:threadsafe_singleton",
+    ],
 )
 
 envoy_cc_library(
