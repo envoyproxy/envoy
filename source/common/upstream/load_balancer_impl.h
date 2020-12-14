@@ -501,7 +501,7 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : protected EdfLoadBalancerBase,
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
                                  Logger::Loggable<Logger::Id::upstream> {
 public:
   LeastRequestLoadBalancer(
