@@ -34,49 +34,49 @@ void ConnPoolImplBase::destructAllConnections() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-bool ConnPoolImplBase::shouldCreateNewConnection(float global_prefetch_ratio) const {
+bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) const {
   // If the host is not healthy, don't make it do extra work, especially as
   // upstream selection logic may result in bypassing this upstream entirely.
-  // If an Envoy user wants prefetching for degraded upstreams this could be
-  // added later via extending the prefetch config.
+  // If an Envoy user wants preconnecting for degraded upstreams this could be
+  // added later via extending the preconnect config.
   if (host_->health() != Upstream::Host::Health::Healthy) {
     return pending_streams_.size() > connecting_stream_capacity_;
   }
 
-  // If global prefetching is on, and this connection is within the global
-  // prefetch limit, prefetch.
-  // We may eventually want to track prefetch_attempts to allow more prefetching for
+  // If global preconnecting is on, and this connection is within the global
+  // preconnect limit, preconnect.
+  // We may eventually want to track preconnect_attempts to allow more preconnecting for
   // heavily weighted upstreams or sticky picks.
-  if (global_prefetch_ratio > 1.0 &&
-      ((pending_streams_.size() + 1 + num_active_streams_) * global_prefetch_ratio >
+  if (global_preconnect_ratio > 1.0 &&
+      ((pending_streams_.size() + 1 + num_active_streams_) * global_preconnect_ratio >
        (connecting_stream_capacity_ + num_active_streams_))) {
     return true;
   }
 
   // The number of streams we want to be provisioned for is the number of
-  // pending and active streams times the prefetch ratio.
+  // pending and active streams times the preconnect ratio.
   // The number of streams we are (theoretically) provisioned for is the
   // connecting stream capacity plus the number of active streams.
   //
-  // If prefetch ratio is not set, it defaults to 1, and this simplifies to the
+  // If preconnect ratio is not set, it defaults to 1, and this simplifies to the
   // legacy value of pending_streams_.size() > connecting_stream_capacity_
-  return (pending_streams_.size() + num_active_streams_) * perUpstreamPrefetchRatio() >
+  return (pending_streams_.size() + num_active_streams_) * perUpstreamPreconnectRatio() >
          (connecting_stream_capacity_ + num_active_streams_);
 }
 
-float ConnPoolImplBase::perUpstreamPrefetchRatio() const {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_prefetch")) {
-    return host_->cluster().perUpstreamPrefetchRatio();
+float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_preconnect")) {
+    return host_->cluster().perUpstreamPreconnectRatio();
   } else {
     return 1.0;
   }
 }
 
 void ConnPoolImplBase::tryCreateNewConnections() {
-  // Somewhat arbitrarily cap the number of connections prefetched due to new
-  // incoming connections. The prefetch ratio is capped at 3, so in steady
-  // state, no more than 3 connections should be prefetched. If hosts go
-  // unhealthy, and connections are not immediately prefetched, it could be that
+  // Somewhat arbitrarily cap the number of connections preconnected due to new
+  // incoming connections. The preconnect ratio is capped at 3, so in steady
+  // state, no more than 3 connections should be preconnected. If hosts go
+  // unhealthy, and connections are not immediately preconnected, it could be that
   // many connections are desired when the host becomes healthy again, but
   // overwhelming it with connections is not desirable.
   for (int i = 0; i < 3; ++i) {
@@ -86,9 +86,9 @@ void ConnPoolImplBase::tryCreateNewConnections() {
   }
 }
 
-bool ConnPoolImplBase::tryCreateNewConnection(float global_prefetch_ratio) {
+bool ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   // There are already enough CONNECTING connections for the number of queued streams.
-  if (!shouldCreateNewConnection(global_prefetch_ratio)) {
+  if (!shouldCreateNewConnection(global_preconnect_ratio)) {
     return false;
   }
 
@@ -188,8 +188,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing connection", client);
     attachStreamToClient(client, context);
-    // Even if there's a ready client, we may want to prefetch a new connection
-    // to handle the next incoming stream.
+    // Even if there's a ready client, we may want to preconnect to handle the next incoming stream.
     tryCreateNewConnections();
     return nullptr;
   }
@@ -210,8 +209,8 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
   }
 }
 
-bool ConnPoolImplBase::maybePrefetch(float global_prefetch_ratio) {
-  return tryCreateNewConnection(global_prefetch_ratio);
+bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
+  return tryCreateNewConnection(global_preconnect_ratio);
 }
 
 void ConnPoolImplBase::onUpstreamReady() {
@@ -358,7 +357,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       // NOTE: We move the existing pending streams to a temporary list. This is done so that
       //       if retry logic submits a new stream to the pool, we don't fail it inline.
       purgePendingStreams(client.real_host_description_, failure_reason, reason);
-      // See if we should prefetch another connection based on active connections.
+      // See if we should preconnect based on active connections.
       tryCreateNewConnections();
     }
 
@@ -429,14 +428,14 @@ void ConnPoolImplBase::purgePendingStreams(
 bool ConnPoolImplBase::connectingConnectionIsExcess() const {
   ASSERT(connecting_stream_capacity_ >=
          connecting_clients_.front()->effectiveConcurrentStreamLimit());
-  // If perUpstreamPrefetchRatio is one, this simplifies to checking if there would still be
+  // If perUpstreamPreconnectRatio is one, this simplifies to checking if there would still be
   // sufficient connecting stream capacity to serve all pending streams if the most recent client
   // were removed from the picture.
   //
-  // If prefetch ratio is set, it also factors in the anticipated load based on both queued streams
-  // and active streams, and makes sure the connecting capacity would still be sufficient to serve
-  // that even with the most recent client removed.
-  return (pending_streams_.size() + num_active_streams_) * perUpstreamPrefetchRatio() <=
+  // If preconnect ratio is set, it also factors in the anticipated load based on both queued
+  // streams and active streams, and makes sure the connecting capacity would still be sufficient to
+  // serve that even with the most recent client removed.
+  return (pending_streams_.size() + num_active_streams_) * perUpstreamPreconnectRatio() <=
          (connecting_stream_capacity_ -
           connecting_clients_.front()->effectiveConcurrentStreamLimit() + num_active_streams_);
 }

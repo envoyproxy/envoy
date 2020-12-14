@@ -106,12 +106,12 @@ public:
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());
-  bool maybePrefetch(float ratio) override {
+  bool maybePreconnect(float ratio) override {
     if (!test_new_connection_pool_) {
       return false;
     }
     ASSERT(dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get()) != nullptr);
-    return dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->maybePrefetch(ratio);
+    return dynamic_cast<ConnPoolImplForTest*>(conn_pool_.get())->maybePreconnect(ratio);
   }
 
   struct TestConnection {
@@ -1041,15 +1041,15 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
   conn_pool_.test_conns_[2].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Test that maybePrefetch is passed up to the base class implementation.
-TEST_P(TcpConnPoolImplTest, TestPrefetch) {
+// Test that maybePreconnect is passed up to the base class implementation.
+TEST_P(TcpConnPoolImplTest, TestPreconnect) {
   if (!test_new_connection_pool_) {
     return;
   }
-  EXPECT_FALSE(conn_pool_.maybePrefetch(0));
+  EXPECT_FALSE(conn_pool_.maybePreconnect(0));
 
   conn_pool_.expectConnCreate();
-  ASSERT_TRUE(conn_pool_.maybePrefetch(2));
+  ASSERT_TRUE(conn_pool_.maybePreconnect(2));
 
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

@@ -853,34 +853,34 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
   }
 }
 
-void ClusterManagerImpl::maybePrefetch(
+void ClusterManagerImpl::maybePreconnect(
     ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
     const ClusterConnectivityState& state,
-    std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
+    std::function<ConnectionPool::Instance*()> pick_preconnect_pool) {
   auto peekahead_ratio = cluster_entry->cluster_info_->peekaheadRatio();
   if (peekahead_ratio <= 1.0) {
     return;
   }
 
   // 3 here is arbitrary. Just as in ConnPoolImplBase::tryCreateNewConnections
-  // we want to limit the work which can be done on any given prefetch attempt.
+  // we want to limit the work which can be done on any given preconnect attempt.
   for (int i = 0; i < 3; ++i) {
     // Just as in ConnPoolImplBase::shouldCreateNewConnection, see if adding this one new connection
-    // would put the cluster over desired capacity. If so, stop prefetching.
+    // would put the cluster over desired capacity. If so, stop preconnecting.
     if ((state.pending_streams_ + 1 + state.active_streams_) * peekahead_ratio <=
         (state.connecting_stream_capacity_ + state.active_streams_)) {
       return;
     }
-    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
-    if (prefetch_pool) {
-      if (!prefetch_pool->maybePrefetch(peekahead_ratio)) {
-        // Given that the next prefetch pick may be entirely different, we could
-        // opt to try again even if the first prefetch fails. Err on the side of
+    ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
+    if (preconnect_pool) {
+      if (!preconnect_pool->maybePreconnect(peekahead_ratio)) {
+        // Given that the next preconnect pick may be entirely different, we could
+        // opt to try again even if the first preconnect fails. Err on the side of
         // caution and wait for the next attempt.
         return;
       }
     } else {
-      // If unable to find a prefetch pool, exit early.
+      // If unable to find a preconnect pool, exit early.
       return;
     }
   }
@@ -900,16 +900,16 @@ ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourceP
   // Select a host and create a connection pool for it if it does not already exist.
   auto ret = entry->second->connPool(priority, protocol, context, false);
 
-  // Now see if another host should be prefetched.
+  // Now see if another host should be preconnected.
   // httpConnPoolForCluster is called immediately before a call for newStream. newStream doesn't
-  // have the load balancer context needed to make selection decisions so prefetching must be
+  // have the load balancer context needed to make selection decisions so preconnecting must be
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePrefetch(entry->second, cluster_manager.cluster_manager_state_,
-                [&entry, &priority, &protocol, &context]() {
-                  return entry->second->connPool(priority, protocol, context, true);
-                });
+  maybePreconnect(entry->second, cluster_manager.cluster_manager_state_,
+                  [&entry, &priority, &protocol, &context]() {
+                    return entry->second->connPool(priority, protocol, context, true);
+                  });
 
   return ret;
 }
@@ -928,15 +928,15 @@ ClusterManagerImpl::tcpConnPoolForCluster(const std::string& cluster, ResourcePr
   auto ret = entry->second->tcpConnPool(priority, context, false);
 
   // tcpConnPoolForCluster is called immediately before a call for newConnection. newConnection
-  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // doesn't have the load balancer context needed to make selection decisions so preconnecting must
   // be performed here in anticipation of the new connection.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  // Now see if another host should be prefetched.
-  maybePrefetch(entry->second, cluster_manager.cluster_manager_state_,
-                [&entry, &priority, &context]() {
-                  return entry->second->tcpConnPool(priority, context, true);
-                });
+  // Now see if another host should be preconnected.
+  maybePreconnect(entry->second, cluster_manager.cluster_manager_state_,
+                  [&entry, &priority, &context]() {
+                    return entry->second->tcpConnPool(priority, context, true);
+                  });
 
   return ret;
 }

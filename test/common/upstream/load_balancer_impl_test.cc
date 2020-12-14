@@ -593,7 +593,7 @@ TEST_P(FailoverTest, BasicDegradedHosts) {
   host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
-  // We don't prefetch degraded hosts.
+  // We don't preconnect degraded hosts.
   EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr));
 }

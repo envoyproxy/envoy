@@ -735,7 +735,7 @@ public:
   /**
    * @return how many streams should be anticipated per each current stream.
    */
-  virtual float perUpstreamPrefetchRatio() const PURE;
+  virtual float perUpstreamPreconnectRatio() const PURE;
 
   /**
    * @return how many streams should be anticipated per each current stream.

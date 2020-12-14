@@ -77,7 +77,7 @@ public:
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-  // Prefetching not yet implemented for extensions.
+  // Preconnecting not yet implemented for extensions.
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
     return nullptr;
   }
@@ -96,7 +96,7 @@ private:
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-    // Prefetching not yet implemented for extensions.
+    // Preconnecting not yet implemented for extensions.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }

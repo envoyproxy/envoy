@@ -1697,12 +1697,12 @@ TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverride
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
-TEST_P(IntegrationTest, Prefetch) {
+TEST_P(IntegrationTest, Preconnect) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_static_resources()
         ->mutable_clusters(0)
-        ->mutable_prefetch_policy()
-        ->mutable_predictive_prefetch_ratio()
+        ->mutable_preconnect_policy()
+        ->mutable_predictive_preconnect_ratio()
         ->set_value(1.5);
   });
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -1738,7 +1738,7 @@ TEST_P(IntegrationTest, Prefetch) {
                                   TestUtility::DefaultTimeout, fake_connections[upstream_index]);
     ++upstream_index;
 
-    // For every other connection, an extra connection should be prefetched.
+    // For every other connection, an extra connection should be preconnected.
     if (i % 2 == 0) {
       waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
                                     TestUtility::DefaultTimeout, fake_connections[upstream_index]);
@@ -1753,12 +1753,12 @@ TEST_P(IntegrationTest, Prefetch) {
   }
 }
 
-TEST_P(IntegrationTest, RandomPrefetch) {
+TEST_P(IntegrationTest, RandomPreconnect) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_static_resources()
         ->mutable_clusters(0)
-        ->mutable_prefetch_policy()
-        ->mutable_predictive_prefetch_ratio()
+        ->mutable_preconnect_policy()
+        ->mutable_predictive_preconnect_ratio()
         ->set_value(1.5);
   });
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

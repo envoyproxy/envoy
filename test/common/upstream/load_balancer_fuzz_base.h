@@ -31,7 +31,7 @@ public:
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
   // once the load balancer is constructed, all this class has to do is call lb_->peekAnotherHost()
   // and lb_->chooseHost().
-  void prefetch();
+  void preconnect();
   void chooseHost();
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 

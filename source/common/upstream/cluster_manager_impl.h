@@ -550,9 +550,9 @@ private:
                                               ThreadLocalClusterUpdateParams&& params);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
-  static void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
-                            const ClusterConnectivityState& cluster_manager_state,
-                            std::function<ConnectionPool::Instance*()> prefetch_pool);
+  static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
+                              const ClusterConnectivityState& cluster_manager_state,
+                              std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
