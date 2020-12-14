@@ -121,10 +121,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
-  if (resource_type != collection_locator.resource_type()) {
-    throw EnvoyException(fmt::format("xdstp:// type does not match {} in {}", resource_type,
-                                     Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
-  }
   const std::string type_url = TypeUtil::descriptorFullNameToTypeUrl(resource_type);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
@@ -137,6 +133,11 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
   }
   case xds::core::v3::ResourceLocator::XDSTP: {
+    if (resource_type != collection_locator.resource_type()) {
+      throw EnvoyException(
+          fmt::format("xdstp:// type does not match {} in {}", resource_type,
+                      Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
+    }
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
