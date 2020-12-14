@@ -24,7 +24,7 @@ MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
 
 MockFilterManagerCallbacks::MockFilterManagerCallbacks() {
   ON_CALL(*this, responseHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
-    return makeOptRef(response_headers_.get());
+    return makeOptRefFromPtr(response_headers_.get());
   }));
 }
 MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;

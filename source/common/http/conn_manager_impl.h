@@ -231,19 +231,19 @@ private:
     void chargeStats(const ResponseHeaderMap& headers) override;
 
     Http::RequestHeaderMapOptRef requestHeaders() override {
-      return makeOptRef(request_headers_.get());
+      return makeOptRefFromPtr(request_headers_.get());
     }
     Http::RequestTrailerMapOptRef requestTrailers() override {
-      return makeOptRef(request_trailers_.get());
+      return makeOptRefFromPtr(request_trailers_.get());
     }
     Http::ResponseHeaderMapOptRef continueHeaders() override {
-      return makeOptRef(continue_headers_.get());
+      return makeOptRefFromPtr(continue_headers_.get());
     }
     Http::ResponseHeaderMapOptRef responseHeaders() override {
-      return makeOptRef(response_headers_.get());
+      return makeOptRefFromPtr(response_headers_.get());
     }
     Http::ResponseTrailerMapOptRef responseTrailers() override {
-      return makeOptRef(response_trailers_.get());
+      return makeOptRefFromPtr(response_trailers_.get());
     }
 
     void endStream() override {

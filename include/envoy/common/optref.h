@@ -66,7 +66,7 @@ template <class T> struct OptRef : public absl::optional<std::reference_wrapper<
 
 template <class T> OptRef<T> makeOptRef(T& ref) { return {ref}; }
 
-template <class T> OptRef<T> makeOptRef(T* ptr) {
+template <class T> OptRef<T> makeOptRefFromPtr(T* ptr) {
   if (ptr == nullptr) {
     return {};
   }
