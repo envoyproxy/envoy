@@ -413,7 +413,7 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
       rds, server_factory_context_, "stat_prefix", outer_init_manager_);
   RdsRouteConfigSubscription& subscription =
       (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
-  init_watcher_.expectReady().Times(1); // The parent_init_target_ will call once.
+  init_watcher_.expectReady(); // The parent_init_target_ will call once.
   outer_init_manager_.initialize(init_watcher_);
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> init_vhds;

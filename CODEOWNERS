@@ -44,6 +44,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
 # common transport socket
 /*/extensions/transport_sockets/common @alyssawilk @wez470
+# starttls transport socket
+/*/extensions/transport_sockets/starttls @cpakulski @lizan
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension

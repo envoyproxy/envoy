@@ -41,7 +41,7 @@ public:
 // Verify filter functionality when signing works.
 TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), sign(_)).Times(1);
+  EXPECT_CALL(*(filter_config_->signer_), sign(_));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -52,7 +52,7 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   setup();
   filter_config_->host_rewrite_ = "foo";
-  EXPECT_CALL(*(filter_config_->signer_), sign(_)).Times(1);
+  EXPECT_CALL(*(filter_config_->signer_), sign(_));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
