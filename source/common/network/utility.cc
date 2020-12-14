@@ -101,9 +101,9 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::Instanc
                                        IoHandle::RecvMsgOutput& output, IoHandle& handle,
                                        const Address::Instance& local_address) {
 
-  Buffer::Reservation reservation = buffer->reserveSingleSlice(max_packet_size);
-  Api::IoCallUint64Result result = handle.recvmsg(reservation.slices(), reservation.numSlices(),
-                                                  local_address.ip()->port(), output);
+  auto reservation = buffer->reserveSingleSlice(max_packet_size);
+  Buffer::RawSlice slice = reservation.slice();
+  Api::IoCallUint64Result result = handle.recvmsg(&slice, 1, local_address.ip()->port(), output);
 
   if (result.ok()) {
     reservation.commit(std::min(max_packet_size, static_cast<size_t>(result.rc_)));
@@ -614,21 +614,16 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   if (handle.supportsMmsg()) {
     const auto max_packet_size = udp_packet_processor.maxPacketSize();
 
-    // Buffer::Reservation is always passed by value, and can only be constructed
+    // Buffer::ReservationSingleSlice is always passed by value, and can only be constructed
     // by Buffer::Instance::reserve(), so this is needed to keep a fixed array
     // in which all elements are legally constructed.
-    //
-    // TODO(ggreenway) PERF: each reservation currently has inline storage for 18 pointers (144
-    // bytes on 64-bit) because the reservation can hold several buffers. For a read of 16 packets,
-    // that is 2304 bytes. Figure out a way to make the reservation only hold 2 pointers for the
-    // `reserveSingleSlice()` case.
     struct BufferAndReservation {
       BufferAndReservation(uint64_t max_packet_size)
           : buffer_(std::make_unique<Buffer::OwnedImpl>()),
             reservation_(buffer_->reserveSingleSlice(max_packet_size, true)) {}
 
       Buffer::InstancePtr buffer_;
-      Buffer::Reservation reservation_;
+      Buffer::ReservationSingleSlice reservation_;
     };
     constexpr uint32_t num_packets_per_mmsg_call = 16u;
     constexpr uint32_t num_slices_per_packet = 1u;
@@ -637,7 +632,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                           absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
     for (uint32_t i = 0; i < num_packets_per_mmsg_call; i++) {
       buffers.push_back(max_packet_size);
-      slices[i][0] = buffers[i].reservation_.slices()[0];
+      slices[i][0] = buffers[i].reservation_.slice();
     }
 
     IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);

@@ -31,13 +31,9 @@ void WatermarkBuffer::prepend(Instance& data) {
   checkHighAndOverflowWatermarks();
 }
 
-/*void WatermarkBuffer::commit(RawSlice* iovecs, uint64_t num_iovecs) {
-  OwnedImpl::commit(iovecs, num_iovecs);
-  checkHighAndOverflowWatermarks();
-  }*/
-
-void WatermarkBuffer::commit(Reservation& reservation, uint64_t length) {
-  OwnedImpl::commit(reservation, length);
+void WatermarkBuffer::commit(uint64_t length, absl::Span<RawSlice> slices,
+                             absl::Span<SliceDataPtr> owned_slices) {
+  OwnedImpl::commit(length, slices, owned_slices);
   checkHighAndOverflowWatermarks();
 }
 
@@ -65,7 +61,7 @@ SliceDataPtr WatermarkBuffer::extractMutableFrontSlice() {
 // Adjust the reservation size based on space available before hitting
 // the high watermark to avoid overshooting by a lot and thus violating the limits
 // the watermark is imposing.
-Reservation WatermarkBuffer::reserve(uint64_t preferred_length) {
+Reservation WatermarkBuffer::reserveApproximately(uint64_t preferred_length) {
   uint64_t adjusted_length = preferred_length;
 
   if (high_watermark_ > 0 && preferred_length > 0) {
@@ -81,7 +77,7 @@ Reservation WatermarkBuffer::reserve(uint64_t preferred_length) {
     }
   }
 
-  return OwnedImpl::reserve(adjusted_length);
+  return OwnedImpl::reserveApproximately(adjusted_length);
 }
 
 void WatermarkBuffer::appendSliceForTest(const void* data, uint64_t size) {

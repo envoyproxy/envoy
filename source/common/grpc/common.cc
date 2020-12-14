@@ -131,9 +131,9 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
   Buffer::InstancePtr body(new Buffer::OwnedImpl());
   const uint32_t size = message.ByteSize();
   const uint32_t alloc_size = size + 5;
-  Buffer::Reservation reservation = body->reserveSingleSlice(alloc_size);
-  ASSERT(reservation.slices()[0].len_ >= alloc_size);
-  uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slices()[0].mem_);
+  auto reservation = body->reserveSingleSlice(alloc_size);
+  ASSERT(reservation.slice().len_ >= alloc_size);
+  uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   *current++ = 0; // flags
   const uint32_t nsize = htonl(size);
   std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
@@ -148,9 +148,9 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
 Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   auto body = std::make_unique<Buffer::OwnedImpl>();
   const uint32_t size = message.ByteSize();
-  Buffer::Reservation reservation = body->reserveSingleSlice(size);
-  ASSERT(reservation.slices()[0].len_ >= size);
-  uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slices()[0].mem_);
+  auto reservation = body->reserveSingleSlice(size);
+  ASSERT(reservation.slice().len_ >= size);
+  uint8_t* current = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
   message.SerializeWithCachedSizes(&codec_stream);

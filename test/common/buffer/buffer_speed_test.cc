@@ -208,7 +208,7 @@ static void bufferReserveCommit(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     auto size = state.range(0);
-    Buffer::Reservation reservation = buffer.reserve(size);
+    Buffer::Reservation reservation = buffer.reserveApproximately(size);
     reservation.commit(size);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
@@ -224,7 +224,7 @@ static void bufferReserveCommitPartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     auto size = state.range(0);
-    Buffer::Reservation reservation = buffer.reserve(size);
+    Buffer::Reservation reservation = buffer.reserveApproximately(size);
     // Commit one byte from the first slice and nothing from any subsequent slice.
     reservation.commit(1);
     if (buffer.length() >= MaxBufferLength) {

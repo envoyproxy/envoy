@@ -105,16 +105,6 @@ public:
     src.size_ = 0;
   }
 
-  /*void commit(Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
-    FUZZ_ASSERT(num_iovecs == 1);
-    size_ += iovecs[0].len_;
-    }*/
-
-  void commit(Buffer::Reservation&, uint64_t length) override {
-    size_ += length;
-    FUZZ_ASSERT(start_ + size_ + length <= data_.size());
-  }
-
   void copyOut(size_t start, uint64_t size, void* data) const override {
     ::memcpy(data, this->start() + start, size);
   }
@@ -151,23 +141,10 @@ public:
     src.size_ -= length;
   }
 
-  /*uint64_t reserve(uint64_t length, Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
-    FUZZ_ASSERT(num_iovecs > 0);
-    FUZZ_ASSERT(start_ + size_ + length <= data_.size());
-    iovecs[0].mem_ = mutableEnd();
-    iovecs[0].len_ = length;
-    return 1;
-    }*/
-
-  Buffer::Reservation reserve(uint64_t length) override {
-    return reserveSingleSlice(length, false);
-  }
-
-  Buffer::Reservation reserveSingleSlice(uint64_t length, bool separate_slice) override {
-    ASSERT(!separate_slice);
+  Buffer::Reservation reserveApproximately(uint64_t length) override {
     FUZZ_ASSERT(start_ + size_ + length <= data_.size());
 
-    Buffer::Reservation reservation = Buffer::Reservation::bufferImplUseOnlyConstruct(*this);
+    auto reservation = Buffer::Reservation::bufferImplUseOnlyConstruct(*this);
     Buffer::RawSlice slice;
     slice.mem_ = mutableEnd();
     slice.len_ = length;
@@ -175,6 +152,25 @@ public:
     reservation.bufferImplUseOnlyOwnedSlices().push_back(nullptr);
 
     return reservation;
+  }
+
+  Buffer::ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice) override {
+    ASSERT(!separate_slice);
+    FUZZ_ASSERT(start_ + size_ + length <= data_.size());
+
+    auto reservation = Buffer::ReservationSingleSlice::bufferImplUseOnlyConstruct(*this);
+    Buffer::RawSlice slice;
+    slice.mem_ = mutableEnd();
+    slice.len_ = length;
+    reservation.bufferImplUseOnlySlice() = slice;
+
+    return reservation;
+  }
+
+  void commit(uint64_t length, absl::Span<Buffer::RawSlice>,
+              absl::Span<Buffer::SliceDataPtr>) override {
+    size_ += length;
+    FUZZ_ASSERT(start_ + size_ + length <= data_.size());
   }
 
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
@@ -280,12 +276,12 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     if (reserve_length == 0) {
       break;
     }
-    Buffer::Reservation reservation = target_buffer.reserve(reserve_length);
+    Buffer::Reservation reservation = target_buffer.reserveApproximately(reserve_length);
     for (uint32_t i = 0; i < reservation.numSlices(); ++i) {
       ::memset(reservation.slices()[i].mem_, insert_value, reservation.slices()[i].len_);
     }
     const uint32_t target_length =
-        std::min(reserve_length, action.reserve_commit().commit_length());
+        std::min<uint32_t>(reservation.length(), action.reserve_commit().commit_length());
     reservation.commit(target_length);
     break;
   }

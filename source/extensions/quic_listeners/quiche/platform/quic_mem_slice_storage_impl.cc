@@ -33,9 +33,9 @@ QuicMemSliceStorageImpl::QuicMemSliceStorageImpl(const iovec* iov, int iov_count
 
     // Use a separate slice so that we do not violate the restriction of |max_slice_len| when
     // ToSpan() is called.
-    Envoy::Buffer::Reservation reservation = buffer_.reserveSingleSlice(slice_len, true);
+    auto reservation = buffer_.reserveSingleSlice(slice_len, true);
     QuicUtils::CopyToBuffer(iov, iov_count, io_offset, slice_len,
-                            static_cast<char*>(reservation.slices()[0].mem_));
+                            static_cast<char*>(reservation.slice().mem_));
     io_offset += slice_len;
     reservation.commit(slice_len);
   }

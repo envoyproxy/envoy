@@ -23,6 +23,14 @@ build:clang --repo_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
 build:clang --linkopt='-L$(llvm-config --libdir)'
 build:clang --linkopt='-Wl,-rpath,$(llvm-config --libdir)'
 
+build:clang-asan --action_env='PATH=${PATH}'
+build:clang-asan --action_env=CC=clang
+build:clang-asan --action_env=CXX=clang++
+build:clang-asan --action_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
+build:clang-asan --repo_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
+build:clang-asan --linkopt='-L$(llvm-config --libdir)'
+build:clang-asan --linkopt='-Wl,-rpath,$(llvm-config --libdir)'
+
 build:clang-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:clang-asan --copt=-fsanitize=vptr,function
 build:clang-asan --linkopt=-fsanitize=vptr,function

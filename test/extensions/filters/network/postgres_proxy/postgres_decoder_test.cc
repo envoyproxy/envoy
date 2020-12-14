@@ -528,9 +528,9 @@ public:
   MOCK_METHOD(void*, linearize, (uint32_t), (override));
   MOCK_METHOD(void, move, (Instance&), (override));
   MOCK_METHOD(void, move, (Instance&, uint64_t), (override));
-  MOCK_METHOD(Buffer::Reservation, reserve, (uint64_t), (override));
-  MOCK_METHOD(Buffer::Reservation, reserveSingleSlice, (uint64_t, bool), (override));
-  MOCK_METHOD(void, commit, (Buffer::Reservation & reservation, uint64_t length), (override));
+  MOCK_METHOD(Buffer::Reservation, reserveApproximately, (uint64_t), (override));
+  MOCK_METHOD(Buffer::ReservationSingleSlice, reserveSingleSlice, (uint64_t, bool), (override));
+  MOCK_METHOD(void, commit, (uint64_t, absl::Span<RawSlice>, absl::Span<SliceDataPtr>), (override));
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
   MOCK_METHOD(std::string, toString, (), (const, override));

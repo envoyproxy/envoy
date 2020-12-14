@@ -135,7 +135,7 @@ private:
     Event::Dispatcher& dispatcher_;
     Network::ClientConnectionPtr connection_;
     Buffer::OwnedImpl buffer_;
-    absl::optional<Buffer::Reservation> current_buffer_reservation_;
+    absl::optional<Buffer::ReservationSingleSlice> current_buffer_reservation_;
     char* current_slice_mem_{};
   };
 

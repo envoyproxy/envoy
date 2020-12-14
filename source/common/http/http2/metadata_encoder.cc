@@ -62,11 +62,11 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
     ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
     return false;
   }
-  Buffer::Reservation reservation = payload_.reserveSingleSlice(buflen);
-  ASSERT(reservation.slices()[0].len_ >= buflen);
+  auto reservation = payload_.reserveSingleSlice(buflen);
+  ASSERT(reservation.slice().len_ >= buflen);
 
   // Creates payload using nghttp2.
-  uint8_t* buf = reinterpret_cast<uint8_t*>(reservation.slices()[0].mem_);
+  uint8_t* buf = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
   const ssize_t result = nghttp2_hd_deflate_hd(deflater_.get(), buf, buflen, nva.begin(), nvlen);
   RELEASE_ASSERT(result > 0,
                  fmt::format("Failed to deflate metadata payload, with result {}.", result));

@@ -39,9 +39,9 @@ static void appendSlice(Buffer::Instance& buffer, uint32_t size) {
   // A 16kb request currently has inline metadata, which makes it 16384+8. This gets rounded up
   // to the next page size. Request enough that there is no extra space, to ensure that this results
   // in a new slice.
-  Buffer::Reservation reservation = buffer.reserveSingleSlice(16384);
+  auto reservation = buffer.reserveSingleSlice(16384);
 
-  memcpy(reservation.slices()[0].mem_, data.data(), data.size());
+  memcpy(reservation.slice().mem_, data.data(), data.size());
   reservation.commit(data.size());
 }
 
@@ -54,7 +54,7 @@ static void addFullSlices(Buffer::Instance& output_buffer, int num_slices, bool 
 
   for (int i = 0; i < num_slices; i++) {
     auto start_size = buffer->length();
-    Buffer::Reservation reservation = buffer->reserve(16384);
+    Buffer::Reservation reservation = buffer->reserveApproximately(16384);
     for (unsigned i = 0; i < reservation.numSlices(); i++) {
       memset(reservation.slices()[i].mem_, 'a', reservation.slices()[i].len_);
     }

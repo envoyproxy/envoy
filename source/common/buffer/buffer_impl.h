@@ -622,9 +622,10 @@ public:
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  Reservation reserve(uint64_t preferred_length) override;
-  Reservation reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
-  void commit(Reservation& reservation, uint64_t length) override;
+  Reservation reserveApproximately(uint64_t preferred_length) override;
+  ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
+  void commit(uint64_t length, absl::Span<RawSlice> slices,
+              absl::Span<SliceDataPtr> owned_slices) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;

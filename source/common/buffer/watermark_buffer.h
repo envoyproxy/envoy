@@ -34,8 +34,9 @@ public:
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   SliceDataPtr extractMutableFrontSlice() override;
-  Reservation reserve(uint64_t preferred_length) override;
-  void commit(Reservation& reservation, uint64_t length) override;
+  Reservation reserveApproximately(uint64_t preferred_length) override;
+  void commit(uint64_t length, absl::Span<RawSlice> slices,
+              absl::Span<SliceDataPtr> owned_slices) override;
   void postProcess() override { checkLowWatermark(); }
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
