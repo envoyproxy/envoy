@@ -16,6 +16,8 @@
 #include "envoy/network/udp_packet_writer_handler.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/interval_value.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -333,7 +335,7 @@ public:
    * Set the fraction of incoming connections that will be closed immediately
    * after being opened.
    */
-  virtual void setRejectFraction(float reject_fraction) PURE;
+  virtual void setRejectFraction(UnitFloat reject_fraction) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

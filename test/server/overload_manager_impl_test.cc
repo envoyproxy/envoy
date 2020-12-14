@@ -236,7 +236,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(0, cb_count);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(0, scale_percent_gauge.value());
@@ -282,7 +282,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(2, cb_count);
   EXPECT_EQ(30, pressure_gauge2.value());
 
@@ -302,7 +302,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(4, cb_count);
   EXPECT_EQ(41, pressure_gauge1.value());
   EXPECT_EQ(42, pressure_gauge2.value());
@@ -327,7 +327,7 @@ TEST_F(OverloadManagerImplTest, ScaledTrigger) {
   timer_cb_();
 
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(0, scale_percent_gauge.value());
 
@@ -336,7 +336,7 @@ TEST_F(OverloadManagerImplTest, ScaledTrigger) {
   factory3_.monitor_->setPressure(0.65);
   timer_cb_();
 
-  EXPECT_EQ(action_state.value(), 0.5 /* = 0.65 / (0.8 - 0.5) */);
+  EXPECT_EQ(action_state.value(), UnitFloat(0.5) /* = 0.65 / (0.8 - 0.5) */);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(50, scale_percent_gauge.value());
 
@@ -408,13 +408,13 @@ TEST_F(OverloadManagerImplTest, DelayedUpdatesAreCoalesced) {
   // When monitor 3 publishes its update, the action won't be visible to the thread-local state
   factory3_.monitor_->setPressure(0.6);
   factory3_.monitor_->publishUpdate();
-  EXPECT_EQ(action_state.value(), 0.0);
+  EXPECT_EQ(action_state.value(), UnitFloat::min());
 
   // Now when monitor 4 publishes a larger value, the update from monitor 3 is skipped.
   EXPECT_FALSE(action_state.isSaturated());
   factory4_.monitor_->setPressure(0.65);
   factory4_.monitor_->publishUpdate();
-  EXPECT_EQ(action_state.value(), 0.5 /* = (0.65 - 0.5) / (0.8 - 0.5) */);
+  EXPECT_EQ(action_state.value(), UnitFloat(0.5) /* = (0.65 - 0.5) / (0.8 - 0.5) */);
 }
 
 TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
@@ -504,7 +504,8 @@ TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
 
   // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
   // a timer scale factor of 0.8 (1 - 0.2).
-  EXPECT_CALL(*scaled_timer_manager, setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
+  EXPECT_CALL(*scaled_timer_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
   factory1_.monitor_->setPressure(0.6);
 
   timer_cb_();

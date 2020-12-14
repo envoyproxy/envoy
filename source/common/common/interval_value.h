@@ -22,6 +22,13 @@ public:
 
   T value() const { return value_; }
 
+  bool operator==(ClosedIntervalValue<T, Interval> other) const { return value_ == other.value(); }
+  bool operator!=(ClosedIntervalValue<T, Interval> other) const { return value_ != other.value(); }
+  bool operator<(ClosedIntervalValue<T, Interval> other) const { return value_ < other.value(); }
+  bool operator<=(ClosedIntervalValue<T, Interval> other) const { return value_ <= other.value(); }
+  bool operator>=(ClosedIntervalValue<T, Interval> other) const { return value_ >= other.value(); }
+  bool operator>(ClosedIntervalValue<T, Interval> other) const { return value_ > other.value(); }
+
 private:
   T value_;
 };

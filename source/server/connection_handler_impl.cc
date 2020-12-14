@@ -153,7 +153,7 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
+void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction) {
   listener_reject_fraction_ = reject_fraction;
   for (auto& listener : listeners_) {
     listener.second.listener_->listener()->setRejectFraction(reject_fraction);
