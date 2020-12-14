@@ -74,7 +74,7 @@ public:
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
                        Http::ResponseHeaderMap& response_headers,
                        const Http::ResponseTrailerMap& response_trailers,
-                       StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
+                       StreamInfo::StreamInfol& stream_info, Http::Code& code, std::string& body,
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
     if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
@@ -90,7 +90,7 @@ public:
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();
       response_headers.setStatus(std::to_string(enumToInt(code)));
-      stream_info.response_code_ = static_cast<uint32_t>(code);
+      stream_info.setResponseCode(static_cast<uint32_t>(code));
     }
 
     if (body_formatter_) {
@@ -126,14 +126,14 @@ public:
   }
 
   void rewrite(const Http::RequestHeaderMap* request_headers,
-               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfoImpl& stream_info,
+               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
                Http::Code& code, std::string& body,
                absl::string_view& content_type) const override {
     // Set response code to stream_info and response_headers due to:
     // 1) StatusCode filter is using response_code from stream_info,
     // 2) %RESP(:status)% is from Status() in response_headers.
     response_headers.setStatus(std::to_string(enumToInt(code)));
-    stream_info.response_code_ = static_cast<uint32_t>(code);
+    stream_info.setResponseCode(static_cast<uint32_t>(code));
 
     if (request_headers == nullptr) {
       request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
