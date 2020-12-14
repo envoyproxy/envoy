@@ -170,6 +170,10 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
 
 void DnsCacheImpl::onReResolve(const std::string& host) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
+  // If we need to erase the host, hold onto the PrimaryHostInfo object that owns this callback.
+  // This is defined at function scope so that it is only erased on function exit to avoid
+  // use-after-free issues
+  PrimaryHostInfoPtr host_to_erase;
 
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
   // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
@@ -195,7 +199,10 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
     }
     {
       absl::WriterMutexLock writer_lock{&primary_hosts_lock_};
-      primary_hosts_.erase(host);
+      auto host_it = primary_hosts_.find(host);
+      ASSERT(host_it != primary_hosts_.end());
+      host_to_erase = std::move(host_it->second);
+      primary_hosts_.erase(host_it);
     }
     notifyThreads(host);
   } else {
