@@ -43,6 +43,9 @@ public:
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
 
+  // TODO: This method is unimplemented for OpenTracing.
+  std::string getTraceId() const override { return std::string(); };
+
 private:
   OpenTracingDriver& driver_;
   opentracing::FinishSpanOptions finish_options_;

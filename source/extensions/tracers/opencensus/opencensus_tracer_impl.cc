@@ -77,6 +77,8 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override{};
   std::string getBaggage(absl::string_view) override { return std::string(); };
 
+  std::string getTraceId() const override;
+
 private:
   ::opencensus::trace::Span span_;
   const envoy::config::trace::v3::OpenCensusConfig& oc_config_;
@@ -241,6 +243,11 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
       break;
     }
   }
+}
+
+std::string Span::getTraceId() const {
+  const auto& ctx = span_.context();
+  return ctx.trace_id().ToHex();
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& /*config*/, const std::string& name,

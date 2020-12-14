@@ -171,6 +171,7 @@ public:
   void injectContext(Http::RequestHeaderMap&) override {}
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return std::string(); }
+  std::string getTraceId() const override { return std::string(); }
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }

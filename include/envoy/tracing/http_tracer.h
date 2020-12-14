@@ -174,6 +174,14 @@ public:
    * @param key baggage value
    */
   virtual void setBaggage(absl::string_view key, absl::string_view value) PURE;
+
+  /**
+   * Retrieve the trace ID associated with this span.
+   * The trace id may be created for this span, propagated by parent spans, or
+   * not created yet.
+   * @return trace ID
+   */
+  virtual std::string getTraceId() const PURE;
 };
 
 /**

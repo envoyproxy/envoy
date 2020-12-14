@@ -127,6 +127,9 @@ TEST(OpenCensusTracerTest, Span) {
     // Baggage methods are a noop in opencensus and won't affect events.
     span->setBaggage("baggage_key", "baggage_value");
     ASSERT_EQ("", span->getBaggage("baggage_key"));
+
+    // Trace id is automatically created when no parent context exists.
+    ASSERT_NE(span->getTraceId(), "");
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
@@ -217,6 +220,10 @@ void testIncomingHeaders(
                                               {Tracing::Reason::Sampling, false});
     span->injectContext(injected_headers);
     span->finishSpan();
+
+    // Check contents via public API.
+    // Trace id is set via context propagation headers.
+    EXPECT_EQ(span->getTraceId(), "404142434445464748494a4b4c4d4e4f");
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
@@ -225,7 +232,7 @@ void testIncomingHeaders(
   const auto& sd = spans[0];
   ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
 
-  // Check contents.
+  // Check contents by inspecting private span data.
   EXPECT_TRUE(sd.has_remote_parent());
   EXPECT_EQ("6162636465666768", sd.parent_span_id().ToHex());
   EXPECT_EQ("404142434445464748494a4b4c4d4e4f", sd.context().trace_id().ToHex());

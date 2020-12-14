@@ -88,6 +88,9 @@ public:
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
 
+  // TODO: This method is unimplemented for OpenTracing.
+  std::string getTraceId() const override { return std::string(); };
+
   /*
    * Get pointer to corresponding SpanStore object. This method is mainly used in testing. Used to
    * check the internal data of the span.

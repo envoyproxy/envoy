@@ -156,6 +156,9 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return std::string(); }
 
+  // TODO: This method is unimplemented for X-Ray.
+  std::string getTraceId() const override { return std::string(); };
+
   /**
    * Creates a child span.
    * In X-Ray terms this creates a sub-segment and sets its parent ID to the current span's ID.
