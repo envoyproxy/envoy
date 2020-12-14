@@ -37,6 +37,7 @@ class TcpStatsdSinkTest : public Event::TestUsingSimulatedTime, public testing::
 public:
   TcpStatsdSinkTest() {
     cluster_manager_.initializeClusters({"fake_cluster"}, {});
+    cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     sink_ = std::make_unique<TcpStatsdSink>(
         local_info_, "fake_cluster", tls_, cluster_manager_,
         cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_);
@@ -49,8 +50,7 @@ public:
     conn_info.host_description_ = Upstream::makeTestHost(
         std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80", simTime());
 
-    EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
-        .WillOnce(Return(conn_info));
+    EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, connect());
   }
@@ -153,7 +153,7 @@ TEST_F(TcpStatsdSinkTest, NoHost) {
   snapshot_.counters_.push_back({1, counter});
 
   Upstream::MockHost::MockCreateConnectionData conn_info;
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_))
       .WillOnce(Return(conn_info))
       .WillOnce(Return(conn_info));
   sink_->flush(snapshot_);

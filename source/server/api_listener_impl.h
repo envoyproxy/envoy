@@ -141,6 +141,7 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
+      bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
 
       SyntheticReadCallbacks& parent_;

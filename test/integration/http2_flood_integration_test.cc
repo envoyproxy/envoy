@@ -1305,4 +1305,81 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
 
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityNoOpenStreams) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // TODO(yanavlasov): The protocol constraint tracker for upstream connections considers the stream
+  // to be in the OPEN state after the server sends complete response headers. The correctness of
+  // this is debatable and needs to be revisited.
+
+  // The `floodClient` method sends request headers to open upstream connection, but upstream does
+  // not send any response. In this case the number of streams tracked by the upstream protocol
+  // constraints checker is still 0.
+  floodClient(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(1),
+                                            Http2Frame::makeClientStreamId(2)),
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM + 1,
+              "cluster.cluster_0.http2.inbound_priority_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneOpenStream) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send response header, but keep the stream open. This should bump the number of OPEN streams
+  // tracked by the upstream protocol constraints checker to 1.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  auto buf = serializeFrames(
+      Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                    Http2Frame::makeClientStreamId(1)),
+      Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 + 1);
+
+  auto* upstream = fake_upstreams_.front().get();
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Upstream connection should be disconnected
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  // Downstream client should get stream reset since upstream sent headers but did not complete the
+  // stream
+  response->waitForReset();
+  EXPECT_EQ(
+      1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
+}
+
+// Verify that protocol constraint tracker correctly applies limits to the CLOSED streams as well.
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneClosedStream) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send response header and end the stream
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto frame = Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                             Http2Frame::makeClientStreamId(1));
+  auto buf = serializeFrames(
+      frame, Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 + 1);
+
+  auto* upstream = fake_upstreams_.front().get();
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Upstream connection should be disconnected
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  EXPECT_EQ(
+      1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
+}
+
 } // namespace Envoy

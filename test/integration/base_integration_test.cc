@@ -92,7 +92,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
-  connection->enableHalfClose(enable_half_close_);
+  connection->enableHalfClose(enableHalfClose());
   return connection;
 }
 
@@ -226,7 +226,7 @@ BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                                        Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options, source_address);
+                                                enableHalfClose(), options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

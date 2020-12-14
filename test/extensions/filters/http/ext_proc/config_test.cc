@@ -37,7 +37,7 @@ TEST(HttpExtProcConfigTest, CorrectConfig) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
+  EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));

@@ -74,6 +74,7 @@ public:
 
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
+        upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         pool_(std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
                                                  Upstream::ResourcePriority::Default, nullptr,
                                                  nullptr, state_)) {
@@ -138,7 +139,7 @@ public:
         EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes())
             .Times(num_clients)
             .WillRepeatedly(Return(*buffer_limits));
-        EXPECT_CALL(*test_client.connection_, setBufferLimits(*buffer_limits)).Times(1);
+        EXPECT_CALL(*test_client.connection_, setBufferLimits(*buffer_limits));
       }
     }
     // Finally (for InSequence tests) set up createCodecClient and make sure the
@@ -212,6 +213,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime())};
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   std::unique_ptr<TestConnPoolImpl> pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -335,6 +337,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
   host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime());
+  new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   pool_ = std::make_unique<TestConnPoolImpl>(
       dispatcher_, random_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);
 

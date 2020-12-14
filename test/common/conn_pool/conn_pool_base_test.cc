@@ -53,7 +53,8 @@ public:
 class ConnPoolImplBaseTest : public testing::Test {
 public:
   ConnPoolImplBaseTest()
-      : pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_) {
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -81,6 +82,7 @@ public:
       new NiceMock<Upstream::MockHostDescription>()};
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   Upstream::HostSharedPtr host_{
       Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_.timeSource())};
   TestConnPoolImplBase pool_;
@@ -119,7 +121,7 @@ TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
   EXPECT_CALL(pool_, onPoolFailure).WillOnce(InvokeWithoutArgs([&]() -> void {
     pool_.newStream(context_);
   }));
-  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
+  EXPECT_CALL(pool_, instantiateActiveClient);
   clients_[0]->close();
   CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*connecting capacity*/);
 
@@ -135,7 +137,7 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Unhealthy);
 
   // On new stream, create 1 connection.
-  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
+  EXPECT_CALL(pool_, instantiateActiveClient);
   auto cancelable = pool_.newStream(context_);
   CHECK_STATE(0 /*active*/, 1 /*pending*/, 1 /*connecting capacity*/);
 
@@ -152,7 +154,7 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Degraded);
 
   // On new stream, create 1 connection.
-  EXPECT_CALL(pool_, instantiateActiveClient).Times(1);
+  EXPECT_CALL(pool_, instantiateActiveClient);
   auto cancelable = pool_.newStream(context_);
 
   cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);

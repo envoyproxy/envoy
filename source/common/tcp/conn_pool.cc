@@ -50,7 +50,7 @@ ActiveTcpClient::~ActiveTcpClient() {
 void ActiveTcpClient::clearCallbacks() {
   if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
-    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->scheduleOnUpstreamReady();
   }
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
@@ -60,14 +60,18 @@ void ActiveTcpClient::clearCallbacks() {
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
-  // Do not pass the Connected event to any session which registered during onEvent above.
-  // Consumers of connection pool connections assume they are receiving already connected
-  // connections.
-  if (callbacks_ && event != Network::ConnectionEvent::Connected) {
-    callbacks_->onEvent(event);
-    // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
-    // Clear the pointer to avoid using it again.
-    callbacks_ = nullptr;
+  if (callbacks_) {
+    // Do not pass the Connected event to any session which registered during onEvent above.
+    // Consumers of connection pool connections assume they are receiving already connected
+    // connections.
+    if (event == Network::ConnectionEvent::Connected) {
+      connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
+    } else {
+      callbacks_->onEvent(event);
+      // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
+      // Clear the pointer to avoid using it again.
+      callbacks_ = nullptr;
+    }
   }
 }
 

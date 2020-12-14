@@ -156,7 +156,7 @@ public:
                          Network::ConnectionEvent event);
   // See if the drain process has started and/or completed.
   void checkForDrained();
-  void onUpstreamReady();
+  void scheduleOnUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
   // Called if this pool is likely to be picked soon, to determine if it's worth
   // prefetching a connection.
@@ -259,6 +259,9 @@ private:
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
+
+  void onUpstreamReady();
+  Event::SchedulableCallbackPtr upstream_ready_cb_;
 };
 
 } // namespace ConnectionPool
