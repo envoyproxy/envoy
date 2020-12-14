@@ -11,6 +11,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
@@ -864,6 +865,14 @@ class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEn
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
+class HttpMatchingData {
+public:
+  virtual ~HttpMatchingData() = default;
+
+  virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;
+  virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
+};
+
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
@@ -879,16 +888,42 @@ public:
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   /**
+   * Add a decoder filter that is used when reading stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void
+  addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
+
+  /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   /**
+   * Add an encoder filter that is used when writing stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void
+  addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
+
+  /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a decoder/encoder filter that is used both when reading and writing stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
+                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.

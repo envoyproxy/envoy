@@ -264,9 +264,10 @@ TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
   NiceMock<Runtime::MockLoader> runtime;
   MirrorPolicyImpl policy(config, upstream, runtime);
 
-  EXPECT_CALL(runtime.snapshot_,
-              featureEnabled("runtime_key",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
+  EXPECT_CALL(
+      runtime.snapshot_,
+      featureEnabled("runtime_key",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
       .Times(4)
       .WillRepeatedly(Return(true));
   EXPECT_EQ(true, policy.shouldMirror("get"));
@@ -274,9 +275,10 @@ TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
   EXPECT_EQ(true, policy.shouldMirror("GET"));
   EXPECT_EQ(true, policy.shouldMirror("SET"));
 
-  EXPECT_CALL(runtime.snapshot_,
-              featureEnabled("runtime_key",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
+  EXPECT_CALL(
+      runtime.snapshot_,
+      featureEnabled("runtime_key",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
       .Times(4)
       .WillRepeatedly(Return(false));
   EXPECT_EQ(false, policy.shouldMirror("get"));

@@ -39,7 +39,6 @@
 using testing::_;
 using testing::ContainerEq;
 using testing::Eq;
-using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -3036,15 +3035,17 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
       .WillRepeatedly(Return(true));
   EXPECT_EQ(
       "something_else",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_), 43))
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 43))
       .WillRepeatedly(Return(false));
   EXPECT_EQ(
       "www2",
@@ -5616,11 +5617,13 @@ virtual_hosts:
 )EOF";
 
   Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(false));
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.shadow_enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(true));
   EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
@@ -5673,11 +5676,13 @@ virtual_hosts:
 )EOF";
 
   Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(false));
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.shadow_enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(true));
   EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 

@@ -102,9 +102,10 @@ public:
 
     fault_config_ = std::make_shared<Filters::Common::Fault::FaultDelayConfig>(fault);
 
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("mongo.fault.fixed_delay.percent",
-                               Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
+    EXPECT_CALL(
+        runtime_.snapshot_,
+        featureEnabled("mongo.fault.fixed_delay.percent",
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {

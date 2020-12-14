@@ -21,7 +21,7 @@ TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Http::StreamDecoderFilterSharedPtr filter;
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter).WillOnce(::testing::SaveArg<0>(&filter));
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
 
   envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig config;
   config.set_cdn_id("cdn");

@@ -12,6 +12,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/ssl/connection.h"
 
 #include "common/http/conn_manager_config.h"
@@ -469,8 +470,17 @@ public:
   ~MockFilterChainFactoryCallbacks() override;
 
   MOCK_METHOD(void, addStreamDecoderFilter, (Http::StreamDecoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamDecoderFilter,
+              (Http::StreamDecoderFilterSharedPtr filter,
+               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamEncoderFilter,
+              (Http::StreamEncoderFilterSharedPtr filter,
+               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamFilter,
+              (Http::StreamFilterSharedPtr filter,
+               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
 };
 

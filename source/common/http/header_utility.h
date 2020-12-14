@@ -47,6 +47,8 @@ public:
 
     friend class HeaderUtility;
   };
+  static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap::GetResult& header,
+                                                             absl::string_view separator = ",");
   static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap& headers,
                                                              const Http::LowerCaseString& key,
                                                              absl::string_view separator = ",");
