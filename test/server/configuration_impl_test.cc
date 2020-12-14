@@ -163,7 +163,7 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
   EXPECT_THROW(TestUtility::validate(bootstrap), Envoy::ProtoValidationException);
 }
 
-// This should throw an proto validation exception in the v4 api with the oneof promotion.
+// This should throw a proto validation exception in the v4 api with the oneof promotion.
 TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
   std::string json = R"EOF(
   {
