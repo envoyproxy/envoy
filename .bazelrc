@@ -211,6 +211,7 @@ build:remote --auth_enabled=true
 build:remote --remote_download_toplevel
 
 # Windows bazel does not allow sandboxed as a spawn strategy
+build:remote-windows --action_env=WRAPT_INSTALL_EXTENSIONS=false
 build:remote-windows --spawn_strategy=remote,local
 build:remote-windows --strategy=Javac=remote,local
 build:remote-windows --strategy=Closure=remote,local
