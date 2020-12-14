@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 29]
+// [#next-free-field: 30]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -161,15 +161,23 @@ message Bootstrap {
   // Configuration for internal processing of stats.
   metrics.v4alpha.StatsConfig stats_config = 13;
 
-  // Optional duration between flushes to configured stats sinks. For
-  // performance reasons Envoy latches counters and only flushes counters and
-  // gauges at a periodic interval. If not specified the default is 5000ms (5
-  // seconds).
-  // Duration must be at least 1ms and at most 5 min.
-  google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
-    lt {seconds: 300}
-    gte {nanos: 1000000}
-  }];
+  oneof stats_flush {
+    // Optional duration between flushes to configured stats sinks. For
+    // performance reasons Envoy latches counters and only flushes counters and
+    // gauges at a periodic interval. If not specified the default is 5000ms (5
+    // seconds). Only one of `stats_flush_interval` or `stats_flush_on_admin`
+    // can be set.
+    // Duration must be at least 1ms and at most 5 min.
+    google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
+      lt {seconds: 300}
+      gte {nanos: 1000000}
+    }];
+
+    // Flush stats to sinks only when queried for on the admin interface. If set,
+    // a flush timer is not created. Only one of `stats_flush_on_admin` or
+    // `stats_flush_interval` can be set.
+    bool stats_flush_on_admin = 29 [(validate.rules).bool = {const: true}];
+  }
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.

@@ -466,8 +466,8 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   // Check that the added callback was invoked.
   EXPECT_EQ(test, false);
 
-  // Small test to cover new statsFlushInterval() on Instance.h.
-  EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
+  // Small test to cover new the flush interval on the statsConfig in Instance.h.
+  EXPECT_EQ(test_server_->server().statsConfig().flushInterval(), std::chrono::milliseconds(5000));
 }
 
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {

@@ -18,6 +18,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -217,11 +218,6 @@ public:
   virtual TimeSource& timeSource() PURE;
 
   /**
-   * @return the flush interval of stats sinks.
-   */
-  virtual std::chrono::milliseconds statsFlushInterval() const PURE;
-
-  /**
    * Flush the stats sinks outside of a flushing interval.
    * Note: stats flushing may not be synchronous.
    * Therefore, this function may return prior to flushing taking place.
@@ -233,6 +229,11 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
+   * @return const StatsConfig& the configuration of server stats.
+   */
+  virtual Configuration::StatsConfig& statsConfig() PURE;
 
   /**
    * @return Configuration::ServerFactoryContext& factory context for filters.

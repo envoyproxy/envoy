@@ -18,6 +18,7 @@
 #include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload/overload_manager.h"
@@ -142,9 +143,9 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
-   * @return std::chrono::milliseconds the flush interval of stats sinks.
+   * @return StatsConfig& the servers stats configuration.
    */
-  virtual std::chrono::milliseconds statsFlushInterval() const PURE;
+  virtual StatsConfig& statsConfig() PURE;
 };
 
 /**

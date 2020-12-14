@@ -3,12 +3,14 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/config/well_known_names.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/utility.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -85,7 +87,8 @@ TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(5000), config.statsFlushInterval());
+  EXPECT_EQ(std::chrono::milliseconds(5000), config.statsConfig().flushInterval());
+  EXPECT_FALSE(config.statsConfig().flushOnAdmin());
 }
 
 TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
@@ -110,7 +113,80 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(std::chrono::milliseconds(500), config.statsFlushInterval());
+  EXPECT_EQ(std::chrono::milliseconds(500), config.statsConfig().flushInterval());
+  EXPECT_FALSE(config.statsConfig().flushOnAdmin());
+}
+
+TEST_F(ConfigurationImplTest, StatsOnAdmin) {
+  std::string json = R"EOF(
+  {
+    "stats_flush_on_admin": true,
+
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_TRUE(config.statsConfig().flushOnAdmin());
+}
+
+TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
+  std::string json = R"EOF(
+  {
+    "stats_flush_on_admin": false,
+
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  EXPECT_THROW(TestUtility::validate(bootstrap), Envoy::ProtoValidationException);
+}
+
+// This should throw a proto validation exception in the v4 api with the oneof promotion.
+TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
+  std::string json = R"EOF(
+  {
+    "stats_flush_on_admin": true,
+    "stats_flush_interval": "0.500s",
+
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
@@ -330,7 +406,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_EQ(1, config.statsSinks().size());
+  EXPECT_EQ(1, config.statsConfig().sinks().size());
 }
 
 TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
