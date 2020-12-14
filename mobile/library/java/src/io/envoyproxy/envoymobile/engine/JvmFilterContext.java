@@ -190,6 +190,30 @@ class JvmFilterContext {
     filter.setResponseFilterCallbacks(EnvoyHTTPFilterCallbacksImpl.create(callbackHandle));
   }
 
+  /**
+   * Dispatches error received from the JNI layer up to the platform.
+   *
+   * @param errorCode,    the error code.
+   * @param message,      the error message.
+   * @param attemptCount, the number of times an operation was attempted before firing this error.
+   * @return Object,      not used in HTTP filters.
+   */
+  public Object onError(int errorCode, byte[] message, int attemptCount) {
+    String errorMessage = new String(message);
+    filter.onError(errorCode, errorMessage, attemptCount);
+    return null;
+  }
+
+  /**
+   * Dispatches cancellation notice up to the platform.
+   *
+   * @return Object, not used in HTTP filters.
+   */
+  public Object onCancel() {
+    filter.onCancel();
+    return null;
+  }
+
   private static byte[][] toJniHeaders(Object headers) {
     return JniBridgeUtility.toJniHeaders((Map<String, List<String>>)headers);
   }

@@ -87,4 +87,21 @@ public interface EnvoyHTTPFilter {
    */
   Object[] onResumeResponse(Map<String, List<String>> headers, ByteBuffer data,
                             Map<String, List<String>> trailers, boolean endStream);
+
+  /**
+   * Called when the async HTTP stream has an error.
+   *
+   * @param errorCode,    the error code.
+   * @param message,      the error message.
+   * @param attemptCount, the number of times an operation was attempted before firing this error.
+   *                      -1 is used in scenarios where it does not make sense to have an attempt
+   *                      count for an error. This is different from 0, which intentionally conveys
+   *                      that the action was _not_ executed.
+   */
+  void onError(int errorCode, String message, int attemptCount);
+
+  /**
+   * Called when the async HTTP stream is canceled.
+   */
+  void onCancel();
 }

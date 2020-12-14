@@ -97,6 +97,18 @@ internal class EnvoyHTTPFilterAdapter(
     return arrayOf(0, trailers)
   }
 
+  override fun onError(errorCode: Int, message: String, attemptCount: Int) {
+    (filter as? ResponseFilter)?.let { responseFilter ->
+      responseFilter.onError(EnvoyError(errorCode, message, attemptCount))
+    }
+  }
+
+  override fun onCancel() {
+    (filter as? ResponseFilter)?.let { responseFilter ->
+      responseFilter.onCancel()
+    }
+  }
+
   override fun setRequestFilterCallbacks(callbacks: EnvoyHTTPFilterCallbacks) {
     (filter as? AsyncRequestFilter)?.let { asyncRequestFilter ->
       asyncRequestFilter.setRequestFilterCallbacks(RequestFilterCallbacksImpl(callbacks))
