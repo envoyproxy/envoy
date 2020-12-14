@@ -188,7 +188,7 @@ public:
    * compatibility.
    * @param api_config_source the config source to extract transport API version from.
    * @return envoy::config::core::v3::ApiVersion transport API version
-   * @throws DeprecateDMajorVersion when the transport version is disabled.
+   * @throws DeprecatedMajorVersionException when the transport version is disabled.
    */
   template <class Proto>
   static envoy::config::core::v3::ApiVersion
