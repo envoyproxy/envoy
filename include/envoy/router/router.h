@@ -453,20 +453,20 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 /**
  * All virtual cluster stats. @see stats_macro.h
  */
-#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
-  COUNTER(upstream_rq_total)
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(other)
 
 /**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
-struct VirtualClusterStats {
-  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -486,8 +486,9 @@ public:
    */
   virtual VirtualClusterStats& stats() const PURE;
 
-  static VirtualClusterStats generateStats(Stats::Scope& scope) {
-    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  static VirtualClusterStats generateStats(Stats::Scope& scope,
+                                           const VirtualClusterStatNames& stat_names) {
+    return VirtualClusterStats(stat_names, scope);
   }
 };
 
