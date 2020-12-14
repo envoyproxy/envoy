@@ -102,6 +102,7 @@ std::string BufferHelper::removeString(Buffer::Instance& data) {
 
   char* start = reinterpret_cast<char*>(data.linearize(length));
   std::string ret(start, length);
+  ret.resize(ret.find('\0'));
   data.drain(length);
   return ret;
 }
