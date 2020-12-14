@@ -526,13 +526,18 @@ public:
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
-  static ClusterStats generateStats(Stats::Scope& scope);
-  static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
-  static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
-                                                                  const std::string& stat_prefix,
-                                                                  bool track_remaining);
-  static ClusterRequestResponseSizeStats generateRequestResponseSizeStats(Stats::Scope&);
-  static ClusterTimeoutBudgetStats generateTimeoutBudgetStats(Stats::Scope&);
+  static ClusterStats generateStats(Stats::Scope& scope,
+                                    const ClusterStatNames& cluster_stat_names);
+  static ClusterLoadReportStats
+  generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
+  static ClusterCircuitBreakersStats
+  generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatName prefix, bool track_remaining,
+                               const ClusterCircuitBreakersStatNames& stat_names);
+  static ClusterRequestResponseSizeStats
+  generateRequestResponseSizeStats(Stats::Scope&,
+                                   const ClusterRequestResponseSizeStatNames& stat_names);
+  static ClusterTimeoutBudgetStats
+  generateTimeoutBudgetStats(Stats::Scope&, const ClusterTimeoutBudgetStatNames& stat_names);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -648,7 +653,8 @@ public:
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name, Stats::Scope& stats_scope);
+                     const std::string& cluster_name, Stats::Scope& stats_scope,
+                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
     ResourceManagerImplPtr load(const envoy::config::cluster::v3::Cluster& config,
                                 Runtime::Loader& runtime, const std::string& cluster_name,
                                 Stats::Scope& stats_scope,
@@ -657,11 +663,12 @@ private:
     using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
     Managers managers_;
+    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names_;
   };
 
   struct OptionalClusterStats {
     OptionalClusterStats(const envoy::config::cluster::v3::Cluster& config,
-                         Stats::Scope& stats_scope);
+                         Stats::Scope& stats_scope, const ClusterManager& manager);
     const ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
     const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   };

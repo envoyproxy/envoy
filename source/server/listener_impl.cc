@@ -187,6 +187,7 @@ Event::Dispatcher& ListenerFactoryContextBaseImpl::dispatcher() { return server_
 Grpc::Context& ListenerFactoryContextBaseImpl::grpcContext() { return server_.grpcContext(); }
 bool ListenerFactoryContextBaseImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
 Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.httpContext(); }
+Router::Context& ListenerFactoryContextBaseImpl::routerContext() { return server_.routerContext(); }
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
@@ -595,6 +596,9 @@ bool PerListenerFactoryContextImpl::healthCheckFailed() {
 }
 Http::Context& PerListenerFactoryContextImpl::httpContext() {
   return listener_factory_context_base_->httpContext();
+}
+Router::Context& PerListenerFactoryContextImpl::routerContext() {
+  return listener_factory_context_base_->routerContext();
 }
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();

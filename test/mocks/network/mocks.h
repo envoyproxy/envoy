@@ -474,7 +474,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Connection&, connection, ());
   MOCK_METHOD(bool, shouldDrainReadBuffer, ());
-  MOCK_METHOD(void, setReadBufferReady, ());
+  MOCK_METHOD(void, setTransportSocketIsReadable, ());
   MOCK_METHOD(void, raiseEvent, (ConnectionEvent));
   MOCK_METHOD(void, flushWriteBuffer, ());
 

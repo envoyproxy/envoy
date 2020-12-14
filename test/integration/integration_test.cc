@@ -1432,7 +1432,10 @@ TEST_P(IntegrationTest, TestFlood) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {
@@ -1478,7 +1481,10 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {
@@ -1542,6 +1548,38 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
+}
+
+// Expect that if an upgrade was not expected, the HCM correctly removes upgrade headers from the
+// response and the response encoder does not drop trailers.
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: websocket\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n"
+                                              "trailer1:t2\r\n"
+                                              "\r\n",
+                                              false));
+
+  // Expect that upgrade headers are dropped and trailers are sent.
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  EXPECT_NE(response->trailers(), nullptr);
 }
 
 TEST_P(IntegrationTest, ConnectWithNoBody) {

@@ -21,6 +21,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/singleton:95.1"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/thread_local:95.7"
+"source/common/matcher:92.8"
 "source/common/tracing:94.9"
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:93.7"
@@ -76,7 +77,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:84.9"
 "source/server:94.5"
 "source/server/admin:95.1"
-"source/server/config_validation:76.6"
+"source/server/config_validation:75.9"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

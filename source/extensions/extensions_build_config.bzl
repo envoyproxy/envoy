@@ -72,9 +72,11 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
+    # Disabled by default
+    "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
     "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
-    "envoy.filters.http.oauth2":                         "//source/extensions/filters/http/oauth2:config",
+    "envoy.filters.http.oauth2":                        "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
     "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
@@ -178,6 +180,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+    "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
 
     #
     # Retry host predicates
@@ -226,11 +229,6 @@ EXTENSIONS = {
     "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
     "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
     "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
-}
-
-# These filters will not be built into Envoy by default. To build Envoy with any of these filter, please move it to EXTENSIONS.
-DISABLED_BY_DEFAULT_EXTENSIONS = {
-    "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

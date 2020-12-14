@@ -116,6 +116,7 @@ TEST(SquashFilterConfigTest, ParsesAndEscapesEnvironment) {
   const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
+
 TEST(SquashFilterConfigTest, TwoEnvironmentVariables) {
   TestEnvironment::setEnvVar("ENV1", "1", 1);
   TestEnvironment::setEnvVar("ENV2", "2", 1);
@@ -155,7 +156,8 @@ TEST(SquashFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
 
 class SquashFilterTest : public testing::Test {
 public:
-  SquashFilterTest() : request_(&cm_.async_client_) {}
+  SquashFilterTest()
+      : request_(&factory_context_.cluster_manager_.thread_local_cluster_.async_client_) {}
 
 protected:
   void SetUp() override {}
@@ -164,9 +166,10 @@ protected:
     envoy::extensions::filters::http::squash::v3::Squash p;
     p.set_cluster("squash");
     factory_context_.cluster_manager_.initializeClusters({"squash"}, {});
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"squash"});
     config_ = std::make_shared<SquashFilterConfig>(p, factory_context_.cluster_manager_);
 
-    filter_ = std::make_shared<SquashFilter>(config_, cm_);
+    filter_ = std::make_shared<SquashFilter>(config_, factory_context_.cluster_manager_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
@@ -180,8 +183,9 @@ protected:
     attachmentTimeout_timer_ =
         new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("squash"))
-        .WillRepeatedly(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
+        .WillRepeatedly(
+            ReturnRef(factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
 
     expectAsyncClientSend();
 
@@ -209,7 +213,8 @@ protected:
   }
 
   void expectAsyncClientSend() {
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+                send_(_, _, _))
         .WillOnce(Invoke(
             [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
                 const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
@@ -248,7 +253,6 @@ protected:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Envoy::Event::MockTimer>* attachmentTimeout_timer_{};
-  NiceMock<Envoy::Upstream::MockClusterManager> cm_;
   Envoy::Http::MockAsyncClientRequest request_;
   SquashFilterConfigSharedPtr config_;
   std::shared_ptr<SquashFilter> filter_;
@@ -258,9 +262,10 @@ protected:
 TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
   initFilter();
 
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("squash")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(factory_context_.cluster_manager_.thread_local_cluster_.async_client_));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
           [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
@@ -297,7 +302,7 @@ TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
 
 TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
   initFilter();
-  EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
@@ -446,7 +451,7 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
         attachmentTimeout_timer_->invokeCallback();
       }));
 
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
                            const Http::AsyncClient::RequestOptions&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));

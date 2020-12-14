@@ -49,7 +49,7 @@ protected:
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
     // The filter should continue decoding when the cache lookup result (miss) is ready.
-    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(1);
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
 
     // The cache lookup callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
