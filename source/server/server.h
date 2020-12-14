@@ -364,6 +364,7 @@ private:
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
+  bool startup_lifecycle_event_raised_{};
 
   ServerFactoryContextImpl server_contexts_;
 
@@ -373,9 +374,6 @@ private:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
-
-  // startup_ is true means Startup notifications have been called.
-  bool startup_{};
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

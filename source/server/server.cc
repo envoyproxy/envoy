@@ -616,7 +616,7 @@ void InstanceImpl::startWorkers() {
     // Update server stats as soon as initialization is done.
     updateServerStats();
     workers_started_ = true;
-    notifyCallbacksForStage(Stage::WorkerStarted);
+    notifyCallbacksForStage(Stage::WorkersStarted);
     // At this point we are ready to take traffic and all listening ports are up. Notify our
     // parent if applicable that they can stop listening and drain.
     restarter_.drainParentListeners();
@@ -717,9 +717,13 @@ void InstanceImpl::run() {
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
                                     access_log_manager_, init_manager_, overloadManager(), [this] {
-                                      if (!startup_) {
+                                      // This ensures Startup event to be sent first, required by
+                                      // tests. In static configuration, cluster manager will
+                                      // initialize init_manager immediately when setInitializedCb
+                                      // is called.
+                                      if (!startup_lifecycle_event_raised_) {
                                         notifyCallbacksForStage(Stage::Startup);
-                                        startup_ = true;
+                                        startup_lifecycle_event_raised_ = true;
                                       }
 
                                       notifyCallbacksForStage(Stage::PostInit);
@@ -731,9 +735,11 @@ void InstanceImpl::run() {
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                          "main_thread", *dispatcher_);
   dispatcher_->post([this] {
-    if (!startup_) {
+    // It's possible that Startup event is already raised during RunHelper
+    // construction.
+    if (!startup_lifecycle_event_raised_) {
       notifyCallbacksForStage(Stage::Startup);
-      startup_ = true;
+      startup_lifecycle_event_raised_ = true;
     }
   });
   dispatcher_->run(Event::Dispatcher::RunType::Block);

@@ -358,9 +358,9 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
-  bool startup = false, post_init = false, worker_started = false, shutdown = false,
+  bool startup = false, post_init = false, workers_started = false, shutdown = false,
        shutdown_with_completion = false;
-  absl::Notification started, post_init_fired, worker_started_fired, worker_started_block,
+  absl::Notification started, post_init_fired, workers_started_fired, workers_started_block,
       shutdown_begin, completion_block, completion_done;
   // Expect drainParentListeners not to be called before workers start.
   EXPECT_CALL(restart_, drainParentListeners).Times(0);
@@ -376,10 +376,10 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::WorkerStarted, [&] {
-      worker_started = true;
-      worker_started_fired.Notify();
-      worker_started_block.WaitForNotification();
+    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::WorkersStarted, [&] {
+      workers_started = true;
+      workers_started_fired.Notify();
+      workers_started_block.WaitForNotification();
     });
     auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
@@ -417,14 +417,14 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   EXPECT_TRUE(post_init);
   EXPECT_FALSE(shutdown);
 
-  worker_started_fired.WaitForNotification();
-  EXPECT_TRUE(worker_started);
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
   EXPECT_FALSE(shutdown);
   EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 
   EXPECT_CALL(restart_, drainParentListeners);
-  worker_started_block.Notify();
+  workers_started_block.Notify();
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   shutdown_begin.WaitForNotification();

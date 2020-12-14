@@ -29,7 +29,7 @@ public:
     /**
      * All workers have started.
      */
-    WorkerStarted,
+    WorkersStarted,
 
     /**
      * The server instance is being shutdown and the dispatcher is about to exit.

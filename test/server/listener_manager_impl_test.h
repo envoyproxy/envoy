@@ -53,7 +53,7 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)), callback_([] {}) {}
+  ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -296,7 +296,7 @@ protected:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
-  std::function<void()> callback_;
+  MockFunction<void()> callback_;
 };
 
 } // namespace Server
