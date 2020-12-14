@@ -10,8 +10,6 @@
 
 #include "absl/debugging/symbolize.h"
 
-#define SVCNAME TEXT("ENVOY")
-
 namespace Envoy {
 
 namespace {
@@ -130,7 +128,7 @@ void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
     service_static->UpdateState(SERVICE_STOPPED, E_INVALIDARG, true);
   }
 
-  service_static->handle_ = ::RegisterServiceCtrlHandler(SVCNAME, Handler);
+  service_static->handle_ = ::RegisterServiceCtrlHandlerA("ENVOY\0", Handler);
   if (service_static->handle_ == 0) {
     service_static->UpdateState(SERVICE_STOPPED, ::GetLastError(), false);
   }
