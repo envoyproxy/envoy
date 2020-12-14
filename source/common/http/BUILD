@@ -169,11 +169,14 @@ envoy_cc_library(
     deps = [
         ":headers_lib",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/matcher:matcher_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:linked_object",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
         "//source/common/local_reply:local_reply_lib",
+        "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
     ],
 )
 
