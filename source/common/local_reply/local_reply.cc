@@ -74,7 +74,7 @@ public:
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
                        Http::ResponseHeaderMap& response_headers,
                        const Http::ResponseTrailerMap& response_trailers,
-                       StreamInfo::StreamInfol& stream_info, Http::Code& code, std::string& body,
+                       StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
     if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
