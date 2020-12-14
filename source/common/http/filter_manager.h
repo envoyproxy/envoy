@@ -118,6 +118,10 @@ class SkipAction : public Matcher::ActionBase<
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
+ *
+ * This class is responsible for performing matching and updating match data when a match tree is
+ * configured for the associated filter. When not using a match tree, only minimal overhead (i.e.
+ * memory overhead of unused fields) should apply.
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {

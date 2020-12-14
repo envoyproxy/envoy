@@ -255,7 +255,7 @@ void ActiveStreamFilterBase::evaluateMatchTreeWithNewData(
   match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
 
   if (match_tree_evaluated_ && match_result.result_) {
-    if (dynamic_cast<SkipAction*>(match_result.result_.get())) {
+    if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
       skip_ = true;
     }
   }
