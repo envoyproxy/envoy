@@ -155,7 +155,7 @@ StructFormatter::toFormatMap(const ProtobufWkt::Struct& struct_format) const {
       break;
     default:
       throw EnvoyException(
-          "Only string values or nested structs are supported in structured access log format");
+          "Only string values or nested structs are supported in structured access log format.");
     }
   }
   return {std::move(output)};
