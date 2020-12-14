@@ -58,6 +58,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //        .... [further cluster config]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols (HTTP/1.1, HTTP/2).
+  // Note that HTTP/2 should generally be used for upstream clusters doing gRPC.
   message ExplicitHttpConfig {
     oneof protocol_config {
       option (validate.required) = true;

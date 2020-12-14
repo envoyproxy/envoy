@@ -62,6 +62,7 @@ message HttpProtocolOptions {
       "envoy.extensions.upstreams.http.v3.HttpProtocolOptions";
 
   // If this is used, the cluster will only operate on one of the possible upstream protocols (HTTP/1.1, HTTP/2).
+  // Note that HTTP/2 should generally be used for upstream clusters doing gRPC.
   message ExplicitHttpConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.extensions.upstreams.http.v3.HttpProtocolOptions.ExplicitHttpConfig";
