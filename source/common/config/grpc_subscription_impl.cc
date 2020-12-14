@@ -78,10 +78,23 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
 
-  // TODO(adamsjob): make the threshold configurable, either through runtime or bootstrap
-  if (update_duration.count() > 50) {
-    ENVOY_LOG(debug, "Config update for gRPC config for {} with {} resources took {} ms", type_url_,
-              resources.size(), update_duration.count());
+  if (update_duration > updateDurationLogThreshold()) {
+    // Figure out the total size of all resource names plus delimiters
+    int name_size = 0;
+    std::for_each(resources.begin(), resources.end(),
+                  [&name_size](const Config::DecodedResource& resource) {
+                    name_size += resource.name().size() + 2;
+                  });
+    std::string resource_names;
+    resource_names.reserve(name_size);
+    for (const auto& resource : resources) {
+      resource_names.append(resource.get().name());
+      if (&resource != &resources.back()) {
+        resource_names.append(", ");
+      }
+    }
+    ENVOY_LOG(debug, "gRPC config update took {} ms! Resources names: {}", update_duration.count(),
+              resource_names);
   }
 }
 
@@ -100,12 +113,6 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
   stats_.version_text_.set(system_version_info);
   stats_.update_duration_.recordValue(update_duration.count());
-
-  // TODO(adamsjob): make the threshold configurable, either through runtime or bootstrap
-  if (update_duration.count() > 50) {
-    ENVOY_LOG(debug, "Config update for gRPC config for {} with {} resources took {} ms", type_url_,
-              added_resources.size(), update_duration.count());
-  }
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
@@ -141,6 +148,13 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();
   }
+}
+
+// Returns the threshold used to trigger logging of long config updates.
+// TODO(adamsjob): make the threshold configurable, either through runtime or bootstrap
+std::chrono::milliseconds& GrpcSubscriptionImpl::updateDurationLogThreshold() {
+  static std::chrono::milliseconds* threshold_ms = new std::chrono::milliseconds(50);
+  return *threshold_ms;
 }
 
 } // namespace Config

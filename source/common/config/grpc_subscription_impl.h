@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 
 #include "envoy/config/grpc_mux.h"
@@ -42,6 +43,7 @@ public:
 
 private:
   void disableInitFetchTimeoutTimer();
+  std::chrono::milliseconds& updateDurationLogThreshold();
 
   GrpcMuxSharedPtr grpc_mux_;
   SubscriptionCallbacks& callbacks_;
