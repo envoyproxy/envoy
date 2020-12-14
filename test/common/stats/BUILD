@@ -4,7 +4,6 @@ load(
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -61,8 +60,8 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
-    name = "recent_lookups_speed_test",
+envoy_cc_benchmark_binary(
+    name = "recent_lookups_benchmark",
     srcs = ["recent_lookups_speed_test.cc"],
     external_deps = [
         "benchmark",
@@ -73,6 +72,11 @@ envoy_cc_test_binary(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:recent_lookups_lib",
     ],
+)
+
+envoy_benchmark_test(
+    name = "recent_lookups_benchmark_test",
+    benchmark_binary = "recent_lookups_benchmark",
 )
 
 envoy_cc_test(
@@ -178,8 +182,8 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_test_binary(
-    name = "symbol_table_speed_test",
+envoy_cc_benchmark_binary(
+    name = "symbol_table_benchmark",
     srcs = [
         "make_elements_helper.cc",
         "make_elements_helper.h",
@@ -199,6 +203,11 @@ envoy_cc_test_binary(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_benchmark_test(
+    name = "symbol_table_benchmark_test",
+    benchmark_binary = "symbol_table_benchmark",
 )
 
 envoy_cc_test(
