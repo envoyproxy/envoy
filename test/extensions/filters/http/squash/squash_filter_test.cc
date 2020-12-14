@@ -363,6 +363,25 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
   completeGetStatusRequest("attached");
 }
 
+TEST_F(SquashFilterTest, PollingAttachmentNoCluster) {
+  doDownstreamRequest();
+  // Expect the get attachment request
+  expectAsyncClientSend();
+  completeCreateRequest();
+
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
+  completeGetStatusRequest("attaching");
+
+  // Expect the second get attachment request
+  ON_CALL(factory_context_.cluster_manager_, getThreadLocalCluster("squash"))
+      .WillByDefault(Return(nullptr));
+  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
+  retry_timer->invokeCallback();
+}
+
 TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
   doDownstreamRequest();
   // Expect the first get attachment request
