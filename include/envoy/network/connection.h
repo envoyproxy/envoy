@@ -80,8 +80,11 @@ public:
   /**
    * Callback function for when bytes have been sent by a connection.
    * @param bytes_sent supplies the number of bytes written to the connection.
+   * @return indicates if callback should be called in the future. If true is returned
+   * the callback will be called again in the future. If false is returned, the callback
+   * will be removed from callback list.
    */
-  using BytesSentCb = std::function<void(uint64_t bytes_sent)>;
+  using BytesSentCb = std::function<bool(uint64_t bytes_sent)>;
 
   struct ConnectionStats {
     Stats::Counter& read_total_;
@@ -324,6 +327,14 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   * Instructs the connection to start using secure transport.
+   * Note: Not all underlying transport sockets support such operation.
+   * @return boolean telling if underlying transport socket was able to
+             start secure transport.
+   */
+  virtual bool startSecureTransport() PURE;
 
   /**
    *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip

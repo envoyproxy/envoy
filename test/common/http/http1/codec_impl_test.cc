@@ -448,6 +448,39 @@ TEST_P(Http1ServerConnectionImplTest, UnsupportedEncoding) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: unsupported transfer encoding");
 }
 
+// Verify that the optimization which moves large slices of body instead of copying them is working.
+// Note that this test is validating a performance optimization, not a functional behavior
+// requirement. If future changes to the codec make this test not pass, but do not regress
+// performance of large HTTP body handling, this test can be changed or removed.
+TEST_P(Http1ServerConnectionImplTest, LargeBodyOptimization) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  std::string post = "POST / HTTP/1.1\r\ncontent-length: 1000000\r\n\r\n";
+  post += std::string(50000, '0');
+  Buffer::OwnedImpl buffer = createBufferWithNByteSlices(post, 16384);
+
+  // Remember the original buffer slices, but not the first one because it contains
+  // non-body and will not have the optimization applied to it.
+  auto original_slices = buffer.getRawSlices();
+  original_slices.erase(original_slices.begin());
+
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(_, false)).WillOnce(Invoke([&](Buffer::Instance& body, bool) {
+    auto end_slices = body.getRawSlices();
+    end_slices.erase(end_slices.begin());
+    EXPECT_EQ(original_slices, end_slices);
+  }));
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0U, buffer.length());
+}
+
 // Verify that data in the two body chunks is merged before the call to decodeData.
 TEST_P(Http1ServerConnectionImplTest, ChunkedBody) {
   initialize();
@@ -2595,7 +2628,7 @@ TEST_P(Http1ClientConnectionImplTest, ConnectResponseWithEarlyData) {
   // Send response headers and payload
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl expected_data("12345abcd");
-  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n12345abcd");
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());

@@ -128,15 +128,13 @@ void LightStepDriver::LightStepTransporter::Send(std::unique_ptr<lightstep::Buff
       absl::optional<std::chrono::milliseconds>(timeout));
   serializeGrpcMessage(*report, message->body());
 
-  if (collector_cluster_.exists()) {
+  if (collector_cluster_.threadLocalCluster().has_value()) {
     active_report_ = std::move(report);
     active_callback_ = &callback;
-    active_cluster_ = collector_cluster_.info();
-    active_request_ = driver_.clusterManager()
-                          .httpAsyncClientForCluster(collector_cluster_.info()->name())
-                          .send(std::move(message), *this,
-                                Http::AsyncClient::RequestOptions().setTimeout(
-                                    std::chrono::milliseconds(timeout)));
+    active_cluster_ = collector_cluster_.threadLocalCluster()->get().info();
+    active_request_ = collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
   } else {
     ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
     driver_.tracerStats().reports_skipped_no_cluster_.inc();
@@ -199,7 +197,8 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
                                 cm_, /* allow_added_via_api */ true);
   cluster_ = lightstep_config.collector_cluster();
 
-  if (!(cm_.get(cluster_)->info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
+  if (!(cm_.clusters().getCluster(cluster_)->get().info()->features() &
+        Upstream::ClusterInfo::Features::HTTP2)) {
     throw EnvoyException(
         fmt::format("{} collector cluster must support http2 for gRPC calls", cluster_));
   }

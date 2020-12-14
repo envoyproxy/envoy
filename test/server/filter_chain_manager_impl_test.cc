@@ -199,7 +199,7 @@ TEST_F(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
 
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _));
   filter_chain_manager_.addFilterChains(
       std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
       nullptr, filter_chain_factory_builder_, filter_chain_manager_);

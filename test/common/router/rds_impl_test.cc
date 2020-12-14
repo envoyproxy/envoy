@@ -226,7 +226,7 @@ TEST_F(RdsImplTest, Basic) {
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
   // Make sure we don't lookup/verify clusters.
-  EXPECT_CALL(server_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
+  EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
   rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -298,8 +298,10 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
       ],
       "vhds": {
         "config_source": {
+          "resource_api_version": "V3",
           "api_config_source": {
             "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
             "grpc_services": {
               "envoy_grpc": {
                 "cluster_name": "xds_cluster"
@@ -344,8 +346,10 @@ TEST_F(RdsImplTest, VirtualHostUpdateWhenProviderHasBeenDeallocated) {
 rds:
   route_config_name: my_route
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -394,8 +398,10 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
   const std::string rds_config = R"EOF(
   route_config_name: my_route
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -407,7 +413,7 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
       rds, server_factory_context_, "stat_prefix", outer_init_manager_);
   RdsRouteConfigSubscription& subscription =
       (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
-  init_watcher_.expectReady().Times(1); // The parent_init_target_ will call once.
+  init_watcher_.expectReady(); // The parent_init_target_ will call once.
   outer_init_manager_.initialize(init_watcher_);
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> init_vhds;
@@ -487,6 +493,7 @@ virtual_hosts:
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   // Only static route.
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_,

@@ -42,6 +42,7 @@ public:
   }
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override { return false; }
 };
 } // namespace
 
@@ -165,7 +166,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     if (slices_to_commit > 0) {
       read_buffer.commit(slices, slices_to_commit);
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
         keep_reading = false;
       }
     }
@@ -301,7 +302,7 @@ void SslSocket::shutdownSsl() {
       if (rc == 0) {
         // See https://www.openssl.org/docs/manmaster/man3/SSL_shutdown.html
         // if return value is 0,  Call SSL_read() to do a bidirectional shutdown.
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
       }
     }
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);

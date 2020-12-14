@@ -306,6 +306,8 @@ public:
   } SchemeValues;
 
   struct {
+    const std::string Brotli{"br"};
+    const std::string Compress{"compress"};
     const std::string Chunked{"chunked"};
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
