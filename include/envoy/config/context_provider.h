@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/pure.h"
+
 #include "xds/core/v3/context_params.pb.h"
 
 namespace Envoy {

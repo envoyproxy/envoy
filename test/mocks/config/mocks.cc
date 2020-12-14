@@ -42,5 +42,9 @@ MockUntypedConfigUpdateCallbacks::MockUntypedConfigUpdateCallbacks() = default;
 MockUntypedConfigUpdateCallbacks::~MockUntypedConfigUpdateCallbacks() = default;
 
 MockTypedFactory::~MockTypedFactory() = default;
+
+MockContextProvider::MockContextProvider() = default;
+MockContextProvider::~MockContextProvider() = default;
+
 } // namespace Config
 } // namespace Envoy

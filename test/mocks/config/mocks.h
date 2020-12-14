@@ -165,5 +165,13 @@ public:
   MOCK_METHOD(std::string, category, (), (const));
 };
 
+class MockContextProvider : public ContextProvider {
+public:
+  MockContextProvider();
+  ~MockContextProvider() override;
+
+  MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
+};
+
 } // namespace Config
 } // namespace Envoy
