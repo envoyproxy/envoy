@@ -1,25 +1,24 @@
 .. _config_thrift_filters_router:
 
-Router
-======
+路由
+=====
 
-The router filter implements Thrift forwarding. It will be used in almost all Thrift proxying
-scenarios. The filter's main job is to follow the instructions specified in the configured
-:ref:`route table <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>`.
+路由过滤器实现了 Thrift 转发。几乎所有的 Thrift 代理场景都会用到它。过滤器的主要工作就是遵从配置在
+:ref:`路由表 <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>` 中指定的指令。
 
-* :ref:`v3 API reference <envoy_v3_api_msg_config.filter.thrift.router.v2alpha1.Router>`
-* This filter should be configured with the name *envoy.filters.thrift.router*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_config.filter.thrift.router.v2alpha1.Router>`
+* 此过滤器的名称应该被配置为 *envoy.filters.thrift.router*。
 
-Statistics
-----------
+统计
+----
 
-The filter outputs statistics in the *thrift.<stat_prefix>.* namespace.
+过滤器输出的统计信息都在 *thrift.<stat_prefix>.* 命名空间内。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  route_missing, Counter, Total requests with no route found.
-  unknown_cluster, Counter, Total requests with a route that has an unknown cluster.
-  upstream_rq_maintenance_mode, Counter, Total requests with a destination cluster in maintenance mode.
-  no_healthy_upstream, Counter, Total requests with no healthy upstream endpoints available.
+  route_missing, Counter, 未找到路由的请求总数。
+  unknown_cluster, Counter, 具有未知集群路由的请求总数。
+  upstream_rq_maintenance_mode, Counter, 目标集群处于维护模式下的请求总数。
+  no_healthy_upstream, Counter, 没有健康的上游端点可用的请求总数。
