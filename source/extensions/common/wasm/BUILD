@@ -58,14 +58,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "wasm_interoperation_lib",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//source/extensions/filters/common/expr:cel_state_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "wasm_lib",
     srcs = [
         "context.cc",
@@ -83,7 +75,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":wasm_hdr",
-        ":wasm_interoperation_lib",
         ":wasm_runtime_factory_interface",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",

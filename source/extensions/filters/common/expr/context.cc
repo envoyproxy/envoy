@@ -276,11 +276,12 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
     const CelState* cel_state = dynamic_cast<const CelState*>(object);
     if (cel_state) {
       return cel_state->exprValue(arena_, false);
-    }
-    absl::optional<std::string> serialized = object->serializeAsString();
-    if (serialized.has_value()) {
-      std::string* out = ProtobufWkt::Arena::Create<std::string>(arena_, serialized.value());
-      return CelValue::CreateBytes(out);
+    } else if (object != nullptr) {
+      absl::optional<std::string> serialized = object->serializeAsString();
+      if (serialized.has_value()) {
+        std::string* out = ProtobufWkt::Arena::Create<std::string>(arena_, serialized.value());
+        return CelValue::CreateBytes(out);
+      }
     }
   }
   return {};
