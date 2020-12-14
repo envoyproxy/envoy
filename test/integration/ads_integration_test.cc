@@ -171,7 +171,7 @@ TEST_P(AdsIntegrationTest, ClusterInitializationUpdateOneOfThe2Warming) {
 }
 
 // Make sure two clusters sharing same secret are both kept warming before secret
-// arives. Verify that the clusters are eventually initialized.
+// arrives. Verify that the clusters are eventually initialized.
 // This is a regression test of #11120.
 TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
   initialize();
