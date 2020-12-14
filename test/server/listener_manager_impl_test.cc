@@ -4714,7 +4714,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 }
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
-       TraditionalUpdateIfImplicitProxyProtocolChanges) {
+       DEPRECATED_FEATURE_TEST(TraditionalUpdateIfImplicitProxyProtocolChanges)) {
 
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
