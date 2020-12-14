@@ -285,7 +285,7 @@ Duration(us)  # Calls  Mean(ns)  StdDev(ns)  Min(ns)  Max(ns)  Category       De
 ```
 
 The second type is performance annotations owned by a class instance. They can measure
-operations spanned accross the instance's methods:
+operations spanned across the instance's methods:
 ```c++
 class CustomFilter : public Http::StreamEncoderFilter {
 public:
