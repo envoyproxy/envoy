@@ -263,6 +263,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      disable_tls_inspector_injection_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_tls_inspector_injection")),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
           parent.factory_.createDrainManager(config.drain_type()))),
@@ -342,6 +344,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
+      disable_tls_inspector_injection_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_tls_inspector_injection")),
       connection_balancer_(origin.connection_balancer_),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
@@ -556,6 +560,9 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
 }
 
 void ListenerImpl::buildTlsInspectorListenerFilter() {
+  if (disable_tls_inspector_injection_) {
+    return;
+  }
   // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
   const bool need_tls_inspector = needTlsInspector(config_);
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
@@ -738,7 +745,7 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   }
 
   // See buildTlsInspectorListenerFilter().
-  if (needTlsInspector(config_) ^ needTlsInspector(config)) {
+  if (!disable_tls_inspector_injection_ && (needTlsInspector(config_) ^ needTlsInspector(config))) {
     return false;
   }
   return ListenerMessageUtil::filterChainOnlyChange(config_, config);
