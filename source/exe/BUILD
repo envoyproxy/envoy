@@ -168,8 +168,10 @@ envoy_cc_win32_library(
     srcs = ["win32/platform_impl.cc"],
     deps = [
         ":platform_header_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "//source/common/event:signal_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
 )

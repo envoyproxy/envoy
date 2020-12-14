@@ -340,6 +340,10 @@ message HttpConnectionManager {
   // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` does not apply to
   // this corner case.
   //
+  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
+  // is configured, this timeout is scaled according to the value for
+  // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
+  //
   // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
   // to the granularity of events presented to the connection manager. For example, while receiving
   // very large request headers, it may be the case that there is traffic regularly arriving on the
