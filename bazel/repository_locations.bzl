@@ -32,7 +32,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "https://github.com/bazelbuild/bazel-toolchains/releases/download/{version}/bazel-toolchains-{version}.tar.gz",
             "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/{version}.tar.gz",
         ],
-        release_date = "2020-10-08",
+        release_date = "2020-11-26",
         use_category = ["build"],
     ),
     build_bazel_rules_apple = dict(
