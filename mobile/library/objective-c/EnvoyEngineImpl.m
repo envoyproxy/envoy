@@ -214,6 +214,27 @@ static void ios_http_filter_set_response_callbacks(envoy_http_filter_callbacks c
   filter.setResponseFilterCallbacks(responseFilterCallbacks);
 }
 
+static void ios_http_filter_on_cancel(const void *context) {
+  EnvoyHTTPFilter *filter = (__bridge EnvoyHTTPFilter *)context;
+  if (filter.onCancel == nil) {
+    return;
+  }
+  filter.onCancel();
+}
+
+static void ios_http_filter_on_error(envoy_error error, const void *context) {
+  EnvoyHTTPFilter *filter = (__bridge EnvoyHTTPFilter *)context;
+  if (filter.onError == nil) {
+    return;
+  }
+
+  NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
+                                                    length:error.message.length
+                                                  encoding:NSUTF8StringEncoding];
+  error.message.release(error.message.context);
+  filter.onError(error.error_code, errorMessage, error.attempt_count);
+}
+
 static void ios_http_filter_release(const void *context) {
   CFRelease(context);
   return;
@@ -253,6 +274,8 @@ static void ios_http_filter_release(const void *context) {
   api->on_resume_request = ios_http_filter_on_resume_request;
   api->set_response_callbacks = ios_http_filter_set_response_callbacks;
   api->on_resume_response = ios_http_filter_on_resume_response;
+  api->on_cancel = ios_http_filter_on_cancel;
+  api->on_error = ios_http_filter_on_error;
   api->release_filter = ios_http_filter_release;
   api->static_context = CFBridgingRetain(filterFactory);
   api->instance_context = NULL;
