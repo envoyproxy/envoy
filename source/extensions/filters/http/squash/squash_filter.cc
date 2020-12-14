@@ -276,14 +276,14 @@ void SquashFilter::pollForAttachment() {
   request->headers().setReferencePath(debug_attachment_path_);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
 
-  // TODO(mattklein123): The following code should check to see if the cluster has been removed
-  // by CDS. This is a preexisting bug so was not fixed in my recent refactor because testing is
-  // non-trivial.
-  in_flight_request_ =
-      cm_.getThreadLocalCluster(config_->clusterName())
-          ->httpAsyncClient()
-          .send(std::move(request), check_attachment_callback_,
-                Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(request), check_attachment_callback_,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  } else {
+    scheduleRetry();
+  }
   // No need to check if in_flight_request_ is null as onFailure will take care of
   // cleanup.
 }
