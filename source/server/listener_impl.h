@@ -396,7 +396,6 @@ private:
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  const bool disable_tls_inspector_injection_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
   Network::UdpListenerWorkerRouterPtr udp_listener_worker_router_;
