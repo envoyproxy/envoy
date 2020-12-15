@@ -1,40 +1,38 @@
 .. _install_sandboxes_grpc_bridge:
 
-gRPC Bridge
+gRPC 网桥
 ===========
 
 Envoy gRPC
 ~~~~~~~~~~
 
-The gRPC bridge sandbox is an example usage of Envoy's
-:ref:`gRPC bridge filter <config_http_filters_grpc_bridge>`.
+gRPC 网桥沙盒是 Envoy
+:ref:`gRPC 网桥过滤器 <config_http_filters_grpc_bridge>` 的一个示例用法。
 
-This is an example of a key-value store where an ``http``-based client CLI, written in ``Python``,
-updates a remote store, written in ``Go``, using the stubs generated for both languages.
+该示例是用 ``Python`` 编写的基于 ``http`` 客户端的 CLI，
+更新由 ``Go`` 编写的远程存储的键值存储示例，并且这两种语言都使用 stub 生成代码。
 
-The client send messages through a proxy that upgrades the HTTP requests from ``http/1.1`` to ``http/2``.
+客户端通过代理发送消息，将 HTTP 请求从 ``http/1.1`` 升级到 ``http/2``。
 
-``[client](http/1.1) -> [client-egress-proxy](http/2) -> [server-ingress-proxy](http/2) -> [server]``
+``[客户端](http/1.1) -> [客户端出口代理](http/2) -> [服务端入口代理](http/2) -> [服务端]``
 
-Another Envoy feature demonstrated in this example is Envoy's ability to do authority
-base routing via its route configuration.
+本示例中演示 Envoy 的另一个功能是 Envoy 能够通过路由的配置实现基于路由的授权。
 
 
-Running the Sandbox
+运行沙盒
 ~~~~~~~~~~~~~~~~~~~
 
 .. include:: _include/docker-env-setup.rst
 
-Step 3: Generate the protocol stubs
+步骤 3：生成协议 stub
 ***********************************
 
-A docker-compose file is provided that generates the stubs for both ``client`` and ``server`` from the
-specification in the ``protos`` directory.
+``protos`` 目录中提供了一个 docker-compose 文件，用于为 ``客户端`` 和 ``服务端`` 生成 stub。
 
-Inspecting the ``docker-compose-protos.yaml`` file, you will see that it contains both the ``python``
-and ``go`` gRPC protoc commands necessary for generating the protocol stubs.
+检查 ``docker-compose-protos.yaml`` 文件， 你将看到包含生成协议 stub 所需的 ``python``
+和 ``go`` 的 gRPC protoc 命令。
 
-Generate the stubs as follows:
+生成 stub 的过程如下所示：
 
 .. code-block:: console
 
@@ -47,14 +45,13 @@ Generate the stubs as follows:
   grpc-bridge_stubs_go_1 exited with code 0
   grpc-bridge_stubs_python_1 exited with code 0
 
-You may wish to clean up left over containers with the following command:
+你可以使用以下命令清理剩余的容器：
 
 .. code-block:: console
 
   $ docker container prune
 
-You can view the generated ``kv`` modules for both the client and server in their
-respective directories:
+你可以在客户端和服务端各自的目录中查看生成的 ``kv`` 模块:
 
 .. code-block:: console
 
@@ -64,12 +61,12 @@ respective directories:
   $ ls -la server/kv/kv.pb.go
   -rw-r--r--  1 mdesales  CORP\Domain Users  9994 Nov  6 21:59 server/kv/kv.pb.go
 
-These generated ``python`` and ``go`` stubs can be included as external modules.
+这些生成的 ``python`` 和 ``go`` 的 stub 可以作为外部模块包含。
 
-Step 4: Start all of our containers
+步骤 4：启动所有容器
 ***********************************
 
-To build this sandbox example and start the example services, run the following commands:
+构建沙盒示例并启动示例服务，运行以下命令：
 
 .. code-block:: console
 
@@ -87,17 +84,17 @@ To build this sandbox example and start the example services, run the following 
     grpc-bridge_grpc-server_1              /bin/sh -c /bin/server         Up      0.0.0.0:8081->8081/tcp
 
 
-Sending requests to the Key/Value store
+发送请求到键/值存储
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To use the Python service and send gRPC requests:
+使用 Python 服务发送 gRPC 请求：
 
 .. code-block:: console
 
   $ pwd
   envoy/examples/grpc-bridge
 
-Set a key:
+设置键:
 
 .. code-block:: console
 
@@ -105,28 +102,28 @@ Set a key:
   setf foo to bar
 
 
-Get a key:
+获取键:
 
 .. code-block:: console
 
   $ docker-compose exec python /client/client.py get foo
   bar
 
-Modify an existing key:
+修改存在的键:
 
 .. code-block:: console
 
   $ docker-compose exec python /client/client.py set foo baz
   setf foo to baz
 
-Get the modified key:
+获取修改后的键:
 
 .. code-block:: console
 
   $ docker-compose exec python /client/client.py get foo
   baz
 
-In the running docker-compose container, you should see the gRPC service printing a record of its activity:
+在运行的 docker-compose 容器中，你应该看到 gRPC 服务打印的活动记录：
 
 .. code-block:: console
 
