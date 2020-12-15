@@ -86,8 +86,6 @@ public:
   const std::string KillRequest = "envoy.filters.http.kill_request";
   // External Processing filter
   const std::string ExternalProcessing = "envoy.filters.http.ext_proc";
-  // Match tree wrapper
-  const std::string MatchingFilter = "envoy.filters.http.matching_filter";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;
