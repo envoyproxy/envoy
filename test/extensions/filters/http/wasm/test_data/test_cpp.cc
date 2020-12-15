@@ -35,6 +35,7 @@ public:
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
   FilterTrailersStatus onRequestTrailers(uint32_t) override;
+  FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
   FilterTrailersStatus onResponseTrailers(uint32_t) override;
   FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
   void onLog() override;
@@ -275,6 +276,15 @@ FilterTrailersStatus TestContext::onRequestTrailers(uint32_t) {
     logWarn("request bogus-trailer found");
   }
   return FilterTrailersStatus::Continue;
+}
+
+FilterHeadersStatus TestContext::onResponseHeaders(uint32_t, bool) {
+  root()->stream_context_id_ = id();
+  auto test = root()->test_;
+  if (test == "headers") {
+    CHECK_RESULT(addResponseHeader("test-status", "OK"));
+  }
+  return FilterHeadersStatus::Continue;
 }
 
 FilterTrailersStatus TestContext::onResponseTrailers(uint32_t) {

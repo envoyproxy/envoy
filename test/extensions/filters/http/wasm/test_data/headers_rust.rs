@@ -36,6 +36,11 @@ impl HttpContext for TestStream {
         Action::Continue
     }
 
+    fn on_http_response_headers(&mut self, _: usize) -> Action {
+        self.set_http_response_header("test-status", Some("OK"));
+        Action::Continue
+    }
+
     fn on_http_response_trailers(&mut self, _: usize) -> Action {
         Action::Pause
     }
