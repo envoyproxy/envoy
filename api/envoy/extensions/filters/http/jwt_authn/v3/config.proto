@@ -48,6 +48,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       http_uri:
 //         uri: https://example.com/.well-known/jwks.json
 //         cluster: example_jwks_cluster
+//         timeout: 1s
 //       cache_duration:
 //         seconds: 300
 //
@@ -94,6 +95,7 @@ message JwtProvider {
     //      http_uri:
     //        uri: https://www.googleapis.com/oauth2/v1/certs
     //        cluster: jwt.www.googleapis.com|443
+    //        timeout: 1s
     //      cache_duration:
     //        seconds: 300
     //
@@ -209,6 +211,7 @@ message RemoteJwks {
   //    http_uri:
   //      uri: https://www.googleapis.com/oauth2/v1/certs
   //      cluster: jwt.www.googleapis.com|443
+  //      timeout: 1s
   //
   config.core.v3.HttpUri http_uri = 1;
 
@@ -451,6 +454,7 @@ message FilterStateRule {
 //          http_uri:
 //            uri: https://example.com/.well-known/jwks.json
 //            cluster: example_jwks_cluster
+//            timeout: 1s
 //      provider2:
 //        issuer: issuer2
 //        local_jwks:
@@ -495,6 +499,7 @@ message JwtAuthentication {
   //          http_uri:
   //            uri: https://example.com/.well-known/jwks.json
   //            cluster: example_jwks_cluster
+  //            timeout: 1s
   //      provider2:
   //        issuer: provider2
   //        local_jwks:

@@ -93,6 +93,25 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
+// Test TLS upstream.
+TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
+  upstream_tls_ = true;
+  config_helper_.configureUpstreamTls();
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+
+  EXPECT_EQ("world", tcp_client->data());
+}
+
 // Test proxying data in both directions, and that all data is flushed properly
 // when there is an upstream disconnect.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
@@ -297,7 +316,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log->set_name("accesslog");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
-    access_log_config.mutable_log_format()->set_text_format(
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
         "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");
