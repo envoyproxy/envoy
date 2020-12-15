@@ -1,58 +1,50 @@
 .. _config_network_filters_dubbo_proxy:
 
-Dubbo proxy
+Dubbo 代理
 ============
 
-The dubbo proxy filter decodes the RPC protocol between dubbo clients
-and servers. the decoded RPC information is converted to metadata.
-the metadata includes the basic request ID, request type, serialization type,
-and the required service name, method name, parameter name,
-and parameter value for routing.
+Dubbo 代理过滤器解码 dubbo 客户端与服务端之间的 RPC 协议。解码的信息会被转换为元数据。元数据主要包含基础请求 ID、请求类型、序列化类型以及路由所需要的服务名称、方法名称、参数名称和参数值。
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboProxy>`
-* This filter should be configured with the name *envoy.filters.network.dubbo_proxy*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.DubboProxy>`
+* 过滤器的名称应该被配置为 *envoy.filters.network.dubbo_proxy* 。
 
 .. _config_network_filters_dubbo_proxy_stats:
 
-Statistics
-----------
+统计
+------
 
-Every configured dubbo proxy filter has statistics rooted at *dubbo.<stat_prefix>.* with the
-following statistics:
+每个配置的 dubbo 代理过滤器统计以 *dubbo.<stat_prefix>.* 为跟，统计信息如下：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  request, Counter, Total requests
-  request_twoway, Counter, Total twoway requests
-  request_oneway, Counter, Total oneway requests
-  request_event, Counter, Total event requests
-  request_decoding_error, Counter, Total decoding error requests
-  request_decoding_success, Counter, Total decoding success requests
-  request_active, Gauge, Total active requests
-  response, Counter, Total responses
-  response_success, Counter, Total success responses
-  response_error, Counter, Total responses that protocol parse error
-  response_error_caused_connection_close, Counter, Total responses that caused by the downstream connection close
-  response_business_exception, Counter, Total responses that the protocol contains exception information returned by the business layer
-  response_decoding_error, Counter, Total decoding error responses
-  response_decoding_success, Counter, Total decoding success responses
-  response_error, Counter, Total responses that protocol parse error
-  local_response_success, Counter, Total local responses
-  local_response_error, Counter, Total local responses that encoding error
-  local_response_business_exception, Counter, Total local responses that the protocol contains business exception
-  cx_destroy_local_with_active_rq, Counter, Connections destroyed locally with an active query
-  cx_destroy_remote_with_active_rq, Counter, Connections destroyed remotely with an active query
+  request, Counter, 请求总数
+  request_twoway, Counter, 双向请求总数
+  request_oneway, Counter, 单向请求总数
+  request_event, Counter, 事件请求总数
+  request_decoding_error, Counter, 解码异常请求总数
+  request_decoding_success, Counter, 解码成功请求总数
+  request_active, Gauge, 活跃请求总数
+  response, Counter, 响应总数
+  response_success, Counter, 成功响应总数
+  response_error, Counter, 协议解析异常的响应总数
+  response_error_caused_connection_close, Counter, 下游关闭连接导致的响应总数
+  response_business_exception, Counter, 协议包含业务层返回异常的响应总数
+  response_decoding_error, Counter, 解码异常响应总数
+  response_decoding_success, Counter, 解码成功响应总数
+  response_error, Counter, 协议解析异常响应总数
+  local_response_success, Counter, 本地响应总数
+  local_response_error, Counter, 本地编码异常响应总数
+  local_response_business_exception, Counter, 本地协议包含业务异常的相应总数
+  cx_destroy_local_with_active_rq, Counter, 本地销毁的有活跃查询的连接总数
+  cx_destroy_remote_with_active_rq, Counter, 远端销毁的有活跃查询的连接总数
 
 
-Implement custom filter based on the dubbo proxy filter
---------------------------------------------------------
+基于 dubbo 代理过滤器实现自定义过滤器
+---------------------------------------
 
-If you want to implement a custom filter based on the dubbo protocol,
-the dubbo proxy filter like HTTP also provides a very convenient way to expand,
-the first step is to implement the DecoderFilter interface, and give the filter named, such as testFilter,
-the second step is to add your configuration, configuration method refer to the following sample
+如果你想要基于 dubbo 协议实现一个自定义过滤器，dubbo 过滤器特提供了类似于 HTTP 的一种非常方便的扩展方式，首先第一步就是实现 DecoderFilter 接口，并给出过滤器的名称，例如 testFilter，第二步就是添加你自己的配置，配置方法可以参考下面的示例：
 
 .. code-block:: yaml
 
