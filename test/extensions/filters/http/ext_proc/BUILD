@@ -52,6 +52,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "mutation_utils_test",
+    srcs = ["mutation_utils_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "ext_proc_integration_test",
     srcs = ["ext_proc_integration_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",

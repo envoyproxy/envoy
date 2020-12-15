@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-extern void expectHttpHeader(const envoy::config::core::v3::HeaderMap headers,
+extern void expectHttpHeader(const envoy::config::core::v3::HeaderMap& headers,
                              absl::string_view key, absl::string_view value) {
   for (auto it = headers.headers().cbegin(); it != headers.headers().cend(); it++) {
     if (it->key() == key) {

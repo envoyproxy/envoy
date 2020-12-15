@@ -11,22 +11,17 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "ext_proc",
-    srcs = [
-        "ext_proc.cc",
-        "headers.cc",
-    ],
-    hdrs = [
-        "ext_proc.h",
-        "headers.h",
-    ],
+    srcs = ["ext_proc.cc"],
+    hdrs = ["ext_proc.h"],
     deps = [
         ":client_interface",
+        ":mutation_utils_lib",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -50,6 +45,18 @@ envoy_cc_library(
     hdrs = ["client.h"],
     deps = [
         "//include/envoy/grpc:status",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "mutation_utils_lib",
+    srcs = ["mutation_utils.cc"],
+    hdrs = ["mutation_utils.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//source/common/http:headers_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )

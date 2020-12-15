@@ -12,11 +12,11 @@ namespace ExternalProcessing {
 
 Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const uint32_t timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, std::chrono::milliseconds(timeout_ms));
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, std::chrono::milliseconds(timeout_ms), context.scope(), stats_prefix);
 
   return [filter_config, grpc_service = proto_config.grpc_service(),
           &context](Http::FilterChainFactoryCallbacks& callbacks) {

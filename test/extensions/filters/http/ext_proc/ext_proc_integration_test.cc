@@ -32,10 +32,8 @@ protected:
 
   void TearDown() override {
     if (processor_connection_) {
-      AssertionResult result = processor_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = processor_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
+      ASSERT_TRUE(processor_connection_->close());
+      ASSERT_TRUE(processor_connection_->waitForDisconnect());
     }
     cleanupUpstreamAndDownstream();
   }
@@ -60,7 +58,6 @@ protected:
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_proc_filter));
-      std::cerr << MessageUtil::getJsonStringFromMessage(bootstrap, true) << '\n';
     });
   }
 
@@ -84,25 +81,18 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   // Expect a message on the gRPC stream to the fake remote service
-  AssertionResult result =
-      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = processor_connection_->waitForNewStream(*dispatcher_, processor_stream_);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   ProcessingRequest request_headers_msg;
-  result = processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg));
   // Just close the stream without doing anything
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
 
   // Now expect a message to the real upstream
-  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
-  RELEASE_ASSERT(result, result.message());
-  result = upstream_request_->waitForEndStream(*dispatcher_);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Respond from the upstream with a simple 200
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -127,14 +117,10 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   HttpTestUtility::addDefaultHeaders(headers);
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-  AssertionResult result =
-      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = processor_connection_->waitForNewStream(*dispatcher_, processor_stream_);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   ProcessingRequest request_headers_msg;
-  result = processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg));
   // Fail the stream immediately
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
 
@@ -155,14 +141,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   headers.addCopy(LowerCaseString("x-remove-this"), "yes");
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-  AssertionResult result =
-      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = processor_connection_->waitForNewStream(*dispatcher_, processor_stream_);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   ProcessingRequest request_headers_msg;
-  result = processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg));
 
   EXPECT_TRUE(request_headers_msg.has_request_headers());
   const auto request_headers = request_headers_msg.request_headers();
@@ -183,12 +165,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   response_header_mutation->add_remove_headers("x-remove-this");
   processor_stream_->sendGrpcMessage(response_msg);
 
-  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
-  RELEASE_ASSERT(result, result.message());
-  result = upstream_request_->waitForEndStream(*dispatcher_);
-  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   auto has_hdr1 = upstream_request_->headers().get(LowerCaseString("x-remove-this"));
   EXPECT_TRUE(has_hdr1.empty());

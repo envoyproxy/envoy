@@ -43,7 +43,7 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, 200ms));
+    config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -139,6 +139,11 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
   EXPECT_TRUE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, PostAndChangeHeaders) {
@@ -166,6 +171,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   auto add1 = headers_mut->add_set_headers();
   add1->mutable_header()->set_key("x-new-header");
   add1->mutable_header()->set_value("new");
+  add1->mutable_append()->set_value(false);
   auto add2 = headers_mut->add_set_headers();
   add2->mutable_header()->set_key("x-some-other-header");
   add2->mutable_header()->set_value("no");
@@ -174,6 +180,10 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   // We should now have changed the original header a bit
+  request_headers_.iterate([](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+    std::cerr << e.key().getStringView() << ": " << e.value().getStringView() << '\n';
+    return Http::HeaderMap::Iterate::Continue;
+  });
   auto get1 = request_headers_.get(LowerCaseString("x-new-header"));
   EXPECT_EQ(get1.size(), 1);
   EXPECT_EQ(get1[0]->key(), "x-new-header");
@@ -199,6 +209,11 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
   EXPECT_TRUE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, PostAndFail) {
@@ -233,6 +248,10 @@ TEST_F(HttpFilterTest, PostAndFail) {
   filter_->onDestroy();
   // The other side closed the stream
   EXPECT_FALSE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().streams_failed_.value());
 }
 
 TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
@@ -268,6 +287,11 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   filter_->onDestroy();
   // The other side closed the stream
   EXPECT_FALSE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
 }
 
 TEST_F(HttpFilterTest, PostAndClose) {
@@ -306,6 +330,10 @@ TEST_F(HttpFilterTest, PostAndClose) {
 
   // The other side closed the stream
   EXPECT_FALSE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, OutOfOrder) {
@@ -344,6 +372,11 @@ TEST_F(HttpFilterTest, OutOfOrder) {
 
   // We closed the stream
   EXPECT_TRUE(stream_close_sent_);
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 } // namespace
