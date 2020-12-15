@@ -23,7 +23,7 @@ public:
   NiceMock<Envoy::Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
 };
 
-TEST_F(TcpConnPoolTest, TestNoHost) {
+TEST_F(TcpConnPoolTest, TestNoConnPool) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config;
   config.set_hostname("host");
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(nullptr));
