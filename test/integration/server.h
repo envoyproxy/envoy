@@ -84,7 +84,7 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
   }
 
-    void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     Thread::LockGuard lock(lock_);
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }

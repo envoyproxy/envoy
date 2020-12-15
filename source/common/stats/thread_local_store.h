@@ -340,7 +340,8 @@ private:
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
     ScopePtr scopeFromStatName(StatName name) override {
-      return Utility::scopeFromStatNames(*this, {prefix_.statName(), name});
+      SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+      return parent_.scopeFromStatName(StatName(joined.get()));
     }
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }

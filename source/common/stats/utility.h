@@ -65,7 +65,7 @@ public:
   static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
 
   /**
-   * Creates a subscope from a vector of tokens which are used to create the
+   * Creates a nested scope from a vector of tokens which are used to create the
    * name. The tokens can be specified as DynamicName or StatName. For
    * tokens specified as DynamicName, a dynamic StatName will be created. See
    * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
