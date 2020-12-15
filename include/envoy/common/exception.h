@@ -12,6 +12,8 @@ namespace Envoy {
   ASSERT(MainThreadSingleton::get().isMainThread());                                               \
   try
 
+#define MainThreadSingleton InjectableSingleton<MainThread>
+
 class EnvoyException : public std::runtime_error {
 public:
   EnvoyException(const std::string& message) : std::runtime_error(message) {}
@@ -25,7 +27,7 @@ private:
   std::thread::id main_thread_id_;
 };
 
-using MainThreadSingleton = InjectableSingleton<MainThread>;
+
 
 /*
 bool isMainThread() {
