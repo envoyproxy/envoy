@@ -1118,7 +1118,8 @@ VirtualHostImpl::VirtualHostImpl(
     : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
       vcluster_scope_(Stats::Utility::scopeFromStatNames(
           scope,
-          {statName(), factory_context.routerContext().virtualClusterStatNames().vcluster_})),
+          {stat_name_storage_.statName(),
+           factory_context.routerContext().virtualClusterStatNames().vcluster_})),
       rate_limit_policy_(virtual_host.rate_limits()), global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
