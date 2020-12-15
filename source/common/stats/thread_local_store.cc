@@ -128,6 +128,14 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 }
 
 ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  auto new_scope = std::make_unique<ScopeImpl>(*this, stat_name_storage.statName());
+  Thread::LockGuard lock(lock_);
+  scopes_.emplace(new_scope.get());
+  return new_scope;
+}
+
+ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
@@ -324,9 +332,9 @@ void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
   }
 }
 
-ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
+ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix)
     : scope_id_(parent.next_scope_id_++), parent_(parent),
-      prefix_(Utility::sanitizeStatsName(prefix), parent.alloc_.symbolTable()),
+      prefix_(prefix, parent.alloc_.symbolTable()),
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {

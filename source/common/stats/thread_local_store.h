@@ -159,6 +159,7 @@ public:
     return default_scope_->counterFromString(name);
   }
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
@@ -321,7 +322,7 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -337,6 +338,9 @@ private:
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
+    }
+    ScopePtr scopeFromStatName(StatName name) override {
+      return Utility::scopeFromStatNames(*this, {prefix_.statName(), name});
     }
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }

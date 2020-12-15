@@ -65,6 +65,24 @@ public:
   static absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
 
   /**
+   * Creates a subscope from a vector of tokens which are used to create the
+   * name. The tokens can be specified as DynamicName or StatName. For
+   * tokens specified as DynamicName, a dynamic StatName will be created. See
+   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * for more detail on why symbolic StatNames are preferred when possible.
+   *
+   * See also counterFromStatNames, which is slightly faster but does not allow
+   * passing DynamicName(string)s as names.
+   *
+   * @param scope The scope in which to create the counter.
+   * @param elements The vector of mixed DynamicName and StatName
+   * @param tags optionally specified tags.
+   * @return A counter named using the joined elements.
+   */
+  static ScopePtr scopeFromElements(Scope& scope, const ElementVec& elements);
+  static ScopePtr scopeFromStatNames(Scope& scope, const StatNameVec& names);
+
+  /**
    * Creates a counter from a vector of tokens which are used to create the
    * name. The tokens can be specified as DynamicName or StatName. For
    * tokens specified as DynamicName, a dynamic StatName will be created. See

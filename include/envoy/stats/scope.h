@@ -45,6 +45,7 @@ public:
    * @param name supplies the scope's namespace prefix.
    */
   virtual ScopePtr createScope(const std::string& name) PURE;
+  virtual ScopePtr scopeFromStatName(StatName name) PURE;
 
   /**
    * Deliver an individual histogram value to all registered sinks.
