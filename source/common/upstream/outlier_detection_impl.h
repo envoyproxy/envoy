@@ -248,6 +248,40 @@ struct DetectionStats {
   ALL_OUTLIER_DETECTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+// Names used in runtime configuration.
+const std::string max_ejection_percent_runtime = "outlier_detection.max_ejection_percent";
+const std::string consecutive_gateway_failure_runtime =
+    "outlier_detection.consecutive_gateway_failure";
+const std::string consecutive_5xx_runtime = "outlier_detection.consecutive_5xx";
+const std::string consecutive_local_origin_failure_runtime =
+    "outlier_detection.consecutive_local_origin_failure";
+const std::string interval_ms_runtime = "outlier_detection.interval_ms";
+const std::string base_ejection_time_ms_runtime = "outlier_detection.base_ejection_time_ms";
+const std::string max_ejection_time_ms_runtime = "outlier_detection.max_ejection_time_ms";
+const std::string enforcing_consecutive_5xx_runtime = "outlier_detection.enforcing_consecutive_5xx";
+const std::string enforcing_consecutive_gateway_failure_runtime =
+    "outlier_detection.enforcing_consecutive_gateway_failure";
+const std::string enforcing_success_rate_runtime = "outlier_detection.enforcing_success_rate";
+const std::string enforcing_consecutive_local_origin_failure_runtime =
+    "outlier_detection.enforcing_consecutive_local_origin_failure";
+const std::string enforcing_local_origin_success_rate_runtime =
+    "outlier_detection.enforcing_local_origin_success_rate";
+const std::string enforcing_failure_percentage_runtime =
+    "outlier_detection.enforcing_failure_percentage";
+const std::string enforcing_failure_percentage_local_origin_runtime =
+    "outlier_detection.enforcing_failure_percentage_local_origin";
+const std::string success_rate_minimum_hosts_runtime =
+    "outlier_detection.success_rate_minimum_hosts";
+const std::string success_rate_request_volume_runtime =
+    "outlier_detection.success_rate_request_volume";
+const std::string failure_percentage_minimum_hosts_runtime =
+    "outlier_detection.failure_percentage_minimum_hosts";
+const std::string failure_percentage_request_volume_runtime =
+    "outlier_detection.failure_percentage_request_volume";
+const std::string success_rate_stdev_factor_runtime = "outlier_detection.success_rate_stdev_factor";
+const std::string failure_percentage_threshold_runtime =
+    "outlier_detection.failure_percentage_threshold";
+
 /**
  * Configuration for the outlier detection.
  */
