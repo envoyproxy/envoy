@@ -205,7 +205,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
         // this tells the libevent callback to pull this callback off the active_callbacks_
         // queue. We do this so that the callbacks are executed in the main libevent loop,
         // not in this completion routine
-        Buffer::RawSlice buffer{(void *)data.data(), 1};
+        Buffer::RawSlice buffer{(void*)data.data(), 1};
         auto result = watcher->write_handle_->writev(&buffer, 1);
         RELEASE_ASSERT(result.rc_ == 1,
                        fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
