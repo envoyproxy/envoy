@@ -108,22 +108,32 @@ public:
   }
 
   JwksData* findByIssuer(const std::string& issuer) override {
-    const auto it = issuer_ptr_map_.find(issuer);
+    JwksData* data = findIssuerMap(issuer);
+    if (!data && !issuer.empty()) {
+      // The first empty issuer from JwtProvider can be used.
+      return findIssuerMap(Envoy::EMPTY_STRING);
+    }
+    return data;
+  }
+
+  JwksData* findByProvider(const std::string& provider) override {
+    const auto& it = jwks_data_map_.find(provider);
+    if (it != jwks_data_map_.end()) {
+      return &it->second;
+    }
+    // Verififer::innerCreate() makes sure that all provider names are defined.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+private:
+  JwksData* findIssuerMap(const std::string& issuer) {
+    const auto& it = issuer_ptr_map_.find(issuer);
     if (it == issuer_ptr_map_.end()) {
       return nullptr;
     }
     return it->second;
   }
 
-  JwksData* findByProvider(const std::string& provider) final {
-    const auto it = jwks_data_map_.find(provider);
-    if (it == jwks_data_map_.end()) {
-      return nullptr;
-    }
-    return &it->second;
-  }
-
-private:
   // The Jwks data map indexed by provider.
   absl::node_hash_map<std::string, JwksDataImpl> jwks_data_map_;
   // The Jwks data pointer map indexed by issuer.

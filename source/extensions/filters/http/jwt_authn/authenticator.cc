@@ -149,15 +149,8 @@ void AuthenticatorImpl::startVerify() {
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
   if (!jwt_->iss_.empty()) {
-    // Check if token extracted from the location contains the issuer specified by config.
-    if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
-      doneWithStatus(Status::JwtUnknownIssuer);
-      return;
-    }
-  } else {
-    // If provider is not specified, in allow_missing_or_failed or allow_missing case,
-    // the issuer specified in "iss" payload is required in order to lookup provider.
-    if (!provider_) {
+    // Check if `iss` is allowed.
+    if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
       doneWithStatus(Status::JwtUnknownIssuer);
       return;
     }
@@ -166,8 +159,15 @@ void AuthenticatorImpl::startVerify() {
   // Check the issuer is configured or not.
   jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
                          : jwks_cache_.findByIssuer(jwt_->iss_);
-  // isIssuerSpecified() check already make sure the issuer is in the cache.
-  ASSERT(jwks_data_ != nullptr);
+  // When `provider` is valid, findByProvider should never return nullptr.
+  // Only when `allow_missing` or `allow_missing_or_fail` is used, `provider` may be invalid.
+  // In this case, `iss` from the Jwt token is used to find the first provider with the issuer.
+  // If not found, use the first provider without issuer specified.
+  // If still no found, fail the request with UnknownIssuer error.
+  if (!jwks_data_) {
+    doneWithStatus(Status::JwtUnknownIssuer);
+    return;
+  }
 
   // Default is 60 seconds
   uint64_t clock_skew_seconds = ::google::jwt_verify::kClockSkewInSecond;

@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //
 // A JwtProvider message specifies how a JSON Web Token (JWT) can be verified. It specifies:
 //
-// * issuer: the principal that issues the JWT. It has to match the one from the token.
+// * issuer: the principal that issues the JWT. If specified, it has to match the one from the token.
 // * allowed audiences: the ones in the token have to be listed here.
 // * how to fetch public key JWKS to verify the token signature.
 // * how to extract JWT token in the request.
@@ -59,11 +59,12 @@ message JwtProvider {
 
   // Specify the `principal <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ that issued
   // the JWT, usually a URL or an email address.
+  // It is optional. If specified, it has to match with "iss" field in the JWT payload.
   //
   // Example: https://securetoken.google.com
   // Example: 1234567-compute@developer.gserviceaccount.com
   //
-  string issuer = 1 [(validate.rules).string = {min_len: 1}];
+  string issuer = 1;
 
   // The list of JWT `audiences <https://tools.ietf.org/html/rfc7519#section-4.1.3>`_ are
   // allowed to access. A JWT containing any of these audiences will be accepted. If not specified,
