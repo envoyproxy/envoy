@@ -5,6 +5,7 @@ package envoy.extensions.upstreams.http.v3;
 import "envoy/config/core/v3/protocol.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.v3";
 option java_outer_classname = "HttpProtocolOptionsProto";
@@ -57,10 +58,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //        .... [further cluster config]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols (HTTP/1.1, HTTP/2).
-  // If :ref:`http2_protocol_options <envoy_api_field_config.cluster.v3.Cluster.http2_protocol_options>` are
-  // present, HTTP2 will be used, otherwise HTTP1.1 will be used.
+  // Note that HTTP/2 should generally be used for upstream clusters doing gRPC.
   message ExplicitHttpConfig {
     oneof protocol_config {
+      option (validate.required) = true;
+
       config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
 
       config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
@@ -82,8 +84,9 @@ message HttpProtocolOptions {
   config.core.v3.UpstreamHttpProtocolOptions upstream_http_protocol_options = 2;
 
   // This controls the actual protocol to be used upstream.
-  // If none of the *upstream_protocol_options* are chosen, the default is *explicit_http_config*.
   oneof upstream_protocol_options {
+    option (validate.required) = true;
+
     // To explicitly configure either HTTP/1 or HTTP/2 (but not both!) use *explicit_http_config*.
     // If the *explicit_http_config* is empty, HTTP/1.1 is used.
     ExplicitHttpConfig explicit_http_config = 3;

@@ -96,6 +96,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 // Test TLS upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   upstream_tls_ = true;
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   config_helper_.configureUpstreamTls();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));

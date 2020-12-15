@@ -957,6 +957,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
     auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
     std::chrono::milliseconds timeout(1000);
     auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
