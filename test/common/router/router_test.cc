@@ -54,7 +54,6 @@ using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
-using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
@@ -6038,8 +6037,9 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
     fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     TestShadowPolicy policy("cluster", "foo", fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_,
-                featureEnabled("foo", Matcher<const envoy::type::v3::FractionalPercent&>(_), 3))
+    EXPECT_CALL(
+        runtime.snapshot_,
+        featureEnabled("foo", testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 3))
         .WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
   }

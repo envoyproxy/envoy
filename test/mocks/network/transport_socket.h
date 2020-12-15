@@ -26,6 +26,7 @@ public:
   MOCK_METHOD(IoResult, doWrite, (Buffer::Instance & buffer, bool end_stream));
   MOCK_METHOD(void, onConnected, ());
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
+  MOCK_METHOD(bool, startSecureTransport, ());
 
   TransportSocketCallbacks* callbacks_{};
 };
