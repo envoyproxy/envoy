@@ -164,12 +164,7 @@ private:
           stream_info_(parent_.time_source_), local_response_sent_{false}, pending_transport_end_{
                                                                                false} {
       parent_.stats_.request_active_.inc();
-
-      stream_info_.setDownstreamLocalAddress(parent_.read_callbacks_->connection().localAddress());
-      stream_info_.setDownstreamRemoteAddress(
-          parent_.read_callbacks_->connection().remoteAddress());
-      stream_info_.setDownstreamDirectRemoteAddress(
-          parent_.read_callbacks_->connection().directRemoteAddress());
+      stream_info_.setDownstreamAddresses(parent_.read_callbacks_->connection());
     }
     ~ActiveRpc() override {
       request_timer_->complete();

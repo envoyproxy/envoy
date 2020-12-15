@@ -73,7 +73,9 @@ enum class ConnectionCloseType {
 /**
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
-class Connection : public Event::DeferredDeletable, public FilterManager {
+class Connection : public Event::DeferredDeletable,
+                   public FilterManager,
+                   public ConnectedSocketAddressProvider {
 public:
   enum class State { Open, Closing, Closed };
 
@@ -188,18 +190,6 @@ public:
   virtual bool readEnabled() const PURE;
 
   /**
-   * @return The address of the remote client. Note that this method will never return nullptr.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
-
-  /**
-   * @return The address of the remote directly connected peer. Note that this method
-   * will never return nullptr. This address is not affected or modified by PROXY protocol
-   * or any other listener filter.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
-
-  /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
    */
   struct UnixDomainSocketPeerCredentials {
@@ -222,14 +212,6 @@ public:
    * supported for unix socket connections.
    */
   virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
-
-  /**
-   * @return the local address of the connection. For client connections, this is the origin
-   * address. For server connections, this is the local destination address. For server connections
-   * it can be different from the proxy address if the downstream connection has been redirected or
-   * the proxy is operating in transparent mode. Note that this method will never return nullptr.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons

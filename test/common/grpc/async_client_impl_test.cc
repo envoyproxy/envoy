@@ -128,9 +128,11 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
 
   // Prepare the parent context of this call.
+  NiceMock<Network::MockConnectionSocket> socket;
+  socket.local_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address);
   StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
-  stream_info.setDownstreamLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address));
+  stream_info.setDownstreamAddresses(socket);
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;

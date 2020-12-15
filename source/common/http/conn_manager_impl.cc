@@ -618,16 +618,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-  filter_manager_.streamInfo().setDownstreamLocalAddress(
-      connection_manager_.read_callbacks_->connection().localAddress());
-  filter_manager_.streamInfo().setDownstreamDirectRemoteAddress(
-      connection_manager_.read_callbacks_->connection().directRemoteAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
   // prevents surprises for logging code in edge cases.
-  filter_manager_.streamInfo().setDownstreamRemoteAddress(
-      connection_manager_.read_callbacks_->connection().remoteAddress());
+  filter_manager_.streamInfo().setDownstreamAddresses(
+      connection_manager_.read_callbacks_->connection());
 
   filter_manager_.streamInfo().setDownstreamSslConnection(
       connection_manager_.read_callbacks_->connection().ssl());

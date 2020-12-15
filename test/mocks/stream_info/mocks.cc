@@ -58,23 +58,20 @@ MockStreamInfo::MockStreamInfo()
             upstream_local_address_ = upstream_local_address;
           }));
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
-  ON_CALL(*this, setDownstreamLocalAddress(_))
-      .WillByDefault(
-          Invoke([this](const Network::Address::InstanceConstSharedPtr& downstream_local_address) {
-            downstream_local_address_ = downstream_local_address;
-          }));
   ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
-  ON_CALL(*this, setDownstreamDirectRemoteAddress(_))
-      .WillByDefault(Invoke(
-          [this](const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) {
-            downstream_direct_remote_address_ = downstream_direct_remote_address;
-          }));
   ON_CALL(*this, downstreamDirectRemoteAddress())
       .WillByDefault(ReturnRef(downstream_direct_remote_address_));
   ON_CALL(*this, setDownstreamRemoteAddress(_))
       .WillByDefault(
           Invoke([this](const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
             downstream_remote_address_ = downstream_remote_address;
+          }));
+  ON_CALL(*this, setDownstreamAddresses(_))
+      .WillByDefault(
+          Invoke([this](const Network::ConnectedSocketAddressProvider& address_provider) {
+            downstream_local_address_ = address_provider.localAddress();
+            downstream_direct_remote_address_ = address_provider.directRemoteAddress();
+            downstream_remote_address_ = address_provider.remoteAddress();
           }));
   ON_CALL(*this, downstreamRemoteAddress()).WillByDefault(ReturnRef(downstream_remote_address_));
   ON_CALL(*this, setDownstreamSslConnection(_))

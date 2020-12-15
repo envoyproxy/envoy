@@ -10,6 +10,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
@@ -446,23 +447,9 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @param downstream_local_address sets the local address of the downstream connection. Note that
-   * it can be different than the local address of the upstream connection.
-   */
-  virtual void setDownstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_local_address) PURE;
-
-  /**
    * @return the downstream local address. Note that this will never be nullptr.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
-
-  /**
-   * @param downstream_direct_remote_address sets the direct physical address of downstream
-   * connection.
-   */
-  virtual void setDownstreamDirectRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) PURE;
 
   /**
    * @return the downstream directly connected address. This will never be nullptr. This is
@@ -483,6 +470,12 @@ public:
    * proxy proto, x-forwarded-for, etc.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
+
+  /**
+   * Set the stream's downstream addresses as a set.
+   */
+  virtual void
+  setDownstreamAddresses(const Network::ConnectedSocketAddressProvider& address_provider) PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.

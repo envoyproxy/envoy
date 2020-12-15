@@ -19,16 +19,10 @@ namespace Envoy {
 namespace Network {
 
 /**
- * A socket passed to a connection. For server connections this represents the accepted socket, and
- * for client connections this represents the socket being connected to a remote address.
- *
- * TODO(jrajahalme): Hide internals (e.g., fd) from listener filters by providing callbacks filters
- * may need (set/getsockopt(), peek(), recv(), etc.)
+ * Interface for providing a connected socket's remote addresses.
  */
-class ConnectionSocket : public virtual Socket {
+class ConnectedSocketAddressProvider : public virtual SocketAddressProvider {
 public:
-  ~ConnectionSocket() override = default;
-
   /**
    * @return the remote address of the socket.
    */
@@ -39,7 +33,17 @@ public:
    *         connected peer, and cannot be modified by listener filters.
    */
   virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+};
 
+/**
+ * A socket passed to a connection. For server connections this represents the accepted socket, and
+ * for client connections this represents the socket being connected to a remote address.
+ *
+ * TODO(jrajahalme): Hide internals (e.g., fd) from listener filters by providing callbacks filters
+ * may need (set/getsockopt(), peek(), recv(), etc.)
+ */
+class ConnectionSocket : public virtual Socket, public ConnectedSocketAddressProvider {
+public:
   /**
    * Restores the local address of the socket. On accepted sockets the local address defaults to the
    * one at which the connection was received at, which is the same as the listener's address, if

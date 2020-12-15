@@ -935,10 +935,8 @@ public:
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
       filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
           filter_callbacks_.connection_.ssl());
-      filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
-          filter_callbacks_.connection_.localAddress());
-      filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
-          filter_callbacks_.connection_.remoteAddress());
+      filter_callbacks_.connection_.streamInfo().setDownstreamAddresses(
+          filter_callbacks_.connection_);
       EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
@@ -1092,10 +1090,7 @@ TEST_F(TcpProxyTest, BadFactory) {
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   filter_callbacks_.connection_.streamInfo().setDownstreamSslConnection(
       filter_callbacks_.connection_.ssl());
-  filter_callbacks_.connection_.streamInfo().setDownstreamLocalAddress(
-      filter_callbacks_.connection_.localAddress());
-  filter_callbacks_.connection_.streamInfo().setDownstreamRemoteAddress(
-      filter_callbacks_.connection_.remoteAddress());
+  filter_callbacks_.connection_.streamInfo().setDownstreamAddresses(filter_callbacks_.connection_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
 

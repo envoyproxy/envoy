@@ -184,18 +184,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
-  void setDownstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
-    downstream_local_address_ = downstream_local_address;
-  }
-
   const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
     return downstream_local_address_;
-  }
-
-  void setDownstreamDirectRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) override {
-    downstream_direct_remote_address_ = downstream_direct_remote_address;
   }
 
   const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
@@ -209,6 +199,13 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
     return downstream_remote_address_;
+  }
+
+  void
+  setDownstreamAddresses(const Network::ConnectedSocketAddressProvider& address_provider) override {
+    downstream_local_address_ = address_provider.localAddress();
+    downstream_direct_remote_address_ = address_provider.directRemoteAddress();
+    downstream_remote_address_ = address_provider.remoteAddress();
   }
 
   void

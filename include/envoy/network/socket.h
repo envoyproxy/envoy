@@ -43,21 +43,27 @@ private:
   Network::SocketOptionName(level, option, #level "/" #option)
 
 /**
- * Base class for Sockets
+ * Interface for providing a socket's local address.
  */
-class Socket {
+class SocketAddressProvider {
 public:
-  virtual ~Socket() = default;
-
-  /**
-   * Type of sockets supported. See man 2 socket for more details
-   */
-  enum class Type { Stream, Datagram };
+  virtual ~SocketAddressProvider() = default;
 
   /**
    * @return the local address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
+};
+
+/**
+ * Base class for Sockets
+ */
+class Socket : public virtual SocketAddressProvider {
+public:
+  /**
+   * Type of sockets supported. See man 2 socket for more details
+   */
+  enum class Type { Stream, Datagram };
 
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the

@@ -9,6 +9,7 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/test_time.h"
@@ -121,9 +122,11 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, MetadataIsInitialized) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
 
   // Prepare the parent context of this call.
+  NiceMock<Network::MockConnectionSocket> socket;
+  socket.local_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address);
   StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
-  stream_info.setDownstreamLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address));
+  stream_info.setDownstreamAddresses(socket);
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;

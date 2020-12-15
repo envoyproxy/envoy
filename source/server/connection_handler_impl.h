@@ -252,9 +252,6 @@ private:
                                             listener_.parent_.dispatcher_.timeSource(),
                                             StreamInfo::FilterState::LifeSpan::Connection)) {
       listener_.stats_.downstream_pre_cx_active_.inc();
-      stream_info_->setDownstreamLocalAddress(socket_->localAddress());
-      stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
-      stream_info_->setDownstreamDirectRemoteAddress(socket_->directRemoteAddress());
     }
     ~ActiveTcpSocket() override {
       accept_filters_.clear();

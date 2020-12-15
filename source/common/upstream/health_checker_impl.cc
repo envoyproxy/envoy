@@ -270,8 +270,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   Router::FilterUtility::setUpstreamScheme(
       *request_headers, host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource());
-  stream_info.setDownstreamLocalAddress(local_address_);
-  stream_info.setDownstreamRemoteAddress(local_address_);
+  stream_info.setDownstreamAddresses(*this);
   stream_info.onUpstreamHostSelected(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);
