@@ -9,7 +9,7 @@ namespace Envoy {
  * Base class for all envoy exceptions.
  */
 #define envoy_try                                                                                  \
-  assert(MainThreadSingleton::get().isMainThread());                                               \
+  ASSERT(MainThreadSingleton::get().isMainThread());                                               \
   try
 
 class EnvoyException : public std::runtime_error {
