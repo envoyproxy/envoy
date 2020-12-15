@@ -72,7 +72,6 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
-    cluster_->refresh();
   }
 
   void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
@@ -83,7 +82,6 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
-    cluster_->refresh();
   }
 
   void setupPrioritySet() {
@@ -107,25 +105,22 @@ public:
 
     cluster_ =
         std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
-                                  factory_context, std::move(scope), tls_, false);
+                                  factory_context, std::move(scope), false);
 
-    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
-    lb_factory_ = thread_aware_lb_->factory();
-    lb_ = lb_factory_->create();
-
-    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("aggregate_cluster")))
-        .WillRepeatedly(Return(&aggregate_cluster_));
+    cm_.initializeThreadLocalClusters({"primary", "secondary"});
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq("primary"))).WillRepeatedly(Return(&primary_));
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
-    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("tertiary"))).WillRepeatedly(Return(nullptr));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
-    ON_CALL(aggregate_cluster_, loadBalancer()).WillByDefault(ReturnRef(*lb_));
 
     setupPrioritySet();
 
     ON_CALL(primary_, loadBalancer()).WillByDefault(ReturnRef(primary_load_balancer_));
     ON_CALL(secondary_, loadBalancer()).WillByDefault(ReturnRef(secondary_load_balancer_));
+
+    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
+    lb_factory_ = thread_aware_lb_->factory();
+    lb_ = lb_factory_->create();
   }
 
   Stats::TestUtil::TestStore stats_store_;
@@ -150,7 +145,7 @@ public:
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Upstream::MockThreadLocalCluster> aggregate_cluster_, primary_, secondary_;
+  NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
 

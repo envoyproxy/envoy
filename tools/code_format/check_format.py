@@ -110,6 +110,11 @@ GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
 
+# Header files that can throw exceptions. These should be limited; the only
+# valid situation identified so far is template functions used for config
+# processing.
+EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
+
 # We want all URL references to exist in repository_locations.bzl files and have
 # metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
 # we have some exceptions for either infrastructure files or places we fall
@@ -169,8 +174,20 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+
 LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
+}
+
+CODE_CONVENTION_REPLACEMENTS = {
+    # We can't just remove Times(1) everywhere, since .Times(1).WillRepeatedly
+    # is a legitimate pattern. See
+    # https://github.com/google/googletest/blob/master/googlemock/docs/for_dummies.md#cardinalities-how-many-times-will-it-be-called
+    ".Times(1);": ";",
+    # These may miss some cases, due to line breaks, but should reduce the
+    # Times(1) noise.
+    ".Times(1).WillOnce": ".WillOnce",
+    ".Times(1).WillRepeatedly": ".WillOnce",
 }
 
 UNOWNED_EXTENSIONS = {
@@ -412,11 +429,11 @@ class FormatChecker:
 
   def denylistedForExceptions(self, file_path):
     # Returns true when it is a non test header file or the file_path is in DENYLIST or
-    # it is under toos/testdata subdirectory.
+    # it is under tools/testdata subdirectory.
     if file_path.endswith(DOCS_SUFFIX):
       return False
 
-    return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
+    return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
 
   def allowlistedForBuildUrls(self, file_path):
@@ -568,6 +585,10 @@ class FormatChecker:
     for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
       line = line.replace(invalid_construct, valid_construct)
 
+    # Fix code conventions violations.
+    for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
+      line = line.replace(invalid_construct, valid_construct)
+
     return line
 
   # We want to look for a call to condvar.waitFor, but there's no strong pattern
@@ -633,6 +654,10 @@ class FormatChecker:
     for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
       if invalid_construct in line:
         reportError("term %s should be replaced with standard library term %s" %
+                    (invalid_construct, valid_construct))
+    for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
+      if invalid_construct in line:
+        reportError("term %s should be replaced with preferred term %s" %
                     (invalid_construct, valid_construct))
     # Do not include the virtual_includes headers.
     if re.search("#include.*/_virtual_includes/", line):

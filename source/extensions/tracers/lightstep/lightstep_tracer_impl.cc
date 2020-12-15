@@ -126,15 +126,13 @@ void LightStepDriver::LightStepTransporter::Send(std::unique_ptr<lightstep::Buff
       absl::optional<std::chrono::milliseconds>(timeout));
   serializeGrpcMessage(*report, message->body());
 
-  if (collector_cluster_.exists()) {
+  if (collector_cluster_.threadLocalCluster().has_value()) {
     active_report_ = std::move(report);
     active_callback_ = &callback;
-    active_cluster_ = collector_cluster_.info();
-    active_request_ = driver_.clusterManager()
-                          .httpAsyncClientForCluster(collector_cluster_.info()->name())
-                          .send(std::move(message), *this,
-                                Http::AsyncClient::RequestOptions().setTimeout(
-                                    std::chrono::milliseconds(timeout)));
+    active_cluster_ = collector_cluster_.threadLocalCluster()->get().info();
+    active_request_ = collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
   } else {
     ENVOY_LOG(debug, "collector cluster '{}' does not exist", driver_.cluster());
     driver_.tracerStats().reports_skipped_no_cluster_.inc();
