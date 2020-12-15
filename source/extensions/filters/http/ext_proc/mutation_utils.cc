@@ -39,9 +39,9 @@ void MutationUtils::applyHeaderMutations(
     if (!sh.has_header()) {
       continue;
     }
-    // The "router" and "ext_authz" both use "false" as the default here,
-    // which matches ext_authz, but does not match the way that the same
-    // proto is used in the router
+    // Make "false" the default. This is logical and matches the ext_authz
+    // filter. However, the router handles this same protobuf and uses "true"
+    // as the default instead.
     const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
     if (append) {
       headers.addCopy(LowerCaseString(sh.header().key()), sh.header().value());
