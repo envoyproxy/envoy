@@ -342,7 +342,13 @@ static_resources:
 
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::adsBootstrap(const std::string& api_type,
-                                       envoy::config::core::v3::ApiVersion api_version) {
+                                       envoy::config::core::v3::ApiVersion resource_api_version,
+                                       envoy::config::core::v3::ApiVersion transport_api_version) {
+  // We use this to allow tests to default to having a single API version but override and make
+  // the transport/resource API version distinction when needed.
+  if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO) {
+    transport_api_version = resource_api_version;
+  }
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
@@ -352,7 +358,7 @@ dynamic_resources:
     resource_api_version: {1}
     ads: {{}}
   ads_config:
-    transport_api_version: {1}
+    transport_api_version: {2}
     api_type: {0}
 static_resources:
   clusters:
@@ -376,13 +382,15 @@ static_resources:
         explicit_http_config:
           http2_protocol_options: {{}}
 admin:
-  access_log_path: {2}
+  access_log_path: {3}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type, api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     api_type,
+                     resource_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     transport_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
                      Platform::null_device_path);
 }
 
