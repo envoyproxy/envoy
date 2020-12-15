@@ -104,7 +104,7 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
     // Instead we cheat here by scheduling the token timer to run immediately after the stack is
     // unwound, at which point we can directly called encode/decodeData.
     token_timer_->enableTimer(std::chrono::milliseconds(0), &scope_);
-    ENVOY_LOG(trace, "stream limiter: token timer is{}enabled.",
+    ENVOY_LOG(trace, "stream limiter: token timer is{}enabled for first time.",
               token_timer_->enabled() ? " " : " not ");
   }
 }
