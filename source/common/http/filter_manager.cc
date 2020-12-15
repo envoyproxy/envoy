@@ -447,6 +447,14 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "decodeHeaders when end_stream is already false");
+    // A filter should not continue after a local reply was sent. Indicate the error and stop
+    // iteration.
+    if ((*entry)->complete() && status != FilterHeadersStatus::StopIteration) {
+      ENVOY_BUG(
+          false,
+          "Filters should not return FilterHeadersStatus::Continue after sending a local reply.");
+      status = FilterHeadersStatus::StopIteration;
+    }
 
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,

@@ -287,6 +287,30 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   EXPECT_EQ(response->body(), "body");
 }
 
+// Tests a filter that returns a FilterHeadersStatus::Continue after a local reply. In debug mode,
+// this fails on ENVOY_BUG. In opt mode, the status is corrected and the failure is logged.
+TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
+#ifdef NDEBUG
+  config_helper_.addFilter(R"EOF(
+  name: continue-after-local-reply-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_LOG_CONTAINS(
+      "trace",
+      "Filters should not return FilterHeadersStatus::Continue after sending a local reply.",
+      response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+#endif
+}
+
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.addFilter(R"EOF(
 name: add-trailers-filter
