@@ -570,6 +570,33 @@ TEST_P(ServerStatsTest, FlushStats) {
   EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
 }
 
+TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  options_.bootstrap_version_ = 3;
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", true);
+  EXPECT_TRUE(server_->statsConfig().flushOnAdmin());
+  EXPECT_EQ(std::chrono::seconds(5), server_->statsConfig().flushInterval());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(0L, counter->value());
+
+  // Flush via admin.
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
+  EXPECT_EQ(1L, counter->value());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -658,11 +685,13 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
-// Validate that bootstrap pb_text loads.
-TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
-  EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
-                          initialize("test/server/test_data/server/node_bootstrap.pb_text"));
-  EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
+// Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
+// set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2TransportWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/dynamic_v2.yaml"),
+                          DeprecatedMajorVersionException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
 }
 
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
@@ -671,8 +700,7 @@ TEST_P(ServerInstanceImplTest,
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
       DeprecatedMajorVersionException,
-      "Support for v2 will be removed from Envoy at the start of Q1 2021. You may make use of v2 "
-      "in Q3 2020 by setting");
+      "Support for v2 will be removed from Envoy at the start of Q1 2021.");
 }
 
 // Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
@@ -789,12 +817,25 @@ TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
 }
 
 // Validate that bootstrap v2 YAML with deprecated fields loads fails if V3 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromYaml) {
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3SelectedFromYaml)) {
   options_.bootstrap_version_ = 3;
 
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
       EnvoyException, "has unknown fields");
+}
+
+// Validate that bootstrap with v2 dynamic transport loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2TransportWithoutExplicitVersion)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/dynamic_v2.yaml");
+}
+
+// Validate that bootstrap pb_text loads.
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
+  EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
+                          initialize("test/server/test_data/server/node_bootstrap.pb_text"));
+  EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
 }
 
 // Validate that we blow up on invalid version number.

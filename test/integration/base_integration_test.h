@@ -369,11 +369,14 @@ public:
 protected:
   void setUdpFakeUpstream(bool value) { upstream_config_.udp_fake_upstream_ = value; }
   bool initialized() const { return initialized_; }
-  const FakeUpstreamConfig& upstreamConfig() {
-    // TODO(alyssawilk) make enable_half_close_ private and remove this.
-    upstream_config_.enable_half_close_ = enable_half_close_;
-    return upstream_config_;
-  }
+
+  // Right now half-close is set globally, not separately for upstream and
+  // downstream.
+  void enableHalfClose(bool value) { upstream_config_.enable_half_close_ = value; }
+
+  bool enableHalfClose() { return upstream_config_.enable_half_close_; }
+
+  const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
@@ -413,6 +416,7 @@ protected:
   bool create_xds_upstream_{false};
   bool tls_xds_upstream_{false};
   bool use_lds_{true}; // Use the integration framework's LDS set up.
+  bool upstream_tls_{false};
 
   Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
@@ -441,8 +445,6 @@ protected:
   // If true, allow incomplete streams in AutonomousUpstream
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
-
-  bool enable_half_close_{false};
 
   // True if test will use a fixed RNG value.
   bool deterministic_{};

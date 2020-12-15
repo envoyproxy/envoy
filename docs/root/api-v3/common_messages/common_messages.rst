@@ -22,4 +22,4 @@ Common messages
   ../extensions/filters/common/fault/v3/fault.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
   ../extensions/common/matching/v3/extension_matcher.proto
-  ../extensions/filters/common/matching/v3/skip_action.proto
+  ../extensions/filters/common/matcher/action/v3/skip_action.proto

@@ -41,7 +41,7 @@ std::string denyPrivateConfigWithMatcher() {
               action:
                 name: skip
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.common.matching.v3.SkipFilterMatchAction
+                  "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
   )EOF";
 }
 
@@ -75,6 +75,8 @@ public:
             discovery->mutable_default_config()->PackFrom(default_configuration);
           }
           discovery->set_apply_default_config_without_warming(apply_without_warming);
+          discovery->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
           api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
           api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -249,7 +251,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithMatcher) {
   Http::TestRequestHeaderMapImpl banned_request_headers_skipped{
       {":method", "GET"}, {":path", "/private/key"}, {"some-header", "match"}, {":scheme", "http"}, {":authority", "host"}};
   {
-    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
+    auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers_skipped);
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());

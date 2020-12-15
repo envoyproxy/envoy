@@ -258,7 +258,7 @@ void ActiveStreamFilterBase::evaluateMatchTreeWithNewData(
   match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
 
   if (match_tree_evaluated_ && match_result.result_) {
-    if (dynamic_cast<SkipAction*>(match_result.result_.get())) {
+    if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
       skip_ = true;
     }
   }
@@ -273,8 +273,8 @@ bool ActiveStreamDecoderFilter::canContinue() {
   return !parent_.state_.local_complete_;
 }
 
-Buffer::WatermarkBufferPtr ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
+Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
+  auto buffer = dispatcher().getWatermarkFactory().create(
       [this]() -> void { this->requestDataDrained(); },
       [this]() -> void { this->requestDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
@@ -282,7 +282,7 @@ Buffer::WatermarkBufferPtr ActiveStreamDecoderFilter::createBuffer() {
   return buffer;
 }
 
-Buffer::WatermarkBufferPtr& ActiveStreamDecoderFilter::bufferedData() {
+Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
@@ -1360,15 +1360,15 @@ absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeCon
   return parent_.filter_manager_callbacks_.routeConfig();
 }
 
-Buffer::WatermarkBufferPtr ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer(
+Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
+  auto buffer = dispatcher().getWatermarkFactory().create(
       [this]() -> void { this->responseDataDrained(); },
       [this]() -> void { this->responseDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
-  return Buffer::WatermarkBufferPtr{buffer};
+  return buffer;
 }
-Buffer::WatermarkBufferPtr& ActiveStreamEncoderFilter::bufferedData() {
+Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::complete() { return parent_.state_.local_complete_; }

@@ -37,6 +37,7 @@ envoy_extension_cc_test(
     srcs = ["cluster_update_test.cc"],
     extension_name = "envoy.clusters.aggregate",
     deps = [
+        "//source/common/router:context_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/clusters/aggregate:cluster",

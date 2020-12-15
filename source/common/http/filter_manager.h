@@ -1,8 +1,9 @@
 #pragma once
 
 #include "envoy/matcher/matcher.h"
-#include "envoy/extensions/filters/common/matching/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
+#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -12,7 +13,6 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
-#include "common/http/filter_manager.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
@@ -35,7 +35,7 @@ public:
     response_headers_ = &response_headers;
   }
 
-  Http::RequestHeaderMapOptConstRef requestHeaders() const {
+  Http::RequestHeaderMapOptConstRef requestHeaders() const override {
     if (request_headers_) {
       return absl::make_optional(std::cref(*request_headers_));
     }
@@ -43,7 +43,7 @@ public:
     return absl::nullopt;
   }
 
-  Http::ResponseHeaderMapOptConstRef responseHeaders() const {
+  Http::ResponseHeaderMapOptConstRef responseHeaders() const override {
     if (response_headers_) {
       return absl::make_optional(std::cref(*response_headers_));
     }
@@ -149,7 +149,7 @@ public:
 };
 
 class SkipAction : public Matcher::ActionBase<
-                       envoy::extensions::filters::common::matching::v3::SkipFilterMatchAction> {};
+                       envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
 class SkipActionFactory : public Matcher::ActionFactory {
 public:
@@ -159,11 +159,15 @@ public:
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::filters::common::matching::v3::SkipFilterMatchAction>();
+        envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
   }
 };
 /**
  * Base class wrapper for both stream encoder and decoder filters.
+ *
+ * This class is responsible for performing matching and updating match data when a match tree is
+ * configured for the associated filter. When not using a match tree, only minimal overhead (i.e.
+ * memory overhead of unused fields) should apply.
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
@@ -195,8 +199,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   void commonContinue();
   virtual bool canContinue() PURE;
-  virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
-  virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
+  virtual Buffer::InstancePtr createBuffer() PURE;
+  virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool complete() PURE;
   virtual bool has100Continueheaders() PURE;
   virtual void do100ContinueHeaders() PURE;
@@ -299,8 +303,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   // ActiveStreamFilterBase
   bool canContinue() override;
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override { return false; }
   void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
@@ -388,8 +392,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
 
   // ActiveStreamFilterBase
   bool canContinue() override { return true; }
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override;
   void do100ContinueHeaders() override;
@@ -685,18 +689,26 @@ public:
   }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
-    auto matching_data = match_tree ? std::make_shared<HttpMatchingDataImpl>() : nullptr;
+    if (match_tree) {
+      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
+      addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+      return;
+    }
 
-    addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
     addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
-    auto matching_data = match_tree ? std::make_shared<HttpMatchingDataImpl>() : nullptr;
+    if (match_tree) {
+      addStreamEncoderFilterWorker(filter, std::move(match_tree),
+                                   std::make_shared<HttpMatchingDataImpl>(), false);
+      return;
+    }
 
-    addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
@@ -708,10 +720,15 @@ public:
     // matching on both request and response data.
     // TODO(snowp): The match tree might be fully evaluated twice, ideally we should expose
     // the result to both filters after the first match evaluation.
-    auto matching_data = match_tree ? std::make_shared<HttpMatchingDataImpl>() : nullptr;
+    if (match_tree) {
+      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
+      addStreamDecoderFilterWorker(filter, match_tree, matching_data, true);
+      addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+      return;
+    }
 
-    addStreamDecoderFilterWorker(filter, match_tree, matching_data, true);
-    addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
@@ -967,8 +984,8 @@ private:
   // processing the next filter. The storage is created on demand. We need to store metadata
   // temporarily in the filter in case the filter has stopped all while processing headers.
   std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
-  Buffer::WatermarkBufferPtr buffered_response_data_;
-  Buffer::WatermarkBufferPtr buffered_request_data_;
+  Buffer::InstancePtr buffered_response_data_;
+  Buffer::InstancePtr buffered_request_data_;
   uint32_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;

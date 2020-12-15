@@ -1,0 +1,9 @@
+1.16.2 (December 7, 2020)
+=========================
+
+Bug Fixes
+---------
+*Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+* http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+* vrp: allow supervisord to open its log file.

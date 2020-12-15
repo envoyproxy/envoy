@@ -40,6 +40,7 @@ admin:
       port_value: 0
 dynamic_resources:
   lds_config:
+    resource_api_version: V3
     path: {}
 static_resources:
   secrets:
@@ -113,6 +114,27 @@ std::string ConfigHelper::tcpProxyConfig() {
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF");
+}
+
+std::string ConfigHelper::startTlsConfig() {
+  return absl::StrCat(
+      tcpProxyConfig(),
+      fmt::format(R"EOF(
+      transport_socket:
+        name: "starttls"
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          cleartext_socket_config:
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+                certificate_chain:
+                  filename: {}
+                private_key:
+                  filename: {}
+)EOF",
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
 std::string ConfigHelper::tlsInspectorFilter() {
@@ -262,6 +284,7 @@ dynamic_resources:
     resource_api_version: V3
     api_config_source:
       api_type: {}
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
