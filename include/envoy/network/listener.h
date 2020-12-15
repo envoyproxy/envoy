@@ -94,8 +94,7 @@ public:
   /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
-   *         configuration is set, false otherwise. Note that this flag is deprecated and will be
-   *         removed from the v2 API.
+   *         configuration is set, false otherwise.
    */
   virtual bool handOffRestoredDestinationConnections() const PURE;
 
