@@ -12,7 +12,7 @@ namespace ExternalProcessing {
 class MockClient : public ExternalProcessorClient {
 public:
   MockClient();
-  virtual ~MockClient();
+  ~MockClient() override;
   MOCK_METHOD(ExternalProcessorStreamPtr, start,
               (ExternalProcessorCallbacks&, const std::chrono::milliseconds&));
 };
