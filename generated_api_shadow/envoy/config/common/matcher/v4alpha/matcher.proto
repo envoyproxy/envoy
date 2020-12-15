@@ -165,20 +165,6 @@ message Matcher {
   OnMatch on_no_match = 3;
 }
 
-// Wrapper around an existing extension that provides an associated matcher. This allows
-// decorating an existing extension with a matcher, which can be used to match against
-// relevant protocol data.
-message ExtensionWithMatcher {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.common.matcher.v3.ExtensionWithMatcher";
-
-  // The associated matcher.
-  Matcher matcher = 1 [(validate.rules).message = {required: true}];
-
-  // The underlying extension config.
-  core.v4alpha.TypedExtensionConfig typed_config = 2 [(validate.rules).message = {required: true}];
-}
-
 // Match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
 // [#next-free-field: 11]
