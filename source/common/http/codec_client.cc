@@ -36,8 +36,15 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
-  ENVOY_CONN_LOG(debug, "connecting", *connection_);
-  connection_->connect();
+  // In general, codecs are handed new not-yet-connected connections, but in the
+  // case of ALPN, the codec may be handed an already connected connection.
+  if (!connection_->connecting()) {
+    ASSERT(connection_->state() == Network::Connection::State::Open);
+    connected_ = true;
+  } else {
+    ENVOY_CONN_LOG(debug, "connecting", *connection_);
+    connection_->connect();
+  }
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });

@@ -57,6 +57,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
+// [#next-free-field: 6]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.upstreams.http.v3.HttpProtocolOptions";
@@ -87,6 +88,24 @@ message HttpProtocolOptions {
     config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
   }
 
+  // If this is used, the cluster can use either HTTP/1 or HTTP/2, and will use whichever
+  // protocol is negotiated by ALPN with the upstream.
+  // Clusters configured with *AutoHttpConfig* will use the highest available
+  // protocol; HTTP/2 if supported, otherwise HTTP/1.
+  // If the upstream does not support ALPN, *AutoHttpConfig* will fail over to HTTP/1.
+  // This can only be used with transport sockets which support ALPN. Using a
+  // transport socket which does not support ALPN will result in configuration
+  // failure. The transport layer may be configured with custom ALPN, but the default ALPN
+  // for the cluster (or if custom ALPN fails) will be "h2,http/1.1".
+  message AutoHttpConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig";
+
+    config.core.v4alpha.Http1ProtocolOptions http_protocol_options = 1;
+
+    config.core.v4alpha.Http2ProtocolOptions http2_protocol_options = 2;
+  }
+
   // This contains options common across HTTP/1 and HTTP/2
   config.core.v4alpha.HttpProtocolOptions common_http_protocol_options = 1;
 
@@ -104,5 +123,8 @@ message HttpProtocolOptions {
     // This allows switching on protocol based on what protocol the downstream
     // connection used.
     UseDownstreamHttpConfig use_downstream_protocol_config = 4;
+
+    // This allows switching on protocol based on ALPN
+    AutoHttpConfig auto_config = 5;
   }
 }

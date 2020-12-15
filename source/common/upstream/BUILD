@@ -58,6 +58,7 @@ envoy_cc_library(
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
+        "//source/common/http:mixed_conn_pool",
         "//source/common/http/http1:conn_pool_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/network:resolver_lib",

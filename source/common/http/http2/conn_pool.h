@@ -19,6 +19,8 @@ class ActiveClient : public CodecClientCallbacks,
                      public Envoy::Http::ActiveClient {
 public:
   ActiveClient(HttpConnPoolImplBase& parent);
+  ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+               Upstream::Host::CreateConnectionData& data);
   ~ActiveClient() override = default;
 
   // ConnPoolImpl::ActiveClient

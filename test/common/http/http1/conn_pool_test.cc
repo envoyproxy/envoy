@@ -184,8 +184,8 @@ struct ActiveTestRequest {
     }
 
     if (type == Type::CreateConnection) {
-      expectNewStream();
       EXPECT_CALL(*parent_.conn_pool_->test_clients_[client_index_].connect_timer_, disableTimer());
+      expectNewStream();
       parent.conn_pool_->test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
     }
@@ -443,8 +443,8 @@ TEST_F(Http1ConnPoolImplTest, ConnectFailure) {
   Http::ConnectionPool::Cancellable* handle = conn_pool_->newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
+  EXPECT_CALL(callbacks.pool_failure_, ready());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -480,22 +480,22 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
   // Move time forward, signal that the first connect completed and verify the time to connect.
   uint64_t upstream_cx_connect_ms1 = 0;
   simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep2_ms));
+  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
       .WillOnce(SaveArg<1>(&upstream_cx_connect_ms1));
   r1.expectNewStream();
-  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
   EXPECT_EQ(sleep1_ms + sleep2_ms, upstream_cx_connect_ms1);
 
   // Move time forward, signal that the second connect completed and verify the time to connect.
   uint64_t upstream_cx_connect_ms2 = 0;
   simulated_time.advanceTimeWait(std::chrono::milliseconds(sleep3_ms));
+  EXPECT_CALL(*conn_pool_->test_clients_[1].connect_timer_, disableTimer());
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
       .WillOnce(SaveArg<1>(&upstream_cx_connect_ms2));
   r2.expectNewStream();
-  EXPECT_CALL(*conn_pool_->test_clients_[1].connect_timer_, disableTimer());
   conn_pool_->test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::Connected);
   EXPECT_EQ(sleep2_ms + sleep3_ms, upstream_cx_connect_ms2);
 
@@ -1066,10 +1066,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
 
   NiceMock<MockRequestEncoder> request_encoder;
   ResponseDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
   EXPECT_CALL(*conn_pool_->test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
-  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   EXPECT_TRUE(
@@ -1192,10 +1192,10 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
 
   NiceMock<MockRequestEncoder> request_encoder;
   ResponseDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
   EXPECT_CALL(*conn_pool_->test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
-  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   EXPECT_TRUE(

@@ -321,6 +321,52 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(ConnectionImplTest, UnregisterRegisterDuringConnectCallback) {
+  setUpBasicConnection();
+
+  NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
+  // Verify the code path in the mixed connection pool, where the original
+  // network callback is unregistered when Connected is raised, and a new
+  // callback is registered.
+  // event.
+  int expected_callbacks = 2;
+  client_connection_->connect();
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+
+        expected_callbacks--;
+        if (expected_callbacks == 0) {
+          dispatcher_->exit();
+        }
+      }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        expected_callbacks--;
+        // Register the new callback. It should immediately get the Connected
+        // event without an extra dispatch loop.
+        EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::Connected));
+        client_connection_->addConnectionCallbacks(upstream_callbacks_);
+        // Remove the old connection callbacks, to regression test removal
+        // under the stack of onEvent.
+        client_connection_->removeConnectionCallbacks(client_callbacks_);
+        if (expected_callbacks == 0) {
+          dispatcher_->exit();
+        }
+      }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Swap the callbacks back as disconnect() expects client_callbacks_ to be
+  // registered.
+  client_connection_->removeConnectionCallbacks(upstream_callbacks_);
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  disconnect(true);
+}
+
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
   dispatcher_ = api_->allocateDispatcher("test_thread");
 

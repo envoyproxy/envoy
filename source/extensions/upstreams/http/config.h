@@ -42,6 +42,7 @@ public:
 
   bool use_downstream_protocol_{};
   bool use_http2_{};
+  bool use_alpn_{};
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {

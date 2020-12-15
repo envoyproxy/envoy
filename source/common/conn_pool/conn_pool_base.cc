@@ -329,6 +329,11 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
   }
 
+  if (client.connect_timer_) {
+    client.connect_timer_->disableTimer();
+    client.connect_timer_.reset();
+  }
+
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     state_.decrConnectingStreamCapacity(client.currentUnusedCapacity());
@@ -387,17 +392,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   } else if (event == Network::ConnectionEvent::Connected) {
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
-
     ASSERT(client.state_ == ActiveClient::State::CONNECTING);
     transitionActiveClientState(client, ActiveClient::State::READY);
 
+    // At this point, for the mixed ALPN pool, the client may be deleted. Do not
+    // refer to client after this point.
+    onConnected(client);
     onUpstreamReady();
     checkForDrained();
-  }
-
-  if (client.connect_timer_) {
-    client.connect_timer_->disableTimer();
-    client.connect_timer_.reset();
   }
 }
 

@@ -14,6 +14,9 @@ public:
   void SetUp() override {
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+
+    upstream_tls_ = true;
+    config_helper_.configureUpstreamTls(use_alpn_);
   }
 
   void initialize() override { HttpIntegrationTest::initialize(); }
@@ -22,5 +25,7 @@ public:
   void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                            uint32_t response1_bytes, uint32_t response2_bytes);
   void manySimultaneousRequests(uint32_t request_bytes, uint32_t response_bytes);
+
+  bool use_alpn_{false};
 };
 } // namespace Envoy

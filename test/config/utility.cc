@@ -655,14 +655,37 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls() {
-  addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+void ConfigHelper::configureUpstreamTls(bool use_alpn) {
+  addConfigModifier([use_alpn](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
     protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
     ConfigHelper::setProtocolOptions(*cluster, protocol_options);
 
+    if (use_alpn) {
+      ConfigHelper::HttpProtocolOptions new_protocol_options;
+
+      HttpProtocolOptions old_protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      protocol_options.MergeFrom(old_protocol_options);
+
+      new_protocol_options = old_protocol_options;
+      new_protocol_options.clear_explicit_http_config();
+      new_protocol_options.mutable_auto_config();
+      if (old_protocol_options.explicit_http_config().has_http_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http_protocol_options());
+      } else if (old_protocol_options.explicit_http_config().has_http2_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http2_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http2_protocol_options());
+      }
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(new_protocol_options);
+    }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
     auto* validation_context =
         tls_context.mutable_common_tls_context()->mutable_validation_context();

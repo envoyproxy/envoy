@@ -109,6 +109,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
+  bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

@@ -28,6 +28,7 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -1361,8 +1362,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  auto upstream_protocol = host->cluster().upstreamHttpProtocol(downstream_protocol);
-  std::vector<uint8_t> hash_key = {uint8_t(upstream_protocol)};
+  // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
+  // We could do better here, and always use the ALPN pool and simply make sure
+  // we end up on a connection of the correct protocol, but for simplicity we're
+  // starting with something simpler.
+  auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
+  std::vector<uint8_t> hash_key;
+  hash_key.reserve(upstream_protocols.size());
+  for (auto protocol : upstream_protocols) {
+    hash_key.push_back(uint8_t(protocol));
+  }
 
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
@@ -1399,7 +1408,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
-            parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
+            parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.cluster_manager_state_);
@@ -1467,20 +1476,26 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    std::vector<Http::Protocol>& protocols,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     ClusterConnectivityState& state) {
-  if (protocol == Http::Protocol::Http2 &&
+  if (protocols.size() == 2 &&
+      ((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
+       (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11))) {
+    return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
+                                                         priority, options,
+                                                         transport_socket_options, state);
+  }
+
+  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state);
-  } else if (protocol == Http::Protocol::Http3) {
-    // Quic connection pool is not implemented.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  } else {
-    return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state);
   }
+  ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
+  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
+                                       transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
