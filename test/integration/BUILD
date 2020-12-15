@@ -1229,6 +1229,8 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    # TODO(envoyproxy/windows-dev): Investigate timeout
+    tags = ["flaky_on_windows"],
     deps = [
         ":integration_lib",
         ":starttls_integration_proto_cc_proto",
