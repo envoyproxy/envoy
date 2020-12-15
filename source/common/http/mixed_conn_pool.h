@@ -24,7 +24,6 @@ public:
   Http::Protocol protocol() { return protocol_; }
 
 private:
-  bool connected_{};
   // Default to HTTP/1, as servers which don't support ALPN are probably HTTP/1 only.
   Http::Protocol protocol_ = Protocol::Http11;
 };

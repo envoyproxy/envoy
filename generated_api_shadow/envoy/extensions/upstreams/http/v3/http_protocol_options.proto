@@ -76,13 +76,14 @@ message HttpProtocolOptions {
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
   }
 
-  // If this is used, the cluster can will use both HTTP/1 and HTTP/2, whichever
+  // If this is used, the cluster can use either HTTP/1 or HTTP/2, and will use whichever
   // protocol is negotiated by ALPN with the upstream.
   // Clusters configured with *AutoHttpConfig* will use the highest available
   // protocol; HTTP/2 if supported, otherwise HTTP/1.
   // If the upstream does not support ALPN, *AutoHttpConfig* will fail over to HTTP/1.
-  // This can only be used with transport sockets which support ALPN. The
-  // transport layer may be configured with custom ALPN, but the default ALPN
+  // This can only be used with transport sockets which support ALPN. Using a
+  // transport socket which does not support ALPN will result in configuation
+  // failure. The transport layer may be configured with custom ALPN, but the default ALPN
   // for the cluster (or if custom ALPN fails) will be "h2,http/1.1".
   message AutoHttpConfig {
     config.core.v3.Http1ProtocolOptions http_protocol_options = 1;
