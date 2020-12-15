@@ -135,8 +135,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
-    # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -980,7 +978,6 @@ envoy_cc_test(
     srcs = ["load_stats_integration_test.cc"],
     # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test, hangs at
     # IpVersionsClientType/LoadStatsIntegrationTest.NoLocalLocality/3
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",

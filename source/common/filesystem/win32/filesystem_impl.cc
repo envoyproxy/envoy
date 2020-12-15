@@ -149,7 +149,8 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
-std::string InstanceImplWin32::fileReadToEnd(const std::string& path, bool retry_sharing_violations) {
+std::string InstanceImplWin32::fileReadToEnd(const std::string& path,
+                                             bool retry_sharing_violations) {
   std::string out;
   int attempts = 1;
   constexpr int max_attempts = 3;
@@ -157,20 +158,19 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path, bool retry
     try {
       out = fileReadToEnd(path);
       return out;
-    }
-    catch (const EnvoyException& e) {
-        if (retry_sharing_violations) {
-          std::string exception_message(e.what());
-            ENVOY_LOG_MISC(warn, "{}", exception_message);
-          if (exception_message.find("Error sharing violation") != std::string::npos) {
-            ENVOY_LOG_MISC(warn, "retrying");
-            ++attempts;
-          } else {
-             throw e;
-          }
+    } catch (const EnvoyException& e) {
+      if (retry_sharing_violations) {
+        std::string exception_message(e.what());
+        ENVOY_LOG_MISC(warn, "{}", exception_message);
+        if (exception_message.find("Error sharing violation") != std::string::npos) {
+          ENVOY_LOG_MISC(warn, "retrying");
+          ++attempts;
         } else {
           throw e;
         }
+      } else {
+        throw e;
+      }
     }
     Sleep(20 * exp2(attempts));
   } while (attempts <= max_attempts && retry_sharing_violations);
