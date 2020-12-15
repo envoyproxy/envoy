@@ -1,9 +1,7 @@
 #pragma once
 
-#include "envoy/matcher/matcher.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -158,8 +156,7 @@ public:
     return []() { return std::make_unique<SkipAction>(); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
+    return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
   }
 };
 /**

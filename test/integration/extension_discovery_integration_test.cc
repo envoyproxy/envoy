@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -56,9 +56,10 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
-                        bool set_default_config = true, bool rate_limit = false) {
+                        bool set_default_config = true, bool rate_limit = false,
+                        bool use_default_matcher = false) {
     config_helper_.addConfigModifier(
-        [this, name, apply_without_warming, set_default_config, rate_limit](
+        [this, name, apply_without_warming, set_default_config, rate_limit, use_default_matcher](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 http_connection_manager) {
           auto* filter = http_connection_manager.mutable_http_filters()->Add();
@@ -69,10 +70,38 @@ public:
           discovery->add_type_urls(
               "type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher");
           if (set_default_config) {
-            const auto default_configuration =
-                TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
-                    "code: 403");
-            discovery->mutable_default_config()->PackFrom(default_configuration);
+            if (use_default_matcher) {
+              const auto default_configuration = TestUtility::parseYaml<
+                  envoy::extensions::common::matching::v3::ExtensionWithMatcher>(
+                  R"EOF(
+                    extension_config:
+                      name: set-response-code
+                      typed_config:
+                        "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                        code: 403
+                    matcher:
+                      matcher_tree:
+                        input:
+                          name: request-headers
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpRequestHeaderMatchInput
+                            header_name: default-matcher-header
+                        exact_match_map:
+                          map:
+                            match:
+                              action:
+                                name: skip
+                                typed_config:
+                                  "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+                  )EOF");
+
+              discovery->mutable_default_config()->PackFrom(default_configuration);
+            } else {
+              const auto default_configuration =
+                  TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
+                      "code: 403");
+              discovery->mutable_default_config()->PackFrom(default_configuration);
+            }
           }
           discovery->set_apply_default_config_without_warming(apply_without_warming);
           discovery->mutable_config_source()->set_resource_api_version(
@@ -155,7 +184,7 @@ public:
   }
 
   void sendXdsResponseWithFullYaml(const std::string& name, const std::string& version,
-                       const std::string& full_yaml) {
+                                   const std::string& full_yaml) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
@@ -248,14 +277,49 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithMatcher) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("403", response->headers().getStatusValue());
   }
-  Http::TestRequestHeaderMapImpl banned_request_headers_skipped{
-      {":method", "GET"}, {":path", "/private/key"}, {"some-header", "match"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl banned_request_headers_skipped{{":method", "GET"},
+                                                                {":path", "/private/key"},
+                                                                {"some-header", "match"},
+                                                                {":scheme", "http"},
+                                                                {":authority", "host"}};
   {
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers_skipped);
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+}
+
+TEST_P(ExtensionDiscoveryIntegrationTest, BasicDefaultMatcher) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false, true, false, true);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  registerTestServerPorts({"http"});
+  sendXdsResponse("foo", "1", invalidConfig());
+  test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_fail", 1);
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+  }
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {"default-matcher-header", "match"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {

@@ -1,10 +1,10 @@
 #include "common/http/match_wrapper/config.h"
 
 #include "envoy/http/filter.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
 #include "common/matcher/matcher.h"
-#include "envoy/matcher/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,15 +20,17 @@ struct DelegatingFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamDecoderFilter(std::move(filter), match_tree_);
   }
-  void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
-                              Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree) override {
+  void
+  addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree) override {
     delegated_callbacks_.addStreamDecoderFilter(std::move(filter), std::move(match_tree));
   }
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamEncoderFilter(std::move(filter), match_tree_);
   }
-  void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
-                              Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree) override {
+  void
+  addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree) override {
     delegated_callbacks_.addStreamEncoderFilter(std::move(filter), std::move(match_tree));
   }
   void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
@@ -58,10 +60,10 @@ Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyped(
 
     auto message = factory.createEmptyConfigProto();
     proto_config.extension_config().typed_config();
-    Config::Utility::translateOpaqueConfig(proto_config.extension_config().typed_config(), ProtobufWkt::Struct(),
+    Config::Utility::translateOpaqueConfig(proto_config.extension_config().typed_config(),
+                                           ProtobufWkt::Struct(),
                                            context.messageValidationVisitor(), *message);
-    auto filter_factory =
-        factory.createFilterFactoryFromProto(*message, prefix, context);
+    auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
 
     auto match_tree =
         Matcher::MatchTreeFactory<Http::HttpMatchingData>(context.messageValidationVisitor())
