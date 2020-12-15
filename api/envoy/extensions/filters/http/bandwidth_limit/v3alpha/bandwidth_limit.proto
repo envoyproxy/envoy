@@ -19,6 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
 // [#extension: envoy.filters.http.bandwidth_limit]
 
+// [#next-free-field: 5]
 message BandwidthLimit {
   // Defines the mode for the bandwidth limit filter.
   // Values represent bitmask.
@@ -33,7 +34,7 @@ message BandwidthLimit {
     Egress = 2;
 
     // Filter enabled for both Ingress and Egress traffic.
-    IngressAndEgress = 4;
+    IngressAndEgress = 3;
   }
 
   // The human readable prefix to use when emitting stats.
@@ -55,6 +56,8 @@ message BandwidthLimit {
   //
   google.protobuf.UInt64Value limit_kbps = 3 [(validate.rules).uint64 = {gte: 1}];
 
-  // Optional fill_rate for the token buckets (per second). Defaults to 64.
+  // Optional fill_rate for the token buckets (per second). Defaults to 16.
+  // .. note::
+  //   In the current implementation, the fill_rate must be <= 32 to avoid too aggressive refills.
   google.protobuf.UInt32Value fill_rate = 4 [(validate.rules).uint32 = {gte: 1}];
 }
