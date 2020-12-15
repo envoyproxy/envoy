@@ -80,7 +80,8 @@ public:
     const CompressorStats& stats() const { return stats_; }
     const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
     uint32_t minimumLength() const { return min_content_length_; }
-    bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
+    bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers,
+                                const bool ignore_chunked = false) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
 
   protected:
@@ -122,6 +123,7 @@ public:
     bool compressionEnabled() const override { return compression_enabled_.enabled(); }
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
     bool disableOnEtagHeader() const { return disable_on_etag_header_; }
+    bool alwaysCompressContentIfExists() const { return always_compress_content_if_exists_; }
     bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
 
   private:
@@ -137,6 +139,7 @@ public:
 
     const bool disable_on_etag_header_;
     const bool remove_accept_encoding_header_;
+    const bool always_compress_content_if_exists_;
     const ResponseCompressorStats response_stats_;
   };
 

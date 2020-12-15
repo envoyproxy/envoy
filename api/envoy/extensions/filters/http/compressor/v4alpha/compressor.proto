@@ -74,6 +74,10 @@ message Compressor {
     //    To avoid interfering with other compression filters in the same chain use this option in
     //    the filter closest to the upstream.
     bool remove_accept_encoding_header = 3;
+
+    // If true, response would be compressed even if content-length/transfer-encoding header is missing,
+    // unless response has no content (e.g. HEAD, 204 etc)
+    bool always_compress_content_if_exists = 4;
   }
 
   reserved 1, 2, 3, 4, 5;

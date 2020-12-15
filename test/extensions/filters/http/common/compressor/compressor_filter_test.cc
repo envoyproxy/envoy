@@ -315,8 +315,29 @@ TEST_F(CompressorFilterTest, EmptyResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, true));
 }
 
-// No compression when request was a HEAD
-TEST_F(CompressorFilterTest, HeadRequest) {
+// HEAD request is compressed if always_compress_content_if_exists is set to false (default)
+TEST_F(CompressorFilterTest, HeadRequestCompressed) {
+  doRequestNoCompression({{":method", "HEAD"}, {"accept-encoding", "deflate, test"}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "HEAD"}, {"content-length", "256"}};
+  doResponseCompression(headers, false);
+}
+
+// No compression when request was a HEAD and always_compress_if_content_exists is set to true
+TEST_F(CompressorFilterTest, HeadRequestNoCompression) {
+  setUpFilter(R"EOF(
+  {
+    "response_direction_config": {
+      "always_compress_content_if_exists": "true",
+    },
+    "compressor_library": {
+      "name": "test",
+      "typed_config": {
+        "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+      }
+    }
+  }
+  )EOF");
+  response_stats_prefix_ = "response.";
   doRequestNoCompression({{":method", "HEAD"}, {"accept-encoding", "deflate, test"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "HEAD"}, {"content-length", "256"}};
   doResponseNoCompression(headers);
@@ -556,7 +577,10 @@ INSTANTIATE_TEST_SUITE_P(
     IsMinimumContentLengthTestSuite, IsMinimumContentLengthTest,
     testing::Values(std::make_tuple("content-length", "31", "", true),
                     std::make_tuple("content-length", "29", "", false),
-                    std::make_tuple("", "", "\"content_length\": 500,", true),
+                    std::make_tuple("transfer-encoding", "chunked", "", true),
+                    std::make_tuple("transfer-encoding", "Chunked", "", true),
+                    std::make_tuple("transfer-encoding", "chunked", "\"content_length\": 500,",
+                                    true),
                     std::make_tuple("content-length", "501", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "499", "\"content_length\": 500,", false)));
 

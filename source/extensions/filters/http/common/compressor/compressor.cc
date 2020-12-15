@@ -109,6 +109,10 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
+      always_compress_content_if_exists_(
+          proto_config.has_response_direction_config()
+              ? proto_config.response_direction_config().always_compress_content_if_exists()
+              : false),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
 
 const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
@@ -225,12 +229,15 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
   const bool isEnabledAndContentLengthBigEnough =
-      config.compressionEnabled() && config.isMinimumContentLength(headers);
+      config.compressionEnabled() &&
+      config.isMinimumContentLength(headers, config.alwaysCompressContentIfExists());
+  const bool should_try_to_compress_content =
+      config.alwaysCompressContentIfExists() ? isResponseWithContent(headers) : true;
   const bool isCompressible = isEnabledAndContentLengthBigEnough &&
                               config.isContentTypeAllowed(headers) &&
                               !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
                               !headers.getInline(response_content_encoding_handle.handle()) &&
-                              isResponseWithContent(headers);
+                              should_try_to_compress_content;
   if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
@@ -508,7 +515,7 @@ bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
 }
 
 bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
-    const Http::RequestOrResponseHeaderMap& headers) const {
+    const Http::RequestOrResponseHeaderMap& headers, const bool ignore_chunked) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length != nullptr) {
     uint64_t length;
@@ -520,8 +527,12 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     }
     return is_minimum_content_length;
   }
+  if (ignore_chunked) {
+    return true;
+  }
 
-  return true;
+  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                   Http::Headers::get().TransferEncodingValues.Chunked);
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const {
