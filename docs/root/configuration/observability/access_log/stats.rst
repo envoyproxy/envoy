@@ -1,35 +1,35 @@
 .. _config_access_log_stats:
 
-Statistics
+统计
 ==========
 
-Currently only the gRPC and file based access logs have statistics.
+目前只有基于 gRPC 和文件的访问日志有统计。
 
-gRPC access log statistics
+gRPC 访问日志统计
 --------------------------
 
-The gRPC access log has statistics rooted at *access_logs.grpc_access_log.* with the following statistics:
+gRPC访问日志的统计以 *access_logs.grpc_access_log.* 为根，统计信息如下:
 
 .. csv-table::
-   :header: Name, Type, Description
+   :header: 名字, 类型, 描述
    :widths: 1, 1, 2
 
-   logs_written, Counter, Total log entries sent to the logger which were not dropped. This does not imply the logs have been flushed to the gRPC endpoint yet.
-   logs_dropped, Counter, Total log entries dropped due to network or HTTP/2 back up.
+   logs_written, Counter, 发送到日志处理器未被丢弃的日志条目总数。这并不意味着日志已经刷新到gRPC端点。
+   logs_dropped, Counter, 由于网络或 HTTP/2 阻塞而丢弃的日志条目总数。
 
 
-File access log statistics
+File 访问日志统计
 --------------------------
 
-The file access log has statistics rooted at the *filesystem.* namespace.
+文件访问日志的统计以 *filesystem.* 为根的命名空间。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名字, 类型, 描述
   :widths: 1, 1, 2
 
-  write_buffered, Counter, Total number of times file data is moved to Envoy's internal flush buffer
-  write_completed, Counter, Total number of times a file was successfully written
-  write_failed, Counter, Total number of times an error occurred during a file write operation
-  flushed_by_timer, Counter, Total number of times internal flush buffers are written to a file due to flush timeout
-  reopen_failed, Counter, Total number of times a file was failed to be opened
-  write_total_buffered, Gauge, Current total size of internal flush buffer in bytes
+  write_buffered, Counter, 数据被移入 Envoy 内部刷新缓存区的总次数
+  write_completed, Counter, 文件写成功的总次数
+  write_failed, Counter, 文件写操作过程中出错的总次数
+  flushed_by_timer, Counter, 内部刷新缓冲区由于刷新定时器到期而写文件的总次数
+  reopen_failed, Counter, 文件打开失败的总次数
+  write_total_buffered, Gauge, 当前内部刷新缓冲区的总大小（以字节为单位）
