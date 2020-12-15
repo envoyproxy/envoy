@@ -277,18 +277,18 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
 
 IntegrationStreamDecoderPtr
 Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
-  // This a bit complex exchange below is to ensure that the upstream outbound queue is
-  // empty before forcing upstream socket to return EAGAIN. Envoy's upstream codec will send a few
-  // frames (i.e. SETTINGS and ACKs) after a new stream was established, and the test need to make
-  // sure these are flushed into the socket. To do so the test goes through the following steps:
+  // This complex exchange below is to ensure that the upstream outbound queue is empty before
+  // forcing upstream socket to return EAGAIN. Envoy's upstream codec will send a few frames (i.e.
+  // SETTINGS and ACKs) after a new stream was established, and the test needs to make sure these
+  // are flushed into the socket. To do so the test goes through the following steps:
   // 1. send request headers, do not end stream
   // 2. wait for headers to be received by the upstream and send response headers without ending
-  // stream
-  // 3. wait for client to receive response headers
-  // 4. send 1 byte of data from client
+  // the stream
+  // 3. wait for the client to receive response headers
+  // 4. send 1 byte of data from the client
   // 5. wait for 1 byte of data at the upstream. Receiving this DATA frame means that all other
-  // frames that Envoy sent before it are
-  //    also received and the Envoy's upstream outbound queue is empty.
+  // frames that Envoy sent before it were also received by the upstream and the Envoy's upstream
+  // outbound queue is empty.
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
