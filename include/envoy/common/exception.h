@@ -24,7 +24,7 @@ struct MainThread {
   bool isMainThread() { return main_thread_id_ == std::this_thread::get_id(); }
 
 private:
-  std::thread::id main_thread_id_;
+  const std::thread::id main_thread_id_;
 };
 
 
