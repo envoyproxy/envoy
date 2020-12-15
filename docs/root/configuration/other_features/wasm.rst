@@ -9,9 +9,9 @@ The following runtimes are supported by Envoy:
   :header: Name, Description
   :widths: 1, 2
 
-  envoy.wasm.runtime.v8, "`V8<https://v8.dev>`-based runtime"
-  envoy.wasm.runtime.wasmtime, "`Wasmtime<https://github.com/bytecodealliance/wasmtime>` runtime"
-  envoy.wasm.runtime.wavm, "`WAVM<https://github.com/WAVM/WAVM>` runtime"
+  envoy.wasm.runtime.v8, "`V8<https://v8.dev>`_-based runtime"
+  envoy.wasm.runtime.wasmtime, "`Wasmtime<https://github.com/bytecodealliance/wasmtime>`_ runtime"
+  envoy.wasm.runtime.wavm, "`WAVM<https://github.com/WAVM/WAVM>`_ runtime"
   envoy.wasm.runtime.null, "Compiled modules linked into Envoy"
 
 Wasm runtime emits the following statistics:
