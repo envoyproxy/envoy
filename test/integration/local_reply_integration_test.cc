@@ -162,7 +162,8 @@ mappers:
     body:
       inline_string: "customized body text"
     body_format_override:
-      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
+      text_format_source:
+        inline_string: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
   - filter:
       header_filter:
         header:
@@ -367,7 +368,8 @@ mappers:
   body:
     inline_string: "customized body text"
 body_format:
-  text_format: "%RESPONSE_CODE% - %LOCAL_REPLY_BODY%"
+  text_format_source:
+    inline_string: "%RESPONSE_CODE% - %LOCAL_REPLY_BODY%"
 )EOF";
   setLocalReplyConfig(yaml);
   initialize();
