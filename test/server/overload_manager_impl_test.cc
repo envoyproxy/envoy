@@ -483,6 +483,8 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
         timer_scale_factors:
           - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
             min_timeout: 2s
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_scale: { value: 10 }
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:

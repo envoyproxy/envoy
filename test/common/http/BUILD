@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/router:context_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -85,6 +86,7 @@ envoy_cc_fuzz_test(
     corpus = "codec_impl_corpus",
     deps = [
         ":codec_impl_fuzz_proto_cc_proto",
+        "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",

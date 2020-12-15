@@ -232,14 +232,14 @@ TEST_F(PostgresProxyDecoderTest, TwoMessagesInOneBuffer) {
 TEST_F(PostgresProxyDecoderTest, Unknown) {
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
-  EXPECT_CALL(callbacks_, incMessagesUnknown()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesUnknown());
   createPostgresMsg(data_, "=", "some not important string which will be ignored anyways");
   decoder_->onData(data_, true);
 }
 
 // Test if each frontend command calls incMessagesFrontend() method.
 TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
-  EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesFrontend());
   createPostgresMsg(data_, GetParam(), "SELECT 1;");
   decoder_->onData(data_, true);
 
@@ -262,7 +262,7 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
 
   // Now set the decoder to be in_transaction state.
   decoder_->getSession().setInTransaction(true);
-  EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(1);
+  EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "X");
   decoder_->onData(data_, true);
   ASSERT_FALSE(decoder_->getSession().inTransaction());
@@ -270,7 +270,7 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
 
 // Query message should invoke filter's callback message
 TEST_F(PostgresProxyFrontendDecoderTest, QueryMessage) {
-  EXPECT_CALL(callbacks_, processQuery).Times(1);
+  EXPECT_CALL(callbacks_, processQuery);
   createPostgresMsg(data_, "Q", "SELECT * FROM whatever;");
   decoder_->onData(data_, true);
 }
@@ -307,7 +307,7 @@ TEST_F(PostgresProxyFrontendDecoderTest, ParseMessage) {
 
 // Test if each backend command calls incMessagesBackend()) method.
 TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
-  EXPECT_CALL(callbacks_, incMessagesBackend()).Times(1);
+  EXPECT_CALL(callbacks_, incMessagesBackend());
   createPostgresMsg(data_, GetParam(), "Some not important message");
   decoder_->onData(data_, false);
 }
@@ -363,7 +363,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "COMMIT");
   decoder_->onData(data_, false);
@@ -375,7 +375,7 @@ TEST_F(PostgresProxyDecoderTest, Backend) {
   decoder_->onData(data_, false);
   data_.drain(data_.length());
 
-  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Noop));
+  EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "C", "ROLLBACK");
   decoder_->onData(data_, false);
@@ -533,6 +533,9 @@ public:
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
   MOCK_METHOD(std::string, toString, (), (const, override));
+  MOCK_METHOD(void, setWatermarks, (uint32_t), (override));
+  MOCK_METHOD(uint32_t, highWatermark, (), (const, override));
+  MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
 };
 
 // Test verifies that decoder calls Buffer::linearize method

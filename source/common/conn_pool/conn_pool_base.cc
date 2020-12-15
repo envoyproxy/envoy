@@ -15,7 +15,8 @@ ConnPoolImplBase::ConnPoolImplBase(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state)
     : state_(state), host_(host), priority_(priority), dispatcher_(dispatcher),
-      socket_options_(options), transport_socket_options_(transport_socket_options) {}
+      socket_options_(options), transport_socket_options_(transport_socket_options),
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
@@ -211,6 +212,10 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 
 bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
   return tryCreateNewConnection(global_preconnect_ratio);
+}
+
+void ConnPoolImplBase::scheduleOnUpstreamReady() {
+  upstream_ready_cb_->scheduleCallbackCurrentIteration();
 }
 
 void ConnPoolImplBase::onUpstreamReady() {

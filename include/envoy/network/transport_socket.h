@@ -65,10 +65,10 @@ public:
   virtual bool shouldDrainReadBuffer() PURE;
 
   /**
-   * Mark read buffer ready to read in the event loop. This is used when yielding following
-   * shouldDrainReadBuffer().
+   * Mark the transport socket as readable in order to force a read in a future iteration of the
+   * event loop. This is used when yielding following shouldDrainReadBuffer().
    */
-  virtual void setReadBufferReady() PURE;
+  virtual void setTransportSocketIsReadable() PURE;
 
   /**
    * Raise a connection event to the connection. This can be used by a secure socket (e.g. TLS)
@@ -146,6 +146,13 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
+
+  /**
+   * Instructs a transport socket to start using secure transport.
+   * Note: Not all transport sockets support such operation.
+   * @return boolean indicating if the transport socket was able to start secure transport.
+   */
+  virtual bool startSecureTransport() PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;

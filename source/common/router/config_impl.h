@@ -159,10 +159,12 @@ class ConfigImpl;
  */
 class VirtualHostImpl : public VirtualHost {
 public:
-  VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
-                  const ConfigImpl& global_route_config,
-                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-                  ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
+  VirtualHostImpl(
+      const envoy::config::route::v3::VirtualHost& virtual_host,
+      const ConfigImpl& global_route_config,
+      Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+      ProtobufMessage::ValidationVisitor& validator,
+      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
                                           const Http::RequestHeaderMap& headers,
@@ -456,12 +458,13 @@ public:
     if (!isDirectResponse()) {
       return false;
     }
-    return !host_redirect_.empty() || !path_redirect_.empty() || !prefix_rewrite_redirect_.empty();
+    return !host_redirect_.empty() || !path_redirect_.empty() ||
+           !prefix_rewrite_redirect_.empty() || regex_rewrite_redirect_ != nullptr;
   }
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
-  void validateClusters(Upstream::ClusterManager& cm) const;
+  void validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -551,7 +554,9 @@ protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   std::string regex_rewrite_substitution_;
+  std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
   absl::optional<ConnectConfig> connect_config_;
@@ -559,11 +564,13 @@ protected:
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
   /**
-   * returns the correct path rewrite string for this route.
+   * Returns the correct path rewrite string for this route.
+   *
+   * The provided container may be used to store memory backing the return value
+   * therefore it must outlive any use of the return value.
    */
-  const std::string& getPathRewrite() const {
-    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
-  }
+  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
+                                    absl::optional<std::string>& container) const;
 
   void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;

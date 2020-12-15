@@ -1,6 +1,7 @@
 #include "extensions/clusters/aggregate/cluster.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
@@ -20,7 +21,14 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
                                 added_via_api, factory_context.dispatcher().timeSource()),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random), tls_(tls),
-      clusters_(config.clusters().begin(), config.clusters().end()) {}
+      clusters_(config.clusters().begin(), config.clusters().end()) {
+  tls_.set([info = info(), &runtime, &random](Event::Dispatcher&) {
+    auto per_thread_load_balancer = std::make_unique<PerThreadLoadBalancer>();
+    per_thread_load_balancer->lb_ = std::make_unique<AggregateClusterLoadBalancer>(
+        info->stats(), runtime, random, info->lbConfig());
+    return per_thread_load_balancer;
+  });
+}
 
 PriorityContextPtr
 Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
@@ -38,8 +46,8 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
     if (skip_predicate(cluster)) {
       continue;
     }
-    auto tlc = cluster_manager_.get(cluster);
-    // It is possible that the cluster doesn't exist, e.g., the cluster cloud be deleted or the
+    auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
+    // It is possible that the cluster doesn't exist, e.g., the cluster could be deleted or the
     // cluster hasn't been added by xDS.
     if (tlc == nullptr) {
       continue;
@@ -67,7 +75,7 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
 
 void Cluster::startPreInit() {
   for (const auto& cluster : clusters_) {
-    auto tlc = cluster_manager_.get(cluster);
+    auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
     // It is possible when initializing the cluster, the included cluster doesn't exist. e.g., the
     // cluster could be added dynamically by xDS.
     if (tlc == nullptr) {
@@ -92,12 +100,9 @@ void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predic
   // Post the priority set to worker threads.
   // TODO(mattklein123): Remove "this" capture.
   tls_.runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()](
-                           OptRef<ThreadLocal::ThreadLocalObject>) {
+                           OptRef<PerThreadLoadBalancer> per_thread_load_balancer) {
     PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
-    Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
-    ASSERT(cluster != nullptr);
-    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer())
-        .refresh(std::move(priority_context));
+    per_thread_load_balancer->get().refresh(std::move(priority_context));
   });
 }
 

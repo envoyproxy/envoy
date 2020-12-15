@@ -343,10 +343,6 @@ envoy_cc_test(
         "http2_integration_test.h",
     ],
     shard_count = 4,
-    # TODO(envoyproxy/windows-dev): Diagnose flake, observed to fail at;
-    # IpVersions/Http2MetadataIntegrationTest.UpstreamMetadataAfterEndStream/IPv6
-    # (expected 200, received 503)
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -1220,6 +1216,30 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "starttls_integration_proto",
+    srcs = [":starttls_integration_test.proto"],
+)
+
+envoy_cc_test(
+    name = "starttls_integration_test",
+    srcs = [
+        "starttls_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":integration_lib",
+        ":starttls_integration_proto_cc_proto",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/starttls:config",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "tcp_tunneling_integration_test",
     srcs = [
@@ -1307,6 +1327,8 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
+    # TODO(envoyproxy/windows-dev): Investigate flakes in #14286.
+    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",

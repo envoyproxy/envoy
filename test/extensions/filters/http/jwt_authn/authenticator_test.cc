@@ -204,7 +204,7 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
 
 // Test multiple tokens; the one from query parameter is bad, verification should fail.
 TEST_F(AuthenticatorTest, TestMultipleJWTOneBadFromQuery) {
-  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _));
 
   // headers with multiple tokens: one good, one bad
   Http::TestRequestHeaderMapImpl headers{
@@ -217,7 +217,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTOneBadFromQuery) {
 
 // Test multiple tokens; the one from header is bad, verification should fail.
 TEST_F(AuthenticatorTest, TestMultipleJWTOneBadFromHeader) {
-  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _));
 
   // headers with multiple tokens: one good, one bad
   Http::TestRequestHeaderMapImpl headers{
@@ -230,7 +230,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTOneBadFromHeader) {
 
 // Test multiple tokens; all are good, verification is ok.
 TEST_F(AuthenticatorTest, TestMultipleJWTAllGood) {
-  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _));
 
   // headers with multiple tokens: all are good
   Http::TestRequestHeaderMapImpl headers{
@@ -245,7 +245,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTAllGood) {
 TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
   createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*all_missing=*/false);
-  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _));
 
   // headers with multiple tokens: one good, one bad
   Http::TestRequestHeaderMapImpl headers{
@@ -288,7 +288,7 @@ TEST_F(AuthenticatorTest, TestInvalidPrefix) {
 // This test verifies when a JWT is non-expiring without audience specified, JwtAudienceNotAllowed
 // is returned.
 TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_, httpAsyncClient()).Times(0);
 
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(NonExpiringToken)}};
@@ -382,10 +382,10 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
 // onComplete() callback should not be called, but internal request->cancel() should be called.
 // Most importantly, no crash.
 TEST_F(AuthenticatorTest, TestOnDestroy) {
-  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _));
 
   // Cancel is called once.
-  EXPECT_CALL(*raw_fetcher_, cancel()).Times(1);
+  EXPECT_CALL(*raw_fetcher_, cancel());
 
   Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
   initTokenExtractor();

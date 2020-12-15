@@ -41,6 +41,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
@@ -75,13 +76,27 @@ getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
   return nullptr;
 }
 
-uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config) {
+// TODO(alyssawilk) move this to the new config library in a follow-up.
+uint64_t
+parseFeatures(const envoy::config::cluster::v3::Cluster& config,
+              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
   uint64_t features = 0;
-  if (config.has_http2_protocol_options()) {
-    features |= ClusterInfoImpl::Features::HTTP2;
-  }
-  if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
-    features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
+
+  if (options) {
+    if (options->use_http2_) {
+      features |= ClusterInfoImpl::Features::HTTP2;
+    }
+    if (options->use_downstream_protocol_) {
+      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
+    }
+  } else {
+    if (config.has_http2_protocol_options()) {
+      features |= ClusterInfoImpl::Features::HTTP2;
+    }
+    if (config.protocol_selection() ==
+        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
+      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
+    }
   }
   if (config.close_connections_on_host_health_failure()) {
     features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
@@ -148,10 +163,15 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
             name);
   }
+  if (factory == nullptr) {
+    factory =
+        Registry::FactoryRegistry<Server::Configuration::ProtocolOptionsFactory>::getFactory(name);
+  }
 
   if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
-        "Didn't find a registered network or http filter implementation for name: '{}'", name));
+    throw EnvoyException(fmt::format("Didn't find a registered network or http filter or protocol "
+                                     "options implementation for name: '{}'",
+                                     name));
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
@@ -162,11 +182,10 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
 
   Envoy::Config::Utility::translateOpaqueConfig(
       typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
-
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
-std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
+absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   if (!config.typed_extension_protocol_options().empty() &&
@@ -175,7 +194,7 @@ std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtoco
                          "extension_protocol_options can be specified");
   }
 
-  std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
+  absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
@@ -617,21 +636,26 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
                       hosts_removed, overprovisioning_factor);
 }
 
-ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
+ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
+                                            const ClusterStatNames& stat_names) {
+  return ClusterStats(stat_names, scope);
 }
 
-ClusterRequestResponseSizeStats
-ClusterInfoImpl::generateRequestResponseSizeStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(POOL_HISTOGRAM(scope))};
+ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
+    Stats::Scope& scope, const ClusterRequestResponseSizeStatNames& stat_names) {
+  return ClusterRequestResponseSizeStats(stat_names, scope);
 }
 
-ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
+ClusterLoadReportStats
+ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope,
+                                         const ClusterLoadReportStatNames& stat_names) {
+  return ClusterLoadReportStats(stat_names, scope);
 }
 
-ClusterTimeoutBudgetStats ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_TIMEOUT_BUDGET_STATS(POOL_HISTOGRAM(scope))};
+ClusterTimeoutBudgetStats
+ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
+                                            const ClusterTimeoutBudgetStatNames& stat_names) {
+  return ClusterTimeoutBudgetStats(stat_names, scope);
 }
 
 // Implements the FactoryContext interface required by network filters.
@@ -672,16 +696,46 @@ private:
   Api::Api& api_;
 };
 
+std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>
+createOptions(const envoy::config::cluster::v3::Cluster& config,
+              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options) {
+  if (options) {
+    return std::move(options);
+  }
+
+  if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_CONFIGURED_PROTOCOL) {
+    // Make sure multiple protocol configurations are not present
+    if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
+      throw EnvoyException(fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
+                                       "configured with non-default 'protocol_selection' values"));
+    }
+  }
+
+  return std::make_shared<ClusterInfoImpl::HttpProtocolOptionsConfigImpl>(
+      config.http_protocol_options(), config.http2_protocol_options(),
+      config.common_http_protocol_options(),
+      (config.has_upstream_http_protocol_options()
+           ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
+                 config.upstream_http_protocol_options())
+           : absl::nullopt),
+      config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
+      config.has_http2_protocol_options());
+}
+
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
+      extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
+      http_protocol_options_(
+          createOptions(config, extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
+                                    "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"))),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.common_http_protocol_options(), max_headers_count,
+          http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
@@ -693,17 +747,17 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
-      load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
+      stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
+      load_report_stats_store_(stats_scope_->symbolTable()),
+      load_report_stats_(generateLoadReportStats(
+          load_report_stats_store_, factory_context.clusterManager().clusterLoadReportStatNames())),
       optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
-                                  ? std::make_unique<OptionalClusterStats>(config, *stats_scope_)
+                                  ? std::make_unique<OptionalClusterStats>(
+                                        config, *stats_scope_, factory_context.clusterManager())
                                   : nullptr),
-      features_(parseFeatures(config)),
-      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
-      http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
-      common_http_protocol_options_(config.common_http_protocol_options()),
-      extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
-      resource_managers_(config, runtime, name_, *stats_scope_),
+      features_(parseFeatures(config, http_protocol_options_)),
+      resource_managers_(config, runtime, name_, *stats_scope_,
+                         factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
@@ -724,11 +778,6 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.connection_pool_per_downstream_connection()),
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
-      upstream_http_protocol_options_(
-          config.has_upstream_http_protocol_options()
-              ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
-                    config.upstream_http_protocol_options())
-              : absl::nullopt),
       cluster_type_(
           config.has_cluster_type()
               ? absl::make_optional<envoy::config::cluster::v3::Cluster::CustomClusterType>(
@@ -788,17 +837,9 @@ ClusterInfoImpl::ClusterInfoImpl(
         name_));
   }
 
-  if (config.protocol_selection() == envoy::config::cluster::v3::Cluster::USE_CONFIGURED_PROTOCOL) {
-    // Make sure multiple protocol configurations are not present
-    if (config.has_http_protocol_options() && config.has_http2_protocol_options()) {
-      throw EnvoyException(fmt::format("cluster: Both HTTP1 and HTTP2 options may only be "
-                                       "configured with non-default 'protocol_selection' values"));
-    }
-  }
-
-  if (config.common_http_protocol_options().has_idle_timeout()) {
-    idle_timeout_ = std::chrono::milliseconds(
-        DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
+  if (http_protocol_options_->common_http_protocol_options_.has_idle_timeout()) {
+    idle_timeout_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        http_protocol_options_->common_http_protocol_options_.idle_timeout()));
     if (idle_timeout_.value().count() == 0) {
       idle_timeout_ = absl::nullopt;
     }
@@ -841,7 +882,6 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   if (i != extension_protocol_options_.end()) {
     return i->second;
   }
-
   return nullptr;
 }
 
@@ -1106,19 +1146,24 @@ void ClusterImplBase::validateEndpointsForZoneAwareRouting(
 }
 
 ClusterInfoImpl::OptionalClusterStats::OptionalClusterStats(
-    const envoy::config::cluster::v3::Cluster& config, Stats::Scope& stats_scope)
+    const envoy::config::cluster::v3::Cluster& config, Stats::Scope& stats_scope,
+    const ClusterManager& manager)
     : timeout_budget_stats_(
           (config.track_cluster_stats().timeout_budgets() || config.track_timeout_budgets())
-              ? std::make_unique<ClusterTimeoutBudgetStats>(generateTimeoutBudgetStats(stats_scope))
+              ? std::make_unique<ClusterTimeoutBudgetStats>(generateTimeoutBudgetStats(
+                    stats_scope, manager.clusterTimeoutBudgetStatNames()))
               : nullptr),
-      request_response_size_stats_(config.track_cluster_stats().request_response_sizes()
-                                       ? std::make_unique<ClusterRequestResponseSizeStats>(
-                                             generateRequestResponseSizeStats(stats_scope))
-                                       : nullptr) {}
+      request_response_size_stats_(
+          (config.track_cluster_stats().request_response_sizes()
+               ? std::make_unique<ClusterRequestResponseSizeStats>(generateRequestResponseSizeStats(
+                     stats_scope, manager.clusterRequestResponseSizeStatNames()))
+               : nullptr)) {}
 
 ClusterInfoImpl::ResourceManagers::ResourceManagers(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-    const std::string& cluster_name, Stats::Scope& stats_scope) {
+    const std::string& cluster_name, Stats::Scope& stats_scope,
+    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names)
+    : circuit_breakers_stat_names_(circuit_breakers_stat_names) {
   managers_[enumToInt(ResourcePriority::Default)] =
       load(config, runtime, cluster_name, stats_scope, envoy::config::core::v3::DEFAULT);
   managers_[enumToInt(ResourcePriority::High)] =
@@ -1126,16 +1171,31 @@ ClusterInfoImpl::ResourceManagers::ResourceManagers(
 }
 
 ClusterCircuitBreakersStats
-ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix,
-                                              bool track_remaining) {
-  std::string prefix(fmt::format("circuit_breakers.{}.", stat_prefix));
-  if (track_remaining) {
-    return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
-                                               POOL_GAUGE_PREFIX(scope, prefix))};
-  } else {
-    return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
-                                               NULL_POOL_GAUGE(scope))};
-  }
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatName prefix,
+                                              bool track_remaining,
+                                              const ClusterCircuitBreakersStatNames& stat_names) {
+  auto make_gauge = [&stat_names, &scope, prefix](Stats::StatName stat_name) -> Stats::Gauge& {
+    return Stats::Utility::gaugeFromElements(scope,
+                                             {stat_names.circuit_breakers_, prefix, stat_name},
+                                             Stats::Gauge::ImportMode::Accumulate);
+  };
+
+#define REMAINING_GAUGE(stat_name) track_remaining ? make_gauge(stat_name) : scope.nullGauge("")
+
+  return {
+      make_gauge(stat_names.cx_open_),
+      make_gauge(stat_names.cx_pool_open_),
+      make_gauge(stat_names.rq_open_),
+      make_gauge(stat_names.rq_pending_open_),
+      make_gauge(stat_names.rq_retry_open_),
+      REMAINING_GAUGE(stat_names.remaining_cx_),
+      REMAINING_GAUGE(stat_names.remaining_cx_pools_),
+      REMAINING_GAUGE(stat_names.remaining_pending_),
+      REMAINING_GAUGE(stat_names.remaining_retries_),
+      REMAINING_GAUGE(stat_names.remaining_rq_),
+  };
+
+#undef REMAINING_GAUGE
 }
 
 Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
@@ -1159,12 +1219,15 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
 
   bool track_remaining = false;
 
+  Stats::StatName priority_stat_name;
   std::string priority_name;
   switch (priority) {
   case envoy::config::core::v3::DEFAULT:
+    priority_stat_name = circuit_breakers_stat_names_.default_;
     priority_name = "default";
     break;
   case envoy::config::core::v3::HIGH:
+    priority_stat_name = circuit_breakers_stat_names_.high_;
     priority_name = "high";
     break;
   default:
@@ -1209,7 +1272,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
       max_connection_pools,
-      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining),
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_stat_name,
+                                                    track_remaining, circuit_breakers_stat_names_),
       budget_percent, min_retry_concurrency);
 }
 

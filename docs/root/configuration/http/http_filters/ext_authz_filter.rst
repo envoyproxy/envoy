@@ -45,7 +45,11 @@ A sample filter configuration for a gRPC authorization server:
   clusters:
     - name: ext-authz
       type: static
-      http2_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
       load_assignment:
         cluster_name: ext-authz
         endpoints:

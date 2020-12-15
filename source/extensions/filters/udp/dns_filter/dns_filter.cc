@@ -383,7 +383,6 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
   // Get the service_list config for the domain
   const auto* service_config = getServiceConfigForDomain(query.name_);
   if (service_config != nullptr) {
-
     // We can redirect to more than one cluster, but only one is supported
     const auto& cluster_target = service_config->targets_.begin();
     const auto& target_name = cluster_target->first;
@@ -395,7 +394,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
     }
 
     // Determine if there is a cluster
-    Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(target_name);
+    Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(target_name);
     if (cluster == nullptr) {
       ENVOY_LOG(trace, "No cluster found for service target: {}", target_name);
       return false;
@@ -453,7 +452,7 @@ bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRe
   // Return an address for all discovered endpoints. The address and query type must match
   // for the host to be included in the response
   size_t cluster_endpoints = 0;
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(lookup_name);
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(lookup_name);
   if (cluster != nullptr) {
     // TODO(abaptiste): consider using host weights when returning answer addresses
     const std::chrono::seconds ttl = getDomainTTL(lookup_name);

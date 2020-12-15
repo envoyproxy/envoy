@@ -59,6 +59,7 @@ public:
   absl::string_view failureReason() const override;
   bool canFlushClose() override { return handshake_complete_; }
   Envoy::Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override { return false; }
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
