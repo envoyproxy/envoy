@@ -80,6 +80,7 @@
 - validate：验证
 - workload：工作负载
 - removed：移除
+- sandbox：沙盒
 
 ## 术语
 
@@ -88,8 +89,8 @@
 - Envoy
 - gRPC
 - Thrift
-- secrets
-- configmaps
+- secret
+- configmap
 - sidecar
 - TLS / mTLS
 - Virtual service
