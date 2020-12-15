@@ -479,20 +479,20 @@ public:
   virtual void setRequestTrailers(RequestTrailerMapPtr&& request_trailers) PURE;
 
   /**
-   * Passes ownership of received continue headers to the parent. This may be called multiple
-   * times in the case of multiple upstream calls.
+   * Passes ownership of received continue headers to the parent. This may be called multiple times
+   * in the case of multiple upstream calls.
    */
   virtual void setContinueHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
-   * Passes ownership of received response headers to the parent. This may be called multiple
-   * times in the case of multiple upstream calls.
+   * Passes ownership of received response headers to the parent. This may be called multiple times
+   * in the case of multiple upstream calls.
    */
   virtual void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
-   * Passes ownership of received response trailers to the parent. This may be called multiple
-   * times in the case of multiple upstream calls.
+   * Passes ownership of received response trailers to the parent. This may be called multiple times
+   * in the case of multiple upstream calls.
    */
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
@@ -522,15 +522,15 @@ public:
   /**
    * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.
    * Note that response headers might be set multiple times (e.g. if a local reply is issued after
-   * headers have been received but before headers have been encoded), so it is not safe in
-   * general to assume that any set of headers will be valid for the duration of a stream.
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of a stream.
    */
   virtual ResponseHeaderMapOptRef responseHeaders() PURE;
 
   /**
    * Retrieves a pointer to the last response trailers set via setResponseTrailers.
-   * Note that response trailers might be set multiple times, so it is not safe in general to
-   * assume that any set of trailers will be valid for the duration of the stream.
+   * Note that response trailers might be set multiple times, so it is not safe in general to assume
+   * that any set of trailers will be valid for the duration of the stream.
    */
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 
