@@ -47,6 +47,7 @@ envoy_cc_test_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/http/http2:codec_lib",
+        "//test/mocks:common_lib",
     ],
 )
 
