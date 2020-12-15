@@ -79,6 +79,9 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/... 
 echo "running flaky test reporting script"
 "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
 
+echo "verifying flaky test with more datapoints"
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //test/integration:eds_integration_test --cache_test_results=no --runs_per_test=1000
+
 # Build tests that are known-flaky or known-failing to ensure no compilation regressions
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
 
