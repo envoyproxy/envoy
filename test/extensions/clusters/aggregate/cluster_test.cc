@@ -112,7 +112,6 @@ public:
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
-    ON_CALL(aggregate_cluster_, loadBalancer()).WillByDefault(ReturnRef(*lb_));
 
     setupPrioritySet();
 
@@ -146,7 +145,7 @@ public:
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Upstream::MockThreadLocalCluster> aggregate_cluster_, primary_, secondary_;
+  NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
 
