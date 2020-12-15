@@ -221,7 +221,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   };
 
   // explicitly tell the validator to fail the validation
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -510,8 +510,8 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
-        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-            "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+       "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
 
       {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
