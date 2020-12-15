@@ -462,7 +462,8 @@ private:
                                          Event::Dispatcher& dispatcher, TimeSource& time_source,
                                          Upstream::ResourcePriority priority) PURE;
 
-  std::unique_ptr<GenericConnPool> createConnPool();
+  std::unique_ptr<GenericConnPool>
+  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
   UpstreamRequestPtr createUpstreamRequest();
 
   void maybeDoShadowing();

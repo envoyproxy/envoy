@@ -20,18 +20,13 @@ namespace Http {
 class HttpConnPool : public Router::GenericConnPool, public Envoy::Http::ConnectionPool::Callbacks {
 public:
   // GenericConnPool
-  HttpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
+  HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
+               const Router::RouteEntry& route_entry,
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
     ASSERT(!is_connect);
-    // TODO(mattklein123): Pass thread local cluster into this function, removing an additional
-    // map lookup and moving the error handling closer to the source (where it is likely already
-    // done).
-    const auto thread_local_cluster = cm.getThreadLocalCluster(route_entry.clusterName());
-    if (thread_local_cluster != nullptr) {
-      conn_pool_ =
-          thread_local_cluster->httpConnPool(route_entry.priority(), downstream_protocol, ctx);
-    }
+    conn_pool_ =
+        thread_local_cluster.httpConnPool(route_entry.priority(), downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
     ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
