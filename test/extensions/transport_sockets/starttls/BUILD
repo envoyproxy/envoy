@@ -40,6 +40,8 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.transport_sockets.starttls",
+    # TODO(envoyproxy/windows-dev): Investigate timeout
+    tags = ["flaky_on_windows"],
     deps = [
         ":starttls_integration_proto_cc_proto",
         "//source/extensions/filters/network/tcp_proxy:config",
