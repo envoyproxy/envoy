@@ -821,7 +821,8 @@ TEST(ConfigTest, AccessLogConfig) {
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
-    file_access_log.mutable_log_format()->set_text_format("the format specifier");
+    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "the format specifier");
     log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
@@ -878,7 +879,8 @@ public:
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
-    file_access_log.mutable_log_format()->set_text_format(access_log_format);
+    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        access_log_format);
     access_log->mutable_typed_config()->PackFrom(file_access_log);
     return config;
   }

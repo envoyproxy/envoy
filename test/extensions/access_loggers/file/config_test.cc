@@ -152,7 +152,8 @@ TEST_F(FileAccessLogTest, LogFormatText) {
       R"(
   path: "/foo"
   log_format:
-    text_format: "plain_text - %REQ(:path)% - %RESPONSE_CODE%"
+    text_format_source:
+      inline_string: "plain_text - %REQ(:path)% - %RESPONSE_CODE%"
 )",
       "plain_text - /bar/foo - 200", false);
 }

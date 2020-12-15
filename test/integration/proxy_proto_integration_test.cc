@@ -250,7 +250,7 @@ TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
     access_log->set_name("accesslog");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
-    access_log_config.mutable_log_format()->set_text_format(
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "remote=%DOWNSTREAM_REMOTE_ADDRESS% local=%DOWNSTREAM_LOCAL_ADDRESS%");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     config_blob->PackFrom(tcp_proxy_config);

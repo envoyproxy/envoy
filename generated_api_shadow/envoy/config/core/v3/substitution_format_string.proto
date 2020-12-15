@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
@@ -16,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
+// [#next-free-field: 6]
 message SubstitutionFormatString {
   oneof format {
     option (validate.required) = true;
@@ -36,7 +39,8 @@ message SubstitutionFormatString {
     //
     //   upstream connect error:503:path=/foo
     //
-    string text_format = 1 [(validate.rules).string = {min_len: 1}];
+    // Deprecated in favor of :ref:`text_format_source <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format_source>`. To migrate text format strings, use the :ref:`inline_string <envoy_v3_api_field_config.core.v3.DataSource.inline_string>` field.
+    string text_format = 1 [deprecated = true];
 
     // Specify a format with command operators to form a JSON string.
     // Its details is described in :ref:`format dictionary<config_access_log_format_dictionaries>`.
@@ -61,6 +65,25 @@ message SubstitutionFormatString {
     //  }
     //
     google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
+
+    // Specify a format with command operators to form a text string.
+    // Its details is described in :ref:`format string<config_access_log_format_strings>`.
+    //
+    // For example, setting ``text_format`` like below,
+    //
+    // .. validated-code-block:: yaml
+    //   :type-name: envoy.config.core.v3.SubstitutionFormatString
+    //
+    //   text_format_source:
+    //     inline_string: "%LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=%REQ(:path)%\n"
+    //
+    // generates plain text similar to:
+    //
+    // .. code-block:: text
+    //
+    //   upstream connect error:503:path=/foo
+    //
+    DataSource text_format_source = 5;
   }
 
   // If set to true, when command operators are evaluated to null,
