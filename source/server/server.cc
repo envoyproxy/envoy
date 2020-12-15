@@ -86,7 +86,8 @@ InstanceImpl::InstanceImpl(
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      router_context_(store.symbolTable()), process_context_(std::move(process_context)), server_contexts_(*this) {
+      router_context_(store.symbolTable()), process_context_(std::move(process_context)),
+      server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -808,7 +809,6 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  // ASSERT(std::this_thread::get_id() == main_thread_id_);
   ASSERT(MainThreadSingleton::get().isMainThread());
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {

@@ -27,13 +27,4 @@ private:
   const std::thread::id main_thread_id_;
 };
 
-
-
-/*
-bool isMainThread() {
-  static std::thread::id main_thread_id = std::this_thread::get_id();
-  return main_thread_id == std::this_thread::get_id();
-}
-*/
-
 } // namespace Envoy
