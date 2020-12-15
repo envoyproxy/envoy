@@ -4306,7 +4306,7 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
 
   // A subsequent call to get a connection will consume one of the preconnected
   // connections, leaving two in queue, and kick off 2 more. This time we won't
-  // do the full 3 as the number of outstanding preconnectes is limited by the
+  // do the full 3 as the number of outstanding preconnects is limited by the
   // number of healthy hosts.
   http_preconnect = 0;
   cluster_manager_->getThreadLocalCluster("cluster_1")

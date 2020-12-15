@@ -1523,7 +1523,7 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessWithPreconnect) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.00));
 
-  // First request preconnectes an additional connection.
+  // First request preconnects an additional connection.
   expectClientsCreate(1);
   ActiveTestRequest r1(*this, 0, false);
 
