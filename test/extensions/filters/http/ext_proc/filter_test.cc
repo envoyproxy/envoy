@@ -57,7 +57,7 @@ protected:
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &HttpFilterTest::doSend));
     EXPECT_CALL(*stream, close()).WillRepeatedly(Invoke(this, &HttpFilterTest::doSendClose));
-    return std::move(stream);
+    return stream;
   }
 
   void doSend(ProcessingRequest&& request, bool end_stream) {

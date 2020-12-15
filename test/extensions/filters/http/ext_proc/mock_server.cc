@@ -5,11 +5,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-MockClient::MockClient() {}
-MockClient::~MockClient() {}
+MockClient::MockClient() = default;
+MockClient::~MockClient() = default;
 
-MockStream::MockStream() {}
-MockStream::~MockStream() {}
+MockStream::MockStream() = default;
+MockStream::~MockStream() = default;
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters
