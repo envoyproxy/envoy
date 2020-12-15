@@ -8,6 +8,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
@@ -81,7 +82,7 @@ public:
   std::string getBaggage(absl::string_view) override;
 
   // TODO: This method is unimplemented for Zipkin.
-  std::string getTraceId() const override { return std::string(); };
+  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
   /**
    * @return a reference to the Zipkin::Span object.

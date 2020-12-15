@@ -7,6 +7,7 @@
 #include "envoy/common/time.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/common/random_generator.h"
 #include "common/protobuf/utility.h"
@@ -154,10 +155,10 @@ public:
 
   // X-Ray doesn't support baggage, so noop these OpenTracing functions.
   void setBaggage(absl::string_view, absl::string_view) override {}
-  std::string getBaggage(absl::string_view) override { return std::string(); }
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
 
   // TODO: This method is unimplemented for X-Ray.
-  std::string getTraceId() const override { return std::string(); };
+  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
   /**
    * Creates a child span.

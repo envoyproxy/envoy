@@ -224,7 +224,7 @@ TEST_F(OpenTracingDriverTest, GetTraceId) {
   first_span->finishSpan();
 
   // This method is unimplemented and a noop.
-  ASSERT_EQ(first_span->getTraceId(), "");
+  ASSERT_EQ(first_span->getTraceIdAsHex(), "");
 }
 
 } // namespace

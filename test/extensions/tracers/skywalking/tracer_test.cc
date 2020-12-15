@@ -98,7 +98,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
 
   // This method is unimplemented and a noop.
-  ASSERT_EQ(span->getTraceId(), "");
+  ASSERT_EQ(span->getTraceIdAsHex(), "");
 
   // Test whether the basic functions of Span are normal.
 

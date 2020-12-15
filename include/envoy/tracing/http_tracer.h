@@ -177,11 +177,11 @@ public:
 
   /**
    * Retrieve the trace ID associated with this span.
-   * The trace id may be created for this span, propagated by parent spans, or
+   * The trace id may be generated for this span, propagated by parent spans, or
    * not created yet.
-   * @return trace ID
+   * @return trace ID as a hex string
    */
-  virtual std::string getTraceId() const PURE;
+  virtual std::string getTraceIdAsHex() const PURE;
 };
 
 /**

@@ -729,7 +729,7 @@ TEST_F(LightStepDriverTest, GetTraceId) {
                                              start_time_, {Tracing::Reason::Sampling, true});
 
   // This method is unimplemented and a noop.
-  ASSERT_EQ(span->getTraceId(), "");
+  ASSERT_EQ(span->getTraceIdAsHex(), "");
 }
 
 } // namespace
