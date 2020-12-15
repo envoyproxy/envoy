@@ -34,6 +34,7 @@
 #include "test/mocks/upstream/retry_priority.h"
 #include "test/mocks/upstream/retry_priority_factory.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
@@ -303,8 +304,9 @@ TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
   // Send a headers only request.
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   EXPECT_LOG_CONTAINS(
-      "trace",
-      "Filters should not return FilterHeadersStatus::Continue after sending a local reply.",
+      "error",
+      "envoy bug failure: !(*entry)->complete() || status == FilterHeadersStatus::StopIteration. "
+      "Details: Filters should not FilterHeadersStatus::StopIteration after sending a local reply.",
       response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
