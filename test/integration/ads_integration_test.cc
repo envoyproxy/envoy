@@ -1403,20 +1403,6 @@ TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(BasicClusterInitialWarming)) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
-// If we attempt to use v2 APIs by default, the configuration should be rejected.
-TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(RejectV2ConfigByDefault)) {
-  fatal_by_default_v2_override_ = true;
-  initialize();
-  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-      envoy::config::core::v3::ApiVersion::V2);
-
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", true);
-  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
-  EXPECT_EQ(1, test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value());
-}
-
 // Verify CDS is paused during cluster warming.
 TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(CdsPausedDuringWarming)) {
   initialize();
@@ -1565,6 +1551,32 @@ TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(TypeUrlAnnotationRegression)) {
                                                              "1", true);
 
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
+// Validate v2 resource are rejected by default.
+class AdsV2ResourceRejectTest : public AdsIntegrationTest {
+public:
+  // We need to use a v3 transport as we're not going to set the v2 allow overrides.
+  AdsV2ResourceRejectTest()
+      : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V2,
+                           envoy::config::core::v3::ApiVersion::V3) {}
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsV2ResourceRejectTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// If we attempt to use v2 APIs by default, the configuration should be rejected.
+TEST_P(AdsV2ResourceRejectTest, DEPRECATED_FEATURE_TEST(RejectV2ConfigByDefault)) {
+  fatal_by_default_v2_override_ = true;
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+      envoy::config::core::v3::ApiVersion::V2);
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1", true);
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  EXPECT_EQ(1, test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value());
 }
 
 } // namespace Envoy

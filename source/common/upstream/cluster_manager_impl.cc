@@ -265,7 +265,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
-                            validation_context.dynamicValidationVisitor(), api, runtime_) {
+                            validation_context.dynamicValidationVisitor(), api) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -325,14 +325,14 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              dyn_resources.ads_config().transport_api_version() ==
+              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
                       envoy::config::core::v3::ApiVersion::V3
                   // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
                   // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "DeltaAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, stats_,
+          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
@@ -342,7 +342,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              dyn_resources.ads_config().transport_api_version() ==
+              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
                       envoy::config::core::v3::ApiVersion::V3
                   // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
                   // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
@@ -350,7 +350,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "StreamAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, stats_,
+          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
@@ -425,7 +425,7 @@ void ClusterManagerImpl::initializeSecondaryClusters(
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), dispatcher_);
+        Config::Utility::getAndCheckTransportVersion(load_stats_config), dispatcher_);
   }
 }
 

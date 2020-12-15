@@ -6,6 +6,7 @@
 #include "extensions/filters/network/ext_authz/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -21,8 +22,11 @@ namespace ExtAuthz {
 
 namespace {
 void expectCorrectProto(envoy::config::core::v3::ApiVersion api_version) {
+  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
+  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
+    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
+  }
   std::string yaml = R"EOF(
-  transport_api_version: V3
   grpc_service:
     google_grpc:
       target_uri: ext_authz_server

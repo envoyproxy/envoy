@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
@@ -35,7 +36,8 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     callbacks.addDecoderFilter(std::make_shared<Filter>(
         config, Filters::Common::RateLimit::rateLimitClient(
                     context, proto_config.rate_limit_service().grpc_service(), timeout,
-                    proto_config.rate_limit_service().transport_api_version())));
+                    Envoy::Config::Utility::getAndCheckTransportVersion(
+                        proto_config.rate_limit_service()))));
   };
 }
 
