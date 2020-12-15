@@ -46,6 +46,9 @@ bool anyFilterChain(
 }
 
 bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disable_tls_inspector_injection")) {
+    return false;
+  }
   return anyFilterChain(config,
                         [](const auto& filter_chain) {
                           const auto& matcher = filter_chain.filter_chain_match();
