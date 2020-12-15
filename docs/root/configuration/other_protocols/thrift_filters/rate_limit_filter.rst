@@ -1,41 +1,33 @@
 .. _config_thrift_filters_rate_limit:
 
-Rate limit
-==========
+限流
+=====
 
-* Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
+* 全局限流 :ref:`架构概览 <arch_overview_global_rate_limit>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit>`
-* This filter should be configured with the name *envoy.filters.thrift.rate_limit*.
+* 此过滤器的名称应该被配置为 *envoy.filters.thrift.rate_limit* 。
 
-The Thrift rate limit filter will call the rate limit service when the request's route has one or
-more :ref:`rate limit configurations
-<envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.rate_limits>` that
-match the filter's stage setting. More than one configuration can apply to a request. Each
-configuration results in a descriptor being sent to the rate limit service.
+当请求的路由有一个或者多个与过滤器状态配置相匹配的 :ref:`限流配置 
+<envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.rate_limits>` 时，Thrift 限流过滤器将会调用限流服务。一个请求可以应用于多个配置。每一个配置都会向限流服务发送一个描述符。
 
-If the rate limit service is called, and the response for any of the descriptors is over limit, an
-application exception indicating an internal error is returned.
+如果限流服务被调用，并且任何描述符的响应都会超过限制，就会返回一个显示内部错误的应用程序异常。
 
-If there is an error in calling the rate limit service or it returns an error and
-:ref:`failure_mode_deny
-<envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit.failure_mode_deny>` is set to
-true, an application exception indicating an internal error is returned.
+如果在调用限流服务时发生了错误，或者有错误返回，且 :ref:`failure_mode_deny
+<envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit.failure_mode_deny>` 被设置为 true，则返回一个显示内部错误的应用程序异常。
 
 .. _config_thrift_filters_rate_limit_stats:
 
-Statistics
-----------
+统计
+-----
 
-The filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
+过滤器的输出统计在 *cluster.<route target cluster>.ratelimit.* 命名空间中。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  ok, Counter, Total under limit responses from the rate limit service.
-  error, Counter, Total errors contacting the rate limit service.
-  over_limit, Counter, Total over limit responses from the rate limit service.
-  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of :ref:`failure_mode_deny
-  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit.failure_mode_deny>` set to
-  false."
+  ok, Counter, 来自限流服务的低于限制的响应总数。
+  error, Counter, 访问限流服务的错误总数。
+  over_limit, Counter, 来自限流服务的超限响应的总数。
+  failure_mode_allowed, Counter, "由于 :ref:`failure_mode_deny
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.ratelimit.v3.RateLimit.failure_mode_deny>` 被设置为 false，导致的被允许通过的错误请求总数。"
