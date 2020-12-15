@@ -62,6 +62,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
 TEST(HttpJwtAuthnFilterFactoryTest, ProviderWithoutIssuer) {
   JwtAuthentication proto_config;
   auto& provider = (*proto_config.mutable_providers())["provider"];
+  // This provider did not specify "issuer".
   provider.mutable_local_jwks()->set_inline_string(PublicKey);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;

@@ -334,6 +334,7 @@ providers:
   EXPECT_EQ(tokens[1]->token(), "token2");
 
   // Token1 allows any issuers since its provider did not specify "issuer"
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer2"));
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("abc"));
 
   // Token2 only allows "issuer2"

@@ -160,8 +160,8 @@ void AuthenticatorImpl::startVerify() {
   jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
                          : jwks_cache_.findByIssuer(jwt_->iss_);
   // When `provider` is valid, findByProvider should never return nullptr.
-  // Only when `allow_missing` or `allow_missing_or_fail` is used, `provider` may be invalid.
-  // In this case, `iss` from the Jwt token is used to find the first provider with the issuer.
+  // Only when `allow_missing` or `allow_failed` is used, `provider` is invalid,
+  // Jwt `iss` field is used to find the first provider with the issuer.
   // If not found, use the first provider without issuer specified.
   // If still no found, fail the request with UnknownIssuer error.
   if (!jwks_data_) {

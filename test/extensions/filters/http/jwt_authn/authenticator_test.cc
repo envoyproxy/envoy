@@ -244,6 +244,7 @@ TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProvider) {
 
 // Not "iss" in Jwt, "issuer" in JwtProvider is specified,
 // authenticator doesn't have a valid provider.
+// It needs to find the first JwtProvider without "issuer" specified.
 // The verification fails with JwtUnknownIssuer.
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithoutValidProvider) {
   createAuthenticator(nullptr, absl::nullopt);

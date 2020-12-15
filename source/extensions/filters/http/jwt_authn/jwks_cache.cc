@@ -121,7 +121,7 @@ public:
     if (it != jwks_data_map_.end()) {
       return &it->second;
     }
-    // Verififer::innerCreate() makes sure that all provider names are defined.
+    // Verifier::innerCreate function makes sure that all provider names are defined.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
