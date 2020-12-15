@@ -20,24 +20,25 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
   void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamDecoderFilter(std::move(filter), match_tree_);
   }
-  void
-  addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter,
-                         Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) override {
+  void addStreamDecoderFilter(
+      Envoy::Http::StreamDecoderFilterSharedPtr filter,
+      Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) override {
     delegated_callbacks_.addStreamDecoderFilter(std::move(filter), std::move(match_tree));
   }
   void addStreamEncoderFilter(Envoy::Http::StreamEncoderFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamEncoderFilter(std::move(filter), match_tree_);
   }
-  void
-  addStreamEncoderFilter(Envoy::Http::StreamEncoderFilterSharedPtr filter,
-                         Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) override {
+  void addStreamEncoderFilter(
+      Envoy::Http::StreamEncoderFilterSharedPtr filter,
+      Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) override {
     delegated_callbacks_.addStreamEncoderFilter(std::move(filter), std::move(match_tree));
   }
   void addStreamFilter(Envoy::Http::StreamFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamFilter(std::move(filter), match_tree_);
   }
-  void addStreamFilter(Envoy::Http::StreamFilterSharedPtr filter,
-                       Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) override {
+  void
+  addStreamFilter(Envoy::Http::StreamFilterSharedPtr filter,
+                  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree) override {
     delegated_callbacks_.addStreamFilter(std::move(filter), std::move(match_tree));
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
@@ -69,11 +70,12 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
         Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(context.messageValidationVisitor())
             .create(proto_config.matcher());
 
-    return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree);
+    return
+        [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree);
 
-      return filter_factory(delegated_callbacks);
-    };
+          return filter_factory(delegated_callbacks);
+        };
   }
 
   return [](Envoy::Http::FilterChainFactoryCallbacks&) -> void {};
