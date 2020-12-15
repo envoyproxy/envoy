@@ -436,8 +436,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   auto part_token = property_tokens.find(name);
   if (part_token == property_tokens.end()) {
     if (info) {
-      std::string key;
-      absl::StrAppend(&key, CelStateKeyPrefix, name);
+      std::string key = absl::StrCat(CelStateKeyPrefix, name);
       const CelState* state;
       if (info->filterState().hasData<CelState>(key)) {
         state = &info->filterState().getDataReadOnly<CelState>(key);
