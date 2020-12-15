@@ -9,10 +9,10 @@
 #include "extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/config/utility.h"
+#include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
+#include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.validate.h"
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
-#include "test/integration/starttls_integration_test.pb.h"
-#include "test/integration/starttls_integration_test.pb.validate.h"
 #include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
