@@ -553,8 +553,6 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
-  MainThreadSingleton
-
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
