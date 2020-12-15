@@ -1,24 +1,24 @@
-.. _config_wasm_service:
+.. _config_wasm_runtime:
 
-Wasm service
+Wasm runtime
 ============
 
-The :ref:`WasmService <envoy_v3_api_msg_extensions.wasm.v3.WasmService>` configuration specifies a
-singleton or per-worker Wasm service for background or on-demand activities.
+The following runtimes are supported by Envoy:
 
-Example plugin configuration:
+.. csv-table::
+  :header: Name, Description
+  :widths: 1, 2
 
-.. code-block:: yaml
+  envoy.wasm.runtime.v8, "`V8<https://v8.dev>`-based runtime"
+  envoy.wasm.runtime.wasmtime, "`Wasmtime<https://github.com/bytecodealliance/wasmtime>` runtime"
+  envoy.wasm.runtime.wavm, "`WAVM<https://github.com/WAVM/WAVM>` runtime"
+  envoy.wasm.runtime.null, "Compiled modules linked into Envoy"
 
-  wasm:
-    config:
-      config:
-        name: "my_plugin"
-        vm_config:
-          runtime: "envoy.wasm.runtime.v8"
-          code:
-            local:
-              filename: "/etc/envoy_filter_http_wasm_example.wasm"
-      singleton: true
+Wasm runtime emits the following statistics:
 
-The preceding snippet configures a plugin singleton service from a Wasm binary on local disk.
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  wasm.<runtime>.created, Counter, Total number of execution instances created
+  wasm.<runtime>.active, Gauge, Number of active execution instances
