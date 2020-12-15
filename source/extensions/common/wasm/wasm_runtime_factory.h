@@ -18,7 +18,6 @@ public:
   virtual WasmVmPtr createWasmVm() PURE;
 
   virtual absl::string_view name() PURE;
-  virtual absl::string_view shortName() PURE;
 
   std::string category() { return "envoy.wasm.runtime"; }
 };

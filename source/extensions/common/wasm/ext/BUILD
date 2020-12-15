@@ -85,11 +85,3 @@ cc_proto_library(
         # "//external:protobuf_clib",
     ],
 )
-
-filegroup(
-    name = "jslib",
-    srcs = [
-        "envoy_wasm_intrinsics.js",
-    ],
-    visibility = ["//visibility:public"],
-)

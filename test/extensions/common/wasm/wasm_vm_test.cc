@@ -49,14 +49,12 @@ protected:
   Stats::ScopeSharedPtr scope_;
 };
 
-TEST_F(BaseVmTest, NoRuntime) { EXPECT_EQ(createWasmVm("", scope_), nullptr); }
+TEST_F(BaseVmTest, NoRuntime) { EXPECT_EQ(createWasmVm(""), nullptr); }
 
-TEST_F(BaseVmTest, BadRuntime) {
-  EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid", scope_), nullptr);
-}
+TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid"), nullptr); }
 
 TEST_F(BaseVmTest, NullVmStartup) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->runtime() == "null");
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
@@ -70,7 +68,7 @@ TEST_F(BaseVmTest, NullVmStartup) {
 }
 
 TEST_F(BaseVmTest, NullVmMemory) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_EQ(wasm_vm->getMemorySize(), std::numeric_limits<uint64_t>::max());
   std::string d = "data";
   auto m = wasm_vm->getMemory(reinterpret_cast<uint64_t>(d.data()), d.size()).value();
@@ -137,14 +135,14 @@ protected:
 INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest, testing::Values(false, true));
 
 TEST_P(WasmVmTest, V8BadCode) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   EXPECT_FALSE(wasm_vm->load("bad code", GetParam()));
 }
 
 TEST_P(WasmVmTest, V8Code) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->runtime() == "v8");
 
@@ -163,7 +161,7 @@ TEST_P(WasmVmTest, V8Code) {
 }
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -184,7 +182,7 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 }
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -212,7 +210,7 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 }
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -250,7 +248,7 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 }
 
 TEST_P(WasmVmTest, V8Memory) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
