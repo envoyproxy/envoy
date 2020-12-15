@@ -14,6 +14,8 @@ The following runtimes are supported by Envoy:
   envoy.wasm.runtime.wavm, "`WAVM<https://github.com/WAVM/WAVM>`_ runtime"
   envoy.wasm.runtime.null, "Compiled modules linked into Envoy"
 
+Wasmtime and WAVM runtimes are not included in Envoy release image by default.
+
 Wasm runtime emits the following statistics:
 
 .. csv-table::
