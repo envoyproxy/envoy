@@ -257,11 +257,14 @@ public:
   }
 
 private:
-  template <class T> std::string intResourceName(const T& m) { return m.name(); }
-  template <>
-  std::string intResourceName<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      const envoy::config::endpoint::v3::ClusterLoadAssignment& m) {
-    return m.cluster_name();
+  template <class T> std::string intResourceName(const T& m) {
+    // gcc doesn't allow inline template function to be specialized, using a constexpr if to
+    // workaround.
+    if constexpr (std::is_same<T, envoy::config::endpoint::v3::ClusterLoadAssignment>::value) {
+      return m.cluster_name();
+    } else {
+      return m.name();
+    }
   }
 
   Event::GlobalTimeSystem time_system_;
