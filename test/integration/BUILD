@@ -71,6 +71,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "alpn_integration_test",
+    srcs = ["alpn_integration_test.cc"],
+    deps = [":http_integration_lib"],
+)
+
+envoy_cc_test(
     name = "api_listener_integration_test",
     srcs = ["api_listener_integration_test.cc"],
     deps = [

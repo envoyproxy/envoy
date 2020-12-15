@@ -115,7 +115,8 @@ MockClusterInfo::MockClusterInfo()
         return *typed_metadata_;
       }));
   ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
-  ON_CALL(*this, upstreamHttpProtocol(_)).WillByDefault(Return(Http::Protocol::Http11));
+  ON_CALL(*this, upstreamHttpProtocol(_))
+      .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
