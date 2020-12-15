@@ -82,7 +82,7 @@ message HttpProtocolOptions {
   // protocol; HTTP/2 if supported, otherwise HTTP/1.
   // If the upstream does not support ALPN, *AutoHttpConfig* will fail over to HTTP/1.
   // This can only be used with transport sockets which support ALPN. Using a
-  // transport socket which does not support ALPN will result in configuation
+  // transport socket which does not support ALPN will result in configuration
   // failure. The transport layer may be configured with custom ALPN, but the default ALPN
   // for the cluster (or if custom ALPN fails) will be "h2,http/1.1".
   message AutoHttpConfig {
