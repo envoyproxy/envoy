@@ -61,14 +61,19 @@ message JwtProvider {
   // the JWT, usually a URL or an email address.
   //
   // It is optional. If specified, it has to match the *iss* field in JWT.
-  // Its usage implications are following:
   //
-  // * If a JWT has *iss* field and this field is specified, they have to match.
-  // * If a JWT doesn't have *iss* field,  not to check with this field.
-  // * If this field is not specified, the JWT *iss* field is not checked.
-  // * If *allow_missing* or *allow_missing_or_failed* is used, the JWT *iss* field is used to find
-  //   JwtProvider to verify the signature. If the JWT doesn't have *iss* field, the first JwtProvider
-  //   without this field will be used.
+  // If a JWT has *iss* field and this field is specified, they have to match, otherwise the
+  // JWT *iss* field is not checked.
+  //
+  // If *allow_missing* or *allow_missing_or_failed* is used, the JWT *iss* field is used to find
+  // the *first* JwtProvider with the same *issuer*, and use it to verify the signature.
+  // If a JWT doesn't have the *iss* field, the *first* JwtProvider with empty *issuer* will be used.
+  // If all JwtProviders have non empty *issuer*, a JWT without *iss* will be rejected.
+  //
+  // Multiple JwtProviders can have same "issuer", but it is not recommended when *allow_missing* or
+  // *allow_missing_or_failed* is used where the JWT *iss* is used to find the *first* JwtProvider.
+  // Since :ref:`providers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.providers>`
+  // field is used to list all providers and its type is *map*, its order is nondeterministic.
   //
   // Example: https://securetoken.google.com
   // Example: 1234567-compute@developer.gserviceaccount.com

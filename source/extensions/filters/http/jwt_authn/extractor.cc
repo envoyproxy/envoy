@@ -49,7 +49,7 @@ private:
   // If true, all issuers are ok
   bool allow_all_{false};
   // Only these specified issuers are allowed.
-  absl::node_hash_set<std::string> specified_issuers_;
+  absl::flat_hash_set<std::string> specified_issuers_;
 };
 
 /**

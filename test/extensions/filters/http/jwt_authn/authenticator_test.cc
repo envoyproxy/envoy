@@ -206,6 +206,7 @@ TEST_F(AuthenticatorTest, TestWrongIssuerOKWithProvider) {
 
 // Jwt "iss" is "other.com", "issuer" in JwtProvider is not specified,
 // authenticator doesn't have a valid provider. The verification is OK.
+// When "allow_missing" or "allow_failed" is used, authenticator doesn't have a valid provider.
 TEST_F(AuthenticatorTest, TestWrongIssuerOKWithoutProvider) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.clear_issuer();
@@ -246,6 +247,7 @@ TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProvider) {
 // authenticator doesn't have a valid provider.
 // It needs to find the first JwtProvider without "issuer" specified.
 // The verification fails with JwtUnknownIssuer.
+// When "allow_missing" or "allow_failed" is used, authenticator doesn't have a valid provider.
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithoutValidProvider) {
   createAuthenticator(nullptr, absl::nullopt);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
@@ -279,6 +281,7 @@ TEST_F(AuthenticatorTest, TestJwtWithoutIssWithValidProviderNotIssuer) {
 
 // Not "iss" in Jwt, "issuer" in JwtProvider is not specified,
 // authenticator doesn't have a valid provider. The verification is OK
+// When "allow_missing" or "allow_failed" is used, authenticator doesn't have a valid provider.
 TEST_F(AuthenticatorTest, TestJwtWithoutIssWithoutValidProviderNotIssuer) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.clear_issuer();
