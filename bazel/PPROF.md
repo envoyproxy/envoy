@@ -269,19 +269,19 @@ void doHeavyLifting() {
   bool success = doSomething();
   if (success) {
     finalizeSuccessfulOperation();
-    PERF_RECORD(op, "heavy lifting", "successful");
+    PERF_RECORD(op, "successful", "heavy lifting");
   } else {
     recoverFromFailure();
-    PERF_RECORD(op, "heavy lifting", "failed")
+    PERF_RECORD(op, "failed", "heavy lifting")
   }
 }
 ```
 
 The recorded performance data can be dumped to stdout with a call to `PERF_DUMP()`:
 ```
-Duration(us)  # Calls  Mean(ns)  StdDev(ns)  Min(ns)  Max(ns)  Category       Description
-        2837       22    128965     37035.5   109731   241957  heavy lifting  successful
-         204       13     15745      2449.4    13323    20446  heavy lifting  failed
+Duration(us)  # Calls  Mean(ns)  StdDev(ns)  Min(ns)  Max(ns)  Category    Description
+        2837       22    128965     37035.5   109731   241957  successful  heavy lifting
+         204       13     15745      2449.4    13323    20446  failed      heavy lifting
 ```
 
 The second type is performance annotations owned by a class instance. They can measure
@@ -294,19 +294,19 @@ public:
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    PERF_OWNED_OPERATION(operation);
+    PERF_OWNED_OPERATION(perf_operation_);
     return Http::FilterHeadersStatus::Continue;
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override {
     if (end_stream) {
-      PERF_OWNED_RECORD(operation, "stream encoding", "without trailers")
+      PERF_OWNED_RECORD(perf_operation_, "without trailers", "stream encoding")
     }
     return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
-    PERF_OWNED_RECORD(operation, "stream encoding", "with trailers");
+    PERF_OWNED_RECORD(perf_operation_, "with trailers", "stream encoding");
     return Http::FilterTrailersStatus::Continue;
   }
 
@@ -314,6 +314,6 @@ public:
 
 private:
   ...
-  PERF_OWNER(operation);
+  PERF_OWNER(perf_operation_);
 };
 ```
