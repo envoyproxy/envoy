@@ -400,8 +400,8 @@ void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& mes
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api, bool do_boosting) {
-  const std::string contents = api.fileSystem().fileReadToEnd(path);
+                               Api::Api& api, bool do_boosting, bool retry_sharing_violations) {
+  const std::string contents = api.fileSystem().fileReadToEnd(path, retry_sharing_violations);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.

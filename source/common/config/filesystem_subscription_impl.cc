@@ -49,7 +49,7 @@ void FilesystemSubscriptionImpl::configRejected(const EnvoyException& e,
 std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
   auto owned_message = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   auto& message = *owned_message;
-  MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
+  MessageUtil::loadFromFile(path_, message, validation_visitor_, api_, true, true);
   *config_update = std::move(owned_message);
   const auto decoded_resources =
       DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());

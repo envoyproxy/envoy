@@ -36,6 +36,7 @@ public:
   bool directoryExists(const std::string& path) override;
   ssize_t fileSize(const std::string& path) override;
   std::string fileReadToEnd(const std::string& path) override;
+  std::string fileReadToEnd(const std::string& path, bool retry_sharing_violations) override;
   PathSplitResult splitPathFromFilename(absl::string_view path) override;
   bool illegalPath(const std::string& path) override;
 };

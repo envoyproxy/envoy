@@ -258,7 +258,7 @@ public:
   static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                           bool do_boosting = true);
+                           bool do_boosting = true, bool retry_sharing_violations = false);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.

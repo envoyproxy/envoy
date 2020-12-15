@@ -112,6 +112,13 @@ public:
   virtual std::string fileReadToEnd(const std::string& path) PURE;
 
   /**
+   * @return full file content as a string.
+   * @throw EnvoyException if the file cannot be read.
+   * Be aware, this is not most highly performing file reading method.
+   */
+  virtual std::string fileReadToEnd(const std::string& path, bool retry_sharing_violations) PURE;
+
+  /**
    * @path file path to split
    * @return PathSplitResult containing the parent directory of the input path and the file name
    * @note will throw an exception if path does not contain any path separator character

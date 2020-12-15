@@ -1,5 +1,6 @@
 #include <fcntl.h>
 
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -136,6 +137,9 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
       throw EnvoyException(absl::StrCat("Invalid path: ", path));
     }
 
+    if (last_error == ERROR_SHARING_VIOLATION) {
+      throw EnvoyException(absl::StrCat("Error sharing violation: ", path));
+    }
     throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
 
@@ -143,6 +147,34 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   file_string << file.rdbuf();
 
   return file_string.str();
+}
+
+std::string InstanceImplWin32::fileReadToEnd(const std::string& path, bool retry_sharing_violations) {
+  std::string out;
+  int attempts = 1;
+  constexpr int max_attempts = 3;
+  do {
+    try {
+      out = fileReadToEnd(path);
+      return out;
+    }
+    catch (const EnvoyException& e) {
+        if (retry_sharing_violations) {
+          std::string exception_message(e.what());
+            ENVOY_LOG_MISC(warn, "{}", exception_message);
+          if (exception_message.find("Error sharing violation") != std::string::npos) {
+            ENVOY_LOG_MISC(warn, "retrying");
+            ++attempts;
+          } else {
+             throw e;
+          }
+        } else {
+          throw e;
+        }
+    }
+    Sleep(20 * exp2(attempts));
+  } while (attempts <= max_attempts && retry_sharing_violations);
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 PathSplitResult InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
