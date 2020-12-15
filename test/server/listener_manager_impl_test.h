@@ -279,6 +279,14 @@ protected:
     return scoped_runtime;
   }
 
+  ABSL_MUST_USE_RESULT
+  auto enableTlsInspectorInjectionForThisTest() {
+    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.disable_tls_inspector_injection", "false"}});
+    return scoped_runtime;
+  }
+
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
