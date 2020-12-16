@@ -10,6 +10,7 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
+#include "common/config/protobuf_link_hacks.h"
 #include "common/config/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/eds.h"

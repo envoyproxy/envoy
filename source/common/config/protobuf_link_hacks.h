@@ -47,6 +47,7 @@ const envoy::service::route::v3::RdsDummy _rds_dummy_v3;
 const envoy::service::cluster::v3::CdsDummy _cds_dummy_v3;
 const envoy::service::endpoint::v3::EdsDummy _eds_dummy_v3;
 const envoy::service::route::v3::SrdsDummy _srds_dummy_v3;
+const envoy::service::extension::v3::EcdsDummy _ecds_dummy_v3;
 
 // With the v2 -> v3 migration there is another, related linking issue.
 // Symbols for v2 protos which headers are not included in any file in the codebase are being

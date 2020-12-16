@@ -23,11 +23,9 @@ api_go_test(
     deps = [
         "//envoy/api/v2:pkg_go_proto",
         "//envoy/api/v2/auth:pkg_go_proto",
-        "//envoy/config/bootstrap/v2:pkg_go_proto",
         "//envoy/service/accesslog/v2:pkg_go_proto",
         "//envoy/service/discovery/v2:pkg_go_proto",
         "//envoy/service/metrics/v2:pkg_go_proto",
         "//envoy/service/ratelimit/v2:pkg_go_proto",
-        "//envoy/service/trace/v2:pkg_go_proto",
     ],
 )

@@ -302,7 +302,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "invalid value \"foo\" for type TYPE_ENUM");
+                          "invalid value \"foo\"");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
