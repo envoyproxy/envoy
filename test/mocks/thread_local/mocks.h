@@ -58,17 +58,23 @@ public:
     }
 
     // ThreadLocal::Slot
-    ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
+    ThreadLocalObjectSharedPtr get() override {
+      EXPECT_TRUE(was_set_);
+      return parent_.data_[index_];
+    }
     bool currentThreadRegistered() override { return parent_.registered_; }
     void runOnAllThreads(const UpdateCb& cb) override {
+      EXPECT_TRUE(was_set_);
       parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); });
     }
     void runOnAllThreads(const UpdateCb& cb, Event::PostCb main_callback) override {
+      EXPECT_TRUE(was_set_);
       parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); },
                               main_callback);
     }
 
     void set(InitializeCb cb) override {
+      was_set_ = true;
       if (parent_.defer_data) {
         parent_.deferred_data_[index_] = cb;
       } else {
@@ -78,6 +84,7 @@ public:
 
     MockInstance& parent_;
     const uint32_t index_;
+    bool was_set_{}; // set() must be called before other functions.
   };
 
   void call() {
