@@ -1,6 +1,8 @@
 #include "common/http/http2/protocol_constraints.h"
 
 #include "common/common/assert.h"
+#include "common/http/utility.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -8,16 +10,25 @@ namespace Http2 {
 
 ProtocolConstraints::ProtocolConstraints(
     CodecStats& stats, const envoy::config::core::v3::Http2ProtocolOptions& http2_options)
-    : stats_(stats), max_outbound_frames_(http2_options.max_outbound_frames().value()),
+    : stats_(stats), max_outbound_frames_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                         http2_options, max_outbound_frames,
+                         ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES)),
       frame_buffer_releasor_([this]() { releaseOutboundFrame(); }),
-      max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
+      max_outbound_control_frames_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http2_options, max_outbound_control_frames,
+          ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES)),
       control_frame_buffer_releasor_([this]() { releaseOutboundControlFrame(); }),
-      max_consecutive_inbound_frames_with_empty_payload_(
-          http2_options.max_consecutive_inbound_frames_with_empty_payload().value()),
-      max_inbound_priority_frames_per_stream_(
-          http2_options.max_inbound_priority_frames_per_stream().value()),
-      max_inbound_window_update_frames_per_data_frame_sent_(
-          http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()) {}
+      max_consecutive_inbound_frames_with_empty_payload_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http2_options, max_consecutive_inbound_frames_with_empty_payload,
+          ::Envoy::Http2::Utility::OptionsLimits::
+              DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD)),
+      max_inbound_priority_frames_per_stream_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http2_options, max_inbound_priority_frames_per_stream,
+          ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM)),
+      max_inbound_window_update_frames_per_data_frame_sent_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http2_options, max_inbound_window_update_frames_per_data_frame_sent,
+          ::Envoy::Http2::Utility::OptionsLimits::
+              DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT)) {}
 
 ProtocolConstraints::ReleasorProc
 ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame) {
