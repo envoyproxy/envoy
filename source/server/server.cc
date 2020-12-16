@@ -87,7 +87,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_contexts_(*this) {
+      hooks_(hooks), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -616,7 +616,7 @@ void InstanceImpl::startWorkers() {
     // Update server stats as soon as initialization is done.
     updateServerStats();
     workers_started_ = true;
-    notifyCallbacksForStage(Stage::WorkersStarted);
+    hooks_->onWorkersStarted();
     // At this point we are ready to take traffic and all listening ports are up. Notify our
     // parent if applicable that they can stop listening and drain.
     restarter_.drainParentListeners();
@@ -717,15 +717,6 @@ void InstanceImpl::run() {
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
                                     access_log_manager_, init_manager_, overloadManager(), [this] {
-                                      // This ensures Startup event to be sent first, required by
-                                      // tests. In static configuration, cluster manager will
-                                      // initialize init_manager immediately when setInitializedCb
-                                      // is called.
-                                      if (!startup_lifecycle_event_raised_) {
-                                        notifyCallbacksForStage(Stage::Startup);
-                                        startup_lifecycle_event_raised_ = true;
-                                      }
-
                                       notifyCallbacksForStage(Stage::PostInit);
                                       startWorkers();
                                     });
@@ -734,14 +725,7 @@ void InstanceImpl::run() {
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                          "main_thread", *dispatcher_);
-  dispatcher_->post([this] {
-    // It's possible that Startup event is already raised during RunHelper
-    // construction.
-    if (!startup_lifecycle_event_raised_) {
-      notifyCallbacksForStage(Stage::Startup);
-      startup_lifecycle_event_raised_ = true;
-    }
-  });
+  dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
   main_thread_guard_dog_->stopWatching(watchdog);

@@ -364,7 +364,7 @@ private:
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
-  bool startup_lifecycle_event_raised_{};
+  ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
 

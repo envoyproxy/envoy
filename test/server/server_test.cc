@@ -181,6 +181,11 @@ protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
+    initialize(bootstrap_path, use_intializing_instance, hooks_);
+  }
+
+  void initialize(const std::string& bootstrap_path, const bool use_intializing_instance,
+                  ListenerHooks& hooks) {
     if (options_.config_path_.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
@@ -194,7 +199,7 @@ protected:
 
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart_,
         stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
@@ -313,6 +318,18 @@ public:
   std::string name() const override { return "envoy.custom_stats_sink"; }
 };
 
+// CustomListenerHooks is used for syncrinization between test thread and server thread.
+class CustomListenerHooks : public DefaultListenerHooks {
+public:
+  CustomListenerHooks(std::function<void()> workers_started_cb)
+      : on_workers_started_cb_(workers_started_cb) {}
+
+  void onWorkersStarted() { on_workers_started_cb_(); }
+
+private:
+  std::function<void()> on_workers_started_cb_;
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -358,12 +375,8 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
-  bool startup = false, post_init = false, workers_started = false, shutdown = false,
-       shutdown_with_completion = false;
-  absl::Notification started, post_init_fired, workers_started_fired, workers_started_block,
-      shutdown_begin, completion_block, completion_done;
-  // Expect drainParentListeners not to be called before workers start.
-  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+  bool startup = false, post_init = false, shutdown = false, shutdown_with_completion = false;
+  absl::Notification started, post_init_fired, shutdown_begin, completion_block, completion_done;
 
   // Run the server in a separate thread so we can test different lifecycle stages.
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
@@ -376,16 +389,11 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::WorkersStarted, [&] {
-      workers_started = true;
-      workers_started_fired.Notify();
-      workers_started_block.WaitForNotification();
-    });
-    auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
       shutdown_begin.Notify();
     });
-    auto handle5 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
@@ -393,18 +401,17 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                                server_->dispatcher().post(completion_cb);
                                                completion_done.Notify();
                                              });
-    auto handle6 =
+    auto handle5 =
         server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] { FAIL(); });
-    handle6 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    handle5 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                         [&](Event::PostCb) { FAIL(); });
-    handle6 = nullptr;
+    handle5 = nullptr;
 
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
     handle3 = nullptr;
     handle4 = nullptr;
-    handle5 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
   });
@@ -412,19 +419,12 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   started.WaitForNotification();
   EXPECT_TRUE(startup);
   EXPECT_FALSE(shutdown);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 
   post_init_fired.WaitForNotification();
   EXPECT_TRUE(post_init);
   EXPECT_FALSE(shutdown);
-
-  workers_started_fired.WaitForNotification();
-  EXPECT_TRUE(workers_started);
-  EXPECT_FALSE(shutdown);
-  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
-  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
-
-  EXPECT_CALL(restart_, drainParentListeners);
-  workers_started_block.Notify();
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   shutdown_begin.WaitForNotification();
@@ -437,6 +437,37 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   completion_done.WaitForNotification();
   EXPECT_TRUE(shutdown_with_completion);
 
+  server_thread->join();
+}
+
+TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
+  bool workers_started = false;
+  absl::Notification workers_started_fired, workers_started_block;
+  // Expect drainParentListeners not to be called before workers start.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+      workers_started_block.WaitForNotification();
+    });
+    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+
+  EXPECT_CALL(restart_, drainParentListeners);
+  workers_started_block.Notify();
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
 
