@@ -29,6 +29,7 @@ using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Tcp {
@@ -64,7 +65,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     pool_failure_.ready();
   }
 
-  NiceMock<ConnectionPool::MockUpstreamCallbacks> callbacks_;
+  StrictMock<ConnectionPool::MockUpstreamCallbacks> callbacks_;
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
   ConnectionPool::ConnectionDataPtr conn_data_{};
@@ -310,7 +311,16 @@ public:
   ~TcpConnPoolImplDestructorTest() override = default;
 
   void prepareConn() {
-    connection_ = new NiceMock<Network::MockClientConnection>();
+    connection_ = new StrictMock<Network::MockClientConnection>();
+    EXPECT_CALL(*connection_, setBufferLimits(0));
+    EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
+    EXPECT_CALL(*connection_, addConnectionCallbacks(_));
+    EXPECT_CALL(*connection_, addReadFilter(_));
+    EXPECT_CALL(*connection_, connect());
+    EXPECT_CALL(*connection_, setConnectionStats(_));
+    EXPECT_CALL(*connection_, noDelay(true));
+    EXPECT_CALL(*connection_, streamInfo()).Times(2);
+
     connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
     EXPECT_CALL(*connect_timer_, enableTimer(_, _));
@@ -334,7 +344,7 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Event::MockTimer>* connect_timer_;
-  NiceMock<Network::MockClientConnection>* connection_;
+  Network::MockClientConnection* connection_;
   std::unique_ptr<Tcp::ConnectionPool::Instance> conn_pool_;
   std::unique_ptr<ConnPoolCallbacks> callbacks_;
 };
@@ -751,6 +761,7 @@ TEST_P(TcpConnPoolImplTest, DisconnectWhileBound) {
 
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
+  EXPECT_CALL(callbacks.callbacks_, onEvent(_));
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   // Kill the connection while it has an active request.
@@ -774,6 +785,7 @@ TEST_P(TcpConnPoolImplTest, DisconnectWhilePending) {
 
   EXPECT_CALL(*conn_pool_->test_conns_[0].connect_timer_, disableTimer());
   EXPECT_CALL(callbacks.pool_ready_, ready());
+  EXPECT_CALL(callbacks.callbacks_, onEvent(_));
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   // Second request pending.
@@ -1131,6 +1143,7 @@ TEST_P(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
 TEST_P(TcpConnPoolImplDestructorTest, TestBusyConnectionsAreClosed) {
   prepareConn();
 
+  EXPECT_CALL(callbacks_->callbacks_, onEvent(_));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   conn_pool_.reset();
