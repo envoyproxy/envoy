@@ -324,7 +324,7 @@ void InstanceImpl::initialize(const Options& options,
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
 
-  MainThreadSingleton::initialize(new MainThread());
+  ThreadLocal::MainThreadSingleton::initialize(new ThreadLocal::MainThread());
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
