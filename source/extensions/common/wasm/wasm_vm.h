@@ -28,7 +28,7 @@ public:
                          void* ptr_to_function_return) override;
   proxy_wasm::LogLevel getLogLevel() override;
   void error(absl::string_view message) override;
-  void trace(std::string_view message) override;
+  void trace(absl::string_view message) override;
 };
 
 // Exceptions for issues with the WebAssembly code.
