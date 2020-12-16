@@ -20,11 +20,19 @@ namespace Common {
 namespace Wasm {
 
 proxy_wasm::LogLevel EnvoyWasmVmIntegration::getLogLevel() {
-  auto level = static_cast<size_t>(ENVOY_LOGGER().level());
-  if (level > static_cast<size_t>(proxy_wasm::LogLevel::critical)) {
+  switch (ENVOY_LOGGER().level()) {
+  case spdlog::level::trace:
+    return proxy_wasm::LogLevel::trace;
+  case spdlog::level::debug:
+    return proxy_wasm::LogLevel::debug;
+  case spdlog::level::info:
+    return proxy_wasm::LogLevel::info;
+  case spdlog::level::warn:
+    return proxy_wasm::LogLevel::warn;
+  case spdlog::level::err:
+    return proxy_wasm::LogLevel::error;
+  default:
     return proxy_wasm::LogLevel::critical;
-  } else {
-    return static_cast<proxy_wasm::LogLevel>(level);
   }
 }
 
