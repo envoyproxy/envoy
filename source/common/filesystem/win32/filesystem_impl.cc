@@ -142,15 +142,16 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
     if (!ReadFile(fd, buffer.data(), buffer_size, &bytes_read, NULL)) {
       auto last_error = ::GetLastError();
       if (last_error == ERROR_FILE_NOT_FOUND) {
+        CloseHandle(fd);
         throw EnvoyException(absl::StrCat("Invalid path: ", path));
       }
+      CloseHandle(fd);
       throw EnvoyException(absl::StrCat("unable to read file: ", path));
     }
     complete_buffer.insert(complete_buffer.end(), buffer.begin(), buffer.begin() + bytes_read);
   } while (bytes_read == buffer_size);
-  auto st = std::string(complete_buffer.begin(), complete_buffer.end());
   CloseHandle(fd);
-  return st;
+  return std::string(complete_buffer.begin(), complete_buffer.end());
 }
 
 PathSplitResult InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
