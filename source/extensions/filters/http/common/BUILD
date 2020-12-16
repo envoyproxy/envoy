@@ -56,3 +56,18 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
     ],
 )
+
+envoy_cc_library(
+    name = "stream_rate_limiter_lib",
+    srcs = ["stream_rate_limiter.cc"],
+    hdrs = ["stream_rate_limiter.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
+        "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:token_bucket_impl_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
