@@ -1,4 +1,24 @@
-# CPU or memory consumption testing with `pprof`
+# Table of Contents
+
+   * [CPU or memory consumption testing with gperftools and pprof](#cpu-or-memory-consumption-testing-with-gperftools-and-pprof)
+      * [Collecting CPU or heap profile for a full execution of envoy](#collecting-cpu-or-heap-profile-for-a-full-execution-of-envoy)
+         * [Compiling a statically-linked Envoy](#compiling-a-statically-linked-envoy)
+         * [Collecting the profile](#collecting-the-profile)
+         * [Analyzing the profile](#analyzing-the-profile)
+      * [Collecting CPU or heap profile for the full execution of a test target](#collecting-cpu-or-heap-profile-for-the-full-execution-of-a-test-target)
+      * [Starting and stopping profile programmatically](#starting-and-stopping-profile-programmatically)
+         * [Add tcmalloc_dep dependency to envoy_cc_library rules](#add-tcmalloc_dep-dependency-to-envoy_cc_library-rules)
+      * [Memory Profiling in Tests](#memory-profiling-in-tests)
+         * [Enabling Memory Profiling in Tests](#enabling-memory-profiling-in-tests)
+         * [Bazel Configuration](#bazel-configuration)
+   * [Methodology](#methodology)
+   * [Analyzing with pprof](#analyzing-with-pprof)
+   * [Alternatives to gperftools](#alternatives-to-gperftools)
+      * [On-CPU analysis](#on-cpu-analysis)
+      * [Memory analysis](#memory-analysis)
+   * [Performance annotations](#performance-annotations)
+
+# CPU or memory consumption testing with `gperftools` and `pprof`
 
 To use `pprof` to analyze performance and memory consumption in Envoy, you can
 use the built-in statically linked profiler provided by
@@ -155,3 +175,145 @@ More complex flame/graph charts can be generated and viewed in a browser, which
 is often more helpful than text-based output:
 
     $ pprof -http=localhost:9999 bazel-bin/source/exe/envoy main_common_base*
+
+# Alternatives to `gperftools`
+
+## On-CPU analysis
+
+By default Envoy is built without gperftools. In this case the same results can be
+achieved for On-CPU analysis with the `perf` tool. For this there is no need to tweak
+Envoy's environment, you can even do measurements for an instance running in production
+(beware of possible performance hit though). Simply run:
+```
+$ perf record -g -F 99 -p `pgrep envoy`
+^C[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.694 MB perf.data (1532 samples) ]
+```
+
+The program will store the collected sampling data in the file `perf.data` whose
+format is also understood by recent enough versions of `pprof`:
+```
+$ pprof -http=localhost:9999 perf.data
+```
+## Memory analysis
+
+Unfortunately `perf` doesn't support heap profiling analogous to `gperftools`, but still
+we can get some insight into memory allocations with
+[Brendan Gregg's tools](http://www.brendangregg.com/FlameGraphs/memoryflamegraphs.html).
+You'll need to have [bcc](https://github.com/iovisor/bcc) installed in your system and a
+copy of [FlameGraph](https://github.com/brendangregg/FlameGraph):
+```
+$ git clone https://github.com/brendangregg/FlameGraph
+$ sudo /usr/share/bcc/tools/stackcount -p `pgrep envoy` \
+    -U "/full/path/to/envoy/bazel-bin/source/exe/envoy-static:_Znwm" > out.stack
+$ ./FlameGraph/stackcollapse.pl < out.stacks | ./FlameGraph/flamegraph.pl --color=mem \
+    --title="operator new(std::size_t) Flame Graph" --countname="calls" > out.svg
+```
+
+The `stackcount` utility counts function calls and their stack traces using eBPF probes.
+Since Envoy by default links statically to tcmalloc which provides its own implementation
+of memory management functions the used uprobe looks like
+```/full/path/to/envoy/bazel-bin/source/exe/envoy-static:_Znwm```. The part before
+the colon is a library name (a path to Envoy's binary in our case). The part after the
+colon is a function name as it looks like in the output of `objdump -tT /path/to/lib`,
+that is mangled in our case. To get an idea how your compiler mangles the name you
+can use this one-liner:
+```
+$ echo -e "#include <new>\n void* operator new(std::size_t) {} " | g++ -x c++ -S - -o- 2> /dev/null
+        .file   ""
+        .text
+        .globl  _Znwm
+        .type   _Znwm, @function
+_Znwm:
+.LFB73:
+        .cfi_startproc
+        pushq   %rbp
+        .cfi_def_cfa_offset 16
+        .cfi_offset 6, -16
+        movq    %rsp, %rbp
+        .cfi_def_cfa_register 6
+        movq    %rdi, -8(%rbp)
+        nop
+        popq    %rbp
+        .cfi_def_cfa 7, 8
+        ret
+        .cfi_endproc
+.LFE73:
+        .size   _Znwm, .-_Znwm
+        .ident  "GCC: (GNU) 10.2.1 20201016 (Red Hat 10.2.1-6)"
+        .section        .note.GNU-stack,"",@progbits
+```
+
+WARNING: The name is going to be different on 32-bit and 64-bit platforms due to different sizes
+of `size_t`. Also ```void* operator new[](std::size_t)``` is a separate function as well as `malloc()`.
+The latter is a C function and hence not mangled by the way.
+
+`stackcount` doesn't count how much memory is allocated, but how often. To answer the "how much"
+question you could use Brendan's
+[mallocstacks](https://github.com/brendangregg/BPF-tools/blob/master/old/2017-12-23/mallocstacks.py)
+tool, but it works only for `malloc()` calls. You need to modify it to take into
+account other memory allocating functions.
+
+# Performance annotations
+
+In case there is a need to measure how long a code path takes time to execute in Envoy you may
+resort to instrumenting the code with the
+[performance annotations](https://github.com/envoyproxy/envoy/blob/master/source/common/common/perf_annotation.h).
+
+There are two types of the annotations. The first one is used to measure operations limited by
+a common lexical scope. For example:
+
+```c++
+void doHeavyLifting() {
+  PERF_OPERATION(op);
+  bool success = doSomething();
+  if (success) {
+    finalizeSuccessfulOperation();
+    PERF_RECORD(op, "successful", "heavy lifting");
+  } else {
+    recoverFromFailure();
+    PERF_RECORD(op, "failed", "heavy lifting")
+  }
+}
+```
+
+The recorded performance data can be dumped to stdout with a call to `PERF_DUMP()`:
+```
+Duration(us)  # Calls  Mean(ns)  StdDev(ns)  Min(ns)  Max(ns)  Category    Description
+        2837       22    128965     37035.5   109731   241957  successful  heavy lifting
+         204       13     15745      2449.4    13323    20446  failed      heavy lifting
+```
+
+The second type is performance annotations owned by a class instance. They can measure
+operations spanned across the instance's methods:
+```c++
+class CustomFilter : public Http::StreamEncoderFilter {
+public:
+
+  ...
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override {
+    PERF_OWNED_OPERATION(perf_operation_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override {
+    if (end_stream) {
+      PERF_OWNED_RECORD(perf_operation_, "without trailers", "stream encoding")
+    }
+    return Http::FilterDataStatus::Continue;
+  }
+
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
+    PERF_OWNED_RECORD(perf_operation_, "with trailers", "stream encoding");
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  ...
+
+private:
+  ...
+  PERF_OWNER(perf_operation_);
+};
+```
