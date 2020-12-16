@@ -445,6 +445,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
     ),
+    com_github_nlohmann_json = dict(
+        project_name = "nlohmann JSON",
+        project_desc = "Fast JSON parser/generator for C++",
+        project_url = "https://nlohmann.github.io/json",
+        version = "3.9.1",
+        sha256 = "4cf0df69731494668bdd6460ed8cb269b68de9c19ad8c27abc24cd72605b2d5b",
+        strip_prefix = "json-{version}",
+        urls = ["https://github.com/nlohmann/json/archive/v{version}.tar.gz"],
+        # This will be a replacement for rapidJSON used in extensions and may also be a fast
+        # replacement for protobuf JSON.
+        use_category = ["controlplane", "dataplane_core"],
+        release_date = "2020-07-06",
+        cpe = "cpe:2.3:a:json_project:json:*",
+    ),
     com_github_twitter_common_lang = dict(
         project_name = "twitter.common.lang (Thrift)",
         project_desc = "twitter.common Python language and compatibility facilities",

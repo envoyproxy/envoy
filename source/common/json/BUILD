@@ -9,11 +9,27 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "rapidjson_loader_lib",
+    srcs = ["rapidjson_loader.cc"],
+    hdrs = ["rapidjson_loader.h"],
+    external_deps = [
+        "rapidjson",
+    ],
+    deps = [
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "json_loader_lib",
     srcs = ["json_loader.cc"],
     hdrs = ["json_loader.h"],
     external_deps = [
-        "rapidjson",
+        "json",
     ],
     deps = [
         "//include/envoy/json:json_object_interface",
