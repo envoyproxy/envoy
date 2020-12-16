@@ -19,7 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
 // [#extension: envoy.filters.http.bandwidth_limit]
 
-// [#next-free-field: 5]
 message BandwidthLimit {
   // Defines the mode for the bandwidth limit filter.
   // Values represent bitmask.
