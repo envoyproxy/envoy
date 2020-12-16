@@ -845,16 +845,22 @@ message RequestIDExtension {
   google.protobuf.Any typed_config = 1;
 }
 
+// Match input indicates that matching should be done on a specific request header.
+// TODO(snowp): Link to unified matching docs.
 message HttpRequestHeaderMatchInput {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpRequestHeaderMatchInput";
 
+  // The request header to match on.
   string header_name = 1;
 }
 
+// Match input indicating that matching should be done on a specific response header.
+// TODO(snowp): Link to unified matching docs.
 message HttpResponseHeaderMatchInput {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpResponseHeaderMatchInput";
 
+  // The response header to match on.
   string header_name = 1;
 }
