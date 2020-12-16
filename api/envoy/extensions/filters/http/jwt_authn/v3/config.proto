@@ -73,7 +73,7 @@ message JwtProvider {
   // Multiple JwtProviders can have same "issuer", but it is not recommended when *allow_missing* or
   // *allow_missing_or_failed* is used where the JWT *iss* is used to find the *first* JwtProvider.
   // Since :ref:`providers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.providers>`
-  // field is used to list all providers and its type is *map*, its order is nondeterministic.
+  // field is used to list all providers and its type is *map*, its order is non deterministic.
   //
   // Example: https://securetoken.google.com
   // Example: 1234567-compute@developer.gserviceaccount.com
