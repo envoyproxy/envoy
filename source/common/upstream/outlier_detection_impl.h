@@ -249,37 +249,40 @@ struct DetectionStats {
 };
 
 // Names used in runtime configuration.
-const std::string max_ejection_percent_runtime = "outlier_detection.max_ejection_percent";
-const std::string consecutive_gateway_failure_runtime =
+constexpr absl::string_view MaxEjectionPercentRuntime = "outlier_detection.max_ejection_percent";
+constexpr absl::string_view ConsecutiveGatewayFailureRuntime =
     "outlier_detection.consecutive_gateway_failure";
-const std::string consecutive_5xx_runtime = "outlier_detection.consecutive_5xx";
-const std::string consecutive_local_origin_failure_runtime =
+constexpr absl::string_view Consecutive5xxRuntime = "outlier_detection.consecutive_5xx";
+constexpr absl::string_view ConsecutiveLocalOriginFailureRuntime =
     "outlier_detection.consecutive_local_origin_failure";
-const std::string interval_ms_runtime = "outlier_detection.interval_ms";
-const std::string base_ejection_time_ms_runtime = "outlier_detection.base_ejection_time_ms";
-const std::string max_ejection_time_ms_runtime = "outlier_detection.max_ejection_time_ms";
-const std::string enforcing_consecutive_5xx_runtime = "outlier_detection.enforcing_consecutive_5xx";
-const std::string enforcing_consecutive_gateway_failure_runtime =
+constexpr absl::string_view IntervalMsRuntime = "outlier_detection.interval_ms";
+constexpr absl::string_view BaseEjectionTimeMsRuntime = "outlier_detection.base_ejection_time_ms";
+constexpr absl::string_view MaxEjectionTimeMsRuntime = "outlier_detection.max_ejection_time_ms";
+constexpr absl::string_view EnforcingConsecutive5xxRuntime =
+    "outlier_detection.enforcing_consecutive_5xx";
+constexpr absl::string_view EnforcingConsecutiveGatewayFailureRuntime =
     "outlier_detection.enforcing_consecutive_gateway_failure";
-const std::string enforcing_success_rate_runtime = "outlier_detection.enforcing_success_rate";
-const std::string enforcing_consecutive_local_origin_failure_runtime =
+constexpr absl::string_view EnforcingSuccessRateRuntime =
+    "outlier_detection.enforcing_success_rate";
+constexpr absl::string_view EnforcingConsecutiveLocalOriginFailureRuntime =
     "outlier_detection.enforcing_consecutive_local_origin_failure";
-const std::string enforcing_local_origin_success_rate_runtime =
+constexpr absl::string_view EnforcingLocalOriginSuccessRateRuntime =
     "outlier_detection.enforcing_local_origin_success_rate";
-const std::string enforcing_failure_percentage_runtime =
+constexpr absl::string_view EnforcingFailurePercentageRuntime =
     "outlier_detection.enforcing_failure_percentage";
-const std::string enforcing_failure_percentage_local_origin_runtime =
+constexpr absl::string_view EnforcingFailurePercentageLocalOriginRuntime =
     "outlier_detection.enforcing_failure_percentage_local_origin";
-const std::string success_rate_minimum_hosts_runtime =
+constexpr absl::string_view SuccessRateMinimumHostsRuntime =
     "outlier_detection.success_rate_minimum_hosts";
-const std::string success_rate_request_volume_runtime =
+constexpr absl::string_view SuccessRateRequestVolumeRuntime =
     "outlier_detection.success_rate_request_volume";
-const std::string failure_percentage_minimum_hosts_runtime =
+constexpr absl::string_view FailurePercentageMinimumHostsRuntime =
     "outlier_detection.failure_percentage_minimum_hosts";
-const std::string failure_percentage_request_volume_runtime =
+constexpr absl::string_view FailurePercentageRequestVolumeRuntime =
     "outlier_detection.failure_percentage_request_volume";
-const std::string success_rate_stdev_factor_runtime = "outlier_detection.success_rate_stdev_factor";
-const std::string failure_percentage_threshold_runtime =
+constexpr absl::string_view SuccessRateStdevFactorRuntime =
+    "outlier_detection.success_rate_stdev_factor";
+constexpr absl::string_view FailurePercentageThresholdRuntime =
     "outlier_detection.failure_percentage_threshold";
 
 /**

@@ -73,9 +73,9 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       return;
     }
     if (Http::CodeUtility::isGatewayError(response_code)) {
-      if (++consecutive_gateway_failure_ == detector->runtime().snapshot().getInteger(
-                                                consecutive_gateway_failure_runtime,
-                                                detector->config().consecutiveGatewayFailure())) {
+      if (++consecutive_gateway_failure_ ==
+          detector->runtime().snapshot().getInteger(
+              ConsecutiveGatewayFailureRuntime, detector->config().consecutiveGatewayFailure())) {
         detector->onConsecutiveGatewayFailure(host_.lock());
       }
     } else {
@@ -83,7 +83,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     }
 
     if (++consecutive_5xx_ == detector->runtime().snapshot().getInteger(
-                                  consecutive_5xx_runtime, detector->config().consecutive5xx())) {
+                                  Consecutive5xxRuntime, detector->config().consecutive5xx())) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
@@ -187,7 +187,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
   local_origin_sr_monitor_.incTotalReqCounter();
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
-          consecutive_local_origin_failure_runtime,
+          ConsecutiveLocalOriginFailureRuntime,
           detector->config().consecutiveLocalOriginFailure())) {
     detector->onConsecutiveLocalOriginFailure(host_.lock());
   }
@@ -327,7 +327,7 @@ void DetectorImpl::addHostMonitor(HostSharedPtr host) {
 
 void DetectorImpl::armIntervalTimer() {
   interval_timer_->enableTimer(std::chrono::milliseconds(
-      runtime_.snapshot().getInteger(interval_ms_runtime, config_.intervalMs())));
+      runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())));
 }
 
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
@@ -341,9 +341,9 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   }
 
   const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
-      runtime_.snapshot().getInteger(base_ejection_time_ms_runtime, config_.baseEjectionTimeMs()));
+      runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
   const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
-      runtime_.snapshot().getInteger(max_ejection_time_ms_runtime, config_.maxEjectionTimeMs()));
+      runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
   ASSERT(monitor->numEjections() > 0);
   if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time)) <=
       (now - monitor->lastEjectionTime().value())) {
@@ -365,25 +365,25 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
 bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectionType type) {
   switch (type) {
   case envoy::data::cluster::v2alpha::CONSECUTIVE_5XX:
-    return runtime_.snapshot().featureEnabled(enforcing_consecutive_5xx_runtime,
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutive5xxRuntime,
                                               config_.enforcingConsecutive5xx());
   case envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE:
-    return runtime_.snapshot().featureEnabled(enforcing_consecutive_gateway_failure_runtime,
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutiveGatewayFailureRuntime,
                                               config_.enforcingConsecutiveGatewayFailure());
   case envoy::data::cluster::v2alpha::SUCCESS_RATE:
-    return runtime_.snapshot().featureEnabled(enforcing_success_rate_runtime,
+    return runtime_.snapshot().featureEnabled(EnforcingSuccessRateRuntime,
                                               config_.enforcingSuccessRate());
   case envoy::data::cluster::v2alpha::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
-    return runtime_.snapshot().featureEnabled(enforcing_consecutive_local_origin_failure_runtime,
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime,
                                               config_.enforcingConsecutiveLocalOriginFailure());
   case envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN:
-    return runtime_.snapshot().featureEnabled(enforcing_local_origin_success_rate_runtime,
+    return runtime_.snapshot().featureEnabled(EnforcingLocalOriginSuccessRateRuntime,
                                               config_.enforcingLocalOriginSuccessRate());
   case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE:
-    return runtime_.snapshot().featureEnabled(enforcing_failure_percentage_runtime,
+    return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageRuntime,
                                               config_.enforcingFailurePercentage());
   case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
-    return runtime_.snapshot().featureEnabled(enforcing_failure_percentage_local_origin_runtime,
+    return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
   default:
     // Checked by schema.
@@ -456,9 +456,8 @@ void DetectorImpl::updateDetectedEjectionStats(
 
 void DetectorImpl::ejectHost(HostSharedPtr host,
                              envoy::data::cluster::v2alpha::OutlierEjectionType type) {
-  uint64_t max_ejection_percent =
-      std::min<uint64_t>(100, runtime_.snapshot().getInteger(max_ejection_percent_runtime,
-                                                             config_.maxEjectionPercent()));
+  uint64_t max_ejection_percent = std::min<uint64_t>(
+      100, runtime_.snapshot().getInteger(MaxEjectionPercentRuntime, config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * ejections_active_helper_.value() / host_monitors_.size();
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
@@ -472,12 +471,10 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       ejections_active_helper_.inc();
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
-      const std::chrono::milliseconds base_eject_time =
-          std::chrono::milliseconds(runtime_.snapshot().getInteger(base_ejection_time_ms_runtime,
-                                                                   config_.baseEjectionTimeMs()));
-      const std::chrono::milliseconds max_eject_time =
-          std::chrono::milliseconds(runtime_.snapshot().getInteger(max_ejection_time_ms_runtime,
-                                                                   config_.maxEjectionTimeMs()));
+      const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
+          runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
+      const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
+          runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
       if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time) <
           (max_eject_time + base_eject_time)) {
         host_monitors_[host]->ejectTimeBackoff()++;
@@ -605,13 +602,13 @@ DetectorImpl::EjectionPair DetectorImpl::successRateEjectionThreshold(
 void DetectorImpl::processSuccessRateEjections(
     DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
-      success_rate_minimum_hosts_runtime, config_.successRateMinimumHosts());
+      SuccessRateMinimumHostsRuntime, config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
-      success_rate_request_volume_runtime, config_.successRateRequestVolume());
+      SuccessRateRequestVolumeRuntime, config_.successRateRequestVolume());
   uint64_t failure_percentage_minimum_hosts = runtime_.snapshot().getInteger(
-      failure_percentage_minimum_hosts_runtime, config_.failurePercentageMinimumHosts());
+      FailurePercentageMinimumHostsRuntime, config_.failurePercentageMinimumHosts());
   uint64_t failure_percentage_request_volume = runtime_.snapshot().getInteger(
-      failure_percentage_request_volume_runtime, config_.failurePercentageRequestVolume());
+      FailurePercentageRequestVolumeRuntime, config_.failurePercentageRequestVolume());
 
   std::vector<HostSuccessRatePair> valid_success_rate_hosts;
   std::vector<HostSuccessRatePair> valid_failure_percentage_hosts;
@@ -662,7 +659,7 @@ void DetectorImpl::processSuccessRateEjections(
   if (!valid_success_rate_hosts.empty() &&
       valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     const double success_rate_stdev_factor =
-        runtime_.snapshot().getInteger(success_rate_stdev_factor_runtime,
+        runtime_.snapshot().getInteger(SuccessRateStdevFactorRuntime,
                                        config_.successRateStdevFactor()) /
         1000.0;
     getSRNums(monitor_type) = successRateEjectionThreshold(
@@ -684,7 +681,7 @@ void DetectorImpl::processSuccessRateEjections(
   if (!valid_failure_percentage_hosts.empty() &&
       valid_failure_percentage_hosts.size() >= failure_percentage_minimum_hosts) {
     const double failure_percentage_threshold = runtime_.snapshot().getInteger(
-        failure_percentage_threshold_runtime, config_.failurePercentageThreshold());
+        FailurePercentageThresholdRuntime, config_.failurePercentageThreshold());
 
     for (const auto& host_success_rate_pair : valid_failure_percentage_hosts) {
       if ((100.0 - host_success_rate_pair.success_rate_) >= failure_percentage_threshold) {

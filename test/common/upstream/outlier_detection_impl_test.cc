@@ -69,14 +69,13 @@ public:
   OutlierDetectorImplTest()
       : outlier_detection_ejections_active_(cluster_.info_->stats_store_.gauge(
             "outlier_detection.ejections_active", Stats::Gauge::ImportMode::Accumulate)) {
-    ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_5xx_runtime, 100))
+    ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
         .WillByDefault(Return(true));
-    ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_success_rate_runtime, 100))
+    ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingSuccessRateRuntime, 100))
         .WillByDefault(Return(true));
-    ON_CALL(runtime_.snapshot_,
-            featureEnabled(enforcing_consecutive_local_origin_failure_runtime, 100))
+    ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
         .WillByDefault(Return(true));
-    ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_local_origin_success_rate_runtime, 100))
+    ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingLocalOriginSuccessRateRuntime, 100))
         .WillByDefault(Return(true));
 
     // Prepare separate config with split_external_local_origin_errors set to true.
@@ -194,8 +193,7 @@ max_ejection_time: 3s
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
-  ON_CALL(runtime_.snapshot_, getInteger(max_ejection_percent_runtime, _))
-      .WillByDefault(Return(100));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"}, true);
   addHosts({"tcp://127.0.0.1:81"}, false);
@@ -447,9 +445,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
 
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_gateway_failure_runtime, 0))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveGatewayFailureRuntime, 0))
       .WillByDefault(Return(true));
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_5xx_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
       .WillByDefault(Return(false));
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
@@ -550,7 +548,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
                                        _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true));
   // Get the configured number of failures and simulate than number of connect failures.
   uint32_t n =
-      runtime_.snapshot_.getInteger(consecutive_5xx_runtime, detector->config().consecutive5xx());
+      runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout,
                                            absl::optional<uint64_t>(500));
@@ -572,7 +570,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
                                        _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, true))
       .Times(0);
   // Get the configured number of failures and simulate than number of connect failures.
-  n = runtime_.snapshot_.getInteger(consecutive_5xx_runtime, detector->config().consecutive5xx());
+  n = runtime_.snapshot_.getInteger(Consecutive5xxRuntime, detector->config().consecutive5xx());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout,
                                            absl::optional<uint64_t>(200));
@@ -588,7 +586,7 @@ TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
                        envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE, false));
   // Get the configured number of failures and simulate than number of connect failures.
-  n = runtime_.snapshot_.getInteger(consecutive_gateway_failure_runtime,
+  n = runtime_.snapshot_.getInteger(ConsecutiveGatewayFailureRuntime,
                                     detector->config().consecutiveGatewayFailure());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginTimeout);
@@ -606,8 +604,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_, event_logger_));
 
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled(enforcing_consecutive_local_origin_failure_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
       .WillByDefault(Return(true));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
@@ -619,7 +616,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // Get the configured number of failures and simulate than number of connect failures.
-  uint32_t n = runtime_.snapshot_.getInteger(consecutive_local_origin_failure_runtime,
+  uint32_t n = runtime_.snapshot_.getInteger(ConsecutiveLocalOriginFailureRuntime,
                                              detector->config().consecutiveLocalOriginFailure());
   while (n--) {
     hosts_[0]->outlierDetector().putResult(Result::LocalOriginConnectFailed);
@@ -646,7 +643,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
 
   // Simulate few connect failures, not enough for ejection and then simulate connect success
   // and again few failures not enough for ejection.
-  n = runtime_.snapshot_.getInteger(consecutive_local_origin_failure_runtime,
+  n = runtime_.snapshot_.getInteger(ConsecutiveLocalOriginFailureRuntime,
                                     detector->config().consecutiveLocalOriginFailure());
   n--; // make sure that this is not enough for ejection.
   while (n--) {
@@ -688,7 +685,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
 
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_gateway_failure_runtime, 0))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveGatewayFailureRuntime, 0))
       .WillByDefault(Return(true));
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
@@ -780,9 +777,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
   addHosts({"tcp://127.0.0.1:81"});
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
 
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_5xx_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
       .WillByDefault(Return(true));
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_gateway_failure_runtime, 0))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveGatewayFailureRuntime, 0))
       .WillByDefault(Return(false));
 
   // Make sure that EXT_ORIGIN_REQUEST_SUCCESS cancels LOCAL_ORIGIN_CONNECT_FAILED
@@ -829,9 +826,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection to test SR detection in isolation.
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_5xx_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
       .WillByDefault(Return(false));
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_gateway_failure_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveGatewayFailureRuntime, 100))
       .WillByDefault(Return(false));
   // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
   // gets saturated (every 5 times).
@@ -852,7 +849,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
                                        _, envoy::data::cluster::v2alpha::SUCCESS_RATE, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  ON_CALL(runtime_.snapshot_, getInteger(success_rate_stdev_factor_runtime, 1900))
+  ON_CALL(runtime_.snapshot_, getInteger(SuccessRateStdevFactorRuntime, 1900))
       .WillByDefault(Return(1900));
   interval_timer_->invokeCallback();
   EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(
@@ -959,8 +956,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off detecting consecutive local origin failures.
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled(enforcing_consecutive_local_origin_failure_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
       .WillByDefault(Return(false));
   // Expect non-enforcing logging to happen every time the consecutive_ counter
   // gets saturated (every 5 times).
@@ -978,7 +974,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
                        envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  ON_CALL(runtime_.snapshot_, getInteger(success_rate_stdev_factor_runtime, 1900))
+  ON_CALL(runtime_.snapshot_, getInteger(SuccessRateStdevFactorRuntime, 1900))
       .WillByDefault(Return(1900));
   interval_timer_->invokeCallback();
   EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(
@@ -1049,7 +1045,7 @@ TEST_F(OutlierDetectorImplTest, EmptySuccessRate) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  ON_CALL(runtime_.snapshot_, getInteger(success_rate_minimum_hosts_runtime, 5))
+  ON_CALL(runtime_.snapshot_, getInteger(SuccessRateMinimumHostsRuntime, 5))
       .WillByDefault(Return(0));
   interval_timer_->invokeCallback();
 }
@@ -1070,14 +1066,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection and SR detection to test failure percentage detection in isolation.
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_5xx_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
       .WillByDefault(Return(false));
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_gateway_failure_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveGatewayFailureRuntime, 100))
       .WillByDefault(Return(false));
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_success_rate_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingSuccessRateRuntime, 100))
       .WillByDefault(Return(false));
   // Now turn on failure percentage detection.
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_failure_percentage_runtime, 0))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingFailurePercentageRuntime, 0))
       .WillByDefault(Return(true));
   // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
   // gets saturated (every 5 times).
@@ -1108,7 +1104,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
                                        _, envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE, true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  ON_CALL(runtime_.snapshot_, getInteger(success_rate_stdev_factor_runtime, 1900))
+  ON_CALL(runtime_.snapshot_, getInteger(SuccessRateStdevFactorRuntime, 1900))
       .WillByDefault(Return(1900));
   interval_timer_->invokeCallback();
   EXPECT_FLOAT_EQ(100.0 * (50.0 / 300.0),
@@ -1189,13 +1185,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off 5xx detection and SR detection to test failure percentage detection in isolation.
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled(enforcing_consecutive_local_origin_failure_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime, 100))
       .WillByDefault(Return(false));
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_local_origin_success_rate_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingLocalOriginSuccessRateRuntime, 100))
       .WillByDefault(Return(false));
   // Now turn on failure percentage detection.
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_failure_percentage_local_origin_runtime, 0))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingFailurePercentageLocalOriginRuntime, 0))
       .WillByDefault(Return(true));
   // Expect non-enforcing logging to happen every time the consecutive_ counter
   // gets saturated (every 5 times).
@@ -1217,7 +1212,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
                        envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN, false));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  ON_CALL(runtime_.snapshot_, getInteger(failure_percentage_threshold_runtime, 85))
+  ON_CALL(runtime_.snapshot_, getInteger(FailurePercentageThresholdRuntime, 85))
       .WillByDefault(Return(40));
   interval_timer_->invokeCallback();
   EXPECT_EQ(50, hosts_[4]->outlierDetector().successRate(
@@ -1315,7 +1310,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  ON_CALL(runtime_.snapshot_, getInteger(max_ejection_percent_runtime, _)).WillByDefault(Return(1));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(1));
 
   loadRq(hosts_[0], 4, 500);
 
@@ -1344,7 +1339,7 @@ TEST_F(OutlierDetectorImplTest, NotEnforcing) {
 
   loadRq(hosts_[0], 4, 503);
 
-  ON_CALL(runtime_.snapshot_, featureEnabled(enforcing_consecutive_5xx_runtime, 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
       .WillByDefault(Return(false));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX, false));
@@ -1384,7 +1379,7 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  ON_CALL(runtime_.snapshot_, getInteger(max_ejection_percent_runtime, _)).WillByDefault(Return(1));
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(1));
 
   loadRq(hosts_[0], 4, 500);
 
@@ -1521,7 +1516,7 @@ TEST_F(OutlierDetectorImplTest, Consecutive_5xxAlreadyEjected) {
 // - eject the node again. It should be brought back after 10 secs.
 TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
   // Setup base ejection time to 10 secs.
-  ON_CALL(runtime_.snapshot_, getInteger(base_ejection_time_ms_runtime, _))
+  ON_CALL(runtime_.snapshot_, getInteger(BaseEjectionTimeMsRuntime, _))
       .WillByDefault(Return(10000UL));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
@@ -1689,10 +1684,10 @@ TEST_F(OutlierDetectorImplTest, EjectTimeBackoff) {
 // - eject node again. Ejection time should not increase beyond max_ejection_time.
 TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
   // Setup base ejection time to 10 secs.
-  ON_CALL(runtime_.snapshot_, getInteger(base_ejection_time_ms_runtime, _))
+  ON_CALL(runtime_.snapshot_, getInteger(BaseEjectionTimeMsRuntime, _))
       .WillByDefault(Return(10000UL));
   // Setup max ejection time to 30 secs.
-  ON_CALL(runtime_.snapshot_, getInteger(max_ejection_time_ms_runtime, _))
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionTimeMsRuntime, _))
       .WillByDefault(Return(300000UL));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
@@ -1780,10 +1775,10 @@ TEST_F(OutlierDetectorImplTest, MaxEjectTime) {
 // max_ejection_time + base_ejection_time.
 TEST_F(OutlierDetectorImplTest, MaxEjectTimeNotAlligned) {
   // Setup interval time to 10 secs.
-  ON_CALL(runtime_.snapshot_, getInteger(interval_ms_runtime, _)).WillByDefault(Return(10000UL));
-  ON_CALL(runtime_.snapshot_, getInteger(base_ejection_time_ms_runtime, _))
+  ON_CALL(runtime_.snapshot_, getInteger(IntervalMsRuntime, _)).WillByDefault(Return(10000UL));
+  ON_CALL(runtime_.snapshot_, getInteger(BaseEjectionTimeMsRuntime, _))
       .WillByDefault(Return(10000UL));
-  ON_CALL(runtime_.snapshot_, getInteger(max_ejection_time_ms_runtime, _))
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionTimeMsRuntime, _))
       .WillByDefault(Return(305000UL));
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
