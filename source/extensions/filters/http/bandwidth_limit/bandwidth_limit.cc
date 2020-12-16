@@ -21,10 +21,6 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
       time_source_(time_source),
       limit_kbps_(config.has_limit_kbps() ? config.limit_kbps().value() : 0),
       enable_mode_(config.enable_mode()),
-      enforce_threshold_Kbps_(
-          config.has_enforce_threshold_kbps() && !per_route
-              ? absl::optional<uint64_t>(config.enforce_threshold_kbps().value())
-              : absl::nullopt),
       fill_rate_(config.has_fill_rate() ? config.fill_rate().value()
                                         : StreamRateLimiter::DefaultFillRate) {
   if (per_route && !config.has_limit_kbps()) {

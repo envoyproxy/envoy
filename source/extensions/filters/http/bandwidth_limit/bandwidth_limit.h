@@ -66,7 +66,6 @@ public:
   std::shared_ptr<TokenBucketImpl> tokenBucket() { return token_bucket_; }
   const std::shared_ptr<TokenBucketImpl> tokenBucket() const { return token_bucket_; }
   uint64_t fill_rate() const { return fill_rate_; }
-  absl::optional<uint64_t> enforce_threshold() const { return enforce_threshold_Kbps_; }
 
 private:
   friend class FilterTest;
@@ -79,7 +78,6 @@ private:
   TimeSource& time_source_;
   const uint64_t limit_kbps_;
   const EnableMode enable_mode_;
-  const absl::optional<uint64_t> enforce_threshold_Kbps_;
   const uint64_t fill_rate_;
   // Filter chain's shared token bucket
   std::shared_ptr<TokenBucketImpl> token_bucket_;
