@@ -139,7 +139,7 @@ public:
         EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes())
             .Times(num_clients)
             .WillRepeatedly(Return(*buffer_limits));
-        EXPECT_CALL(*test_client.connection_, setBufferLimits(*buffer_limits)).Times(1);
+        EXPECT_CALL(*test_client.connection_, setBufferLimits(*buffer_limits));
       }
     }
     // Finally (for InSequence tests) set up createCodecClient and make sure the
@@ -242,7 +242,6 @@ public:
 };
 
 void Http2ConnPoolImplTest::expectClientConnect(size_t index) {
-  EXPECT_CALL(*test_clients_[index].connect_timer_, disableTimer());
   test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
@@ -260,7 +259,6 @@ void Http2ConnPoolImplTest::expectStreamConnect(size_t index, ActiveTestRequest&
 void Http2ConnPoolImplTest::expectClientReset(size_t index, ActiveTestRequest& r,
                                               bool local_failure) {
   expectStreamReset(r);
-  EXPECT_CALL(*test_clients_[0].connect_timer_, disableTimer());
   if (local_failure) {
     test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
     EXPECT_EQ(r.callbacks_.reason_, ConnectionPool::PoolFailureReason::LocalConnectionFailure);

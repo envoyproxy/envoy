@@ -722,7 +722,7 @@ public:
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -898,7 +898,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercent) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -926,7 +926,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessWithSpuriousMetadata) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1043,7 +1043,7 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1119,7 +1119,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1154,7 +1154,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServicePrefixPatternCheck) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1189,7 +1189,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceExactPatternCheck) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1224,7 +1224,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1268,7 +1268,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   cluster_->info_->stats().upstream_cx_total_.inc();
@@ -1313,7 +1313,7 @@ TEST_F(HttpHealthCheckerImplTest,
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   cluster_->info_->stats().upstream_cx_total_.inc();
@@ -1347,7 +1347,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1405,7 +1405,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
       R"EOF(
         filter_metadata:
@@ -1468,7 +1468,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
       R"EOF(
         filter_metadata:
@@ -1511,7 +1511,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1542,7 +1542,7 @@ TEST_F(HttpHealthCheckerImplTest, ServicePatternDoesNotMatchFail) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1573,7 +1573,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNotPresentInResponseFail) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -1602,7 +1602,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOff) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1628,7 +1628,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOffWithStringPattern) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1659,7 +1659,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessNoTraffic) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -1709,7 +1709,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   health_checker_->start();
 
   // Test fast success immediately moves us to healthy.
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logAddHealthy(_, _, true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(500));
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
@@ -1887,7 +1887,7 @@ TEST_F(HttpHealthCheckerImplTest, HttpFailLogError) {
 TEST_F(HttpHealthCheckerImplTest, Disconnect) {
   setupNoServiceValidationHC();
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -2023,14 +2023,14 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutAfterDisconnect) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _)).Times(2);
   health_checker_->start();
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   for (auto& session : test_sessions_) {
     session->client_connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
@@ -2482,7 +2482,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   // Prepares a host with its designated health check port.
   const HostWithHealthCheckMap hosts{{"127.0.0.1:80", makeHealthCheckConfig(8000)}};
@@ -3072,7 +3072,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
@@ -3106,7 +3106,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMismatch)) 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
@@ -3488,7 +3488,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_, _)).Times(1);
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
@@ -3497,7 +3497,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   // Expected execution flow when a healthcheck is successful and reuse_connection is false.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl response;
   addUint8(response, 2);
@@ -3517,7 +3517,7 @@ TEST_F(TcpHealthCheckerImplTest, WrongData) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_, _)).Times(1);
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
@@ -3700,7 +3700,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithoutReusingConnection) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   expectSessionCreate();
   expectClientCreate();
-  EXPECT_CALL(*connection_, write(_, _)).Times(1);
+  EXPECT_CALL(*connection_, write(_, _));
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
@@ -3709,7 +3709,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithoutReusingConnection) {
   // Expected flow when a healthcheck is successful and reuse_connection is false.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush)).Times(1);
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl response;
   addUint8(response, 2);

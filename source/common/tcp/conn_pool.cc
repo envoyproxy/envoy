@@ -24,7 +24,8 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);
   connection_->detectEarlyCloseWhenReadDisabled(false);
-  connection_->addReadFilter(std::make_shared<ConnReadFilter>(*this));
+  read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
+  connection_->addReadFilter(read_filter_handle_);
   connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
                                    host->cluster().stats().upstream_cx_rx_bytes_buffered_,
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
@@ -59,14 +60,18 @@ void ActiveTcpClient::clearCallbacks() {
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
-  // Do not pass the Connected event to any session which registered during onEvent above.
-  // Consumers of connection pool connections assume they are receiving already connected
-  // connections.
-  if (callbacks_ && event != Network::ConnectionEvent::Connected) {
-    callbacks_->onEvent(event);
-    // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
-    // Clear the pointer to avoid using it again.
-    callbacks_ = nullptr;
+  if (callbacks_) {
+    // Do not pass the Connected event to any session which registered during onEvent above.
+    // Consumers of connection pool connections assume they are receiving already connected
+    // connections.
+    if (event == Network::ConnectionEvent::Connected) {
+      connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
+    } else {
+      callbacks_->onEvent(event);
+      // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
+      // Clear the pointer to avoid using it again.
+      callbacks_ = nullptr;
+    }
   }
 }
 

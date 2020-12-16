@@ -8,8 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
-#include "common/http/http2/codec_impl_legacy.h"
+#include "common/http/http2/codec_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -311,29 +310,6 @@ public:
   }
 };
 
-namespace Legacy {
-class TestHttp1ServerConnectionImpl : public Http::Legacy::Http1::ServerConnectionImpl {
-public:
-  using Http::Legacy::Http1::ServerConnectionImpl::ServerConnectionImpl;
-
-  void onMessageComplete() override {
-    ServerConnectionImpl::onMessageComplete();
-
-    if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
-      // Undo the read disable from the base class - we have many tests which
-      // waitForDisconnect after a full request has been read which will not
-      // receive the disconnect if reading is disabled.
-      activeRequest().value().response_encoder_.readDisable(false);
-    }
-  }
-  ~TestHttp1ServerConnectionImpl() override {
-    if (activeRequest().has_value()) {
-      activeRequest().value().response_encoder_.clearReadDisableCallsForTests();
-    }
-  }
-};
-} // namespace Legacy
-
 FakeHttpConnection::FakeHttpConnection(
     FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection, Type type,
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
@@ -346,15 +322,9 @@ FakeHttpConnection::FakeHttpConnection(
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
-#else
-    codec_ = std::make_unique<Legacy::TestHttp1ServerConnectionImpl>(
-        shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
-#endif
   } else {
     envoy::config::core::v3::Http2ProtocolOptions http2_options =
         ::Envoy::Http2::Utility::initializeAndValidateOptions(
@@ -362,15 +332,9 @@ FakeHttpConnection::FakeHttpConnection(
     http2_options.set_allow_connect(true);
     http2_options.set_allow_metadata(true);
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, random_, http2_options,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
-#else
-    codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, stats, random_, http2_options,
-        max_request_headers_kb, max_request_headers_count, headers_with_underscores_action);
-#endif
     ASSERT(type == Type::HTTP2);
   }
   shared_connection_.connection().addReadFilter(
@@ -528,11 +492,24 @@ FakeUpstream::FakeUpstream(uint32_t port, Network::Address::IpVersion version,
 }
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           const FakeUpstreamConfig& config)
+    : FakeUpstream(std::move(transport_socket_factory),
+                   config.udp_fake_upstream_ ? makeUdpListenSocket(address)
+                                             : makeTcpListenSocket(address),
+                   config) {
+  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}. UDP={}",
+            address->ip()->addressAsString(), address->ip()->port(),
+            Network::Test::addressVersionAsString(address->ip()->version()),
+            config.udp_fake_upstream_);
+}
+
+FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, Network::Address::IpVersion version,
                            const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version),
                    config) {
-  ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
+  ENVOY_LOG(info, "starting fake server on port {}. Address version is {}",
             localAddress()->ip()->port(), Network::Test::addressVersionAsString(version));
 }
 
