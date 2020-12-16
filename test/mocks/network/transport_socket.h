@@ -38,6 +38,7 @@ public:
 
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, usesProxyProtocolOptions, (), (const));
+  MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(TransportSocketPtr, createTransportSocket, (TransportSocketOptionsSharedPtr),
               (const));
 };

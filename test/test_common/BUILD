@@ -15,6 +15,7 @@ envoy_basic_cc_library(
     name = "printers_includes",
     hdrs = ["printers.h"],
     deps = [
+        ":printers_lib",
         "//include/envoy/network:address_interface",
     ],
 )
@@ -86,9 +87,12 @@ envoy_cc_test_library(
 
 envoy_cc_library(
     name = "printers_lib",
-    srcs = ["printers.cc"],
+    srcs = [
+        "printers.cc",
+        "printers.h",
+    ],
     deps = [
-        ":printers_includes",
+        "//include/envoy/network:address_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
     ],

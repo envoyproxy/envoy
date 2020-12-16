@@ -253,7 +253,7 @@ public:
   Stats::StatName statName() const override { return stat_name_.statName(); }
   VirtualClusterStats& stats() const override { return stats_; }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
   VirtualClusterStatNames stat_names_{stats_store_.symbolTable()};
@@ -282,7 +282,7 @@ public:
     return stat_name_->statName();
   }
 
-  mutable Stats::TestSymbolTable symbol_table_;
+  mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   std::string name_{"fake_vhost"};
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;

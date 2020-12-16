@@ -65,11 +65,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
-  ENVOY_LOG_MISC(debug, "Using new codecs");
-  setNewCodecs();
-#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -218,6 +213,14 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
         });
   } else {
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
   }
 }
 
