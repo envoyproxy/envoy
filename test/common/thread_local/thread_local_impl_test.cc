@@ -25,6 +25,7 @@ public:
 class ThreadLocalInstanceImplTest : public testing::Test {
 public:
   ThreadLocalInstanceImplTest() {
+    ThreadLocal::MainThread::init();
     tls_.registerThread(main_dispatcher_, true);
     EXPECT_EQ(&main_dispatcher_, &tls_.dispatcher());
     EXPECT_CALL(thread_dispatcher_, post(_));
