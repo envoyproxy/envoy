@@ -188,7 +188,7 @@ TEST_P(AdsIntegrationTest, Failure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
 
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Cluster, "", {}, {}, {}, true,
+      Config::TypeUrl::get().Cluster, "", {}, {}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Internal,
       fmt::format("does not match the message-wide type URL {}", Config::TypeUrl::get().Cluster)));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
@@ -203,7 +203,7 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {}, {}, true,
+                                      {"cluster_0"}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Internal,
                                       fmt::format("does not match the message-wide type URL {}",
                                                   Config::TypeUrl::get().ClusterLoadAssignment)));
@@ -218,7 +218,7 @@ TEST_P(AdsIntegrationTest, Failure) {
       {buildRouteConfig("listener_0", "route_config_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().Listener, "", {}, {}, {}, true,
+      Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Internal,
       fmt::format("does not match the message-wide type URL {}", Config::TypeUrl::get().Listener)));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
@@ -233,7 +233,7 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
-                                      {"route_config_0"}, {}, {}, true,
+                                      {"route_config_0"}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Internal,
                                       fmt::format("does not match the message-wide type URL {}",
                                                   Config::TypeUrl::get().RouteConfiguration)));
@@ -415,7 +415,7 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
       Config::TypeUrl::get().ClusterLoadAssignment, {buildTlsClusterLoadAssignment("cluster_0")},
       {buildTlsClusterLoadAssignment("cluster_0")}, {}, "2");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"cluster_0"}, {}, {}));
 }
@@ -1167,6 +1167,29 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
   xds_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
 
+TEST_P(AdsIntegrationTest, SetNodeAlways) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_set_node_on_first_message_only(false);
+  });
+  initialize();
+
+  // Check that the node is sent in each request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}, true));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, true));
+};
+
 // Check if EDS cluster defined in file is loaded before ADS request and used as xDS server
 class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                           public HttpIntegrationTest {
@@ -1247,7 +1270,7 @@ TEST_P(AdsClusterFromFileIntegrationTest, BasicTestWidsAdsEndpointLoadedFromFile
   xds_stream_->startGrpcStream();
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"ads_eds_cluster"}, {"ads_eds_cluster"}, {}));
+                                      {"ads_eds_cluster"}, {"ads_eds_cluster"}, {}, true));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("ads_eds_cluster")},
       {buildClusterLoadAssignment("ads_eds_cluster")}, {}, "1");
@@ -1260,8 +1283,6 @@ TEST_P(AdsClusterFromFileIntegrationTest, BasicTestWidsAdsEndpointLoadedFromFile
 
 class AdsIntegrationTestWithRtds : public AdsIntegrationTest {
 public:
-  AdsIntegrationTestWithRtds() = default;
-
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* layered_runtime = bootstrap.mutable_layered_runtime();
@@ -1294,9 +1315,9 @@ public:
         Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
 
     test_server_->waitForCounterGe("runtime.load_success", 1);
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {},
-                                        {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+    EXPECT_TRUE(
+        compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {}, {}));
   }
 };
 
@@ -1310,8 +1331,6 @@ TEST_P(AdsIntegrationTestWithRtds, Basic) {
 
 class AdsIntegrationTestWithRtdsAndSecondaryClusters : public AdsIntegrationTestWithRtds {
 public:
-  AdsIntegrationTestWithRtdsAndSecondaryClusters() = default;
-
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add secondary cluster to the list of static resources.
