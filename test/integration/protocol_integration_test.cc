@@ -304,9 +304,9 @@ TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
   // Send a headers only request.
   IntegrationStreamDecoderPtr response;
   EXPECT_LOG_CONTAINS("error",
-                      "envoy bug failure: !state_.local_complete_ || status != "
-                      "FilterHeadersStatus::Continue. Details: Filters should not return "
-                      "FilterHeadersStatus::Continue after sending a local reply.",
+                      "envoy bug failure: !(state_.local_complete_) || status == "
+                      "FilterHeadersStatus::StopIteration. Details: Filters should return "
+                      "FilterHeadersStatus::StopIteration after sending a local reply.",
                       {
                         response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
                         response->waitForEndStream();
