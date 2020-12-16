@@ -17,7 +17,7 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-// providing logger and nullvm function getter to Wasm VM.
+// providing logger and NullVm function getter to Wasm VM.
 class EnvoyWasmVmIntegration : public proxy_wasm::WasmVmIntegration,
                                Logger::Loggable<Logger::Id::wasm> {
 public:
