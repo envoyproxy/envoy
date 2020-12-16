@@ -236,7 +236,7 @@ private:
   const std::thread::id main_thread_id_;
 };
 
-using MainThreadSingleton = InjectableSingleton<MainThread>
+using MainThreadSingleton = InjectableSingleton<MainThread>;
 
 #define envoy_try                                                                                  \
   ASSERT(MainThreadSingleton::get().isMainThread());                                               \
