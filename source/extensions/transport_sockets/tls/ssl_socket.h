@@ -62,6 +62,7 @@ public:
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  bool startSecureTransport() override { return false; }
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks
@@ -69,8 +70,6 @@ public:
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
-
-  SSL* rawSslForTest() const { return rawSsl(); }
 
 protected:
   SSL* rawSsl() const { return info_->ssl_.get(); }
@@ -110,6 +109,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
+  bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

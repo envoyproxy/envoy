@@ -97,7 +97,7 @@ public:
     }
   }
 
-  SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override {
+  SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
     return SignalEventPtr{listenForSignal_(signal_num, cb)};
   }
 
@@ -127,7 +127,7 @@ public:
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
-  MOCK_METHOD(SignalEvent*, listenForSignal_, (int signal_num, SignalCb cb));
+  MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
   MOCK_METHOD(void, post, (std::function<void()> callback));
   MOCK_METHOD(void, run, (RunType type));
   MOCK_METHOD(const ScopeTrackedObject*, setTrackedObject, (const ScopeTrackedObject* object));
@@ -139,7 +139,7 @@ public:
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
-  MockBufferFactory buffer_factory_;
+  testing::NiceMock<MockBufferFactory> buffer_factory_;
 
 private:
   const std::string name_;
@@ -227,6 +227,8 @@ public:
 
   MOCK_METHOD(void, activate, (uint32_t events));
   MOCK_METHOD(void, setEnabled, (uint32_t events));
+  MOCK_METHOD(void, registerEventIfEmulatedEdge, (uint32_t event));
+  MOCK_METHOD(void, unregisterEventIfEmulatedEdge, (uint32_t event));
 };
 
 } // namespace Event

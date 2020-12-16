@@ -17,10 +17,19 @@ namespace Http1 {
 class ActiveClient : public Envoy::Http::ActiveClient {
 public:
   ActiveClient(HttpConnPoolImplBase& parent);
+  ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data);
 
   // ConnPoolImplBase::ActiveClient
   bool closingWithIncompleteStream() const override;
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
+
+  uint32_t numActiveStreams() const override {
+    // Override the parent class using the codec for numActiveStreams.
+    // Unfortunately for the HTTP/1 codec, the stream is destroyed before decode
+    // is complete, and we must make sure the connection pool does not observe available
+    // capacity and assign a new stream before decode is complete.
+    return stream_wrapper_.get() ? 1 : 0;
+  }
 
   struct StreamWrapper : public RequestEncoderWrapper,
                          public ResponseDecoderWrapper,
@@ -42,10 +51,13 @@ public:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
+    void onStreamDestroy();
+
     ActiveClient& parent_;
+    bool stream_incomplete_{};
     bool encode_complete_{};
-    bool close_connection_{};
     bool decode_complete_{};
+    bool close_connection_{};
   };
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
@@ -56,7 +68,8 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state);
 
 } // namespace Http1
 } // namespace Http

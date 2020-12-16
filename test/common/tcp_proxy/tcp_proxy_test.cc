@@ -821,7 +821,8 @@ TEST(ConfigTest, AccessLogConfig) {
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
-    file_access_log.mutable_log_format()->set_text_format("the format specifier");
+    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "the format specifier");
     log->mutable_typed_config()->PackFrom(file_access_log);
   }
 
@@ -849,6 +850,7 @@ public:
             [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
         .WillByDefault(ReturnPointee(&upstream_host_));
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   }
 
   ~TcpProxyTest() override {
@@ -866,7 +868,6 @@ public:
     config.set_stat_prefix("name");
     auto* route = config.mutable_hidden_envoy_deprecated_deprecated_v1()->mutable_routes()->Add();
     route->set_cluster("fake_cluster");
-
     return config;
   }
 
@@ -878,7 +879,8 @@ public:
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
-    file_access_log.mutable_log_format()->set_text_format(access_log_format);
+    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        access_log_format);
     access_log->mutable_typed_config()->PackFrom(file_access_log);
     return config;
   }
@@ -910,7 +912,7 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+        EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
             .WillOnce(Return(&conn_pool_))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
@@ -922,7 +924,7 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
           .WillRepeatedly(Return(nullptr));
     }
 
@@ -1168,8 +1170,7 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrant) {
   // cancellation call.
   EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
       .Times(0);
-  EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
-      .Times(1);
+  EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1389,6 +1390,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
         k0: v0
 )EOF";
 
+  factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1", "cluster2"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -1405,8 +1407,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
-    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster1", _, _))
-        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -1429,8 +1431,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(2));
-    EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("cluster2", _, _))
-        .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -1468,8 +1470,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
-      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);
@@ -1500,6 +1502,7 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
             k1: from_config
 )EOF";
 
+  factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster1"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
   ProtobufWkt::Value v0, v1, v2;
@@ -1521,8 +1524,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
-      .WillOnce(DoAll(SaveArg<2>(&context), Return(nullptr)));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&context), Return(nullptr)));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);
@@ -1937,6 +1940,8 @@ public:
         cluster: fake_cluster
     )EOF";
 
+    factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fallback_cluster", "fake_cluster"});
     config_ =
         std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_, avoid_boosting));
   }
@@ -1970,7 +1975,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 10000);
 
   // Expect filter to try to open a connection to the fallback cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fallback_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -1992,7 +1997,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -2007,13 +2012,13 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
   setup(false);
   initializeFilter();
 
+  factory_context_.cluster_manager_.initializeThreadLocalClusters({"filter_state_cluster"});
   connection_.streamInfo().filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
@@ -2031,11 +2036,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+          Invoke([](Upstream::ResourcePriority,
                     Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
             Network::TransportSocketOptionsSharedPtr transport_socket_options =
                 context->upstreamTransportSocketOptions();
             EXPECT_NE(transport_socket_options, nullptr);
@@ -2063,11 +2067,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+          Invoke([](Upstream::ResourcePriority,
                     Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
             Network::TransportSocketOptionsSharedPtr transport_socket_options =
                 context->upstreamTransportSocketOptions();
             EXPECT_NE(transport_socket_options, nullptr);
@@ -2094,6 +2097,7 @@ public:
     cluster: fake_cluster
     )EOF";
 
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 };
@@ -2107,7 +2111,7 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -2135,6 +2139,7 @@ public:
     - source_ip: {}
     )EOF";
 
+    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
 
@@ -2158,11 +2163,10 @@ public:
 TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
   setup();
   initializeFilter();
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster(_, _, _))
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(
-          Invoke([](const std::string& cluster, Upstream::ResourcePriority,
+          Invoke([](Upstream::ResourcePriority,
                     Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_EQ(cluster, "fake_cluster");
             EXPECT_TRUE(context->computeHashKey().has_value());
             return nullptr;
           }));

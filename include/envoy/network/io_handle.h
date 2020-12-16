@@ -118,6 +118,9 @@ public:
     unsigned int msg_len_{0};
     // The gso_size, if specified in the transport header
     unsigned int gso_size_{0};
+    // If true indicates a successful syscall, but the packet was dropped due to truncation. We do
+    // not support receiving truncated packets.
+    bool truncated_and_dropped_{false};
   };
 
   /**

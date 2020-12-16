@@ -64,6 +64,16 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
   parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
 }
 
+ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+                           Upstream::Host::CreateConnectionData& data)
+    : Envoy::Http::ActiveClient(
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
+          parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
+  codec_client_->setCodecClientCallbacks(*this);
+  codec_client_->setCodecConnectionCallbacks(*this);
+  parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
+}
+
 bool ActiveClient::closingWithIncompleteStream() const { return closed_with_active_rq_; }
 
 RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
@@ -74,9 +84,10 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state) {
   return std::make_unique<FixedHttpConnPoolImpl>(
-      host, priority, dispatcher, options, transport_socket_options, random_generator,
+      host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(

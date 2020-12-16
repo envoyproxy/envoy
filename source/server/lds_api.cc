@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Server {
 
 LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
-                       const udpa::core::v1::ResourceLocator* lds_resources_locator,
+                       const xds::core::v3::ResourceLocator* lds_resources_locator,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)

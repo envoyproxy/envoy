@@ -108,6 +108,7 @@ private:
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   HealthCheckerMap health_checkers_map_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  TimeSource& time_source_;
 
   void updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks,

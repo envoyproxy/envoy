@@ -94,8 +94,9 @@ public:
   void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
   void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
 
+  absl::optional<Http::Protocol> protocol() const override { return {}; }
   void close() override { connection_->close(Network::ConnectionCloseType::NoFlush); }
-  size_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
+  uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
   bool closingWithIncompleteStream() const override { return false; }
   uint64_t id() const override { return connection_->id(); }
 
@@ -108,6 +109,7 @@ public:
   }
   virtual void clearCallbacks();
 
+  std::shared_ptr<ConnReadFilter> read_filter_handle_;
   Envoy::ConnectionPool::ConnPoolImplBase& parent_;
   ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
@@ -121,9 +123,10 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options)
+               Network::TransportSocketOptionsSharedPtr transport_socket_options,
+               Upstream::ClusterConnectivityState& state)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options) {}
+                                                transport_socket_options, state) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
@@ -136,8 +139,8 @@ public:
         uint64_t old_limit = connecting_client->effectiveConcurrentStreamLimit();
         connecting_client->remaining_streams_ = 1;
         if (connecting_client->effectiveConcurrentStreamLimit() < old_limit) {
-          connecting_stream_capacity_ -=
-              (old_limit - connecting_client->effectiveConcurrentStreamLimit());
+          decrConnectingStreamCapacity(old_limit -
+                                       connecting_client->effectiveConcurrentStreamLimit());
         }
       }
     }
@@ -162,8 +165,7 @@ public:
   newPendingStream(Envoy::ConnectionPool::AttachContext& context) override {
     Envoy::ConnectionPool::PendingStreamPtr pending_stream =
         std::make_unique<TcpPendingStream>(*this, typedContext<TcpAttachContext>(context));
-    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-    return pending_streams_.front().get();
+    return addPendingStream(std::move(pending_stream));
   }
 
   Upstream::HostDescriptionConstSharedPtr host() const override {

@@ -778,6 +778,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   if (!hosts_source) {
     return nullptr;
   }
+
   auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();

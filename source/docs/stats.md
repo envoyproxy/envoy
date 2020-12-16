@@ -184,7 +184,14 @@ showing the memory layout for a few scenarios of constructing and joining symbol
 
 There are several ways to create hot-path contention looking up stats by name,
 and there is no bulletproof way to prevent it from occurring.
- * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests.
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
+   scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
+   in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path and during
+   control-plane updates, so that we do not need to take symbol-table locks. As an example, see
+   [ClusterInfoImpl::generateStats](https://github.com/envoyproxy/envoy/blob/8188e232a9e0b15111d30f4724cbc7bf77d3964a/source/common/upstream/upstream_impl.cc#L641)
+   and its
+   [MAKE_STAT_NAMES_STRUCT](https://github.com/envoyproxy/envoy/blob/8188e232a9e0b15111d30f4724cbc7bf77d3964a/include/envoy/upstream/upstream.h#L646).
+   invocation.
  * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
    made in the hot path.
 
@@ -193,11 +200,6 @@ with a format-check, but we can determine whether symbol-table lookups are
 occurring during via an admin endpoint that shows 20 recent lookups by name, at
 `ENVOY_HOST:ADMIN_PORT/stats?recentlookups`.
 
-As of October 6, 2020, the "fake" symbol table implementation has been removed
-from the system, and the "--use-fake-symbol-table" option is now a no-op,
-triggering a warning if set to "1". The option will be removed in a later
-release.
-
 ### Symbol Table Class Overview
 
 Class | Superclass | Description
@@ -205,7 +207,7 @@ Class | Superclass | Description
 SymbolTable | | Abstract class providing an interface for symbol tables
 SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
 SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
-StatName | | Provides an API and a view into a StatName (dynamic orsymbolized). Like absl::string_view, the backing store must be separately maintained.
+StatName | | Provides an API and a view into a StatName (dynamic or symbolized). Like absl::string_view, the backing store must be separately maintained.
 StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
 StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
 StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free(). 

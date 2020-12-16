@@ -19,6 +19,8 @@ class ActiveClient : public CodecClientCallbacks,
                      public Envoy::Http::ActiveClient {
 public:
   ActiveClient(HttpConnPoolImplBase& parent);
+  ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+               Upstream::Host::CreateConnectionData& data);
   ~ActiveClient() override = default;
 
   // ConnPoolImpl::ActiveClient
@@ -39,7 +41,8 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state);
 
 } // namespace Http2
 } // namespace Http

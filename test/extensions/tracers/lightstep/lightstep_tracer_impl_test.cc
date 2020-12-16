@@ -74,8 +74,9 @@ public:
     opts->component_name = "component";
 
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-    ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillByDefault(ReturnRef(cm_.async_client_));
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
@@ -89,8 +90,8 @@ public:
   void setupValidDriver(int min_flush_spans = LightStepDriver::DefaultMinFlushSpans,
                         Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                             Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+    cm_.initializeClusters({"fake_cluster"}, {});
+    ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
     EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
@@ -150,8 +151,6 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -163,9 +162,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
-
+    cm_.initializeClusters({"fake_cluster"}, {});
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -176,10 +173,8 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+    ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -191,10 +186,6 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 }
 
 TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
   const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
@@ -205,22 +196,25 @@ TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
   opts->access_token = "sample_token";
   opts->component_name = "component";
 
-  ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-      .WillByDefault(ReturnRef(cm_.async_client_));
+  ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+      .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
   auto propagation_mode = Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
 
-  tls_.defer_data = true;
+  tls_.defer_data_ = true;
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
                                               std::move(opts), propagation_mode, grpc_context_);
   tls_.call();
 }
 
 TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, addedViaApi()).WillByDefault(Return(true));
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, addedViaApi()).WillByDefault(Return(true));
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
@@ -234,11 +228,11 @@ TEST_F(LightStepDriverTest, AllowCollectorClusterToBeAddedViaApi) {
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   setupValidDriver(2);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -303,8 +297,8 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("fake_cluster");
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -326,8 +320,8 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -347,11 +341,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -375,11 +369,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -404,11 +398,11 @@ TEST_F(LightStepDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 TEST_F(LightStepDriverTest, FlushOneFailure) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -451,11 +445,11 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 TEST_F(LightStepDriverTest, FlushWithActiveReport) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -496,11 +490,11 @@ TEST_F(LightStepDriverTest, FlushWithActiveReport) {
 TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -544,11 +538,11 @@ TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
 TEST_F(LightStepDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
 
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
@@ -581,11 +575,11 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
 TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   setupValidDriver(1);
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
@@ -667,10 +661,6 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
   envoy::config::trace::v3::LightstepConfig lightstep_config;
   TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
-  EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
-      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
       .Times(AtLeast(1))
       .WillRepeatedly(Return(1000));
@@ -680,6 +670,9 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
       .Times(AtLeast(1))
       .WillRepeatedly(Return(1));
 
+  cm_.initializeClusters({"fake_cluster"}, {});
+  ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
+      .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
   setup(lightstep_config, true);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,

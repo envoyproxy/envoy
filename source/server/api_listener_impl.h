@@ -99,6 +99,7 @@ protected:
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
       }
       void enableHalfClose(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      bool isHalfCloseEnabled() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void close(Network::ConnectionCloseType) override {}
       Event::Dispatcher& dispatcher() override {
         return parent_.parent_.factory_context_.dispatcher();
@@ -140,6 +141,7 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
+      bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
 
       SyntheticReadCallbacks& parent_;

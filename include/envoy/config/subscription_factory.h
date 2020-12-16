@@ -4,6 +4,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
 
+#include "xds/core/v3/resource_locator.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -30,7 +32,7 @@ public:
                                OpaqueResourceDecoder& resource_decoder) PURE;
 
   /**
-   * Collection subscription factory interface for UDPA URLs.
+   * Collection subscription factory interface for xDS-TP URLs.
    *
    * @param collection_locator collection resource locator.
    * @param config envoy::config::core::v3::ConfigSource for authority resolution.
@@ -44,7 +46,7 @@ public:
    * @return SubscriptionPtr subscription object corresponding for collection_locator.
    */
   virtual SubscriptionPtr
-  collectionSubscriptionFromUrl(const udpa::core::v1::ResourceLocator& collection_locator,
+  collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,
                                 absl::string_view type_url, Stats::Scope& scope,
                                 SubscriptionCallbacks& callbacks,
