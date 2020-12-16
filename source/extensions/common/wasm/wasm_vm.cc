@@ -55,7 +55,7 @@ bool EnvoyWasmVmIntegration::getNullVmFunction(absl::string_view function_name, 
   return false;
 }
 
-WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& scope) {
+WasmVmPtr createWasmVm(absl::string_view runtime) {
   if (runtime.empty()) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
                         "Failed to create Wasm VM with unspecified runtime");
@@ -72,8 +72,7 @@ WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& s
   }
 
   auto wasm = runtime_factory->createWasmVm();
-  wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(
-      scope, runtime_factory->name(), runtime_factory->shortName());
+  wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(runtime_factory->name());
   return wasm;
 }
 

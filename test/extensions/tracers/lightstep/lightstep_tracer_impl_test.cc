@@ -119,7 +119,7 @@ public:
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
