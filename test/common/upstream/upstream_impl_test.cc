@@ -1917,7 +1917,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
               socket_address: { address: 192.168.1.2, port_value: 44 }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       {
         envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         Envoy::Stats::ScopePtr scope =
@@ -1930,10 +1930,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
         StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope),
                                   false);
       },
-      EnvoyException,
-      "Protobuf message (type envoy.config.cluster.v3.Cluster reason "
-      "INVALID_ARGUMENT:(lb_policy): invalid "
-      "value \"fakelbtype\" for type TYPE_ENUM) has unknown fields");
+      EnvoyException, "invalid value \"fakelbtype\"");
 }
 
 TEST_F(StaticClusterImplTest, MalformedHostIP) {
@@ -3003,9 +3000,12 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http10, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http10));
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http11));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http2));
+  EXPECT_EQ(Http::Protocol::Http10,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
 TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
@@ -3019,10 +3019,13 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http10));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http11));
-  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http2));
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
 TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
@@ -3035,10 +3038,13 @@ TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
 
   auto cluster = makeCluster(yaml);
 
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt));
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http10));
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http11));
-  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(Http::Protocol::Http2));
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.
