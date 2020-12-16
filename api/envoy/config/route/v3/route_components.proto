@@ -1544,7 +1544,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1712,6 +1712,27 @@ message RateLimit {
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
     }
 
+    // The following descriptor entry is appended with a computed value.
+    // See :ref:`attributes <arch_overview_attributes>` for the set of
+    // available attributes.
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<expression_value>")
+    message Expression {
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
+
+      oneof expr_specifier {
+        // Expression string, e.g. "connection.requested_server_name".
+        string text = 2 [(validate.rules).string = {min_len: 1}];
+      }
+
+      // If set to true, Envoy skips the descriptor if the expression evaluates to an error.
+      // By default, the rate limit is not applied when an expression produces an error.
+      bool skip_if_error = 3;
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -1742,6 +1763,9 @@ message RateLimit {
 
       // Rate limit on metadata.
       MetaData metadata = 8;
+
+      // Rate limit on a computed expression value.
+      Expression expr = 9;
     }
   }
 
