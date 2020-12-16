@@ -232,18 +232,15 @@ public:
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
   static void init() {
-    main_thread_id_ = std::this_thread::get_id(); 
+    main_thread_id_ = std::this_thread::get_id();
     MainThreadSingleton::initialize(new MainThread());
   }
-  static bool isMainThread() { return main_thread_id_ == std::this_thread::get_id(); } 
-private:
+  static bool isMainThread() { return main_thread_id_ == std::this_thread::get_id(); }
   static std::thread::id main_thread_id_;
 };
 
-
-
 #define envoy_try                                                                                  \
-  ASSERT(ThreadLocal::MainThread::isMainThread());                                               \
+  ASSERT(ThreadLocal::MainThread::isMainThread());                                                 \
   try
 
 } // namespace ThreadLocal
