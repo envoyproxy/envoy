@@ -48,12 +48,12 @@ outlier_detection.consecutive_local_origin_failure
   setting in outlier detection
 
 outlier_detection.interval_ms
-  :ref:`interval_ms
+  :ref:`interval
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.interval>`
   setting in outlier detection
 
 outlier_detection.base_ejection_time_ms
-  :ref:`base_ejection_time_ms
+  :ref:`base_ejection_time
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.base_ejection_time>`
   setting in outlier detection
 
@@ -125,6 +125,11 @@ outlier_detection.failure_percentage_minimum_hosts
 outlier_detection.failure_percentage_threshold
   :ref:`failure_percentage_threshold
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.failure_percentage_threshold>`
+  setting in outlier detection
+
+outlier_detection.max_ejection_time_ms
+  :ref:`max_ejection_time
+  <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>`
   setting in outlier detection
 
 Core

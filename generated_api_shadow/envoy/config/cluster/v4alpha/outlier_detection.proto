@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message OutlierDetection {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.v3.OutlierDetection";
@@ -34,7 +34,8 @@ message OutlierDetection {
   google.protobuf.Duration interval = 2 [(validate.rules).duration = {gt {}}];
 
   // The base time that a host is ejected for. The real time is equal to the
-  // base time multiplied by the number of times the host has been ejected.
+  // base time multiplied by the number of times the host has been ejected and is
+  // capped by :ref:`max_ejection_time<envoy_api_field_config.cluster.v4alpha.OutlierDetection.max_ejection_time>`.
   // Defaults to 30000ms or 30s.
   google.protobuf.Duration base_ejection_time = 3 [(validate.rules).duration = {gt {}}];
 
@@ -148,4 +149,9 @@ message OutlierDetection {
   // volume is lower than this setting, failure percentage-based ejection will not be performed for
   // this host. Defaults to 50.
   google.protobuf.UInt32Value failure_percentage_request_volume = 20;
+
+  // The maximum time that a host is ejected for. See :ref:`base_ejection_time<envoy_api_field_config.cluster.v4alpha.OutlierDetection.base_ejection_time>`
+  // for more information.
+  // Defaults to 300000ms or 300s.
+  google.protobuf.Duration max_ejection_time = 21 [(validate.rules).duration = {gt {}}];
 }
