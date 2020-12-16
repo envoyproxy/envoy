@@ -1391,10 +1391,10 @@ public:
       bootstrap.add_node_context_params("cluster");
       bootstrap.mutable_dynamic_resources()->set_lds_resources_locator(
           "xdstp://test/envoy.config.listener.v3.Listener/foo/*");
-      bootstrap.mutable_dynamic_resources()
-          ->mutable_lds_config()
-          ->mutable_api_config_source()
-          ->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+      auto* lds_config = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      lds_config->mutable_api_config_source()->set_api_type(
+          envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
     });
     AdsIntegrationTest::initialize();
   }
