@@ -15,6 +15,7 @@ envoy_cc_library(
         ":thread_local_object",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
