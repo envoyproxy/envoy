@@ -15,7 +15,8 @@ ConnPoolImplBase::ConnPoolImplBase(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state)
     : state_(state), host_(host), priority_(priority), dispatcher_(dispatcher),
-      socket_options_(options), transport_socket_options_(transport_socket_options) {}
+      socket_options_(options), transport_socket_options_(transport_socket_options),
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(ready_clients_.empty());
@@ -214,6 +215,10 @@ bool ConnPoolImplBase::maybePrefetch(float global_prefetch_ratio) {
   return tryCreateNewConnection(global_prefetch_ratio);
 }
 
+void ConnPoolImplBase::scheduleOnUpstreamReady() {
+  upstream_ready_cb_->scheduleCallbackCurrentIteration();
+}
+
 void ConnPoolImplBase::onUpstreamReady() {
   while (!pending_streams_.empty() && !ready_clients_.empty()) {
     ActiveClientPtr& client = ready_clients_.front();
@@ -324,6 +329,11 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
   }
 
+  if (client.connect_timer_) {
+    client.connect_timer_->disableTimer();
+    client.connect_timer_.reset();
+  }
+
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     state_.decrConnectingStreamCapacity(client.currentUnusedCapacity());
@@ -382,17 +392,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
   } else if (event == Network::ConnectionEvent::Connected) {
     client.conn_connect_ms_->complete();
     client.conn_connect_ms_.reset();
-
     ASSERT(client.state_ == ActiveClient::State::CONNECTING);
     transitionActiveClientState(client, ActiveClient::State::READY);
 
+    // At this point, for the mixed ALPN pool, the client may be deleted. Do not
+    // refer to client after this point.
+    onConnected(client);
     onUpstreamReady();
     checkForDrained();
-  }
-
-  if (client.connect_timer_) {
-    client.connect_timer_->disableTimer();
-    client.connect_timer_.reset();
   }
 }
 

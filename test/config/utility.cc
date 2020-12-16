@@ -40,6 +40,7 @@ admin:
       port_value: 0
 dynamic_resources:
   lds_config:
+    resource_api_version: V3
     path: {}
 static_resources:
   secrets:
@@ -113,6 +114,27 @@ std::string ConfigHelper::tcpProxyConfig() {
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF");
+}
+
+std::string ConfigHelper::startTlsConfig() {
+  return absl::StrCat(
+      tcpProxyConfig(),
+      fmt::format(R"EOF(
+      transport_socket:
+        name: "starttls"
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          cleartext_socket_config:
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+                certificate_chain:
+                  filename: {}
+                private_key:
+                  filename: {}
+)EOF",
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
 std::string ConfigHelper::tlsInspectorFilter() {
@@ -245,8 +267,6 @@ typed_config:
 )EOF";
 }
 
-// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
-//               work restores it here.
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
   return fmt::format(
@@ -262,10 +282,11 @@ dynamic_resources:
     resource_api_version: V3
     api_config_source:
       api_type: {}
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      set_node_on_first_message_only: false
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster
@@ -319,7 +340,13 @@ static_resources:
 
 // TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::adsBootstrap(const std::string& api_type,
-                                       envoy::config::core::v3::ApiVersion api_version) {
+                                       envoy::config::core::v3::ApiVersion resource_api_version,
+                                       envoy::config::core::v3::ApiVersion transport_api_version) {
+  // We use this to allow tests to default to having a single API version but override and make
+  // the transport/resource API version distinction when needed.
+  if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO) {
+    transport_api_version = resource_api_version;
+  }
   return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
@@ -329,8 +356,9 @@ dynamic_resources:
     resource_api_version: {1}
     ads: {{}}
   ads_config:
-    transport_api_version: {1}
+    transport_api_version: {2}
     api_type: {0}
+    set_node_on_first_message_only: true
 static_resources:
   clusters:
     name: dummy_cluster
@@ -353,13 +381,15 @@ static_resources:
         explicit_http_config:
           http2_protocol_options: {{}}
 admin:
-  access_log_path: {2}
+  access_log_path: {3}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type, api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     api_type,
+                     resource_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
+                     transport_api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3",
                      Platform::null_device_path);
 }
 
@@ -624,14 +654,37 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls() {
-  addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+void ConfigHelper::configureUpstreamTls(bool use_alpn) {
+  addConfigModifier([use_alpn](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
     protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
     ConfigHelper::setProtocolOptions(*cluster, protocol_options);
 
+    if (use_alpn) {
+      ConfigHelper::HttpProtocolOptions new_protocol_options;
+
+      HttpProtocolOptions old_protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      protocol_options.MergeFrom(old_protocol_options);
+
+      new_protocol_options = old_protocol_options;
+      new_protocol_options.clear_explicit_http_config();
+      new_protocol_options.mutable_auto_config();
+      if (old_protocol_options.explicit_http_config().has_http_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http_protocol_options());
+      } else if (old_protocol_options.explicit_http_config().has_http2_protocol_options()) {
+        new_protocol_options.mutable_auto_config()->mutable_http2_protocol_options()->MergeFrom(
+            old_protocol_options.explicit_http_config().http2_protocol_options());
+      }
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(new_protocol_options);
+    }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
     auto* validation_context =
         tls_context.mutable_common_tls_context()->mutable_validation_context();
@@ -659,10 +712,6 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
 void ConfigHelper::enableDeprecatedV2Api() {
   addRuntimeOverride("envoy.reloadable_features.enable_deprecated_v2_api", "true");
   addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
-}
-
-void ConfigHelper::setNewCodecs() {
-  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "true");
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
@@ -986,7 +1035,8 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   loadHttpConnectionManager(hcm_config);
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->set_text_format(absl::StrCat(format, "\n"));
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        absl::StrCat(format, "\n"));
   }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
@@ -1001,7 +1051,8 @@ bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::strin
   }
   envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
-    access_log_config.mutable_log_format()->set_text_format(std::string(format));
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        std::string(format));
   }
   access_log_config.set_path(filename);
   bootstrap_.mutable_static_resources()

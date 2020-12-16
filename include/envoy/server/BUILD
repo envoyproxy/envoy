@@ -112,6 +112,7 @@ envoy_cc_library(
     hdrs = ["instance.h"],
     deps = [
         ":admin_interface",
+        ":configuration_interface",
         ":drain_manager_interface",
         ":hot_restart_interface",
         ":lifecycle_notifier_interface",
@@ -169,6 +170,7 @@ envoy_cc_library(
     hdrs = ["factory_context.h"],
     deps = [
         ":admin_interface",
+        ":configuration_interface",
         ":drain_manager_interface",
         ":lifecycle_notifier_interface",
         ":process_context_interface",
@@ -182,6 +184,7 @@ envoy_cc_library(
         "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
+        "//include/envoy/router:context_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/singleton:manager_interface",

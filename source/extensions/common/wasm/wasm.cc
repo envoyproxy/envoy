@@ -102,7 +102,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
 Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
            absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
            Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
-    : WasmBase(createWasmVm(runtime, scope), vm_id, vm_configuration, vm_key), scope_(scope),
+    : WasmBase(createWasmVm(runtime), vm_id, vm_configuration, vm_key), scope_(scope),
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       wasm_stats_(WasmStats{
@@ -116,8 +116,7 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
     : WasmBase(base_wasm_handle,
                [&base_wasm_handle]() {
                  return createWasmVm(
-                     getEnvoyWasmIntegration(*base_wasm_handle->wasm()->wasm_vm()).runtime(),
-                     getWasm(base_wasm_handle)->scope_);
+                     getEnvoyWasmIntegration(*base_wasm_handle->wasm()->wasm_vm()).runtime());
                }),
       scope_(getWasm(base_wasm_handle)->scope_),
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
