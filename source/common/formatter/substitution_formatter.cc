@@ -49,8 +49,8 @@ const std::regex& getStartTimeNewlinePattern() {
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
-template <class... Ts> struct JsonFormatMapVisitor : Ts... { using Ts::operator()...; };
-template <class... Ts> JsonFormatMapVisitor(Ts...) -> JsonFormatMapVisitor<Ts...>;
+template <class... Ts> struct StructFormatMapVisitor : Ts... { using Ts::operator()...; };
+template <class... Ts> StructFormatMapVisitor(Ts...) -> StructFormatMapVisitor<Ts...>;
 
 } // namespace
 
@@ -135,17 +135,17 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       absl::string_view local_reply_body) const {
-  const auto output_struct =
-      toStruct(request_headers, response_headers, response_trailers, stream_info, local_reply_body);
+  const auto output_struct = struct_formatter_.format(
+      request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
   const std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
-JsonFormatterImpl::JsonFormatMapWrapper
-JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
-  auto output = std::make_unique<JsonFormatMap>();
-  for (const auto& pair : json_format.fields()) {
+StructFormatter::StructFormatMapWrapper
+StructFormatter::toFormatMap(const ProtobufWkt::Struct& struct_format) const {
+  auto output = std::make_unique<StructFormatMap>();
+  for (const auto& pair : struct_format.fields()) {
     switch (pair.second.kind_case()) {
     case ProtobufWkt::Value::kStringValue:
       output->emplace(pair.first, SubstitutionFormatParser::parse(pair.second.string_value()));
@@ -155,17 +155,17 @@ JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
       break;
     default:
       throw EnvoyException(
-          "Only string values or nested structs are supported in the JSON access log format.");
+          "Only string values or nested structs are supported in structured access log format.");
     }
   }
   return {std::move(output)};
 };
 
-ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& request_headers,
-                                                const Http::ResponseHeaderMap& response_headers,
-                                                const Http::ResponseTrailerMap& response_trailers,
-                                                const StreamInfo::StreamInfo& stream_info,
-                                                absl::string_view local_reply_body) const {
+ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& request_headers,
+                                            const Http::ResponseHeaderMap& response_headers,
+                                            const Http::ResponseTrailerMap& response_trailers,
+                                            const StreamInfo::StreamInfo& stream_info,
+                                            absl::string_view local_reply_body) const {
   const std::string& empty_value =
       omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
   const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
@@ -197,11 +197,11 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         }
         return ValueUtil::stringValue(str);
       };
-  const std::function<ProtobufWkt::Value(const JsonFormatterImpl::JsonFormatMapWrapper&)>
-      json_format_map_callback = [&](const JsonFormatterImpl::JsonFormatMapWrapper& format) {
+  const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>
+      struct_format_map_callback = [&](const StructFormatter::StructFormatMapWrapper& format) {
         ProtobufWkt::Struct output;
         auto* fields = output.mutable_fields();
-        JsonFormatMapVisitor visitor{json_format_map_callback, providers_callback};
+        StructFormatMapVisitor visitor{struct_format_map_callback, providers_callback};
         for (const auto& pair : *format.value_) {
           ProtobufWkt::Value value = absl::visit(visitor, pair.second);
           if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
@@ -211,7 +211,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         }
         return ValueUtil::structValue(output);
       };
-  return json_format_map_callback(json_output_format_).struct_value();
+  return struct_format_map_callback(struct_output_format_).struct_value();
 }
 
 void SubstitutionFormatParser::parseCommandHeader(const std::string& token, const size_t start,
