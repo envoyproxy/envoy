@@ -1917,7 +1917,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
               socket_address: { address: 192.168.1.2, port_value: 44 }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       {
         envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         Envoy::Stats::ScopePtr scope =
@@ -1930,10 +1930,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
         StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope),
                                   false);
       },
-      EnvoyException,
-      "Protobuf message (type envoy.config.cluster.v3.Cluster reason "
-      "INVALID_ARGUMENT:(lb_policy): invalid "
-      "value \"fakelbtype\" for type TYPE_ENUM) has unknown fields");
+      EnvoyException, "invalid value \"fakelbtype\"");
 }
 
 TEST_F(StaticClusterImplTest, MalformedHostIP) {
