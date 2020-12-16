@@ -25,6 +25,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -148,6 +149,27 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
+  autonomous_upstream_ = true;
+  initialize();
+  int num_connections = 50;
+  std::vector<IntegrationTcpClientPtr> clients(num_connections);
+
+  for (int i = 0; i < num_connections; ++i) {
+    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
+  }
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
+  for (int i = 0; i < num_connections; ++i) {
+    IntegrationTcpClientPtr& tcp_client = clients[i];
+    ASSERT_TRUE(tcp_client->write(
+        "GET / HTTP/1.0\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
+        false));
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
+  }
 }
 
 TEST_P(TcpProxyIntegrationTest, NoUpstream) {
