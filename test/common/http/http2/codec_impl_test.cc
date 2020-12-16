@@ -363,14 +363,8 @@ TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   // We have to dynamic cast because protocolErrorForTest() is intentionally not on the
   // Connection API.
   ServerConnectionImpl* raw_server = dynamic_cast<ServerConnectionImpl*>(server_.get());
-  if (raw_server != nullptr) {
-    EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(raw_server->protocolErrorForTest()));
-  } else {
-    Envoy::Http::Legacy::Http2::ServerConnectionImpl* legacy_raw_server =
-        dynamic_cast<Envoy::Http::Legacy::Http2::ServerConnectionImpl*>(server_.get());
-    ASSERT(legacy_raw_server != nullptr);
-    legacy_raw_server->protocolErrorForTest();
-  }
+  ASSERT(raw_server != nullptr);
+  EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(raw_server->protocolErrorForTest()));
 }
 
 // 100 response followed by 200 results in a [decode100ContinueHeaders, decodeHeaders] sequence.
