@@ -324,7 +324,7 @@ void InstanceImpl::initialize(const Options& options,
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
 
-  ThreadLocal::MainThreadSingleton::initialize(new ThreadLocal::MainThread());
+  ThreadLocal::MainThread::init();
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
@@ -809,7 +809,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(ThreadLocal::MainThreadSingleton::get().isMainThread());
+  ASSERT(ThreadLocal::MainThread::isMainThread());
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {
