@@ -193,6 +193,10 @@ OriginalDstClusterFactory::createClusterImpl(
         envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
   }
 
+  if (cluster.has_common_lb_config() && cluster.common_lb_config().has_slow_start_config()) {
+    throw EnvoyException("Slow start mode is not supported for original dst lb");
+  }
+
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
