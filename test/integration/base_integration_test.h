@@ -260,7 +260,7 @@ private:
   template <class T> std::string intResourceName(const T& m) {
     // gcc doesn't allow inline template function to be specialized, using a constexpr if to
     // workaround.
-    if constexpr (std::is_same<T, envoy::config::endpoint::v3::ClusterLoadAssignment>::value) {
+    if constexpr (std::is_same_v<T, envoy::config::endpoint::v3::ClusterLoadAssignment>) {
       return m.cluster_name();
     } else {
       return m.name();
