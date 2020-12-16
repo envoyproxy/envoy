@@ -32,9 +32,11 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
   service_static = &service;
   RELEASE_ASSERT(service_static != nullptr, "Global pointer to service should not be null");
 
+  // The `SERVICE_TABLE_ENTRY` struct requires a volatile `LPSTR`
+  char nullstr[1] = "";
   SERVICE_TABLE_ENTRYA service_table[] = {// Even though the service name is ignored for own process
                                           // services, it must be a valid string and cannot be 0.
-                                          {"ENVOY", (LPSERVICE_MAIN_FUNCTIONA)ServiceMain},
+                                          {nullstr, (LPSERVICE_MAIN_FUNCTIONA)ServiceMain},
                                           // Designates the end of table.
                                           {0, 0}};
 
