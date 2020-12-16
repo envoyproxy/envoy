@@ -231,14 +231,11 @@ public:
 
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
-  MainThread(): main_thread_id_{std::this_thread::get_id()} {}
-  bool inMainThread() {
-    return main_thread_id_ == std::this_thread::get_id();
-  }
-  static void init() {
-    MainThreadSingleton::initialize(new MainThread());
-  }
+  MainThread() : main_thread_id_{std::this_thread::get_id()} {}
+  bool inMainThread() { return main_thread_id_ == std::this_thread::get_id(); }
+  static void init() { MainThreadSingleton::initialize(new MainThread()); }
   static bool isMainThread() { return MainThreadSingleton::get().inMainThread(); }
+
 private:
   std::thread::id main_thread_id_;
 };
