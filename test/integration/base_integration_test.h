@@ -252,16 +252,15 @@ public:
   }
 
 private:
-  std::string intResourceName(const envoy::config::listener::v3::Listener& m) { return m.name(); }
-  std::string intResourceName(const envoy::config::route::v3::RouteConfiguration& m) {
-    return m.name();
+  template <class T> std::string intResourceName(const T& m) {
+    // gcc doesn't allow inline template function to be specialized, using a constexpr if to
+    // workaround.
+    if constexpr (std::is_same_v<T, envoy::config::endpoint::v3::ClusterLoadAssignment>) {
+      return m.cluster_name();
+    } else {
+      return m.name();
+    }
   }
-  std::string intResourceName(const envoy::config::cluster::v3::Cluster& m) { return m.name(); }
-  std::string intResourceName(const envoy::config::endpoint::v3::ClusterLoadAssignment& m) {
-    return m.cluster_name();
-  }
-  std::string intResourceName(const envoy::config::route::v3::VirtualHost& m) { return m.name(); }
-  std::string intResourceName(const envoy::service::runtime::v3::Runtime& m) { return m.name(); }
 
   Event::GlobalTimeSystem time_system_;
 
