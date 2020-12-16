@@ -1,26 +1,18 @@
 .. _arch_overview_threading:
 
-Threading model
+线程模型
 ===============
 
-Envoy uses a single process with multiple threads architecture. A single *primary* thread controls
-various sporadic coordination tasks while some number of *worker* threads perform listening,
-filtering, and forwarding. Once a connection is accepted by a listener, the connection spends the
-rest of its lifetime bound to a single worker thread. This allows the majority of Envoy to be
-largely single threaded (embarrassingly parallel) with a small amount of more complex code handling
-coordination between the worker threads. Generally Envoy is written to be 100% non-blocking and for
-most workloads we recommend configuring the number of worker threads to be equal to the number of
-hardware threads on the machine.
+Envoy 使用单进程-多线程架构。一个 *primary* 线程处理各种轻量协调任务，同时多个 *worker* 线程处理监听、过滤、转发。
+当一个连接被监听器接受，连接的剩余生命周期将绑定在当前 *worker* 线程。这使得 Envoy 大部分代码近似单线程运行（高度并行），
+只有少量的复杂代码用于实现 *worker* 线程之间的协调。Envoy 基本实现了 100% 的非阻塞，对于大多数工作负载，
+我们建议将 *worker* 线程数配置为物理机器的线程数。
 
-Listener connection balancing
+监听器连接均衡
 -----------------------------
 
-By default, there is no coordination between worker threads. This means that all worker threads
-independently attempt to accept connections on each listener and rely on the kernel to perform
-adequate balancing between threads. For most workloads, the kernel does a very good job of
-balancing incoming connections. However, for some workloads, particularly those that have a small
-number of very long lived connections (e.g., service mesh HTTP2/gRPC egress), it may be desirable
-to have Envoy forcibly balance connections between worker threads. To support this behavior,
-Envoy allows for different types of :ref:`connection balancing
-<envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>` to be configured on each :ref:`listener
-<arch_overview_listeners>`.
+默认情况下，*worker* 线程之间没有协调。这表示所有 *worker* 线程都独立的尝试从每一个监听器接受连接，
+然后依赖内核在线程之间执行适当的均衡。对于大多数工作负载，内核都可以很好的均衡传入的连接。但是，
+对于某些工作负载，特别是那些只有少量但非常长寿命的连接的工作负载（例如，服务网格 HTTP2/gRPC egress），
+则可能希望让 Envoy 强制平衡工作线程之间的连接。为了支持这种行为，
+Envoy 允许为每个 :ref:`监听器 <arch_overview_listeners>` 配置不同类型的 :ref:`连接均衡 <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`。
