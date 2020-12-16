@@ -6,7 +6,7 @@
 #include <list>
 
 #include "envoy/event/dispatcher.h"
-#include "common/singleton/threadsafe_singleton.h"
+
 #include "common/common/assert.h"
 #include "common/common/stl_helpers.h"
 

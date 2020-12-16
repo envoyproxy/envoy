@@ -10,6 +10,7 @@
 #include "envoy/thread_local/thread_local_object.h"
 
 #include "common/common/assert.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace ThreadLocal {
