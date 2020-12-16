@@ -135,7 +135,7 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
       std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_valid_address);
 
   Buffer::OwnedImpl buffer;
-  Buffer::Reservation reservation = buffer.reserve(100);
+  auto reservation = buffer.reserveApproximately(100);
 
   auto result = socket->ioHandle().sendmsg(reservation.slices(), reservation.numSlices(), 0,
                                            local_valid_address->ip(), *peer_internal_address);
