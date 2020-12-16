@@ -9,15 +9,11 @@
 #include "common/config/utility.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/status.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -162,15 +158,9 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
 
   switch (type) {
   case Type::HTTP1: {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-          *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-          host->cluster().maxResponseHeadersCount());
-    } else {
-      codec_ = std::make_unique<Legacy::Http1::ClientConnectionImpl>(
-          *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-          host->cluster().maxResponseHeadersCount());
-    }
+    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+        *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
+        host->cluster().maxResponseHeadersCount());
     break;
   }
   case Type::HTTP2: {

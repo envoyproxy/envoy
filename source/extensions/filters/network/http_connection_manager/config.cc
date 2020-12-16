@@ -22,9 +22,7 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/request_id_extension_impl.h"
@@ -566,34 +564,17 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1: {
-    if (context_.runtime().snapshot().runtimeFeatureEnabled(
-            "envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http::Http1::ServerConnectionImpl>(
-          connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
-          callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-          headersWithUnderscoresAction());
-    } else {
-      return std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
-          connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
-          callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-          headersWithUnderscoresAction());
-    }
+    return std::make_unique<Http::Http1::ServerConnectionImpl>(
+        connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
+        callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+        headersWithUnderscoresAction());
   }
   case CodecType::HTTP2: {
-    if (context_.runtime().snapshot().runtimeFeatureEnabled(
-            "envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http::Http2::ServerConnectionImpl>(
-          connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
-          context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-          maxRequestHeadersCount(), headersWithUnderscoresAction());
-    } else {
-      return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
-          connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
-          context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-          maxRequestHeadersCount(), headersWithUnderscoresAction());
-    }
+    return std::make_unique<Http::Http2::ServerConnectionImpl>(
+        connection, callbacks,
+        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
+        context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.

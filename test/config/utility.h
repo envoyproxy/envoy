@@ -279,9 +279,6 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
 
-  // Set new codecs to use for upstream and downstream codecs.
-  void setNewCodecs();
-
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
