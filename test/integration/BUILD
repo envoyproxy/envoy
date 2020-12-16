@@ -71,6 +71,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "alpn_integration_test",
+    srcs = ["alpn_integration_test.cc"],
+    deps = [":http_integration_lib"],
+)
+
+envoy_cc_test(
     name = "api_listener_integration_test",
     srcs = ["api_listener_integration_test.cc"],
     deps = [
@@ -886,6 +892,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/grpc_http1_bridge/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

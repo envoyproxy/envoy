@@ -28,6 +28,7 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -265,7 +266,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
-                            validation_context.dynamicValidationVisitor(), api, runtime_) {
+                            validation_context.dynamicValidationVisitor(), api) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -325,14 +326,14 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              dyn_resources.ads_config().transport_api_version() ==
+              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
                       envoy::config::core::v3::ApiVersion::V3
                   // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
                   // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "DeltaAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, stats_,
+          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
@@ -342,7 +343,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              dyn_resources.ads_config().transport_api_version() ==
+              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
                       envoy::config::core::v3::ApiVersion::V3
                   // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
                   // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
@@ -350,7 +351,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "StreamAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, stats_,
+          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
@@ -371,36 +372,24 @@ ClusterManagerImpl::ClusterManagerImpl(
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateClusterCounts();
 
-  if (local_cluster_name_ &&
-      (active_clusters_.find(local_cluster_name_.value()) == active_clusters_.end())) {
-    throw EnvoyException(
-        fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
+  absl::optional<ThreadLocalClusterManagerImpl::LocalClusterParams> local_cluster_params;
+  if (local_cluster_name_) {
+    auto local_cluster = active_clusters_.find(local_cluster_name_.value());
+    if (local_cluster == active_clusters_.end()) {
+      throw EnvoyException(
+          fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
+    }
+    local_cluster_params.emplace();
+    local_cluster_params->info_ = local_cluster->second->cluster().info();
+    local_cluster_params->load_balancer_factory_ = local_cluster->second->loadBalancerFactory();
+    local_cluster->second->setAddedOrUpdated();
   }
 
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
   // we can instantiate the thread local cluster manager.
-  tls_.set([this](Event::Dispatcher& dispatcher) {
-    return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher);
+  tls_.set([this, local_cluster_params](Event::Dispatcher& dispatcher) {
+    return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_params);
   });
-
-  // For active clusters that exist in bootstrap, post an empty thread local cluster update to
-  // populate them.
-  // TODO(mattklein123): It would be nice if we did not do this and instead all thread local cluster
-  // creation happened as part of the cluster init flow, however there are certain cases that depend
-  // on this behavior including route checking. It may be possible to fix static route checking to
-  // not depend on this behavior, but for now this is consistent with the way we have always done
-  // this so in the interest of minimal change it is not being done now.
-  for (auto& cluster : active_clusters_) {
-    // Skip posting the thread local cluster which is created as part of the thread local cluster
-    // manager constructor. See the TODO in that code for eventually cleaning this up.
-    if (local_cluster_name_ && local_cluster_name_.value() == cluster.first) {
-      continue;
-    }
-
-    // Avoid virtual call in the constructor. This only impacts tests. Remove this when fixing
-    // the above TODO.
-    postThreadLocalClusterUpdateNonVirtual(*cluster.second, ThreadLocalClusterUpdateParams());
-  }
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (dyn_resources.has_cds_config()) {
@@ -437,7 +426,7 @@ void ClusterManagerImpl::initializeSecondaryClusters(
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), dispatcher_);
+        Config::Utility::getAndCheckTransportVersion(load_stats_config), dispatcher_);
   }
 }
 
@@ -536,14 +525,11 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
     params.per_priority_update_params_.emplace_back(host_set->priority(), host_set->hosts(),
                                                     HostVector{});
   }
-  // At this point the update is posted if either there are actual updates or the cluster has
-  // not been added yet. The latter can only happen with dynamic cluster as static clusters are
-  // added immediately.
-  // TODO(mattklein123): Per related TODOs we will see if we can centralize all logic so that
-  // clusters only get added in this path and all of the special casing can be removed.
-  if (!params.per_priority_update_params_.empty() || !cm_cluster.addedOrUpdated()) {
-    postThreadLocalClusterUpdate(cm_cluster, std::move(params));
-  }
+  // NOTE: In all cases *other* than the local cluster, this is when a cluster is added/updated
+  // The local cluster must currently be statically defined and must exist prior to other
+  // clusters being added/updated. We could gate the below update on hosts being available on
+  // the cluster or the cluster not already existing, but the special logic is not worth it.
+  postThreadLocalClusterUpdate(cm_cluster, std::move(params));
 }
 
 bool ClusterManagerImpl::scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority,
@@ -929,20 +915,12 @@ void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
   });
 }
 
-void ClusterManagerImpl::postThreadLocalClusterUpdateNonVirtual(
-    ClusterManagerCluster& cm_cluster, ThreadLocalClusterUpdateParams&& params) {
-  const bool is_local_cluster = local_cluster_name_.has_value() &&
-                                local_cluster_name_.value() == cm_cluster.cluster().info()->name();
+void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
+                                                      ThreadLocalClusterUpdateParams&& params) {
   bool add_or_update_cluster = false;
   if (!cm_cluster.addedOrUpdated()) {
     add_or_update_cluster = true;
     cm_cluster.setAddedOrUpdated();
-  }
-  if (is_local_cluster) {
-    // TODO(mattklein123): This is needed because of the special case of how local cluster is
-    // initialized in the thread local cluster manager constructor. This will all be cleaned up
-    // in a follow up.
-    add_or_update_cluster = false;
   }
 
   LoadBalancerFactorySharedPtr load_balancer_factory;
@@ -961,6 +939,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdateNonVirtual(
   tls_.runOnAllThreads(
       [info = cm_cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
        load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
         if (add_or_update_cluster) {
           if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
             ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
@@ -968,15 +947,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdateNonVirtual(
             ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
           }
 
-          auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
-              *cluster_manager, info, load_balancer_factory);
-          cluster_manager->thread_local_clusters_[info->name()].reset(thread_local_cluster);
-          // TODO(mattklein123): It would be better if update callbacks were done after the initial
-          // cluster member is seeded, assuming it is. In the interest of minimal change this is
-          // deferred for a future change.
-          for (auto& cb : cluster_manager->update_callbacks_) {
-            cb->onClusterAddOrUpdate(*thread_local_cluster);
-          }
+          new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
+                                                                        load_balancer_factory);
+          cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
         }
 
         for (const auto& per_priority : params.per_priority_update_params_) {
@@ -984,6 +957,12 @@ void ClusterManagerImpl::postThreadLocalClusterUpdateNonVirtual(
               info->name(), per_priority.priority_, per_priority.update_hosts_params_,
               per_priority.locality_weights_, per_priority.hosts_added_,
               per_priority.hosts_removed_, per_priority.overprovisioning_factor_);
+        }
+
+        if (new_cluster != nullptr) {
+          for (auto& cb : cluster_manager->update_callbacks_) {
+            cb->onClusterAddOrUpdate(*new_cluster);
+          }
         }
       });
 }
@@ -1059,22 +1038,17 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
-    ClusterManagerImpl& parent, Event::Dispatcher& dispatcher)
+    ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
+    const absl::optional<LocalClusterParams>& local_cluster_params)
     : parent_(parent), thread_local_dispatcher_(dispatcher) {
   // If local cluster is defined then we need to initialize it first.
-  // TODO(mattklein123): Technically accessing active_clusters_ here is a race condition. This has
-  // been this way "forever" but should be fixed in a follow up.
-  if (parent.localClusterName()) {
-    ENVOY_LOG(debug, "adding TLS local cluster {}", parent.localClusterName().value());
-    auto& local_cluster = parent.active_clusters_.at(parent.localClusterName().value());
-    thread_local_clusters_[parent.localClusterName().value()] = std::make_unique<ClusterEntry>(
-        *this, local_cluster->cluster_->info(), local_cluster->loadBalancerFactory());
+  if (local_cluster_params.has_value()) {
+    const auto& local_cluster_name = local_cluster_params->info_->name();
+    ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name);
+    thread_local_clusters_[local_cluster_name] = std::make_unique<ClusterEntry>(
+        *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_);
+    local_priority_set_ = &thread_local_clusters_[local_cluster_name]->priority_set_;
   }
-
-  local_priority_set_ =
-      parent.localClusterName()
-          ? &thread_local_clusters_[parent.localClusterName().value()]->priority_set_
-          : nullptr;
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImpl() {
@@ -1388,8 +1362,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  auto upstream_protocol = host->cluster().upstreamHttpProtocol(downstream_protocol);
-  std::vector<uint8_t> hash_key = {uint8_t(upstream_protocol)};
+  // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
+  // We could do better here, and always use the ALPN pool and simply make sure
+  // we end up on a connection of the correct protocol, but for simplicity we're
+  // starting with something simpler.
+  auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
+  std::vector<uint8_t> hash_key;
+  hash_key.reserve(upstream_protocols.size());
+  for (auto protocol : upstream_protocols) {
+    hash_key.push_back(uint8_t(protocol));
+  }
 
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
@@ -1426,7 +1408,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
-            parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
+            parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.cluster_manager_state_);
@@ -1494,20 +1476,26 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    std::vector<Http::Protocol>& protocols,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     ClusterConnectivityState& state) {
-  if (protocol == Http::Protocol::Http2 &&
+  if (protocols.size() == 2 &&
+      ((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
+       (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11))) {
+    return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
+                                                         priority, options,
+                                                         transport_socket_options, state);
+  }
+
+  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state);
-  } else if (protocol == Http::Protocol::Http3) {
-    // Quic connection pool is not implemented.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  } else {
-    return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state);
   }
+  ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
+  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
+                                       transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(

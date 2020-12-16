@@ -37,6 +37,7 @@ namespace Envoy {
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
+class ThreadLocalCluster;
 } // namespace Upstream
 
 namespace Router {
@@ -1306,7 +1307,7 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

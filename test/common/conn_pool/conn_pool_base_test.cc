@@ -23,6 +23,7 @@ public:
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
+  absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
 
   uint32_t active_streams_{};
 };

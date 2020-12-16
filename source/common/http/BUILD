@@ -142,6 +142,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "mixed_conn_pool",
+    srcs = ["mixed_conn_pool.cc"],
+    hdrs = ["mixed_conn_pool.h"],
+    deps = [
+        ":conn_pool_base_lib",
+        "//source/common/http/http1:conn_pool_lib",
+        "//source/common/http/http2:conn_pool_lib",
+        "//source/common/tcp:conn_pool_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [
@@ -169,11 +181,14 @@ envoy_cc_library(
     deps = [
         ":headers_lib",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/matcher:matcher_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:linked_object",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
         "//source/common/local_reply:local_reply_lib",
+        "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
     ],
 )
 

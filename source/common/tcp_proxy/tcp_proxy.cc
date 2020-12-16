@@ -434,7 +434,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
         downstreamConnection()->streamInfo().filterState());
   }
 
-  if (!maybeTunnel(*thread_local_cluster, cluster_name)) {
+  if (!maybeTunnel(*thread_local_cluster)) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
@@ -443,7 +443,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name) {
+bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
@@ -456,8 +456,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::strin
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(
-      cluster_name, cluster_manager_, config_->tunnelingConfig(), this, *upstream_callbacks_);
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfig(), this,
+                                                      *upstream_callbacks_);
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -647,7 +647,7 @@ void Filter::onUpstreamConnection() {
       return true;
     });
     if (upstream_) {
-      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) {
+      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) -> bool {
         upstream_callbacks->onBytesSent();
         return true;
       });

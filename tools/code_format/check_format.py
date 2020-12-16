@@ -111,6 +111,11 @@ GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
 
+# Header files that can throw exceptions. These should be limited; the only
+# valid situation identified so far is template functions used for config
+# processing.
+EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
+
 # We want all URL references to exist in repository_locations.bzl files and have
 # metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
 # we have some exceptions for either infrastructure files or places we fall
@@ -425,11 +430,11 @@ class FormatChecker:
 
   def denylistedForExceptions(self, file_path):
     # Returns true when it is a non test header file or the file_path is in DENYLIST or
-    # it is under toos/testdata subdirectory.
+    # it is under tools/testdata subdirectory.
     if file_path.endswith(DOCS_SUFFIX):
       return False
 
-    return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
+    return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
 
   def allowlistedForBuildUrls(self, file_path):
