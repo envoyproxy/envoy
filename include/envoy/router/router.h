@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
@@ -36,6 +37,7 @@ namespace Envoy {
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
+class ThreadLocalCluster;
 } // namespace Upstream
 
 namespace Router {
@@ -1254,9 +1256,8 @@ public:
  *
  * It is similar logically to RequestEncoder, only without the getStream interface.
  */
-class GenericUpstream {
+class GenericUpstream : public Event::DeferredDeletable {
 public:
-  virtual ~GenericUpstream() = default;
   /**
    * Encode a data frame.
    * @param data supplies the data to encode. The data may be moved by the encoder.
@@ -1306,7 +1307,7 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

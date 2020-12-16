@@ -59,7 +59,7 @@ response_headers_to_add:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -81,7 +81,7 @@ token_bucket:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -119,7 +119,7 @@ token_bucket:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(1);
+  EXPECT_CALL(context.dispatcher_, createTimer_(_));
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
                                                        ProtobufMessage::getNullValidationVisitor()),
                EnvoyException);

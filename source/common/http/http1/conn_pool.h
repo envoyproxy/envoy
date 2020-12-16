@@ -17,6 +17,7 @@ namespace Http1 {
 class ActiveClient : public Envoy::Http::ActiveClient {
 public:
   ActiveClient(HttpConnPoolImplBase& parent);
+  ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data);
 
   // ConnPoolImplBase::ActiveClient
   bool closingWithIncompleteStream() const override;

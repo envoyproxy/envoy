@@ -51,8 +51,6 @@ envoy_extension_cc_test(
     name = "ratelimit_integration_test",
     srcs = ["ratelimit_integration_test.cc"],
     extension_name = "envoy.filters.http.ratelimit",
-    # TODO(envoyproxy/windows-dev): Apparently resolved by Level Events PR #13787
-    tags = ["flaky_on_windows"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

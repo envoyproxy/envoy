@@ -66,7 +66,7 @@ TEST_F(ScaledRangeTimerManagerTest, CreateAndDestroyTimer) {
 
   {
     MockFunction<TimerCb> callback;
-    auto timer = manager.createTimer(ScaledMinimum(1.0), callback.AsStdFunction());
+    auto timer = manager.createTimer(ScaledMinimum(UnitFloat(1.0)), callback.AsStdFunction());
   }
 }
 
@@ -74,7 +74,7 @@ TEST_F(ScaledRangeTimerManagerTest, CreateSingleScaledTimer) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(ScaledMinimum(0.5), callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(UnitFloat(0.5)), callback.AsStdFunction());
 
   timer->enableTimer(std::chrono::seconds(10));
   EXPECT_TRUE(timer->enabled());
@@ -110,7 +110,7 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileDisabled) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(ScaledMinimum(1.0), callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(UnitFloat(1.0)), callback.AsStdFunction());
 
   EXPECT_FALSE(timer->enabled());
   timer->disableTimer();
@@ -155,7 +155,7 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWithZeroMinTime) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(ScaledMinimum(0.0), callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(UnitFloat(0.0)), callback.AsStdFunction());
 
   timer->enableTimer(std::chrono::seconds(100));
 
@@ -319,7 +319,7 @@ TEST_F(ScaledRangeTimerManagerTest, SingleTimerSameMinMax) {
   ScaledRangeTimerManagerImpl manager(dispatcher_);
 
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(ScaledMinimum(1.0), callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(UnitFloat(1.0)), callback.AsStdFunction());
   EXPECT_CALL(callback, Call());
 
   timer->enableTimer(std::chrono::seconds(1));
@@ -333,7 +333,7 @@ TEST_F(ScaledRangeTimerManagerTest, ScaledMinimumFactorGreaterThan1) {
 
   // If the minimum scale factor is > 1, it should be treated as if it was 1.
   MockFunction<TimerCb> callback;
-  auto timer = manager.createTimer(ScaledMinimum(2), callback.AsStdFunction());
+  auto timer = manager.createTimer(ScaledMinimum(UnitFloat(2)), callback.AsStdFunction());
 
   timer->enableTimer(std::chrono::seconds(10));
   EXPECT_CALL(callback, Call);
