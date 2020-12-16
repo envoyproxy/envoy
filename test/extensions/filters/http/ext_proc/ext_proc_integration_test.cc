@@ -15,8 +15,8 @@ namespace Envoy {
 
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using Extensions::HttpFilters::ExternalProcessing::ExtProcTestUtility;
 
-using Extensions::HttpFilters::ExternalProcessing::expectHttpHeader;
 using Http::LowerCaseString;
 
 class ExtProcIntegrationTest : public HttpIntegrationTest,
@@ -61,6 +61,12 @@ protected:
     });
   }
 
+  void waitForFirstMessage(ProcessingRequest& request) {
+    ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_));
+    ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  }
+
   envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config_{};
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -80,11 +86,8 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   HttpTestUtility::addDefaultHeaders(headers);
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-  // Expect a message on the gRPC stream to the fake remote service
-  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_));
-  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   ProcessingRequest request_headers_msg;
-  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg));
+  waitForFirstMessage(request_headers_msg);
   // Just close the stream without doing anything
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}});
@@ -117,10 +120,8 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   HttpTestUtility::addDefaultHeaders(headers);
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_));
-  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   ProcessingRequest request_headers_msg;
-  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg));
+  waitForFirstMessage(request_headers_msg);
   // Fail the stream immediately
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "500"}}, true);
 
@@ -141,16 +142,18 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   headers.addCopy(LowerCaseString("x-remove-this"), "yes");
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
-  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, processor_connection_));
-  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   ProcessingRequest request_headers_msg;
-  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_headers_msg));
+  waitForFirstMessage(request_headers_msg);
 
   EXPECT_TRUE(request_headers_msg.has_request_headers());
   const auto request_headers = request_headers_msg.request_headers();
-  expectHttpHeader(request_headers.headers(), ":method", "GET");
-  expectHttpHeader(request_headers.headers(), ":path", "/");
-  expectHttpHeader(request_headers.headers(), "x-remove-this", "yes");
+  Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                          {":method", "GET"},
+                                                          {"host", "host"},
+                                                          {":path", "/"},
+                                                          {"x-remove-this", "yes"}};
+  EXPECT_TRUE(ExtProcTestUtility::headerProtosEqualIgnoreOrder(expected_request_headers,
+                                                               request_headers.headers()));
 
   processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 

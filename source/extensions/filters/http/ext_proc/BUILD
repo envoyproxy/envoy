@@ -55,7 +55,7 @@ envoy_cc_library(
     hdrs = ["mutation_utils.h"],
     deps = [
         "//include/envoy/http:header_map_interface",
-        "//source/common/http:headers_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],

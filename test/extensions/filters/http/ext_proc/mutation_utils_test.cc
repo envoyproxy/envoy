@@ -28,16 +28,13 @@ TEST(MutationUtils, TestBuildHeaders) {
   envoy::config::core::v3::HeaderMap proto_headers;
   MutationUtils::buildHttpHeaders(headers, proto_headers);
 
-  for (const auto& it : proto_headers.headers()) {
-    std::cerr << it.key() << ": " << it.value() << '\n';
-  }
-
-  expectHttpHeader(proto_headers, ":method", "GET");
-  expectHttpHeader(proto_headers, ":path", "/foo/the/bar?size=123");
-  expectHttpHeader(proto_headers, "content-type", "text/plain; encoding=UTF8");
-  expectHttpHeader(proto_headers, "x-something-else", "yes");
-  expectHttpHeader(proto_headers, "x-reference", "Foo");
-  expectHttpHeader(proto_headers, "x-number", "9999");
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
+                                          {":path", "/foo/the/bar?size=123"},
+                                          {"content-type", "text/plain; encoding=UTF8"},
+                                          {"x-something-else", "yes"},
+                                          {"x-reference", "Foo"},
+                                          {"x-number", "9999"}};
+  EXPECT_TRUE(ExtProcTestUtility::headerProtosEqualIgnoreOrder(expected, proto_headers));
 }
 
 TEST(MutationUtils, TestApplyMutations) {
@@ -84,7 +81,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-append-this", "3"},     {"x-replace-this", "nope"},
   };
 
-  ASSERT_TRUE(TestUtility::headerMapEqualIgnoreOrder(headers, expected_headers));
+  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(headers, expected_headers));
 }
 
 } // namespace

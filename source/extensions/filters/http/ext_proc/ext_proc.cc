@@ -65,6 +65,10 @@ void Filter::onReceiveMessage(
           MutationUtils::applyHeaderMutations(common_response.header_mutation(), *request_headers_);
         }
       }
+    } else if (response->has_immediate_response()) {
+      // To be implemented later. Leave stream open to allow people to implement
+      // correct servers that don't break us.
+      message_valid = true;
     }
     request_state_ = FilterState::IDLE;
     decoder_callbacks_->continueDecoding();

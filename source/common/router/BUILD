@@ -365,6 +365,7 @@ envoy_cc_library(
     deps = [
         ":header_formatter_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

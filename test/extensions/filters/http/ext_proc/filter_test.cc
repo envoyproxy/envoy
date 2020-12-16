@@ -115,11 +115,16 @@ TEST_F(HttpFilterTest, SimplestPost) {
   ASSERT_TRUE(last_request_.has_request_headers());
   const auto request_headers = last_request_.request_headers();
   EXPECT_FALSE(request_headers.end_of_stream());
-  expectHttpHeader(request_headers.headers(), ":path", "/");
-  expectHttpHeader(request_headers.headers(), ":method", "POST");
-  expectHttpHeader(request_headers.headers(), "content-type", "text/plain");
-  expectHttpHeader(request_headers.headers(), "content-length", "10");
-  expectHttpHeader(request_headers.headers(), "x-some-other-header", "yes");
+
+  Http::TestRequestHeaderMapImpl expected{{":path", "/"},
+                                          {":method", "POST"},
+                                          {":scheme", "http"},
+                                          {"host", "host"},
+                                          {"content-type", "text/plain"},
+                                          {"content-length", "10"},
+                                          {"x-some-other-header", "yes"}};
+  EXPECT_TRUE(
+      ExtProcTestUtility::headerProtosEqualIgnoreOrder(expected, request_headers.headers()));
 
   // Send back a response
   EXPECT_CALL(decoder_callbacks_, continueDecoding());

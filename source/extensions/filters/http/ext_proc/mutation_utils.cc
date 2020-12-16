@@ -1,6 +1,6 @@
 #include "extensions/filters/http/ext_proc/mutation_utils.h"
 
-#include "common/http/headers.h"
+#include "common/http/header_utility.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -22,16 +22,9 @@ void MutationUtils::buildHttpHeaders(const Http::HeaderMap& headers_in,
 
 void MutationUtils::applyHeaderMutations(
     const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation, Http::HeaderMap& headers) {
-  for (const auto& rh : mutation.remove_headers()) {
-    // The "router" component removes headers first when processing this protobuf
-    // Like that component and "ext_auth", don't allow removing any system headers
-    // (with ":") and don't allow removal of "host".
-    if (rh.empty() || rh[0] == ':') {
-      continue;
-    }
-    const LowerCaseString header(rh);
-    if (header != Http::Headers::get().HostLegacy) {
-      headers.remove(header);
+  for (const auto& remove_header : mutation.remove_headers()) {
+    if (!remove_header.empty() && Http::HeaderUtility::isRemovableHeader(remove_header)) {
+      headers.remove(LowerCaseString(remove_header));
     }
   }
 

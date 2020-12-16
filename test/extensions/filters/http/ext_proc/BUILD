@@ -89,11 +89,12 @@ envoy_extension_cc_test_library(
 
 envoy_extension_cc_test_library(
     name = "utils_lib",
+    srcs = ["utils.cc"],
     hdrs = ["utils.h"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
         "//include/envoy/http:header_map_interface",
-        "@com_google_absl//absl/strings",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
