@@ -23,7 +23,6 @@ namespace Upstream {
 #define ALL_HEALTH_CHECKER_STATS(COUNTER, GAUGE)                                                   \
   COUNTER(attempt)                                                                                 \
   COUNTER(failure)                                                                                 \
-  COUNTER(goaway_error)                                                                            \
   COUNTER(network_failure)                                                                         \
   COUNTER(passive_failure)                                                                         \
   COUNTER(success)                                                                                 \

@@ -323,7 +323,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
     handleFailure(envoy::data::core::v3::NETWORK);
   }
 
-  parent_.stats_.goaway_error_.inc();
   if (client_) {
     expect_reset_ = true;
     client_->close();
