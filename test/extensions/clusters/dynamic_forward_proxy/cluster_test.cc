@@ -70,7 +70,11 @@ public:
     for (const auto& host : host_map_) {
       existing_hosts.emplace(host.first, host.second);
     }
-    EXPECT_CALL(*dns_cache_manager_->dns_cache_, hosts()).WillOnce(Return(existing_hosts));
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, iterateHostMap(_)).WillOnce(Invoke([&](auto cb) {
+      for (const auto& host : host_map_) {
+        cb(host.first, host.second);
+      }
+    }));
     if (!existing_hosts.empty()) {
       EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
     }
@@ -154,14 +158,12 @@ TEST_F(ClusterTest, BasicFlow) {
   // Verify no host LB cases.
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
 
-  // LB will not resolve host1 until it has been updated.
+  // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
-  refreshLb();
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 
@@ -174,13 +176,10 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 
-  // Remove the host, LB will still resolve until it is refreshed.
+  // Remove the host, LB will immediately fail to find the host in the map.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
   update_callbacks_->onDnsHostRemove("host1");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
-  refreshLb();
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
 }
 
