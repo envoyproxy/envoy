@@ -19,7 +19,17 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-void EnvoyWasmVmIntegration::error(absl::string_view message) { ENVOY_LOG(trace, message); }
+proxy_wasm::LogLevel EnvoyWasmVmIntegration::getLogLevel() {
+  auto level = static_cast<size_t>(ENVOY_LOGGER().level());
+  if (level > static_cast<size_t>(proxy_wasm::LogLevel::critical)) {
+    return proxy_wasm::LogLevel::critical;
+  } else {
+    return static_cast<proxy_wasm::LogLevel>(level);
+  }
+}
+
+void EnvoyWasmVmIntegration::error(absl::string_view message) { ENVOY_LOG(error, message); }
+void EnvoyWasmVmIntegration::trace(absl::string_view message) { ENVOY_LOG(trace, message); }
 
 bool EnvoyWasmVmIntegration::getNullVmFunction(absl::string_view function_name, bool returns_word,
                                                int number_of_arguments,
@@ -72,7 +82,7 @@ WasmVmPtr createWasmVm(absl::string_view runtime) {
   }
 
   auto wasm = runtime_factory->createWasmVm();
-  wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(runtime_factory->name());
+  wasm->integration() = std::make_unique<EnvoyWasmVmIntegration>();
   return wasm;
 }
 
