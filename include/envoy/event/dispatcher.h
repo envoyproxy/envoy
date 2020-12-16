@@ -52,11 +52,11 @@ using PostCb = std::function<void()>;
 using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
 /**
- * Minimal interface to the disptching loop used to create low-level primitives. See Dispatcher below for the
- * full interface.
+ * Minimal interface to the disptching loop used to create low-level primitives. See Dispatcher
+ * below for the full interface.
  */
 class DispatcherBase {
- public:
+public:
   virtual ~DispatcherBase() = default;
 
   /**
