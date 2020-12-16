@@ -84,7 +84,7 @@ public:
     }
   }
 
-  TestSymbolTable symbol_table_; // Must outlive name_.
+  TestUtil::TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
 
   void setTags(const TagVector& tags) {
@@ -324,7 +324,7 @@ public:
     return textReadout(symbol_table_->toString(name));
   }
 
-  TestSymbolTable symbol_table_;
+  TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };

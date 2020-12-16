@@ -78,7 +78,7 @@ public:
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   ClusterStatNames cluster_stat_names_;
   ClusterLoadReportStatNames cluster_load_report_stat_names_;
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;

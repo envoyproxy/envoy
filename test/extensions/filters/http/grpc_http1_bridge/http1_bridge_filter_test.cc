@@ -33,7 +33,7 @@ public:
 
   ~GrpcHttp1BridgeFilterTest() override { filter_.onDestroy(); }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl context_;
   Http1BridgeFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
