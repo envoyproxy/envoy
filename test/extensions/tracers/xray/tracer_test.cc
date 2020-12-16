@@ -120,6 +120,16 @@ TEST_F(XRayTracerTest, BaggageNotImplemented) {
   ASSERT_EQ("", span->getBaggage("baggage_key"));
 }
 
+TEST_F(XRayTracerTest, GetTraceId) {
+  Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
+  auto span = tracer.createNonSampledSpan();
+  span->finishSpan();
+
+  // This method is unimplemented and a noop.
+  ASSERT_EQ(span->getTraceIdAsHex(), "");
+}
+
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
   NiceMock<Tracing::MockConfig> config;
   constexpr auto expected_span_name = "Service 1";

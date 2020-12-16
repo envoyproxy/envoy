@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/empty_string.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/skywalking/skywalking_types.h"
@@ -87,6 +88,9 @@ public:
   void setSampled(bool sampled) override;
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
+
+  // TODO: This method is unimplemented for OpenTracing.
+  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
   /*
    * Get pointer to corresponding SpanStore object. This method is mainly used in testing. Used to

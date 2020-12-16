@@ -723,6 +723,15 @@ TEST_F(LightStepDriverTest, GetAndSetBaggage) {
   EXPECT_EQ(span->getBaggage(key), value);
 }
 
+TEST_F(LightStepDriverTest, GetTraceId) {
+  setupValidDriver();
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  // This method is unimplemented and a noop.
+  ASSERT_EQ(span->getTraceIdAsHex(), "");
+}
+
 } // namespace
 } // namespace Lightstep
 } // namespace Tracers
