@@ -42,6 +42,7 @@ public:
 };
 
 using DefaultCelStatePrototype = ConstSingleton<CelStatePrototype>;
+using CelStatePrototypeConstPtr = std::unique_ptr<const CelStatePrototype>;
 
 // A simple wrapper around generic values
 class CelState : public StreamInfo::FilterState::Object {

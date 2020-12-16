@@ -54,7 +54,7 @@ namespace Wasm {
 namespace {
 
 // FilterState prefix for CelState values.
-const absl::string_view CelStateKeyPrefix = "wasm.";
+constexpr absl::string_view CelStateKeyPrefix = "wasm.";
 
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using CelState = Filters::Common::Expr::CelState;
@@ -1136,8 +1136,9 @@ WasmResult Context::setProperty(absl::string_view path, absl::string_view value)
   return WasmResult::Ok;
 }
 
-WasmResult Context::declareProperty(absl::string_view path,
-                                    std::unique_ptr<const CelStatePrototype> state_prototype) {
+WasmResult
+Context::declareProperty(absl::string_view path,
+                         Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype) {
   // Do not delete existing schema since it can be referenced by state objects.
   if (state_prototypes_.find(path) == state_prototypes_.end()) {
     state_prototypes_[path] = std::move(state_prototype);

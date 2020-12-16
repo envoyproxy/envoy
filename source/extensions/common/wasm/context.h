@@ -476,7 +476,7 @@ protected:
   bool tcp_connection_closed_ = false;
 
   // Filter state prototype declaration.
-  absl::flat_hash_map<std::string, std::unique_ptr<const Filters::Common::Expr::CelStatePrototype>>
+  absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
       state_prototypes_;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
