@@ -1453,7 +1453,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
                                                         absl::nullopt, "");
-        return FilterHeadersStatus::Continue;
+        return FilterHeadersStatus::StopIteration;
       }));
 
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
@@ -1483,7 +1483,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         decoder_filters_[0]->callbacks_->sendLocalReply(Code::BadRequest, "Bad request", nullptr,
                                                         absl::nullopt, "");
-        return FilterHeadersStatus::Continue;
+        return FilterHeadersStatus::StopIteration;
       }));
 
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
