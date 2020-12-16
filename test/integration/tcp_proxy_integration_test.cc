@@ -164,11 +164,57 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
   for (int i = 0; i < num_connections; ++i) {
     IntegrationTcpClientPtr& tcp_client = clients[i];
     ASSERT_TRUE(tcp_client->write(
-        "GET / HTTP/1.0\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
+        "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
         false));
     tcp_client->waitForHalfClose();
     tcp_client->close();
     EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
+  }
+}
+
+TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::list<IntegrationTcpClientPtr> clients;
+
+  const char* basic_request = "GET / HTTP/1.1\r\nHost: foo\r\ncontent-length: 0\r\n\r\n";
+  const char* request_with_close =
+      "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n";
+  TestRandomGenerator rand;
+
+  for (int i = 0; i < 50; ++i) {
+    int action = rand.random() % 3;
+
+    if (action == 0) {
+      // Add a new connection.
+      clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+    }
+    if (clients.empty()) {
+      break;
+    }
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    if (action == 1) {
+      // Write to the first connection.
+      ASSERT_TRUE(tcp_client->write(basic_request, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->clearData(tcp_client->data().size());
+    } else if (action == 2) {
+      // Close the first connection.
+      ASSERT_TRUE(tcp_client->write(request_with_close, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->waitForHalfClose();
+      tcp_client->close();
+      clients.pop_front();
+    }
+  }
+
+  while (!clients.empty()) {
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    ASSERT_TRUE(tcp_client->write(request_with_close, false));
+    tcp_client->waitForData("\r\n\r\n", false);
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    clients.pop_front();
   }
 }
 
