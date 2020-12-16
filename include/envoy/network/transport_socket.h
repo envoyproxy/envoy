@@ -241,6 +241,12 @@ public:
    * @return bool whether the transport socket will use proxy protocol options.
    */
   virtual bool usesProxyProtocolOptions() const PURE;
+
+  /**
+   * Returns true if the transport socket created by this factory supports some form of ALPN
+   * negotiation.
+   */
+  virtual bool supportsAlpn() const { return false; }
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

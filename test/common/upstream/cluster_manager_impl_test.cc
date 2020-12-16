@@ -4,7 +4,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/network/raw_buffer_socket.h"
 #include "common/router/context_impl.h"
+
+#include "extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"
@@ -161,20 +164,43 @@ static_resources:
   return parseBootstrapFromV3Yaml(yaml);
 }
 
-TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
+class AlpnSocketFactory : public Network::RawBufferSocketFactory {
+public:
+  bool supportsAlpn() const override { return true; }
+};
+
+class AlpnTestConfigFactory
+    : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
+public:
+  std::string name() const override { return "envoy.transport_sockets.alpn"; }
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message&,
+                               Server::Configuration::TransportSocketFactoryContext&) override {
+    return std::make_unique<AlpnSocketFactory>();
+  }
+};
+
+TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
+  AlpnTestConfigFactory alpn_factory;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registered_factory(alpn_factory);
+
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
     - name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
-      http_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          auto_config:
+            http2_protocol_options: {}
+            http_protocol_options: {}
+      transport_socket:
+        name: envoy.transport_sockets.alpn
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
-      "'protocol_selection' values");
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
@@ -277,7 +303,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "invalid value \"foo\" for type TYPE_ENUM");
+                          "invalid value \"foo\"");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {

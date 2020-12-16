@@ -49,6 +49,8 @@ public:
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
+  // Returns the application protocol, or absl::nullopt for TCP.
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
   uint32_t currentUnusedCapacity() const {
     return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
   }
@@ -183,6 +185,9 @@ public:
 
 protected:
   // Creates up to 3 connections, based on the preconnect ratio.
+  virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
+
+  // Creates up to 3 connections, based on the prefetch ratio.
   void tryCreateNewConnections();
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
@@ -210,8 +215,13 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void decrConnectingStreamCapacity(int32_t delta) {
+  void incrConnectingStreamCapacity(uint32_t delta) {
+    state_.incrConnectingStreamCapacity(delta);
+    connecting_stream_capacity_ += delta;
+  }
+  void decrConnectingStreamCapacity(uint32_t delta) {
     state_.decrConnectingStreamCapacity(delta);
+    ASSERT(connecting_stream_capacity_ > delta);
     connecting_stream_capacity_ -= delta;
   }
 
@@ -240,15 +250,15 @@ protected:
   // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
 
+  // The number of streams that can be immediately dispatched
+  // if all CONNECTING connections become connected.
+  uint32_t connecting_stream_capacity_{0};
+
 private:
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
-
-  // The number of streams that can be immediately dispatched
-  // if all CONNECTING connections become connected.
-  uint32_t connecting_stream_capacity_{0};
 
   void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;

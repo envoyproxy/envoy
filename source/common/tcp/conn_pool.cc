@@ -24,7 +24,8 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);
   connection_->detectEarlyCloseWhenReadDisabled(false);
-  connection_->addReadFilter(std::make_shared<ConnReadFilter>(*this));
+  read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
+  connection_->addReadFilter(read_filter_handle_);
   connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
                                    host->cluster().stats().upstream_cx_rx_bytes_buffered_,
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,

@@ -51,6 +51,7 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
+// [#next-free-field: 6]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
@@ -131,4 +132,7 @@ message RateLimitResponse {
 
   // A list of headers to add to the request when forwarded
   repeated config.core.v3.HeaderValue request_headers_to_add = 4;
+
+  // A response body to send to the downstream client when the response code is not OK.
+  bytes raw_body = 5;
 }

@@ -101,6 +101,9 @@ parseFeatures(const envoy::config::cluster::v3::Cluster& config,
   if (config.close_connections_on_host_health_failure()) {
     features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
   }
+  if (options->use_alpn_) {
+    features |= ClusterInfoImpl::Features::USE_ALPN;
+  }
   return features;
 }
 
@@ -916,14 +919,16 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
   }
 }
 
-Http::Protocol
+std::vector<Http::Protocol>
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
-    return downstream_protocol.value();
+    return {downstream_protocol.value()};
+  } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    return {Http::Protocol::Http2, Http::Protocol::Http11};
   } else {
-    return (features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
-                                                                : Http::Protocol::Http11;
+    return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                                 : Http::Protocol::Http11};
   }
 }
 
@@ -940,11 +945,21 @@ ClusterImplBase::ClusterImplBase(
           factory_context.singletonManager(), factory_context.dispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
+  auto* raw_factory_pointer = socket_factory.get();
+
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
                                             runtime, std::move(socket_matcher),
                                             std::move(stats_scope), added_via_api, factory_context);
+
+  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
+      !raw_factory_pointer->supportsAlpn()) {
+    throw EnvoyException(
+        fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
+                    cluster.name(), cluster.DebugString()));
+  }
+
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
