@@ -121,6 +121,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           absl::node_hash_map<std::string, HostSharedPtr> updated_hosts;
           HostVector new_hosts;
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+          absl::flat_hash_set<std::string> all_new_hosts;
           for (const auto& resp : response) {
             // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
             // make a new address that has port in it. We need to both support IPv6 as well as
@@ -135,14 +136,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
-
+            all_new_hosts.emplace(new_hosts.back()->address()->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
           }
 
           HostVector hosts_added;
           HostVector hosts_removed;
           if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                            updated_hosts, all_hosts_)) {
+                                            updated_hosts, all_hosts_, all_new_hosts)) {
             ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
             ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
               return host->priority() == locality_lb_endpoint_.priority();

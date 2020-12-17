@@ -94,11 +94,14 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
 void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   Upstream::HostVector new_hosts;
+  absl::flat_hash_set<std::string> all_new_hosts;
 
   for (const ClusterSlot& slot : *slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true, time_source_));
+    all_new_hosts.emplace(slot.primary()->asString());
     for (auto const& replica : slot.replicas()) {
       new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false, time_source_));
+      all_new_hosts.emplace(replica->asString());
     }
   }
 
@@ -106,7 +109,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   Upstream::HostVector hosts_added;
   Upstream::HostVector hosts_removed;
   const bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                                  updated_hosts, all_hosts_);
+                                                  updated_hosts, all_hosts_, all_new_hosts);
   const bool slot_updated =
       lb_factory_ ? lb_factory_->onClusterSlotUpdate(std::move(slots), updated_hosts) : false;
 

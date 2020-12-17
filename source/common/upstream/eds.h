@@ -53,7 +53,8 @@ private:
                               const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
-                              absl::node_hash_map<std::string, HostSharedPtr>& updated_hosts);
+                              absl::node_hash_map<std::string, HostSharedPtr>& updated_hosts,
+                              const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
 
   // ClusterImplBase

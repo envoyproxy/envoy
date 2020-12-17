@@ -840,7 +840,7 @@ TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
 TEST_F(EdsTest, EndpointMovedToNewPriority) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
-  resetClusterDrainOnHostRemoval();
+  resetCluster();
 
   auto health_checker = std::make_shared<MockHealthChecker>();
   EXPECT_CALL(*health_checker, start());
@@ -899,6 +899,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 
   {
@@ -911,6 +912,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 
   // Moves all the endpoints to priority 1.
@@ -932,7 +934,9 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
 
     // The endpoints were healthy, so moving them around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
     EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 }
 
@@ -941,7 +945,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
 TEST_F(EdsTest, EndpointMoved) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
-  resetClusterDrainOnHostRemoval();
+  resetCluster();
 
   auto health_checker = std::make_shared<MockHealthChecker>();
   EXPECT_CALL(*health_checker, start());
@@ -1008,6 +1012,7 @@ TEST_F(EdsTest, EndpointMoved) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 
   {
@@ -1021,6 +1026,7 @@ TEST_F(EdsTest, EndpointMoved) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
   }
 }
 

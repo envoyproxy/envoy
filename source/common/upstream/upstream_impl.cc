@@ -1384,12 +1384,11 @@ void PriorityStateManager::updateClusterPrioritySet(
   }
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
-                                                   HostVector& current_priority_hosts,
-                                                   HostVector& hosts_added_to_current_priority,
-                                                   HostVector& hosts_removed_from_current_priority,
-                                                   HostMap& updated_hosts,
-                                                   const HostMap& all_hosts) {
+bool BaseDynamicClusterImpl::updateDynamicHostList(
+    const HostVector& new_hosts, HostVector& current_priority_hosts,
+    HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
+    HostMap& updated_hosts, const HostMap& all_hosts,
+    const absl::flat_hash_set<std::string>& all_new_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -1416,6 +1415,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
   absl::node_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
+  // Keep track of hosts we're adding (or replacing)
+  absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     if (updated_hosts.count(host->address()->asString())) {
@@ -1430,6 +1431,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     // being stabilized. We will set it again below if needed.
     if (existing_host_found) {
       existing_host->second->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+    }
+
+    if (existing_host_found && host->priority() != existing_host->second->priority()) {
+      // If the priority has changed, steal the host from it's original priority.
+      // We always do this as an in-place update, even if we're then going to go on to
+      // add a new host anyway due to `skip_inplace_host_update`.
+      // This prevents the priority that's losing this host having to know if we plan to steal
+      // the host instance or leave it alone and create a new one: we simply always steal it.
+      existing_host->second->priority(host->priority());
+      hosts_added_to_current_priority.emplace_back(existing_host->second);
     }
 
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
@@ -1490,15 +1501,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         hosts_changed = true;
       }
 
-      // Did the priority change?
-      if (host->priority() != existing_host->second->priority()) {
-        existing_host->second->priority(host->priority());
-        hosts_added_to_current_priority.emplace_back(existing_host->second);
-      }
-
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
+      new_hosts_for_current_priority.emplace(host->address()->asString());
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
@@ -1555,7 +1561,15 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     erase_from =
         std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&updated_hosts, &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                       [&all_new_hosts, &new_hosts_for_current_priority, &updated_hosts,
+                        &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                         if (all_new_hosts.contains(p->address()->asString()) &&
+                             !new_hosts_for_current_priority.contains(p->address()->asString())) {
+                           // It'll be an immediate deletion if the host exists in the cluster
+                           // somewhere other than this priority.
+                           return false;
+                         }
+
                          if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
                                p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
                            if (p->weight() > max_host_weight) {
