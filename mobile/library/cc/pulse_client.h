@@ -11,10 +11,10 @@
 // #include "stats/element.h"
 // #include "stats/gauge.h"
 
-class StatsClient {
+class PulseClient {
 public:
   // virtual Counter counter(Element element) = 0;
   // virtual Gauge gauge(Element element) = 0;
 };
 
-using StatsClientSharedPtr = std::shared_ptr<StatsClient>;
+using PulseClientSharedPtr = std::shared_ptr<PulseClient>;

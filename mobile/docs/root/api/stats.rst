@@ -1,29 +1,32 @@
 .. _api_stats:
 
-Stats
-=====
+Pulse (Stats)
+=============
 
 ---------------
-``StatsClient``
+``PulseClient``
 ---------------
 
-Envoy Mobile's stats functionality currently supports two type of stats: ``Counter`` and ``Gauge``.
+Pulse is Envoy Mobile's stats library, used for capturing client application time series
+metrics. Currently two types of metrics are supported: ``Counter`` and ``Gauge``.
 
-To use Envoy Mobile's stats function, obtain an instance of ``StatsClient`` from ``Engine``
-(refer to :ref:`api_starting_envoy` for building an engine instance), and store the stats client to
+This library (like all of Envoy Mobile) is under active development.
+
+To leverage Pulse, obtain an instance of a ``PulseClient`` from an Envoy Mobile ``Engine``
+(refer to :ref:`api_starting_envoy` for building an engine instance), and use it to
 create ``Counter`` or ``Gauge`` instances. The following code examples show how to create
 a ``Counter``, and the same approach is used to create a ``Gauge``.
 
 **Kotlin example**::
 
-  statsClient.counter(Element("foo"), Element("bar"))
+  pulseClient.counter(Element("foo"), Element("bar"))
 
 **Swift example**::
 
-  statsClient.counter(elements: ["foo", "bar"])
+  pulseClient.counter(elements: ["foo", "bar"])
 
 
-The ``counter`` method from the stats client takes a variable number of elements and returns a
+The ``counter`` method from the ``PulseClient`` takes a variable number of elements and returns a
 ``Counter`` instance. The elements provided are used to form a dot(``.``) delimited string that
 serves as the identifier of the counter. The string formed from the example code above is
 ``foo.bar``.

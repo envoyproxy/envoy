@@ -1,8 +1,8 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
-/// Envoy implementation of StatsClient.
-final class StatsClientImpl: NSObject {
+/// Envoy implementation of PulseClient.
+final class PulseClientImpl: NSObject {
   private let engine: EnvoyEngine
 
   init(engine: EnvoyEngine) {
@@ -11,7 +11,7 @@ final class StatsClientImpl: NSObject {
   }
 }
 
-extension StatsClientImpl: StatsClient {
+extension PulseClientImpl: PulseClient {
   func counter(elements: [Element]) -> Counter {
     return CounterImpl(elements: elements, engine: self.engine)
   }

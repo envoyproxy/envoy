@@ -6,13 +6,13 @@
 
 #include "executor.h"
 #include "library/common/types/c_types.h"
-#include "stats_client.h"
+#include "pulse_client.h"
 #include "stream_client.h"
 
 class Engine {
 public:
   StreamClientSharedPtr stream_client();
-  StatsClientSharedPtr stats_client();
+  PulseClientSharedPtr pulse_client();
 
 private:
   Engine(envoy_engine_t engine, const std::string& configuration,
@@ -22,7 +22,7 @@ private:
   friend class EngineBuilder;
 
   StreamClientSharedPtr stream_client_;
-  StatsClientSharedPtr stats_client_;
+  PulseClientSharedPtr pulse_client_;
   ExecutorSharedPtr executor_;
 };
 

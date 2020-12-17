@@ -3,11 +3,11 @@ package io.envoyproxy.envoymobile
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 
 /**
- * Envoy implementation of `StatsClient`.
+ * Envoy implementation of `PulseClient`.
  */
-internal class StatsClientImpl constructor(
+internal class PulseClientImpl constructor(
   internal val engine: EnvoyEngine
-) : StatsClient {
+) : PulseClient {
 
   override fun counter(vararg elements: Element): Counter {
     return CounterImpl(engine, elements.asList())
