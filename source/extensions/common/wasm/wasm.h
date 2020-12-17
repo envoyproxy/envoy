@@ -4,6 +4,7 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <unordered_map>
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
@@ -43,7 +44,11 @@ struct WasmStats {
   ALL_WASM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-using AllowedCapabilitiesMap = absl::flat_hash_map<std::string, std::vector<std::string>>;
+// clang-format off
+// We cannot convert this to an absl hash set since the proxy_wasm::WasmBase constructor takes a
+// std::unordered_map as an argument.
+using AllowedCapabilitiesMap = std::unordered_map<std::string, std::vector<std::string>>;
+// clang-format on
 
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {

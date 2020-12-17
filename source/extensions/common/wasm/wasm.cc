@@ -103,8 +103,8 @@ Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view
            absl::string_view vm_key, AllowedCapabilitiesMap allowed_capabilities,
            const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
            Event::Dispatcher& dispatcher)
-    : WasmBase(createWasmVm(runtime), vm_id, vm_configuration, vm_key), scope_(scope),
-      cluster_manager_(cluster_manager), dispatcher_(dispatcher),
+    : WasmBase(createWasmVm(runtime), vm_id, vm_configuration, vm_key, allowed_capabilities),
+      scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       wasm_stats_(WasmStats{
           ALL_WASM_STATS(POOL_COUNTER_PREFIX(*scope_, absl::StrCat("wasm.", runtime, ".")),
