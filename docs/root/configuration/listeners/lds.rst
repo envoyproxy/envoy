@@ -1,39 +1,31 @@
 .. _config_listeners_lds:
 
-Listener discovery service (LDS)
-================================
+监听器发现服务（LDS）
+======================
 
-The listener discovery service (LDS) is an optional API that Envoy will call to dynamically fetch
-listeners. Envoy will reconcile the API response and add, modify, or remove known listeners
-depending on what is required.
+监听器发现服务是一个可选 API，Envoy 调用它来动态获取监听器。Envoy 将协调 API 响应，并根据需要来增加、修改或者删除已知监听器。
 
-The semantics of listener updates are as follows:
+监听器的更新规则如下：
 
-* Every listener must have a unique :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>`. If a name is not
-  provided, Envoy will create a UUID. Listeners that are to be dynamically updated should have a
-  unique name supplied by the management server.
-* When a listener is added, it will be "warmed" before taking traffic. For example, if the listener
-  references an :ref:`RDS <config_http_conn_man_rds>` configuration, that configuration will be
-  resolved and fetched before the listener is moved to "active."
-* Listeners are effectively constant once created. Thus, when a listener is updated, an entirely
-  new listener is created (with the same listen socket). This listener goes through the same
-  warming process described above for a newly added listener.
-* When a listener is updated or removed, the old listener will be placed into a "draining" state
-  much like when the entire server is drained for restart. Connections owned by the listener will
-  be gracefully closed (if possible) for some period of time before the listener is removed and any
-  remaining connections are closed. The drain time is set via the :option:`--drain-time-s` option.
-
+* 每一个监听器都必须有一个唯一的 :ref:`名字 <envoy_v3_api_field_config.listener.v3.Listener.name>`。
+  如果没有提供名字，Envoy 将会创建一个 UUID。能够动态更新的监听器应该有一个由管理服务器提供的唯一名字。
+* 当新增一个监听器时，在它接受流量以前需要先“预热”。比如，如果监听器参考了 :ref:`RDS <config_http_conn_man_rds>`
+  配置，在监听器变成“激活”状态以前，配置需要被获取并解析。
+* 监听器一旦被创建，就不会发生变化。因此，当更新监听器时，会创建一个新的监听器（使用相同的监听套接字）。新
+  创建的监听器会经过同样的上述预热流程。
+* 当监听器在更新或删除时，老监听器会被放置在“排空”状态，这和整个服务器在重启时被排空的场景是非常像的。
+  在监听器被删除且剩余连接被关闭之前，属于监听器的连接将会在特定时间段内被优雅的关闭（如果可能）。
+  排空时间可以通过选项 :option:`--drain-time-s` 来设定。
   .. note::
 
-    Any listeners that are statically defined within the Envoy configuration cannot be modified or
-    removed via the LDS API.
+    在 Envoy 配置内静态定义的任何监听器都是不能够通过 LDS API 来进行修改或删除的。
 
-Configuration
--------------
+配置
+-----
 
 * :ref:`v3 LDS API <v2_grpc_streaming_endpoints>`
 
-Statistics
-----------
+统计
+-----
 
-LDS has a :ref:`statistics <subscription_statistics>` tree rooted at *listener_manager.lds.*
+LDS 有一个以 *listener_manager.lds.* 为根的 :ref:`统计 <subscription_statistics>` 树。
