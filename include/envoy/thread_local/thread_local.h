@@ -244,6 +244,8 @@ private:
   static std::unique_ptr<MainThread> main_thread_;
 };
 
+std::unique_ptr<MainThread> MainThread::main_thread_;
+
 #define envoy_try                                                                                  \
   ASSERT(ThreadLocal::MainThread::isMainThread());                                                 \
   try
