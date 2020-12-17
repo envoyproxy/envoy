@@ -129,7 +129,8 @@ class FilterMatchState {
 public:
   FilterMatchState(Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
                    HttpMatchingDataImplSharedPtr matching_data)
-      : match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)) {}
+      : match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)),
+        match_tree_evaluated_(false) {}
 
   void evaluateMatchTreeWithNewData(std::function<void(HttpMatchingDataImpl&)> update_func);
 
