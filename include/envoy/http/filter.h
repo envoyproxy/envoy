@@ -577,7 +577,7 @@ public:
    * Called when a match result occurs that isn't handled by the filter manager.
    * @param action the resulting match action
    */
-  virtual void onMatchCallback(const Matcher::Action& ) {}
+  virtual void onMatchCallback(const Matcher::Action&) {}
 };
 
 /**

@@ -1,4 +1,3 @@
-#include "common/matcher/matcher.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -6,6 +5,7 @@
 
 #include "common/http/filter_manager.h"
 #include "common/matcher/exact_map_matcher.h"
+#include "common/matcher/matcher.h"
 #include "common/stream_info/filter_state_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 

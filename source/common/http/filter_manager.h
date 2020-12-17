@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "common/http/filter_manager.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -13,6 +12,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
+#include "common/http/filter_manager.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
@@ -138,7 +138,8 @@ public:
   // others should trigger updates to all filters (e.g. filter skip). The callback_handling_filter_
   // should always be present and is the filter wrapper that handles the per filter actions, while
   // secondary_filter_ is present for dual filters to allow setting a value for both wrappers.
-  // TODO(snowp): Should we instead snap a handle to the underlying filter and a list of filter wrappers?
+  // TODO(snowp): Should we instead snap a handle to the underlying filter and a list of filter
+  // wrappers?
   ActiveStreamFilterBase* callback_handling_filter_{};
   ActiveStreamFilterBase* secondary_filter_{};
 
