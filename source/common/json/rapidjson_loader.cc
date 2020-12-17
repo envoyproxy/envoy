@@ -677,6 +677,7 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
     stack_.top()->append(ptr);
     return true;
   default:
+    ENVOY_LOG_MISC(info, "RETURNING FALSE");
     return false;
   }
 }

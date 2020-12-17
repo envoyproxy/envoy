@@ -73,9 +73,8 @@ TEST_F(JsonLoaderTest, Basic) {
   {
     EXPECT_THROW_WITH_MESSAGE(
         Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
-        "JSON supplied is not valid. Error(offset 20, token \"world\"): "
-        "[json.exception.parse_error.101] parse error at line 3, column 8: syntax error while "
-        "parsing object - unexpected end of input; expected '}'\n");
+        "JSON supplied is not valid. Error(offset 19, line 3): Missing a comma or "
+        "'}' after an object member.\n");
   }
 
   {
@@ -258,7 +257,14 @@ TEST_F(JsonLoaderTest, Hash) {
 }
 
 TEST_F(JsonLoaderTest, Schema) {
-  std::string invalid_schema = R"EOF(
+  {
+    std::string invalid_json_schema = R"EOF(
+    {
+      "properties": {"value1"}
+    }
+    )EOF";
+
+    std::string invalid_schema = R"EOF(
     {
       "properties" : {
         "value1": {"type" : "faketype"}
@@ -266,15 +272,82 @@ TEST_F(JsonLoaderTest, Schema) {
     }
     )EOF";
 
-  std::string json_string = R"EOF(
+    std::string different_schema = R"EOF(
+    {
+      "properties" : {
+        "value1" : {"type" : "number"}
+      },
+      "additionalProperties" : false
+    }
+    )EOF";
+
+    std::string valid_schema = R"EOF(
+    {
+      "properties": {
+        "value1": {"type" : "number"},
+        "value2": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+    )EOF";
+
+    std::string json_string = R"EOF(
     {
       "value1": 10,
       "value2" : "test"
     }
     )EOF";
 
+    ObjectSharedPtr json = Factory::loadFromString(json_string);
+    EXPECT_THROW(json->validateSchema(invalid_json_schema), std::invalid_argument);
+    EXPECT_THROW(json->validateSchema(invalid_schema), Exception);
+    EXPECT_THROW(json->validateSchema(different_schema), Exception);
+    EXPECT_NO_THROW(json->validateSchema(valid_schema));
+  }
+
+  {
+    std::string json_string = R"EOF(
+    {
+      "value1": [false, 2.01, 3, null],
+      "value2" : "test"
+    }
+    )EOF";
+
+    std::string empty_schema = R"EOF({})EOF";
+
+    ObjectSharedPtr json = Factory::loadFromString(json_string);
+    EXPECT_NO_THROW(json->validateSchema(empty_schema));
+  }
+}
+
+TEST_F(JsonLoaderTest, NestedSchema) {
+
+  std::string schema = R"EOF(
+  {
+    "properties": {
+      "value1": {"type" : "number"},
+      "value2": {"type": "string"}
+    },
+    "additionalProperties": false
+  }
+  )EOF";
+
+  std::string json_string = R"EOF(
+  {
+    "bar": "baz",
+    "foo": {
+      "value1": "should have been a number",
+      "value2" : "test"
+    }
+  }
+  )EOF";
+
   ObjectSharedPtr json = Factory::loadFromString(json_string);
-  EXPECT_THROW_WITH_MESSAGE(json->validateSchema(invalid_schema), Exception, "not implemented");
+
+  EXPECT_THROW_WITH_MESSAGE(json->getObject("foo")->validateSchema(schema), Exception,
+                            "JSON at lines 4-7 does not conform to schema.\n Invalid schema: "
+                            "#/properties/value1\n Schema violation: type\n Offending document "
+                            "key: #/value1");
 }
 
 TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
@@ -288,11 +361,9 @@ TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
   ]
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      Factory::loadFromString(json_string), Exception,
-      "JSON supplied is not valid. Error(offset 16, token \"listeners\" :): "
-      "[json.exception.parse_error.101] parse error at line 2, column 15: syntax error while "
-      "parsing value - unexpected ':'; expected end of input\n");
+  EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString(json_string), Exception,
+                            "JSON supplied is not valid. Error(offset 14, line 2): Terminate "
+                            "parsing due to Handler error.\n");
 }
 
 TEST_F(JsonLoaderTest, AsString) {
