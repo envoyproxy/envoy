@@ -1,14 +1,11 @@
 .. _config_network_filters_sni_cluster:
 
-Upstream Cluster from SNI
+
+SNI的上游集群
 =========================
 
-The `sni_cluster` is a network filter that uses the SNI value in a TLS
-connection as the upstream cluster name. The filter will not modify the
-upstream cluster for non-TLS connections. This filter should be configured 
-with the name *envoy.filters.network.sni_cluster*.
+`sni_cluster` 是一个在TLS连接中使用SNI值作为上游集群名称的网络过滤器。在非TLS连接中，此过滤器不会修改上游集群。此过滤器应该以名称 *envoy.filters.network.sni_cluster* 来配置。
 
-This filter has no configuration. It must be installed before the
-:ref:`tcp_proxy <config_network_filters_tcp_proxy>` filter.
+这个过滤器没有配置项。必须在 :ref:`tcp_proxy <config_network_filters_tcp_proxy>` 过滤器之前安装。
 
-* :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.Filter.name>`
+* :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.Filter.name>`。
