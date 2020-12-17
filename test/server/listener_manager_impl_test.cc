@@ -556,8 +556,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
-deprecated_v1:
-  bind_to_port: false
+bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
@@ -1488,6 +1487,43 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+bind_to_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)))
+      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           Network::Socket::Type socket_type,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
+        EXPECT_CALL(server_, hotRestart).Times(0);
+        // When bind_to_port is equal to false, create socket fd directly, and do not get socket
+        // fd through hot restart.
+        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+        return real_listener_factory.createListenSocket(address, socket_type, options, params);
+      }));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplTest, DEPRECATED_FEATURE_TEST(DeprecatedBindToPortEqualToFalse)) {
+  InSequence s;
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
 deprecated_v1:
     bind_to_port: false
 filter_chains:
@@ -2105,8 +2141,7 @@ address:
   socket_address:
     address: 0.0.0.0
     port_value: 1234
-deprecated_v1:
-  bind_to_port: false
+bind_to_port: false
 filter_chains:
 - filters: []
   )EOF";
@@ -2123,8 +2158,7 @@ address:
   socket_address:
     address: 0.0.0.0
     port_value: 1234
-deprecated_v1:
-  bind_to_port: false
+bind_to_port: false
 filter_chains:
 - filters: []
   )EOF";
