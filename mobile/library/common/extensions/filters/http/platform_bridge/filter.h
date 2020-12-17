@@ -113,6 +113,7 @@ private:
   envoy_http_filter platform_filter_;
   envoy_http_filter_callbacks platform_request_callbacks_{};
   envoy_http_filter_callbacks platform_response_callbacks_{};
+  bool error_response_{};
   bool request_complete_{};
   bool response_complete_{};
 };
