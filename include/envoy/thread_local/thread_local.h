@@ -232,10 +232,10 @@ public:
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
   bool inMainThread() { return main_thread_id_ == std::this_thread::get_id(); }
-  static void init() { 
+  static void init() {
     static MainThread main_thread;
     main_thread = MainThread();
-    MainThreadSingleton::initialize(&main_thread); 
+    MainThreadSingleton::initialize(&main_thread);
   }
   static void clear() { MainThreadSingleton::clear(); }
   static bool isMainThread() { return MainThreadSingleton::get().inMainThread(); }
