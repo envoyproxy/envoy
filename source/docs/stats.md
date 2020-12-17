@@ -269,7 +269,7 @@ Developers trying to can iterate through changes in these tests locally with:
       test/integration:stats_integration_test
 ```
 
-## Debugging Symbol Table Assertions
+## Debugging Symbol Table Asserts
 
 If you are visiting this section because you saw a message like:
 
