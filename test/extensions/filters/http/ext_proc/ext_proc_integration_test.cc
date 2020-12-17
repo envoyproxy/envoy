@@ -59,6 +59,7 @@ protected:
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_proc_filter));
     });
+    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   }
 
   void waitForFirstMessage(ProcessingRequest& request) {
@@ -77,7 +78,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcIntegrationTest,
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   initializeConfig();
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   HttpIntegrationTest::initialize();
 
   auto conn = makeClientConnection(lookupPort("http"));
@@ -111,7 +111,6 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 
 TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   initializeConfig();
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   HttpIntegrationTest::initialize();
 
   auto conn = makeClientConnection(lookupPort("http"));
@@ -132,7 +131,6 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
 
 TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   initializeConfig();
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   HttpIntegrationTest::initialize();
 
   auto conn = makeClientConnection(lookupPort("http"));
@@ -186,6 +184,46 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+
+  EXPECT_TRUE(request_headers_msg.has_request_headers());
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  // Produce an immediate response
+  ProcessingResponse response_msg;
+  auto* immediate_response = response_msg.mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+  immediate_response->set_body("{\"reason\": \"Not authorized\"}");
+  immediate_response->set_details("Failed because you are not authorized");
+  auto* hdr1 = immediate_response->mutable_headers()->add_set_headers();
+  hdr1->mutable_header()->set_key("x-failure-reason");
+  hdr1->mutable_header()->set_value("testing");
+  auto* hdr2 = immediate_response->mutable_headers()->add_set_headers();
+  hdr2->mutable_header()->set_key("content-type");
+  hdr2->mutable_header()->set_value("application/json");
+  processor_stream_->sendGrpcMessage(response_msg);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "testing",
+      response->headers().get(LowerCaseString("x-failure-reason"))[0]->value().getStringView());
+  EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
 } // namespace Envoy
