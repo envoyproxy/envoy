@@ -119,7 +119,6 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
   if (inform_downstream) {
     upstream_callbacks_.onEvent(event);
   }
-  deferrer_.release();
 }
 
 void HttpUpstream::doneReading() {
@@ -225,8 +224,14 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setGenericPoolReadyDeferrer(
-      {std::move(upstream_), callbacks_, host, info.downstreamSslConnection()});
+  upstream_->setGenericPoolReadyDeferrer({this, host, info.downstreamSslConnection()});
+}
+
+void HttpConnPool::onGenericPoolReadyDeferred(
+    Upstream::HostDescriptionConstSharedPtr& host,
+    const Network::Address::InstanceConstSharedPtr& local_address,
+    Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, local_address, ssl_info);
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,

@@ -64,7 +64,22 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
                    absl::optional<Http::Protocol>) override;
 
+  struct GenericPoolReadyDeferrer {
+    HttpConnPool* http_conn_pool_{};
+    Upstream::HostDescriptionConstSharedPtr host_;
+    Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+
+    void call(Http::RequestEncoder& request_encoder) {
+      ASSERT(http_conn_pool_ != nullptr);
+      http_conn_pool_->onGenericPoolReadyDeferred(
+          host_, request_encoder.getStream().connectionLocalAddress(), ssl_info_);
+    }
+  };
+
 private:
+  void onGenericPoolReadyDeferred(Upstream::HostDescriptionConstSharedPtr& host,
+                                  const Network::Address::InstanceConstSharedPtr& local_address,
+                                  Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const std::string hostname_;
   Http::CodecClient::Type type_;
   Http::ConnectionPool::Instance* conn_pool_{};
@@ -89,24 +104,6 @@ private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
 
-struct GenericPoolReadyDeferrer {
-  std::unique_ptr<GenericUpstream> upstream_;
-  GenericConnectionPoolCallbacks* callbacks_{};
-  Upstream::HostDescriptionConstSharedPtr host_;
-  Ssl::ConnectionInfoConstSharedPtr ssl_info_;
-
-  void call(Http::RequestEncoder& request_encoder) {
-    ASSERT(callbacks_ != nullptr);
-    callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host_,
-                                   request_encoder.getStream().connectionLocalAddress(), ssl_info_);
-  }
-  void release() {
-    if (upstream_) {
-      upstream_.reset();
-    }
-  }
-};
-
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
   ~HttpUpstream() override;
@@ -129,11 +126,9 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
-  void setGenericPoolReadyDeferrer(GenericPoolReadyDeferrer&& deferrer) {
+  void setGenericPoolReadyDeferrer(HttpConnPool::GenericPoolReadyDeferrer&& deferrer) {
     deferrer_ = std::move(deferrer);
   }
-
-  friend class DecoderShim;
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
@@ -174,10 +169,7 @@ private:
 
   // Used to defer onPoolGenericReady call to the time when the CONNECT
   // response is acknowledged.
-  //
-  // Be sure that either call or release are called in order to avoid a memory
-  // leak.
-  GenericPoolReadyDeferrer deferrer_;
+  HttpConnPool::GenericPoolReadyDeferrer deferrer_;
 };
 
 class Http1Upstream : public HttpUpstream {
