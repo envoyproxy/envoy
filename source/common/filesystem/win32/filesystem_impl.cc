@@ -124,6 +124,10 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
     throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
+
+  // In integration tests (and potentially in production) we rename config files and this creates
+  // sharing violation errors while reading the file from a different thread. This is why we need to
+  // add `FILE_SHARE_DELETE` to the sharing mode.
   auto fd = CreateFileA(path.c_str(), GENERIC_READ,
                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, OPEN_EXISTING, 0,
                         NULL);
