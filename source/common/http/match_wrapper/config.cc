@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/matcher/matcher.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Common {
@@ -59,11 +60,9 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             proto_config.extension_config());
 
-    auto message = factory.createEmptyConfigProto();
-    proto_config.extension_config().typed_config();
-    Config::Utility::translateOpaqueConfig(proto_config.extension_config().typed_config(),
-                                           ProtobufWkt::Struct(),
-                                           context.messageValidationVisitor(), *message);
+    auto message =
+        Config::Utility::translateAnyToFactoryConfig(proto_config.extension_config().typed_config(),
+                                                     context.messageValidationVisitor(), factory);
     auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
 
     auto match_tree =

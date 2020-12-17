@@ -1,7 +1,9 @@
 #pragma once
 
+#include "common/protobuf/utility.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -15,6 +17,7 @@
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
+#include "envoy/protobuf/message_validator.h"
 
 namespace Envoy {
 namespace Http {
@@ -106,10 +109,11 @@ class HttpRequestHeadersDataInputFactory : public Matcher::DataInputFactory<Http
 public:
   std::string name() const override { return "request-headers"; }
   Matcher::DataInputPtr<HttpMatchingData>
-  createDataInput(const Protobuf::Message& config) override {
-    const auto& typed_config =
-        dynamic_cast<const envoy::extensions::filters::network::http_connection_manager::v3::
-                         HttpRequestHeaderMatchInput&>(config);
+  createDataInput(const Protobuf::Message& config,
+                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::filters::network::http_connection_manager::v3::
+            HttpRequestHeaderMatchInput&>(config, validation_visitor);
 
     return std::make_unique<HttpRequestHeadersDataInput>(typed_config.header_name());
   };
@@ -133,10 +137,11 @@ class HttpResponseHeadersDataInputFactory : public Matcher::DataInputFactory<Htt
 public:
   std::string name() const override { return "response-headers"; }
   Matcher::DataInputPtr<HttpMatchingData>
-  createDataInput(const Protobuf::Message& config) override {
-    const auto& typed_config =
-        dynamic_cast<const envoy::extensions::filters::network::http_connection_manager::v3::
-                         HttpResponseHeaderMatchInput&>(config);
+  createDataInput(const Protobuf::Message& config,
+                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::filters::network::http_connection_manager::v3::
+            HttpResponseHeaderMatchInput&>(config, validation_visitor);
 
     return std::make_unique<HttpResponseHeadersDataInput>(typed_config.header_name());
   };
