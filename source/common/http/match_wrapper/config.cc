@@ -55,29 +55,24 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
 
-  if (proto_config.has_extension_config()) {
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-            proto_config.extension_config());
+  ASSERT(proto_config.has_extension_config());
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+          proto_config.extension_config());
 
-    auto message =
-        Config::Utility::translateAnyToFactoryConfig(proto_config.extension_config().typed_config(),
-                                                     context.messageValidationVisitor(), factory);
-    auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
+  auto message = Config::Utility::translateAnyToFactoryConfig(
+      proto_config.extension_config().typed_config(), context.messageValidationVisitor(), factory);
+  auto filter_factory = factory.createFilterFactoryFromProto(*message, prefix, context);
 
-    auto match_tree =
-        Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(context.messageValidationVisitor())
-            .create(proto_config.matcher());
+  auto match_tree =
+      Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(context.messageValidationVisitor())
+          .create(proto_config.matcher());
 
-    return
-        [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree);
+  return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree);
 
-          return filter_factory(delegated_callbacks);
-        };
-  }
-
-  return [](Envoy::Http::FilterChainFactoryCallbacks&) -> void {};
+    return filter_factory(delegated_callbacks);
+  };
 }
 
 /**

@@ -177,6 +177,7 @@ envoy_cc_library(
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/common/matcher/input/http/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

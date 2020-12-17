@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
+#include "envoy/extensions/filters/common/matcher/input/http/v3/http_inputs.pb.validate.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
@@ -111,14 +112,15 @@ public:
   Matcher::DataInputPtr<HttpMatchingData>
   createDataInput(const Protobuf::Message& config,
                   ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::filters::network::http_connection_manager::v3::
-            HttpRequestHeaderMatchInput&>(config, validation_visitor);
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const envoy::extensions::filters::common::matcher::input::
+                                             http::v3::HttpRequestHeaderMatchInput&>(
+            config, validation_visitor);
 
     return std::make_unique<HttpRequestHeadersDataInput>(typed_config.header_name());
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::network::http_connection_manager::v3::
+    return std::make_unique<envoy::extensions::filters::common::matcher::input::http::v3::
                                 HttpRequestHeaderMatchInput>();
   }
 };
@@ -139,14 +141,15 @@ public:
   Matcher::DataInputPtr<HttpMatchingData>
   createDataInput(const Protobuf::Message& config,
                   ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::filters::network::http_connection_manager::v3::
-            HttpResponseHeaderMatchInput&>(config, validation_visitor);
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const envoy::extensions::filters::common::matcher::input::
+                                             http::v3::HttpRequestHeaderMatchInput&>(
+            config, validation_visitor);
 
     return std::make_unique<HttpResponseHeadersDataInput>(typed_config.header_name());
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::network::http_connection_manager::v3::
+    return std::make_unique<envoy::extensions::filters::common::matcher::input::http::v3::
                                 HttpResponseHeaderMatchInput>();
   }
 };

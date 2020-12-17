@@ -31,6 +31,8 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
       callbacks.addStreamDecoderFilter(nullptr, nullptr);
       callbacks.addStreamEncoderFilter(nullptr, nullptr);
       callbacks.addStreamFilter(nullptr, nullptr);
+
+      callbacks.addAccessLogHandler(nullptr);
     };
   }
 };
@@ -53,7 +55,7 @@ matcher:
     input:
       name: request-headers
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpRequestHeaderMatchInput
+        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.input.http.v3.HttpRequestHeaderMatchInput
         header_name: default-matcher-header
     exact_match_map:
         map:
@@ -78,6 +80,7 @@ matcher:
   EXPECT_CALL(factory_callbacks, addStreamDecoderFilter(_, testing::IsNull()));
   EXPECT_CALL(factory_callbacks, addStreamEncoderFilter(_, testing::IsNull()));
   EXPECT_CALL(factory_callbacks, addStreamFilter(_, testing::IsNull()));
+  EXPECT_CALL(factory_callbacks, addAccessLogHandler(_));
   cb(factory_callbacks);
 }
 
