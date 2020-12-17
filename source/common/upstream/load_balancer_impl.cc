@@ -22,6 +22,12 @@ static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
+bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
+  // Currently we only allow the number of preconnected connections to equal the
+  // number of healthy hosts.
+  return num_preconnect_picks >= healthy_hosts;
+}
+
 // Distributes load between priorities based on the per priority availability and the normalized
 // total availability. Load is assigned to each priority according to how available each priority is
 // adjusted for the normalized total availability.
@@ -780,7 +786,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
-  if (stashed_random_.size() >= total_healthy_hosts_) {
+  if (tooManyPreconnects(stashed_random_.size(), total_healthy_hosts_)) {
     return nullptr;
   }
 
@@ -869,7 +875,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
-  if (stashed_random_.size() >= total_healthy_hosts_) {
+  if (tooManyPreconnects(stashed_random_.size(), total_healthy_hosts_)) {
     return nullptr;
   }
   return peekOrChoose(context, true);

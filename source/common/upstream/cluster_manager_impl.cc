@@ -858,20 +858,15 @@ void ClusterManagerImpl::maybePreconnect(
   for (int i = 0; i < 3; ++i) {
     // Just as in ConnPoolImplBase::shouldCreateNewConnection, see if adding this one new connection
     // would put the cluster over desired capacity. If so, stop preconnecting.
-    if ((state.pending_streams_ + 1 + state.active_streams_) * peekahead_ratio <=
-        (state.connecting_stream_capacity_ + state.active_streams_)) {
+    if ((state.connecting_stream_capacity_ + state.active_streams_) >
+        (state.pending_streams_ + 1 + state.active_streams_) * peekahead_ratio) {
       return;
     }
     ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
-    if (preconnect_pool) {
-      if (!preconnect_pool->maybePreconnect(peekahead_ratio)) {
-        // Given that the next preconnect pick may be entirely different, we could
-        // opt to try again even if the first preconnect fails. Err on the side of
-        // caution and wait for the next attempt.
-        return;
-      }
-    } else {
-      // If unable to find a preconnect pool, exit early.
+    if (!preconnect_pool || !preconnect_pool->maybePreconnect(peekahead_ratio)) {
+      // Given that the next preconnect pick may be entirely different, we could
+      // opt to try again even if the first preconnect fails. Err on the side of
+      // caution and wait for the next attempt.
       return;
     }
   }
@@ -885,7 +880,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   auto ret = connPool(priority, protocol, context, false);
 
   // Now see if another host should be preconnected.
-  // httpConnPoolForCluster is called immediately before a call for newStream. newStream doesn't
+  // httpConnPool is called immediately before a call for newStream. newStream doesn't
   // have the load balancer context needed to make selection decisions so preconnecting must be
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
@@ -902,7 +897,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   // Select a host and create a connection pool for it if it does not already exist.
   auto ret = tcpConnPool(priority, context, false);
 
-  // tcpConnPoolForCluster is called immediately before a call for newConnection. newConnection
+  // tcpConnPool is called immediately before a call for newConnection. newConnection
   // doesn't have the load balancer context needed to make selection decisions so preconnecting must
   // be performed here in anticipation of the new connection.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
@@ -1253,7 +1248,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-    // Close non connection pool TCP connections obtained from tcpConnForCluster()
+    // Close non connection pool TCP connections obtained from tcpConn()
     //
     // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
     // TCP client. Perhaps it could be rewritten to use a connection pool, and this code deleted.
