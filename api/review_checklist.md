@@ -45,7 +45,9 @@ consider the answers to these questions before sending a PR.
   work necessary to add support for the newer replacement field acceptable to
   known xDS clients in this time frame?
 - No deprecations are allowed when an alternative is "not ready yet" in any
-  major known xDS client (Envoy or gRPC at this point).
+  major known xDS client (Envoy or gRPC at this point). If you are not sure
+  about the current state of a feature in the major known xDS clients, ask
+  one of the API shepherds.
 - Is this deprecated field documented in a way that points to the preferred
   newer method of configuration?
 
