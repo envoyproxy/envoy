@@ -53,6 +53,7 @@ IntegrationTcpClient::IntegrationTcpClient(
                                 std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
+  ;
 
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(

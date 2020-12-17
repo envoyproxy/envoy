@@ -25,6 +25,8 @@ public:
   static const char NO_TRAILERS[];
   // Prevents upstream from finishing response.
   static const char NO_END_STREAM[];
+  // Closes the underlying connection after a given response is sent.
+  static const char CLOSE_AFTER_RESPONSE[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                    AutonomousUpstream& upstream, bool allow_incomplete_streams);

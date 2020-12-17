@@ -21,6 +21,7 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::RESPONSE_DATA_BLOCKS[] = "response_data_blocks";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
+const char AutonomousStream::CLOSE_AFTER_RESPONSE[] = "close_after_response";
 const char AutonomousStream::NO_TRAILERS[] = "no_trailers";
 const char AutonomousStream::NO_END_STREAM[] = "no_end_stream";
 
@@ -83,6 +84,11 @@ void AutonomousStream::sendResponse() {
     if (send_trailers) {
       encodeTrailers(upstream_.responseTrailers());
     }
+  }
+  if (!headers.get_(CLOSE_AFTER_RESPONSE).empty()) {
+    parent_.connection().dispatcher().post(
+        [this]() -> void { parent_.connection().close(Network::ConnectionCloseType::FlushWrite); });
+    return;
   }
 }
 
