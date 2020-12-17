@@ -19,7 +19,8 @@ public:
   // Server::Configuration::BootstrapExtensionFactory
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
-                           Server::Configuration::ServerFactoryContext& context) override;
+                      ProtobufMessage::ValidationVisitor& validation_visitor) override;
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {
     return "envoy.extensions.network.socket_interface.default_socket_interface";

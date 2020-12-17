@@ -15,6 +15,9 @@ namespace Server {
 class BootstrapExtension {
 public:
   virtual ~BootstrapExtension() = default;
+
+  // Called when server is done initializing and we have the ServerFactoryConext available.
+  virtual void serverInitialized(Configuration::ServerFactoryContext& context) PURE;
 };
 
 using BootstrapExtensionPtr = std::unique_ptr<BootstrapExtension>;
@@ -37,7 +40,7 @@ public:
    * @param context general filter context through which persistent resources can be accessed.
    */
   virtual BootstrapExtensionPtr createBootstrapExtension(const Protobuf::Message& config,
-                                                         ServerFactoryContext& context) PURE;
+                      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.bootstrap"; }
 };

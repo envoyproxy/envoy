@@ -91,7 +91,7 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
 
 Server::BootstrapExtensionPtr
 SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
-                                              Server::Configuration::ServerFactoryContext&) {
+                      ProtobufMessage::ValidationVisitor&) {
   return std::make_unique<SocketInterfaceExtension>(*this);
 }
 

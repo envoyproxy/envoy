@@ -139,7 +139,10 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroyed listener manager");
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() { 
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -428,8 +431,7 @@ void InstanceImpl::initialize(const Options& options,
     auto config = Config::Utility::translateAnyToFactoryConfig(
         bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
-    bootstrap_extensions_.push_back(
-        factory.createBootstrapExtension(*config, serverFactoryContext()));
+    bootstrap_extensions_.push_back(factory.createBootstrapExtension(*config, messageValidationContext().staticValidationVisitor()));
   }
 
   // Register the fatal actions.
@@ -533,6 +535,10 @@ void InstanceImpl::initialize(const Options& options,
   // is constructed as part of the InstanceImpl and then populated once
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
+
+  for (auto&& bootstrap_extension: bootstrap_extensions_) {
+    bootstrap_extension->serverInitialized(serverFactoryContext()));
+  }
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
