@@ -190,9 +190,9 @@ TEST_F(GrpcAccessLoggerImplTest, WatermarksOverrun) {
 
   // Now allow the flush to happen. The stored log will get logged, and the next log will succeed.
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(1);
+  EXPECT_CALL(stream, sendMessageRaw_(_, _));
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(1);
+  EXPECT_CALL(stream, sendMessageRaw_(_, _));
   logger_->log(envoy::data::accesslog::v3::HTTPAccessLogEntry(entry));
   EXPECT_EQ(
       2,
@@ -382,6 +382,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, Deduplication) {
   envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
   config.set_log_name("log-1");
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
+  config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
 
   expectClientCreation();
   GrpcAccessLoggerSharedPtr logger1 =

@@ -626,8 +626,8 @@ TEST_P(WasmCommonTest, WASI) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
-        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(1);
-        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("WASI write to stderr"))).Times(1);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("WASI write to stderr")));
         return root_context;
       });
   wasm->start(plugin);
@@ -771,9 +771,10 @@ TEST_P(WasmCommonTest, RemoteCode) {
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
 
-  EXPECT_CALL(cluster_manager, httpAsyncClientForCluster("example_com"))
-      .WillOnce(ReturnRef(cluster_manager.async_client_));
-  EXPECT_CALL(cluster_manager.async_client_, send_(_, _, _))
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -880,9 +881,10 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
 
-  EXPECT_CALL(cluster_manager, httpAsyncClientForCluster("example_com"))
-      .WillRepeatedly(ReturnRef(cluster_manager.async_client_));
-  EXPECT_CALL(cluster_manager.async_client_, send_(_, _, _))
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(Invoke([&, retry = num_retries](
                                  Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                                  const Http::AsyncClient::RequestOptions&) mutable

@@ -2,6 +2,7 @@
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
+#include "common/router/context_impl.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -33,14 +34,15 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 class AggregateClusterUpdateTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AggregateClusterUpdateTest()
-      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
+      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()),
+        router_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_);
+        *factory_.api_, http_context_, grpc_context_, router_context_);
     cluster_manager_->initializeSecondaryClusters(bootstrap);
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
@@ -56,6 +58,7 @@ public:
   AccessLog::MockAccessLogManager log_manager_;
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
+  Router::ContextImpl router_context_;
 
   const std::string default_yaml_config_ = R"EOF(
  static_resources:
@@ -271,7 +274,7 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
       bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.local_info_,
       log_manager_, factory_.dispatcher_, admin_, validation_context_, *factory_.api_,
-      http_context_, grpc_context_);
+      http_context_, grpc_context_, router_context_);
   cluster_manager_->initializeSecondaryClusters(bootstrap);
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");

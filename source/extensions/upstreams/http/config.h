@@ -12,8 +12,10 @@
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "common/common/logger.h"
+#include "common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,15 +42,17 @@ public:
 
   bool use_downstream_protocol_{};
   bool use_http2_{};
+  bool use_alpn_{};
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {
 public:
-  Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& config,
-                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
-    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& typed_config =
-        *dynamic_cast<const envoy::extensions::upstreams::http::v3::HttpProtocolOptions*>(&config);
+  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
+      const Protobuf::Message& config,
+      Server::Configuration::ProtocolOptionsFactoryContext& context) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
+        config, context.messageValidationVisitor());
     return std::make_shared<ProtocolOptionsConfigImpl>(typed_config);
   }
   std::string category() const override { return "envoy.upstream_options"; }

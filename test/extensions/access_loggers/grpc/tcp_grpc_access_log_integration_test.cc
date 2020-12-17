@@ -29,7 +29,7 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrat
 public:
   TcpGrpcAccessLogIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   void createUpstreams() override {
@@ -38,6 +38,9 @@ public:
   }
 
   void initialize() override {
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -127,6 +130,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, TcpGrpcAccessLogIntegrationTest,
 
 // Test a basic full access logging flow.
 TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));

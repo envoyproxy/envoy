@@ -33,7 +33,7 @@ ActiveClient::StreamWrapper::~StreamWrapper() {
   // Upstream connection might be closed right after response is complete. Setting delay=true
   // here to attach pending requests in next dispatcher loop to handle that case.
   // https://github.com/envoyproxy/envoy/issues/2715
-  parent_.parent().onStreamClosed(parent_, true);
+  parent_.parent_.onStreamClosed(parent_, true);
 }
 
 void ActiveClient::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
@@ -76,7 +76,7 @@ void ActiveClient::StreamWrapper::onDecodeComplete() {
     parent_.codec_client_->close();
   } else {
     auto* pool = &parent_.parent();
-    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->scheduleOnUpstreamReady();
     parent_.stream_wrapper_.reset();
 
     pool->checkForDrained();
@@ -92,6 +92,14 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
           parent, parent.host()->cluster().maxRequestsPerConnection(),
           1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
+  parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
+}
+
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data)
+    : Envoy::Http::ActiveClient(
+          parent, parent.host()->cluster().maxRequestsPerConnection(),
+          1, // HTTP1 always has a concurrent-request-limit of 1 per connection.
+          data) {
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
