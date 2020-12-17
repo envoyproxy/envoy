@@ -89,6 +89,25 @@ private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
 
+struct GenericPoolReadyDeferrer {
+  std::unique_ptr<GenericUpstream> upstream_;
+  GenericConnectionPoolCallbacks* callbacks_{};
+  Upstream::HostDescriptionConstSharedPtr host_;
+  Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+
+  void call(Http::RequestEncoder& request_encoder) {
+    ASSERT(callbacks_ != nullptr);
+    callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host_,
+                                   request_encoder.getStream().connectionLocalAddress(),
+                                   ssl_info_);
+  }
+  void release() {
+      if (upstream_) {
+          upstream_.reset();
+      }
+  }
+};
+
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
   ~HttpUpstream() override;
@@ -111,15 +130,7 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
-  void setOnGenericPoolReadyParameters(std::unique_ptr<GenericUpstream>&& upstream,
-                                       GenericConnectionPoolCallbacks& callbacks,
-                                       Upstream::HostDescriptionConstSharedPtr host,
-                                       Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-    upstream_ = std::move(upstream);
-    callbacks_ = &callbacks;
-    host_ = host;
-    ssl_info_ = ssl_info;
-  }
+  void setGenericPoolReadyDeferrer(GenericPoolReadyDeferrer&& deferrer) { deferrer_ = std::move(deferrer); }
 
   friend class DecoderShim;
 
@@ -131,11 +142,6 @@ protected:
   const std::string hostname_;
 
 private:
-  void deferredOnPoolReady() {
-    callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host_,
-                                   request_encoder_->getStream().connectionLocalAddress(),
-                                   ssl_info_);
-  }
   class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
@@ -145,7 +151,7 @@ private:
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else {
-        parent_.deferredOnPoolReady();
+        parent_.deferrer_.call(*parent_.request_encoder_);
       }
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
@@ -165,13 +171,12 @@ private:
   bool read_half_closed_{};
   bool write_half_closed_{};
 
-  // Parameters used to defer onPoolGenericReady
-  // TODO(irozzo) Find a better way, it seems quite risky to me to have a
-  // circular dependency here.
-  std::unique_ptr<GenericUpstream> upstream_;
-  GenericConnectionPoolCallbacks* callbacks_{};
-  Upstream::HostDescriptionConstSharedPtr host_;
-  Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+  // Used to defer onPoolGenericReady call to the time when the CONNECT
+  // response is acknowleged.
+  //
+  // Be sure that either call or release are called in order to avoid a memory
+  // leak.
+  GenericPoolReadyDeferrer deferrer_;
 };
 
 class Http1Upstream : public HttpUpstream {

@@ -108,9 +108,6 @@ void HttpUpstream::onBelowWriteBufferLowWatermark() {
 }
 
 void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
-  if (callbacks_) {
-    upstream_.reset();
-  }
   if (!request_encoder_) {
     return;
   }
@@ -122,6 +119,7 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
   if (inform_downstream) {
     upstream_callbacks_.onEvent(event);
   }
+  deferrer_.release();
 }
 
 void HttpUpstream::doneReading() {
@@ -227,8 +225,7 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setOnGenericPoolReadyParameters(std::move(upstream_), *callbacks_, host,
-                                             info.downstreamSslConnection());
+  upstream_->setGenericPoolReadyDeferrer({ std::move(upstream_), callbacks_, host, info.downstreamSslConnection()});
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
