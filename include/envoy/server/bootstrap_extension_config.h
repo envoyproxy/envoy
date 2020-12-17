@@ -16,7 +16,10 @@ class BootstrapExtension {
 public:
   virtual ~BootstrapExtension() = default;
 
-  // Called when server is done initializing and we have the ServerFactoryConext available.
+  /**
+   * Called when server is done initializing and we have the ServerFactoryContext available.
+   * @param context general filter context through which persistent resources can be accessed.
+   */
   virtual void serverInitialized(Configuration::ServerFactoryContext& context) PURE;
 };
 
@@ -37,7 +40,7 @@ public:
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException. The returned pointer should never be nullptr.
    * @param config the custom configuration for this bootstrap extension type.
-   * @param context general filter context through which persistent resources can be accessed.
+   * @param validation_visitor message validation visitor instance.
    */
   virtual BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
