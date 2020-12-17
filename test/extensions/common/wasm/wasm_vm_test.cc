@@ -61,10 +61,9 @@ TEST_F(BaseVmTest, NullVmStartup) {
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
   EXPECT_TRUE(wasm_vm->getCustomSection("user").empty());
-  EXPECT_EQ(getEnvoyWasmIntegration(*wasm_vm).runtime(), "envoy.wasm.runtime.null");
+  EXPECT_EQ(wasm_vm->runtime(), "null");
   std::function<void()> f;
-  EXPECT_FALSE(
-      getEnvoyWasmIntegration(*wasm_vm).getNullVmFunction("bad_function", false, 0, nullptr, &f));
+  EXPECT_FALSE(wasm_vm->integration()->getNullVmFunction("bad_function", false, 0, nullptr, &f));
 }
 
 TEST_F(BaseVmTest, NullVmMemory) {

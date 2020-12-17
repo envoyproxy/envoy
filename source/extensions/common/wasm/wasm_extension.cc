@@ -39,11 +39,6 @@ RegisterWasmExtension::RegisterWasmExtension(WasmExtension* extension) {
   wasm_extension = extension;
 }
 
-std::unique_ptr<EnvoyWasmVmIntegration>
-EnvoyWasm::createEnvoyWasmVmIntegration(absl::string_view runtime) {
-  return std::make_unique<EnvoyWasmVmIntegration>(runtime);
-}
-
 PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
   return [](const WasmHandleSharedPtr& base_wasm,
             absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
