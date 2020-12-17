@@ -98,13 +98,12 @@ struct GenericPoolReadyDeferrer {
   void call(Http::RequestEncoder& request_encoder) {
     ASSERT(callbacks_ != nullptr);
     callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host_,
-                                   request_encoder.getStream().connectionLocalAddress(),
-                                   ssl_info_);
+                                   request_encoder.getStream().connectionLocalAddress(), ssl_info_);
   }
   void release() {
-      if (upstream_) {
-          upstream_.reset();
-      }
+    if (upstream_) {
+      upstream_.reset();
+    }
   }
 };
 
@@ -130,7 +129,9 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
-  void setGenericPoolReadyDeferrer(GenericPoolReadyDeferrer&& deferrer) { deferrer_ = std::move(deferrer); }
+  void setGenericPoolReadyDeferrer(GenericPoolReadyDeferrer&& deferrer) {
+    deferrer_ = std::move(deferrer);
+  }
 
   friend class DecoderShim;
 
@@ -172,7 +173,7 @@ private:
   bool write_half_closed_{};
 
   // Used to defer onPoolGenericReady call to the time when the CONNECT
-  // response is acknowleged.
+  // response is acknowledged.
   //
   // Be sure that either call or release are called in order to avoid a memory
   // leak.
