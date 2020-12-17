@@ -154,7 +154,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
 TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
   autonomous_upstream_ = true;
   initialize();
-  int num_connections = 50;
+  const int num_connections = 50;
   std::vector<IntegrationTcpClientPtr> clients(num_connections);
 
   for (int i = 0; i < num_connections; ++i) {
@@ -163,6 +163,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
   for (int i = 0; i < num_connections; ++i) {
     IntegrationTcpClientPtr& tcp_client = clients[i];
+    // The autonomous upstream is an HTTP upstream, so send raw HTTP.
+    // This particular request will result in the upstream sending a response,
+    // and flush-closing due to the 'close_after_response' header.
     ASSERT_TRUE(tcp_client->write(
         "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
         false));
@@ -177,11 +180,21 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
   initialize();
   std::list<IntegrationTcpClientPtr> clients;
 
+  // The autonomous upstream parses HTTP, and HTTP headers and sends responses
+  // when full requests are received. basic_request will result in
+  // bidirectional data. request_with_close will result in bidirectional data,
+  // but also the upstream closing the connection.
   const char* basic_request = "GET / HTTP/1.1\r\nHost: foo\r\ncontent-length: 0\r\n\r\n";
   const char* request_with_close =
       "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n";
   TestRandomGenerator rand;
 
+  // Seed some initial clients
+  for (int i = 0; i < 5; ++i) {
+    clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+  }
+
+  // Now randomly write / add more connections / close.
   for (int i = 0; i < 50; ++i) {
     int action = rand.random() % 3;
 
