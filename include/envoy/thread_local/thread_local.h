@@ -233,18 +233,16 @@ struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
   bool inMainThread() { return main_thread_id_ == std::this_thread::get_id(); }
   static void init() { 
-    main_thread_ = std::make_unique<MainThread>();
-    MainThreadSingleton::initialize(main_thread_.get()); 
+    static MainThread main_thread;
+    main_thread = MainThread();
+    MainThreadSingleton::initialize(&main_thread); 
   }
   static void clear() { MainThreadSingleton::clear(); }
   static bool isMainThread() { return MainThreadSingleton::get().inMainThread(); }
 
 private:
   std::thread::id main_thread_id_{std::this_thread::get_id()};
-  static std::unique_ptr<MainThread> main_thread_;
 };
-
-std::unique_ptr<MainThread> MainThread::main_thread_;
 
 #define envoy_try                                                                                  \
   ASSERT(ThreadLocal::MainThread::isMainThread());                                                 \
