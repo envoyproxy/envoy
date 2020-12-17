@@ -88,6 +88,7 @@ InstanceImpl::InstanceImpl(
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       server_contexts_(*this) {
+  ThreadLocal::MainThread::init();
   try {
     if (!options.logPath().empty()) {
       try {
@@ -325,7 +326,7 @@ void InstanceImpl::initialize(const Options& options,
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
 
-  ThreadLocal::MainThread::init();
+
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
