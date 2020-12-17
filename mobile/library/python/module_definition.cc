@@ -13,6 +13,7 @@
 #include "library/cc/engine_builder.h"
 #include "library/cc/envoy_error.h"
 #include "library/cc/executor.h"
+#include "library/cc/pulse_client.h"
 #include "library/cc/request_headers.h"
 #include "library/cc/request_headers_builder.h"
 #include "library/cc/request_method.h"
@@ -23,7 +24,6 @@
 #include "library/cc/response_trailers.h"
 #include "library/cc/response_trailers_builder.h"
 #include "library/cc/retry_policy.h"
-#include "library/cc/stats_client.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_callbacks.h"
 #include "library/cc/stream_client.h"
@@ -50,7 +50,7 @@ PYBIND11_MODULE(envoy_engine, m) {
 
   py::class_<Engine, EngineSharedPtr>(m, "Engine")
       .def("stream_client", &Engine::stream_client)
-      .def("stats_client", &Engine::stats_client);
+      .def("pulse_client", &Engine::pulse_client);
 
   py::class_<EngineBuilder, EngineBuilderSharedPtr>(m, "EngineBuilder")
       .def("add_log_level", &EngineBuilder::add_log_level)
@@ -172,7 +172,7 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def_readwrite("total_upstream_timeout_ms", &RetryPolicy::total_upstream_timeout_ms);
 
   // TODO(crockeo): fill out stubs here once stats client impl
-  py::class_<StatsClient, StatsClientSharedPtr>(m, "StatsClient");
+  py::class_<PulseClient, PulseClientSharedPtr>(m, "PulseClient");
 
   py::class_<Stream, StreamSharedPtr>(m, "Stream")
       .def("send_headers", &Stream::send_headers)

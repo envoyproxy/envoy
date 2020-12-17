@@ -12,7 +12,7 @@ interface Engine {
   fun streamClient(): StreamClient
 
   /**
-   *  @return a {@link StatsClient} for recording time series metrics.
+   *  @return a {@link PulseClient} for recording time series metrics.
    */
-  fun statsClient(): StatsClient
+  fun pulseClient(): PulseClient
 }

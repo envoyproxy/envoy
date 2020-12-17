@@ -7,9 +7,9 @@ Starting Envoy
 ``StreamClient``
 ----------------
 
-Starting an instance of Envoy Mobile is done by building the ``Engine`` instance with ``EngineBuilder``. Requests are performed by the ``StatsClient`` provided by ``Engine``.
+Starting an instance of Envoy Mobile is done by building the ``Engine`` instance with ``EngineBuilder``. Requests are performed by the ``StreamClient`` provided by ``Engine``.
 
-To obtain a ``StatsClient``, call ``streamClient()`` on the ``Engine`` instance (see below).
+To obtain a ``StreamClient``, call ``streamClient()`` on the ``Engine`` instance (see below).
 
 After the stream client is obtained, it should be stored and used to start network requests/streams.
 

@@ -15,7 +15,7 @@ class EngineImpl internal constructor(
 ) : Engine {
 
   private val streamClient: StreamClient
-  private val statsClient: StatsClient
+  private val pulseClient: PulseClient
 
   constructor(
     envoyEngine: EnvoyEngine,
@@ -33,7 +33,7 @@ class EngineImpl internal constructor(
 
   init {
     streamClient = StreamClientImpl(envoyEngine)
-    statsClient = StatsClientImpl(envoyEngine)
+    pulseClient = PulseClientImpl(envoyEngine)
     if (envoyConfiguration == null) {
       envoyEngine.runWithConfig(configurationYAML, logLevel.level, onEngineRunning)
     } else {
@@ -45,7 +45,7 @@ class EngineImpl internal constructor(
     return streamClient
   }
 
-  override fun statsClient(): StatsClient {
-    return statsClient
+  override fun pulseClient(): PulseClient {
+    return pulseClient
   }
 }

@@ -3,7 +3,7 @@
 import Foundation
 import XCTest
 
-final class StatsClientImplTests: XCTestCase {
+final class PulseClientImplTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRecordCounter = nil
@@ -17,8 +17,8 @@ final class StatsClientImplTests: XCTestCase {
       actualCount = count
     }
     let mockEngine = MockEnvoyEngine()
-    let statsClient = StatsClientImpl(engine: mockEngine)
-    let counter = statsClient.counter(elements: ["test", "stat"])
+    let pulseClient = PulseClientImpl(engine: mockEngine)
+    let counter = pulseClient.counter(elements: ["test", "stat"])
     counter.increment()
     XCTAssertEqual(actualSeries, "test.stat")
     XCTAssertEqual(actualCount, 1)
@@ -32,8 +32,8 @@ final class StatsClientImplTests: XCTestCase {
       actualCount = count
     }
     let mockEngine = MockEnvoyEngine()
-    let statsClient = StatsClientImpl(engine: mockEngine)
-    let counter = statsClient.counter(elements: ["test", "stat"])
+    let pulseClient = PulseClientImpl(engine: mockEngine)
+    let counter = pulseClient.counter(elements: ["test", "stat"])
     counter.increment(count: 5)
     XCTAssertEqual(actualSeries, "test.stat")
     XCTAssertEqual(actualCount, 5)
@@ -41,8 +41,8 @@ final class StatsClientImplTests: XCTestCase {
 
   func testCounterWeaklyHoldsEngine() {
     let mockEngine = MockEnvoyEngine()
-    let statsClient = StatsClientImpl(engine: mockEngine)
-    let counter = statsClient.counter(elements: ["test", "stat"])
+    let pulseClient = PulseClientImpl(engine: mockEngine)
+    let counter = pulseClient.counter(elements: ["test", "stat"])
     weak var weakEngine = mockEngine
 
     addTeardownBlock { [counter, weak weakEngine] in
@@ -59,8 +59,8 @@ final class StatsClientImplTests: XCTestCase {
       actualValue = value
     }
     let mockEngine = MockEnvoyEngine()
-    let statsClient = StatsClientImpl(engine: mockEngine)
-    let gauge = statsClient.gauge(elements: ["test", "stat"])
+    let pulseClient = PulseClientImpl(engine: mockEngine)
+    let gauge = pulseClient.gauge(elements: ["test", "stat"])
     gauge.set(value: 5)
     XCTAssertEqual(actualSeries, "test.stat")
     XCTAssertEqual(actualValue, 5)
@@ -74,8 +74,8 @@ final class StatsClientImplTests: XCTestCase {
       actualAmount = amount
     }
     let mockEngine = MockEnvoyEngine()
-    let statsClient = StatsClientImpl(engine: mockEngine)
-    let gauge = statsClient.gauge(elements: ["test", "stat"])
+    let pulseClient = PulseClientImpl(engine: mockEngine)
+    let gauge = pulseClient.gauge(elements: ["test", "stat"])
     gauge.add(amount: 5)
     XCTAssertEqual(actualSeries, "test.stat")
     XCTAssertEqual(actualAmount, 5)
@@ -89,8 +89,8 @@ final class StatsClientImplTests: XCTestCase {
       actualAmount = amount
     }
     let mockEngine = MockEnvoyEngine()
-    let statsClient = StatsClientImpl(engine: mockEngine)
-    let gauge = statsClient.gauge(elements: ["test", "stat"])
+    let pulseClient = PulseClientImpl(engine: mockEngine)
+    let gauge = pulseClient.gauge(elements: ["test", "stat"])
     gauge.sub(amount: 5)
     XCTAssertEqual(actualSeries, "test.stat")
     XCTAssertEqual(actualAmount, 5)

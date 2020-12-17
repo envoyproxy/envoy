@@ -209,9 +209,6 @@ stats_config:
       patterns:
         - safe_regex:
             google_re2: {}
-            regex: '^client.*'
-        - safe_regex:
-            google_re2: {}
             regex: '^cluster\.[\w]+?\.upstream_cx_[\w]+'
         - safe_regex:
             google_re2: {}
@@ -228,6 +225,9 @@ stats_config:
         - safe_regex:
             google_re2: {}
             regex: '^http.hcm.downstream_rq_(?:[12345]xx|total|completed)'
+        - safe_regex:
+            google_re2: {}
+            regex: '^pulse.*'
         - safe_regex:
             google_re2: {}
             regex: '^vhost.api.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|retry.*|time|timeout|total)'

@@ -8,5 +8,5 @@ public protocol Engine: AnyObject {
   func streamClient() -> StreamClient
 
   /// A client for recording time series metrics.
-  func statsClient() -> StatsClient
+  func pulseClient() -> PulseClient
 }

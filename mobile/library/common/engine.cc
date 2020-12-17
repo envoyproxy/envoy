@@ -54,7 +54,7 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
     postinit_callback_handler_ = main_common_->server()->lifecycleNotifier().registerCallback(
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           server_ = TS_UNCHECKED_READ(main_common_)->server();
-          client_scope_ = server_->serverFactoryContext().scope().createScope("client.");
+          client_scope_ = server_->serverFactoryContext().scope().createScope("pulse.");
           auto api_listener = server_->listenerManager().apiListener()->get().http();
           ASSERT(api_listener.has_value());
           http_dispatcher_->ready(server_->dispatcher(), server_->serverFactoryContext().scope(),

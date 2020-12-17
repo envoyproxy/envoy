@@ -14,7 +14,7 @@ NSString *_REQUEST_SCHEME = @"https";
 
 @interface ViewController ()
 @property (nonatomic, strong) id<StreamClient> streamClient;
-@property (nonatomic, strong) id<StatsClient> statsClient;
+@property (nonatomic, strong) id<PulseClient> pulseClient;
 @property (nonatomic, strong) NSArray<NSString *> *filteredHeaders;
 @property (nonatomic, strong) NSMutableArray<Result *> *results;
 @property (nonatomic, weak) NSTimer *requestTimer;
@@ -48,7 +48,7 @@ NSString *_REQUEST_SCHEME = @"https";
   } else {
     NSLog(@"started Envoy, beginning requests...");
     self.streamClient = [engine streamClient];
-    self.statsClient = [engine statsClient];
+    self.pulseClient = [engine pulseClient];
     [self startRequests];
   }
 }
@@ -135,11 +135,11 @@ NSString *_REQUEST_SCHEME = @"https";
   Element *elementCounter = [[Element alloc] initWithStringLiteral:@"counter"];
   Element *elementGauge = [[Element alloc] initWithStringLiteral:@"gauge"];
   id<Counter> counter =
-      [self.statsClient counterWithElements:@[ elementFoo, elementBar, elementCounter ]];
+      [self.pulseClient counterWithElements:@[ elementFoo, elementBar, elementCounter ]];
   [counter incrementWithCount:1];
   [counter incrementWithCount:5];
 
-  id<Gauge> gauge = [self.statsClient gaugeWithElements:@[ elementFoo, elementBar, elementGauge ]];
+  id<Gauge> gauge = [self.pulseClient gaugeWithElements:@[ elementFoo, elementBar, elementGauge ]];
   [gauge setWithValue:5];
   [gauge addWithAmount:10];
   [gauge subWithAmount:1];

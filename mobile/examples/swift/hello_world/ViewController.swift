@@ -12,7 +12,7 @@ final class ViewController: UITableViewController {
   private var results = [Result<Response, RequestError>]()
   private var timer: Timer?
   private var streamClient: StreamClient?
-  private var statsClient: StatsClient?
+  private var pulseClient: PulseClient?
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -28,7 +28,7 @@ final class ViewController: UITableViewController {
         .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
         .build()
       self.streamClient = engine.streamClient()
-      self.statsClient = engine.statsClient()
+      self.pulseClient = engine.pulseClient()
     } catch let error {
       NSLog("starting Envoy failed: \(error)")
     }
@@ -110,16 +110,16 @@ final class ViewController: UITableViewController {
   }
 
   private func recordStats() {
-    guard let statsClient = self.statsClient else {
+    guard let pulseClient = self.pulseClient else {
       NSLog("failed to send stats - Envoy is not running")
       return
     }
 
-    let counter = statsClient.counter(elements: ["foo", "bar", "counter"])
+    let counter = pulseClient.counter(elements: ["foo", "bar", "counter"])
     counter.increment()
     counter.increment(count: 5)
 
-    let gauge = statsClient.gauge(elements: ["foo", "bar", "counter"])
+    let gauge = pulseClient.gauge(elements: ["foo", "bar", "counter"])
     gauge.set(value: 5)
     gauge.add(amount: 10)
     gauge.sub(amount: 1)

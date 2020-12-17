@@ -53,6 +53,16 @@ envoy_mobile_kt_test(
 )
 
 envoy_mobile_kt_test(
+    name = "pulse_client_impl_test",
+    srcs = [
+        "PulseClientImplTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_kt_test(
     name = "request_headers_builder_test",
     srcs = [
         "RequestHeadersBuilderTest.kt",
@@ -76,16 +86,6 @@ envoy_mobile_kt_test(
     name = "retry_policy_mapper_test",
     srcs = [
         "RetryPolicyMapperTest.kt",
-    ],
-    deps = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-    ],
-)
-
-envoy_mobile_kt_test(
-    name = "stats_client_impl_test",
-    srcs = [
-        "StatsClientImplTest.kt",
     ],
     deps = [
         "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",

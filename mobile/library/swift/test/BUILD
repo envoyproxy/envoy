@@ -3,6 +3,20 @@ load("@envoy_mobile//bazel:swift_test.bzl", "envoy_mobile_swift_test")
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_swift_test(
+    name = "counter_tests",
+    srcs = [
+        "CounterTests.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "element_tests",
+    srcs = [
+        "ElementTests.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "engine_builder_tests",
     srcs = [
         "EngineBuilderTests.swift",
@@ -34,6 +48,16 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "pulse_client_impl_tests",
+    srcs = [
+        "PulseClientImplTests.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "request_headers_builder_tests",
     srcs = [
         "RequestHeadersBuilderTests.swift",
@@ -58,29 +82,5 @@ envoy_mobile_swift_test(
     name = "retry_policy_mapper_tests",
     srcs = [
         "RetryPolicyMapperTests.swift",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "stats_client_impl_tests",
-    srcs = [
-        "StatsClientImplTests.swift",
-    ],
-    deps = [
-        "//library/objective-c:envoy_engine_objc_lib",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "counter_tests",
-    srcs = [
-        "CounterTests.swift",
-    ],
-)
-
-envoy_mobile_swift_test(
-    name = "element_tests",
-    srcs = [
-        "ElementTests.swift",
     ],
 )

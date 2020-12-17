@@ -5,7 +5,7 @@ import Foundation
 @objcMembers
 final class EngineImpl: NSObject {
   private let engine: EnvoyEngine
-  private let statsClientImpl: StatsClientImpl
+  private let pulseClientImpl: PulseClientImpl
   private let streamClientImpl: StreamClientImpl
 
   private enum ConfigurationType {
@@ -17,7 +17,7 @@ final class EngineImpl: NSObject {
                onEngineRunning: (() -> Void)?)
   {
     self.engine = engine
-    self.statsClientImpl = StatsClientImpl(engine: engine)
+    self.pulseClientImpl = PulseClientImpl(engine: engine)
     self.streamClientImpl = StreamClientImpl(engine: engine)
     super.init()
 
@@ -66,7 +66,7 @@ extension EngineImpl: Engine {
     return self.streamClientImpl
   }
 
-  func statsClient() -> StatsClient {
-    return self.statsClientImpl
+  func pulseClient() -> PulseClient {
+    return self.pulseClientImpl
   }
 }
