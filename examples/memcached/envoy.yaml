@@ -1,0 +1,41 @@
+static_resources:
+  listeners:
+  - name: redis_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 1999
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.redis_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: egress_memcached
+          settings:
+            protocol: Memcached
+            op_timeout: 5s
+          prefix_routes:
+            catch_all_route:
+              cluster: memcached_cluster
+  clusters:
+  - name: memcached_cluster
+    common_lb_config:
+      consistent_hashing_lb_config:
+        use_hostname_for_hashing: true
+    lb_policy: CLUSTER_PROVIDED
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.clusters.twem
+    eds_cluster_config:
+      eds_config:
+          path: /var/lib/envoy/eds.yaml
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001
+node:
+  cluster: hello-service
+  id: node
+  

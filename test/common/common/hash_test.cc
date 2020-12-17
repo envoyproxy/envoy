@@ -27,22 +27,6 @@ TEST(Hash, murmurHash2) {
   EXPECT_EQ(6142509188972423790U, MurmurHash::murmurHash2(""));
 }
 
-TEST(Hash, twemHash) {
-  EXPECT_EQ(3184479084, HashUtil::twemHash("shylf-comic-sniper-mc-tw1-3", 2));
-  EXPECT_EQ(1477182901, HashUtil::twemHash("shylf-comic-sniper-mc-tw1-7", 1));
-  EXPECT_EQ(903896539,  HashUtil::twemHash("shylf-comic-sniper-mc-tw1-9", 0));
-  EXPECT_EQ(1020461313, HashUtil::twemHash("shylf-comic-sniper-mc-tw1-5", 3));
-  EXPECT_EQ(3247894047, HashUtil::twemHash("shylf-comic-sniper-mc-tw1-6", 3));
-}
-
-TEST(Hash, fnv1a64Hash) {
-  EXPECT_EQ(2248273036, HashUtil::fnv1a64Hash("a"));
-  EXPECT_EQ(2248274341, HashUtil::fnv1a64Hash("b"));
-  EXPECT_EQ(3089323813, HashUtil::fnv1a64Hash("bbbb"));
-  EXPECT_EQ(991453573,  HashUtil::fnv1a64Hash("lalalala"));
-  EXPECT_EQ(4269843203, HashUtil::fnv1a64Hash("ksksksksks"));
-}
-
 #if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726
 TEST(Hash, stdhash) {
   EXPECT_EQ(std::hash<std::string>()(std::string("foo")), MurmurHash::murmurHash2("foo"));

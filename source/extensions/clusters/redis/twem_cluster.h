@@ -27,6 +27,8 @@ public:
       : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Twem) {}
 
 private:
+  friend class TwemClusterTest;
+
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
             const envoy::config::cluster::v3::Cluster& cluster,

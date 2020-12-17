@@ -55,12 +55,14 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
       cluster: fake_cluster
   stat_prefix: foo
   settings:
+    protocol: Memcached
     op_timeout: 0.01s
   )EOF";
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
+  EXPECT_EQ(Common::Redis::Protocol::Memcached, config.protocol());
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_TRUE(config.downstream_auth_username_.empty());
   EXPECT_TRUE(config.downstream_auth_password_.empty());
@@ -152,7 +154,7 @@ public:
   }
 
   // Common::Redis::DecoderFactory
-  Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
+  Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks, Common::Redis::Protocol ) override {
     decoder_callbacks_ = &callbacks;
     return Common::Redis::DecoderPtr{decoder_};
   }

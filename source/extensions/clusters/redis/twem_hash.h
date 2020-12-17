@@ -20,7 +20,7 @@ public:
    */
   static uint32_t hash(absl::string_view key, uint32_t alignment);
 
-  static uint32_t fnv1a64(std::string key);
+  static uint32_t fnv1a64(absl::string_view key);
 };
 } // namespace Redis
 } // namespace Clusters

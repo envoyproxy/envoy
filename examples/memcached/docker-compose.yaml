@@ -1,0 +1,24 @@
+version: "3.7"
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    networks:
+      - envoymesh
+    ports:
+      - "1999:1999"
+      - "8001:8001"
+
+  redis:
+    build:
+      context: .
+      dockerfile: Dockerfile-memcached
+    networks:
+      envoymesh:
+        aliases:
+          - memcached_server
+
+networks:
+  envoymesh: {}

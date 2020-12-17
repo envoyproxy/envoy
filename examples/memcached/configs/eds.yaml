@@ -1,0 +1,10 @@
+version_info: "0"
+resources:
+  - "@type": type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment
+    cluster_name: memcached_cluster
+    endpoints:
+      - lb_endpoints:
+          - endpoint:
+              hostname: mc0
+              address:
+                socket_address: { address: 127.0.0.1, port_value: 11211 }

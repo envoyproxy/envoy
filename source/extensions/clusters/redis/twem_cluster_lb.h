@@ -33,6 +33,7 @@ public:
   using Upstream::RingHashLoadBalancer::RingHashLoadBalancer;
 
 private:
+  friend class TwemLoadBalancerRingTest;
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
   struct Ring : public Upstream::RingHashLoadBalancer::Ring {

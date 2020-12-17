@@ -29,9 +29,9 @@ static_resources:
                 prefix_routes:
                   routes:
                     - prefix: ""
-                      cluster: mc_1
+                      cluster: mc
   clusters:
-    - name: mc_1
+    - name: mc
       connect_timeout: 0.25s
       common_lb_config:
         consistent_hashing_lb_config:
@@ -46,6 +46,15 @@ static_resources:
             cluster_refresh_timeout: 5s
             redirect_refresh_interval: 0s
             redirect_refresh_threshold: 1
-      eds_cluster_config:
-        eds_config:
-          path: ./mc_endpoint.yaml
+      load_assignment:
+        cluster_name: mc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  hostname: mc-tw1
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 12000 }
+              - endpoint:
+                  hostname: mc-tw2
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 13000 }

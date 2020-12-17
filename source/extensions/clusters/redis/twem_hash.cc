@@ -10,7 +10,7 @@ namespace Redis {
 static uint64_t FNV_64_INIT = UINT64_C(0xcbf29ce484222325);
 static uint64_t FNV_64_PRIME = UINT64_C(0x100000001b3);
 
-uint32_t TwemHash::fnv1a64(std::string key) {
+uint32_t TwemHash::fnv1a64(absl::string_view key) {
   uint32_t hash = static_cast<uint32_t>(FNV_64_INIT);
   size_t x;
 

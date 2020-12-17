@@ -65,7 +65,8 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
-  if (value->asArray()[0].asString() == Common::Redis::SupportedCommands::quit()) {
+  if (value->type() == Common::Redis::RespType::Array &&
+        value->asArray()[0].asString() == Common::Redis::SupportedCommands::quit()) {
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
