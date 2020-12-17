@@ -1322,8 +1322,6 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    # TODO(envoyproxy/windows-dev): Investigate flakes in #14286.
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
