@@ -24,6 +24,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -320,6 +321,7 @@ public:
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, noDelay(true));
     EXPECT_CALL(*connection_, streamInfo()).Times(2);
+    EXPECT_CALL(*connection_, id()).Times(AnyNumber());
 
     connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
