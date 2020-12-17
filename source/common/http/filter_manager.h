@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "common/http/filter_manager.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -116,6 +117,39 @@ public:
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
+struct ActiveStreamFilterBase;
+
+/**
+ * Manages the shared match state between one or two filters.
+ * The need for this class comes from the fact that a single instantiated filter can be wrapped by
+ * two different ActiveStreamFilters, one for encoding and one for decoding. Certain match actions
+ * should be made visible to both wrappers (e.g. the skip action), while other actions should be
+ * sent to the underlying filter exactly once.
+ */
+class FilterMatchState {
+public:
+  FilterMatchState(Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                   HttpMatchingDataImplSharedPtr matching_data)
+      : match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)) {}
+
+  void evaluateMatchTreeWithNewData(std::function<void(HttpMatchingDataImpl&)> update_func);
+
+  // Some callbacks should be sent to all filters (e.g. filter specific match actions), while
+  // others should trigger updates to all filters (e.g. filter skip). The callback_handling_filter_
+  // should always be present and is the filter wrapper that handles the per filter actions, while
+  // secondary_filter_ is present for dual filters to allow setting a value for both wrappers.
+  // TODO(snowp): Should we instead snap a handle to the underlying filter and a list of filter wrappers?
+  ActiveStreamFilterBase* callback_handling_filter_{};
+  ActiveStreamFilterBase* secondary_filter_{};
+
+private:
+  Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree_;
+  HttpMatchingDataImplSharedPtr matching_data_;
+  bool match_tree_evaluated_ : 1;
+};
+
+using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
+
 /**
  * Base class wrapper for both stream encoder and decoder filters.
  *
@@ -126,14 +160,12 @@ class SkipAction : public Matcher::ActionBase<
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
   ActiveStreamFilterBase(FilterManager& parent, bool dual_filter,
-                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
-                         HttpMatchingDataImplSharedPtr matching_data)
+                         FilterMatchStateSharedPtr match_state)
       : parent_(parent), iteration_state_(IterationState::Continue),
-        match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)),
-        iterate_from_current_filter_(false), headers_continued_(false),
-        continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
-        decode_headers_called_(false), encode_headers_called_(false), match_tree_evaluated_(false),
-        skip_(false) {}
+        filter_match_state_(std::move(match_state)), iterate_from_current_filter_(false),
+        headers_continued_(false), continue_headers_continued_(false), end_stream_(false),
+        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false),
+        match_tree_evaluated_(false), skip_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -165,6 +197,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void doMetadata() PURE;
   // TODO(soya3129): make this pure when adding impl to encoder filter.
   virtual void handleMetadataAfterHeadersCallback() PURE;
+
+  virtual void onMatchCallback(const Matcher::Action& action) PURE;
 
   // Http::StreamFilterCallbacks
   const Network::Connection* connection() override;
@@ -203,8 +237,6 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     return saved_response_metadata_.get();
   }
 
-  void evaluateMatchTreeWithNewData(std::function<void(HttpMatchingDataImpl&)> update_func);
-
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
   // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
@@ -223,9 +255,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   FilterManager& parent_;
   IterationState iteration_state_;
 
-  Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree_;
-  HttpMatchingDataImplSharedPtr matching_data_;
-
+  FilterMatchStateSharedPtr filter_match_state_;
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
   // current filter instead of the next one. If true, filter iteration starts with the current
@@ -240,6 +270,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool encode_headers_called_ : 1;
   bool match_tree_evaluated_ : 1;
   bool skip_ : 1;
+
+  friend FilterMatchState;
 };
 
 /**
@@ -249,11 +281,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
-                            HttpMatchingDataImplSharedPtr matching_data, bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
-                               std::move(matching_data)),
-        handle_(filter) {}
+                            FilterMatchStateSharedPtr match_state, bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override;
@@ -275,6 +304,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
+  void onMatchCallback(const Matcher::Action& action) override {
+    handle_->onMatchCallback(std::move(action));
+  }
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
@@ -338,11 +370,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
-                            HttpMatchingDataImplSharedPtr matching_data, bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
-                               std::move(matching_data)),
-        handle_(filter) {}
+                            FilterMatchStateSharedPtr match_state, bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override { return true; }
@@ -355,6 +384,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
   void handleMetadataAfterHeadersCallback() override;
+  void onMatchCallback(const Matcher::Action& action) override { handle_->onMatchCallback(action); }
 
   void doMetadata() override {
     if (saved_response_metadata_ != nullptr) {
@@ -639,34 +669,40 @@ public:
 
   // Http::FilterChainFactoryCallbacks
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
+    addStreamDecoderFilterWorker(filter, nullptr, false);
   }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
     if (match_tree) {
-      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
-      addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+      addStreamDecoderFilterWorker(
+          filter,
+          std::make_shared<FilterMatchState>(std::move(match_tree),
+                                             std::make_shared<HttpMatchingDataImpl>()),
+          false);
       return;
     }
 
-    addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
+    addStreamDecoderFilterWorker(filter, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
-    addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
+    addStreamEncoderFilterWorker(filter, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
     if (match_tree) {
-      addStreamEncoderFilterWorker(filter, std::move(match_tree),
-                                   std::make_shared<HttpMatchingDataImpl>(), false);
+      addStreamEncoderFilterWorker(
+          filter,
+          std::make_shared<FilterMatchState>(std::move(match_tree),
+                                             std::make_shared<HttpMatchingDataImpl>()),
+          false);
       return;
     }
 
-    addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
+    addStreamEncoderFilterWorker(filter, nullptr, false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
-    addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
+    addStreamDecoderFilterWorker(filter, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, true);
   }
   void addStreamFilter(StreamFilterSharedPtr filter,
                        Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
@@ -675,14 +711,15 @@ public:
     // TODO(snowp): The match tree might be fully evaluated twice, ideally we should expose
     // the result to both filters after the first match evaluation.
     if (match_tree) {
-      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
-      addStreamDecoderFilterWorker(filter, match_tree, matching_data, true);
-      addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+      auto matching_state = std::make_shared<FilterMatchState>(
+          std::move(match_tree), std::make_shared<HttpMatchingDataImpl>());
+      addStreamDecoderFilterWorker(filter, matching_state, true);
+      addStreamEncoderFilterWorker(filter, std::move(matching_state), true);
       return;
     }
 
-    addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
-    addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
+    addStreamDecoderFilterWorker(filter, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
@@ -765,11 +802,9 @@ public:
 
   // TODO(snowp): Make private as filter chain construction is moved into FM.
   void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                    Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
-                                    HttpMatchingDataImplSharedPtr matching_data, bool dual_filter);
+                                    FilterMatchStateSharedPtr match_state, bool dual_filter);
   void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                    Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
-                                    HttpMatchingDataImplSharedPtr matching_data, bool dual_filter);
+                                    FilterMatchStateSharedPtr match_state, bool dual_filter);
 
   void disarmRequestTimeout();
 

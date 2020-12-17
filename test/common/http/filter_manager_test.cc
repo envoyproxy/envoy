@@ -1,3 +1,4 @@
+#include "common/matcher/matcher.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -154,6 +155,18 @@ Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestMatchingTree() {
   return tree;
 }
 
+struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
+
+Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestMatchingTreeCustomAction() {
+  auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
+      std::make_unique<HttpRequestHeadersDataInput>("match-header"), absl::nullopt);
+
+  tree->addChild("match", Matcher::OnMatch<HttpMatchingData>{
+                              []() { return std::make_unique<TestAction>(); }, nullptr});
+
+  return tree;
+}
+
 Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestAndResponseMatchingTree() {
   auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
       std::make_unique<HttpResponseHeadersDataInput>("match-header"), absl::nullopt);
@@ -246,6 +259,38 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*headers, false);
   filter_manager_->decodeData(data, true);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingHeaders) {
+  initialize();
+
+  // The filter is added, but since we match on the request header we skip the filter.
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new MockStreamDecoderFilter());
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, onMatchCallback(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _));
+  EXPECT_CALL(*decoder_filter, decodeComplete());
+  EXPECT_CALL(*decoder_filter, onDestroy());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter, createRequestMatchingTreeCustomAction());
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"match-header", "match"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*grpc_headers, true);
   filter_manager_->destroyFilters();
 }
 } // namespace

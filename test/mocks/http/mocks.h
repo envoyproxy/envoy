@@ -318,6 +318,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
 
   // Http::StreamDecoderFilter
   MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (RequestHeaderMap & headers, bool end_stream));
@@ -343,6 +344,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
@@ -364,6 +366,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
 
   // Http::StreamDecoderFilter
   MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (RequestHeaderMap & headers, bool end_stream));
