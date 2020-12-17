@@ -14,6 +14,9 @@ envoy_extension_package()
 envoy_cc_library(
     name = "trace_segment_reporter_lib",
     srcs = ["trace_segment_reporter.cc"],
+    external_deps = [
+      "cpp2sky",
+    ],
     hdrs = ["trace_segment_reporter.h"],
     deps = [
         ":skywalking_client_config_lib",

@@ -142,6 +142,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_luajit_luajit()
     _com_github_moonjit_moonjit()
     _com_github_nghttp2_nghttp2()
+    _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_absl()
@@ -425,6 +426,19 @@ def _com_github_datadog_dd_opentracing_cpp():
     native.bind(
         name = "dd_opentracing_cpp",
         actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
+    )
+
+def _com_github_skyapm_cpp2sky():
+    external_http_archive(
+      name = "com_github_skyapm_cpp2sky",
+      build_file = "@envoy//bazel/external:cpp2sky.BUILD"
+    )
+    external_http_archive(
+      name = "skywalking_data_collect_protocol",
+    )
+    native.bind(
+      name = "cpp2sky",
+      actual = "@com_github_skyapm_cpp2sky//:cpp2sky",
     )
 
 def _com_github_tencent_rapidjson():
