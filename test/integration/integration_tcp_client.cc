@@ -48,6 +48,10 @@ IntegrationTcpClient::IntegrationTcpClient(
         client_write_buffer_ =
             new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
         return client_write_buffer_;
+      }))
+      .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                                std::function<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
 
   connection_ = dispatcher.createClientConnection(
