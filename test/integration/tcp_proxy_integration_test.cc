@@ -93,9 +93,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   // Any time an associated connection is destroyed, it increments both counters.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  ;
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
-  ;
 }
 
 // Test TLS upstream.
@@ -118,9 +116,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   EXPECT_EQ("world", tcp_client->data());
   // Any time an associated connection is destroyed, it increments both counters.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  ;
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
-  ;
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
