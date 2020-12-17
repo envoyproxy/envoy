@@ -62,7 +62,10 @@ envoy_sh_test(
 envoy_cc_test(
     name = "main_common_test",
     srcs = ["main_common_test.cc"],
-    data = ["//test/config/integration:google_com_proxy_port_0"],
+    data = [
+        "//test/config/integration:google_com_proxy_port_0",
+        "//test/exe/testdata:test_with_kill_request_filter",
+    ],
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:main_common_lib",

@@ -53,7 +53,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Upstream::ThreadLocalCluster* cluster = config_->clusterManager().get(route_entry->clusterName());
+  Upstream::ThreadLocalCluster* cluster =
+      config_->clusterManager().getThreadLocalCluster(route_entry->clusterName());
   if (!cluster) {
     return Http::FilterHeadersStatus::Continue;
   }

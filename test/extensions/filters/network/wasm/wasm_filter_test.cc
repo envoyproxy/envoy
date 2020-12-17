@@ -40,7 +40,7 @@ public:
   MOCK_CONTEXT_LOG_;
 };
 
-class WasmNetworkFilterTest : public Common::Wasm::WasmNetworkFilterTestBase<
+class WasmNetworkFilterTest : public Extensions::Common::Wasm::WasmNetworkFilterTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmNetworkFilterTest() = default;
@@ -167,14 +167,10 @@ TEST_P(WasmNetworkFilterTest, CloseStream) {
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))));
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
   EXPECT_CALL(filter(),
-              log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))));
-  EXPECT_CALL(filter(),
               log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 2"))));
 
   filter().onEvent(static_cast<Network::ConnectionEvent>(9999)); // Does nothing.
   filter().onEvent(Network::ConnectionEvent::RemoteClose);
-  filter().closeStream(proxy_wasm::WasmStreamType::Downstream);
-  filter().closeStream(proxy_wasm::WasmStreamType::Upstream);
 }
 
 TEST_P(WasmNetworkFilterTest, SegvFailOpen) {

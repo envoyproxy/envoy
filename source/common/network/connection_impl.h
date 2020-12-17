@@ -61,6 +61,7 @@ public:
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
+  bool isHalfCloseEnabled() override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
@@ -118,10 +119,7 @@ public:
   // TODO(htuch): While this is the basis for also yielding to other connections to provide some
   // fair sharing of CPU resources, the underlying event loop does not make any fairness guarantees.
   // Reconsider how to make fairness happen.
-  void setReadBufferReady() override {
-    transport_wants_read_ = true;
-    ioHandle().activateFileEvents(Event::FileReadyType::Read);
-  }
+  void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
 
   // Obtain global next connection ID. This should only be used in tests.
@@ -199,10 +197,11 @@ private:
   bool write_end_stream_ : 1;
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
-  // True if the most recent call to the transport socket's doRead method invoked setReadBufferReady
-  // to schedule read resumption after yielding due to shouldDrainReadBuffer(). When true,
-  // readDisable must schedule read resumption when read_disable_count_ == 0 to ensure that read
-  // resumption happens when remaining bytes are held in transport socket internal buffers.
+  // True if the most recent call to the transport socket's doRead method invoked
+  // setTransportSocketIsReadable to schedule read resumption after yielding due to
+  // shouldDrainReadBuffer(). When true, readDisable must schedule read resumption when
+  // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
+  // in transport socket internal buffers.
   bool transport_wants_read_ : 1;
 };
 

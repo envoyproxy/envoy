@@ -40,7 +40,6 @@ public:
     }
     return false;
   }
-  absl::optional<Envoy::Http::Protocol> protocol() const override { return absl::nullopt; }
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   bool valid() { return conn_pool_ != nullptr; }

@@ -71,9 +71,6 @@ envoy_cc_library(
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
     srcs = ["test_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )
 
 envoy_wasm_cc_binary(
@@ -95,7 +92,4 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "bad_signature_cpp.wasm",
     srcs = ["bad_signature_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )

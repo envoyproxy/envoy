@@ -782,8 +782,8 @@ TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
   // Generates a valid stream_id by sending a request header.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 
   MetadataMapVector metadata_map_vector;
   const int size = 10;
@@ -812,8 +812,8 @@ TEST_P(Http2CodecImplTest, LargeMetadataVecTest) {
   // Generates a valid stream_id by sending a request header.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 
   MetadataMapVector metadata_map_vector;
   const int size = 10;
@@ -839,8 +839,8 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   // Generates a valid stream_id by sending a request header.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 
   MetadataMap metadata_map = {
       {"header_key1", "header_value1"},
@@ -884,6 +884,27 @@ TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
   }));
   EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+}
+
+// Verifies that metadata is not decoded after the stream ended.
+TEST_P(Http2CodecImplTest, NoMetadataEndStreamTest) {
+  allow_metadata_ = true;
+  initialize();
+
+  // Generates a valid stream_id by sending a request header, and end stream.
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  const MetadataMap metadata_map = {{"header_key1", "header_value1"}};
+  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+  MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+
+  // The metadata decoding will not be called after the stream has ended.
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(0);
+  request_encoder_->encodeMetadata(metadata_map_vector);
 }
 
 // Validate the keepalive PINGs are sent and received correctly.
@@ -2081,10 +2102,10 @@ TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
 
 // Verify that outbound control frame counter decreases when send buffer is drained
 TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
-  // Ping frames are 17 bytes each so 237 full frames and a partial frame fit in the current min
+  // Ping frames are 17 bytes each so 240 full frames and a partial frame fit in the current min
   // size for buffer slices. Setting the limit to 2x+1 the number that fits in a single slice allows
   // the logic below that verifies drain and overflow thresholds.
-  static const int kMaxOutboundControlFrames = 475;
+  static const int kMaxOutboundControlFrames = 481;
   max_outbound_control_frames_ = kMaxOutboundControlFrames;
   initialize();
 

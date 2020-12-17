@@ -253,8 +253,7 @@ protected:
 
 using SlicePtr = std::unique_ptr<Slice>;
 
-// OwnedSlice can not be derived from as it has variable sized array as member.
-class OwnedSlice final : public Slice, public InlineStorage {
+class OwnedSlice final : public Slice {
 public:
   /**
    * Create an empty OwnedSlice.
@@ -263,7 +262,7 @@ public:
    */
   static SlicePtr create(uint64_t capacity) {
     uint64_t slice_capacity = sliceSize(capacity);
-    return SlicePtr(new (slice_capacity) OwnedSlice(slice_capacity));
+    return SlicePtr{new OwnedSlice(slice_capacity)};
   }
 
   /**
@@ -274,15 +273,15 @@ public:
    *         the internal implementation) have a nonzero amount of reservable space at the end.
    */
   static SlicePtr create(const void* data, uint64_t size) {
-    uint64_t slice_capacity = sliceSize(size);
-    std::unique_ptr<OwnedSlice> slice(new (slice_capacity) OwnedSlice(slice_capacity));
-    memcpy(slice->base_, data, size);
-    slice->reservable_ = size;
+    auto slice = create(size);
+    slice->append(data, size);
     return slice;
   }
 
 private:
-  OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }
+  OwnedSlice(uint64_t size) : Slice(0, 0, size), storage_(new uint8_t[size]) {
+    base_ = storage_.get();
+  }
 
   bool isMutable() const override { return true; }
 
@@ -293,11 +292,11 @@ private:
    */
   static uint64_t sliceSize(uint64_t data_size) {
     static constexpr uint64_t PageSize = 4096;
-    const uint64_t num_pages = (sizeof(OwnedSlice) + data_size + PageSize - 1) / PageSize;
-    return num_pages * PageSize - sizeof(OwnedSlice);
+    const uint64_t num_pages = (data_size + PageSize - 1) / PageSize;
+    return num_pages * PageSize;
   }
 
-  uint8_t storage_[];
+  std::unique_ptr<uint8_t[]> storage_;
 };
 
 /**
@@ -564,6 +563,7 @@ public:
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
+  RawSlice frontSlice() const override;
   SliceDataPtr extractMutableFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;

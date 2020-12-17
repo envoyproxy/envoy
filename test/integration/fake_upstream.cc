@@ -626,6 +626,30 @@ testing::AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const 
       timeout);
 }
 
+FakeRawConnection::~FakeRawConnection() {
+  // If the filter was already deleted, it means the shared_connection_ was too, so don't try to
+  // access it.
+  if (auto filter = read_filter_.lock(); filter != nullptr) {
+    EXPECT_TRUE(shared_connection_.executeOnDispatcher(
+        [filter = std::move(filter)](Network::Connection& connection) {
+          connection.removeReadFilter(filter);
+        }));
+  }
+}
+
+testing::AssertionResult FakeRawConnection::initialize() {
+  auto filter = Network::ReadFilterSharedPtr{new ReadFilter(*this)};
+  read_filter_ = filter;
+  testing::AssertionResult result = shared_connection_.executeOnDispatcher(
+      [filter = std::move(filter)](Network::Connection& connection) {
+        connection.addReadFilter(filter);
+      });
+  if (!result) {
+    return result;
+  }
+  return FakeConnectionBase::initialize();
+}
+
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,
                                                milliseconds timeout) {
   absl::MutexLock lock(&lock_);

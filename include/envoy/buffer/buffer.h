@@ -29,6 +29,7 @@ struct RawSlice {
   size_t len_ = 0;
 
   bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
+  bool operator!=(const RawSlice& rhs) const { return !(*this == rhs); }
 };
 
 using RawSliceVector = absl::InlinedVector<RawSlice, 16>;
@@ -159,6 +160,14 @@ public:
    */
   virtual RawSliceVector
   getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
+
+  /**
+   * Fetch the valid data pointer and valid data length of the first non-zero-length
+   * slice in the buffer.
+   * @return RawSlice the first non-empty slice in the buffer, or {nullptr, 0} if the buffer
+   * is empty.
+   */
+  virtual RawSlice frontSlice() const PURE;
 
   /**
    * Transfer ownership of the front slice to the caller. Must only be called if the

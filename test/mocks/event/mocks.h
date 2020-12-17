@@ -227,6 +227,8 @@ public:
 
   MOCK_METHOD(void, activate, (uint32_t events));
   MOCK_METHOD(void, setEnabled, (uint32_t events));
+  MOCK_METHOD(void, registerEventIfEmulatedEdge, (uint32_t event));
+  MOCK_METHOD(void, unregisterEventIfEmulatedEdge, (uint32_t event));
 };
 
 } // namespace Event

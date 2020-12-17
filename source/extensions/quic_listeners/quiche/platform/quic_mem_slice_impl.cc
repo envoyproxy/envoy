@@ -29,15 +29,11 @@ QuicMemSliceImpl::QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t lengt
 }
 
 const char* QuicMemSliceImpl::data() const {
-  Envoy::Buffer::RawSliceVector slices = single_slice_buffer_.getRawSlices(/*max_slices=*/1);
-  ASSERT(slices.size() <= 1);
-  return !slices.empty() ? static_cast<const char*>(slices[0].mem_) : nullptr;
+  return reinterpret_cast<const char*>(single_slice_buffer_.frontSlice().mem_);
 }
 
 size_t QuicMemSliceImpl::firstSliceLength(Envoy::Buffer::Instance& buffer) {
-  Envoy::Buffer::RawSliceVector slices = buffer.getRawSlices(/*max_slices=*/1);
-  ASSERT(slices.size() == 1);
-  return slices[0].len_;
+  return buffer.frontSlice().len_;
 }
 
 } // namespace quic

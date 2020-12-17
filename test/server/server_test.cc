@@ -1411,6 +1411,16 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   ASSERT_TRUE(disabled_filter_found);
 }
 
+TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
+  // These are already the defaults. Repeated here for clarity.
+  process_object_ = nullptr;
+  process_context_ = nullptr;
+
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  ProcessContextOptRef context = server_->processContext();
+  EXPECT_FALSE(context.has_value());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

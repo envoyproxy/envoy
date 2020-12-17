@@ -316,6 +316,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TP
 TPM
 TSAN
 TSI
@@ -1219,6 +1220,7 @@ workspace
 writev
 xDS
 xDSes
+xdstp
 xeon
 xform
 xhtml

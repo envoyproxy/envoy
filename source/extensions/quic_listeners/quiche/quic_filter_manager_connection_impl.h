@@ -35,6 +35,7 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void enableHalfClose(bool enabled) override;
+  bool isHalfCloseEnabled() override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }

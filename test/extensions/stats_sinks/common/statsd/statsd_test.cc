@@ -33,12 +33,13 @@ namespace Common {
 namespace Statsd {
 namespace {
 
-class TcpStatsdSinkTest : public testing::Test {
+class TcpStatsdSinkTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   TcpStatsdSinkTest() {
+    cluster_manager_.initializeClusters({"fake_cluster"}, {});
     sink_ = std::make_unique<TcpStatsdSink>(
         local_info_, "fake_cluster", tls_, cluster_manager_,
-        cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_);
+        cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_);
   }
 
   void expectCreateConnection() {
@@ -46,7 +47,7 @@ public:
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = connection_;
     conn_info.host_description_ = Upstream::makeTestHost(
-        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80");
+        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80", simTime());
 
     EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
         .WillOnce(Return(conn_info));
@@ -164,7 +165,7 @@ TEST_F(TcpStatsdSinkTest, NoHost) {
 TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
   sink_ = std::make_unique<TcpStatsdSink>(
       local_info_, "fake_cluster", tls_, cluster_manager_,
-      cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_, "test_prefix");
+      cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_, "test_prefix");
 
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
@@ -210,25 +211,28 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
   snapshot_.counters_.push_back({1, counter});
 
   // Synthetically set buffer above high watermark. Make sure we don't write anything.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
-      1024 * 1024 * 17);
+  cluster_manager_.active_clusters_["fake_cluster"]
+      ->info_->stats()
+      .upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 17);
   sink_->flush(snapshot_);
 
   // Lower and make sure we write.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
-      1024 * 1024 * 15);
+  cluster_manager_.active_clusters_["fake_cluster"]
+      ->info_->stats()
+      .upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 15);
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n"), _));
   sink_->flush(snapshot_);
 
   // Raise and make sure we don't write and kill connection.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
-      1024 * 1024 * 17);
+  cluster_manager_.active_clusters_["fake_cluster"]
+      ->info_->stats()
+      .upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 17);
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   sink_->flush(snapshot_);
 
-  EXPECT_EQ(2UL, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
-                     .counter("statsd.cx_overflow")
+  EXPECT_EQ(2UL, cluster_manager_.active_clusters_["fake_cluster"]
+                     ->info_->stats_store_.counter("statsd.cx_overflow")
                      .value());
   tls_.shutdownThread();
 }

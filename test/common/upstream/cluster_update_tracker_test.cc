@@ -27,7 +27,7 @@ public:
 };
 
 TEST_F(ClusterUpdateTrackerTest, ClusterDoesNotExistAtConstructionTime) {
-  EXPECT_CALL(cm_, get(cluster_name_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(nullptr));
 
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 
@@ -36,7 +36,7 @@ TEST_F(ClusterUpdateTrackerTest, ClusterDoesNotExistAtConstructionTime) {
 }
 
 TEST_F(ClusterUpdateTrackerTest, ClusterDoesExistAtConstructionTime) {
-  EXPECT_CALL(cm_, get(cluster_name_)).WillOnce(Return(&expected_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&expected_));
 
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 
@@ -45,7 +45,7 @@ TEST_F(ClusterUpdateTrackerTest, ClusterDoesExistAtConstructionTime) {
 }
 
 TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
-  EXPECT_CALL(cm_, get(cluster_name_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(nullptr));
 
   ClusterUpdateTracker cluster_tracker(cm_, cluster_name_);
 

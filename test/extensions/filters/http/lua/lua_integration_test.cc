@@ -98,7 +98,7 @@ public:
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       xds_cluster->set_name("xds_cluster");
-      xds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*xds_cluster);
     });
   }
 

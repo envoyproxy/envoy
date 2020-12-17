@@ -60,18 +60,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "BoringSSL",
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
-        version = "2192bbc878822cf6ab5977d4257a1339453d9d39",
-        sha256 = "bb55b0ed2f0cb548b5dce6a6b8307ce37f7f748eb9f1be6bfe2d266ff2b4d52b",
+        version = "1ce6682c7f6cfe0426ed54a37c10775bea9d3502",
+        sha256 = "b878d84f90b9a95fa1e53f46f1b69a5116621e117a6d4dbf602d884311ee6aa7",
         strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-86.0.4240.80
+        # chromium-87.0.4280.66
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-07-30",
+        release_date = "2020-09-21",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -89,24 +89,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Abseil",
         project_desc = "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase",
         project_url = "https://abseil.io/",
-        version = "8f1c34a77a2ba04512b7f9cbc6013d405e6a0b31",
-        sha256 = "635367c5cac4bbab95d0485ba9e68fa422546b06ce050190c99be7e23aba3ce3",
+        version = "5d8fc9192245f0ea67094af57399d7931d6bd53f",
+        sha256 = "e3812f256dd7347a33bf9d93a950cf356c61c0596842ff07d8154cd415145d83",
         strip_prefix = "abseil-cpp-{version}",
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-10-17",
+        release_date = "2020-11-24",
         cpe = "N/A",
     ),
     com_github_c_ares_c_ares = dict(
         project_name = "c-ares",
         project_desc = "C library for asynchronous DNS requests",
         project_url = "https://c-ares.haxx.se/",
-        version = "c15f403875ababb1149215d49683d720b3d035c7",
-        sha256 = "0ad4f9748752909b00a0ca8d2b6a075e0a7a06ee922d9dcf9625d2562d7c894a",
+        version = "1.17.1",
+        sha256 = "d73dd0f6de824afd407ce10750ea081af47eba52b8a6cb307d220131ad93fc40",
         strip_prefix = "c-ares-{version}",
-        urls = ["https://github.com/c-ares/c-ares/archive/{version}.tar.gz"],
+        urls = ["https://github.com/c-ares/c-ares/releases/download/cares-{underscore_version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-10-21",
+        release_date = "2020-11-19",
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
     ),
     com_github_circonus_labs_libcircllhist = dict(
@@ -414,7 +414,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.jwt_authn"],
-        release_date = "2020-11-04",
+        release_date = "2020-11-05",
         cpe = "N/A",
     ),
     com_github_nodejs_http_parser = dict(
@@ -513,7 +513,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2020-11-12",
+        release_date = "2020-11-13",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
@@ -537,11 +537,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Bazel rules for the C++ language",
         project_url = "https://github.com/bazelbuild/rules_cc",
         # TODO(lizan): pin to a point releases when there's a released version.
-        version = "818289e5613731ae410efb54218a4077fb9dbb03",
-        sha256 = "9d48151ea71b3e225adfb6867e6d2c7d0dce46cbdc8710d9a9a628574dfd40a0",
+        version = "b1c40e1de81913a3c40e5948f78719c28152486d",
+        sha256 = "71d037168733f26d2a9648ad066ee8da4a34a13f51d24843a42efa6b65c2420f",
         strip_prefix = "rules_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_cc/archive/{version}.tar.gz"],
-        release_date = "2020-05-13",
+        release_date = "2020-11-11",
         use_category = ["build"],
     ),
     rules_foreign_cc = dict(
@@ -821,8 +821,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk",
-        version = "b5ff880ed13d93dde9faf53d0aa05b216cc60b86",
-        sha256 = "17a16355e4556ed8858e4d0be37a5cdf1a0d9cb0e96b3b5b8a52cf22b48ad094",
+        version = "956f0d500c380cc1656a2d861b7ee12c2515a664",
+        sha256 = "b97e3e716b1f38dc601487aa0bde72490bbc82b8f3ad73f1f3e69733984955df",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -837,7 +837,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2020-10-22",
+        release_date = "2020-11-20",
         cpe = "N/A",
     ),
     proxy_wasm_cpp_host = dict(
