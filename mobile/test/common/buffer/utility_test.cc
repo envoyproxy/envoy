@@ -47,5 +47,26 @@ TEST(DataConstructorTest, FromCppToC) {
   c_data.release(c_data.context);
 }
 
+TEST(DataConstructorTest, CopyFromCppToC) {
+  std::string s = "test string";
+  OwnedImpl cpp_data = OwnedImpl(absl::string_view(s));
+
+  envoy_data c_data = Utility::copyToBridgeData(cpp_data);
+
+  ASSERT_EQ(c_data.length, s.size());
+  ASSERT_EQ(Http::Utility::convertToString(c_data), s);
+  c_data.release(c_data.context);
+}
+
+TEST(DataConstructorTest, CopyStringFromCppToC) {
+  std::string s = "test string";
+
+  envoy_data c_data = Utility::copyToBridgeData(s);
+
+  ASSERT_EQ(c_data.length, s.size());
+  ASSERT_EQ(Http::Utility::convertToString(c_data), s);
+  c_data.release(c_data.context);
+}
+
 } // namespace Buffer
 } // namespace Envoy

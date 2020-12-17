@@ -15,6 +15,7 @@
 #include "extensions/upstreams/http/generic/config.h"
 
 #include "library/common/extensions/filters/http/assertion/config.h"
+#include "library/common/extensions/filters/http/local_error/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
 
 namespace Envoy {

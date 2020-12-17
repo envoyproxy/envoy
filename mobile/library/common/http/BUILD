@@ -13,6 +13,7 @@ envoy_cc_library(
     deps = [
         "//library/common/buffer:bridge_fragment_lib",
         "//library/common/buffer:utility_lib",
+        "//library/common/extensions/filters/http/local_error:local_error_filter_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/network:synthetic_address_lib",
         "//library/common/thread:lock_guard_lib",
@@ -46,5 +47,16 @@ envoy_cc_library(
         "@envoy//include/envoy/buffer:buffer_interface",
         "@envoy//include/envoy/http:header_map_interface",
         "@envoy//source/common/http:header_map_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "internal_headers_lib",
+    hdrs = ["headers.h"],
+    repository = "@envoy",
+    deps = [
+        "@envoy//include/envoy/http:header_map_interface",
+        "@envoy//source/common/singleton:const_singleton",
+        "@envoy//source/common/singleton:threadsafe_singleton",
     ],
 )

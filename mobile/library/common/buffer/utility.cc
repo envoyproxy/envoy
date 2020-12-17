@@ -1,5 +1,7 @@
 #include "library/common/buffer/utility.h"
 
+#include <stdlib.h>
+
 #include "common/buffer/buffer_impl.h"
 
 #include "library/common/buffer/bridge_fragment.h"
@@ -23,6 +25,17 @@ envoy_data toBridgeData(Buffer::Instance& data) {
   bridge_data.bytes = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * bridge_data.length));
   data.copyOut(0, bridge_data.length, const_cast<uint8_t*>(bridge_data.bytes));
   data.drain(bridge_data.length);
+  bridge_data.release = free;
+  bridge_data.context = const_cast<uint8_t*>(bridge_data.bytes);
+  return bridge_data;
+}
+
+envoy_data copyToBridgeData(absl::string_view str) {
+  envoy_data bridge_data;
+  bridge_data.length = str.length();
+  void* buffer = safe_malloc(sizeof(uint8_t) * bridge_data.length);
+  memcpy(buffer, str.data(), str.length());
+  bridge_data.bytes = static_cast<uint8_t*>(buffer);
   bridge_data.release = free;
   bridge_data.context = const_cast<uint8_t*>(bridge_data.bytes);
   return bridge_data;
