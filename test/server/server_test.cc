@@ -318,7 +318,7 @@ public:
   std::string name() const override { return "envoy.custom_stats_sink"; }
 };
 
-// CustomListenerHooks is used for syncrinization between test thread and server thread.
+// CustomListenerHooks is used for synchronization between test thread and server thread.
 class CustomListenerHooks : public DefaultListenerHooks {
 public:
   CustomListenerHooks(std::function<void()> workers_started_cb)
