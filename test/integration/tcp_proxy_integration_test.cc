@@ -91,11 +91,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
 }
 
 // Test TLS upstream.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   upstream_tls_ = true;
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   config_helper_.configureUpstreamTls();
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -110,6 +114,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   tcp_client->close();
 
   EXPECT_EQ("world", tcp_client->data());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -316,7 +323,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log->set_name("accesslog");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
-    access_log_config.mutable_log_format()->set_text_format(
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
         "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");

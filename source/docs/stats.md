@@ -184,7 +184,14 @@ showing the memory layout for a few scenarios of constructing and joining symbol
 
 There are several ways to create hot-path contention looking up stats by name,
 and there is no bulletproof way to prevent it from occurring.
- * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests.
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
+   scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
+   in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path and during
+   control-plane updates, so that we do not need to take symbol-table locks. As an example, see
+   [ClusterInfoImpl::generateStats](https://github.com/envoyproxy/envoy/blob/8188e232a9e0b15111d30f4724cbc7bf77d3964a/source/common/upstream/upstream_impl.cc#L641)
+   and its
+   [MAKE_STAT_NAMES_STRUCT](https://github.com/envoyproxy/envoy/blob/8188e232a9e0b15111d30f4724cbc7bf77d3964a/include/envoy/upstream/upstream.h#L646).
+   invocation.
  * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
    made in the hot path.
 
@@ -262,3 +269,31 @@ Developers trying to can iterate through changes in these tests locally with:
       test/integration:stats_integration_test
 ```
 
+## Debugging Symbol Table Assertions
+
+If you are visiting this section because you saw a message like:
+
+```bash
+[...][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure:
+decode_search != decode_map_.end(). Details: Please see 
+https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#debugging-symbol-table-asserts
+```
+then you have come to the right place.
+
+In production, there is generally one `SymbolTable` per process, except in the 3
+or 4 places where IsolatedStoreImpl is deliberately instantiated. In those scenarios,
+we don't expect names from these stores to be joined together.
+
+In tests, however, most of the Envoy mock structures do not allow any context to
+be passed into constructors. So each mock structure instance that requires a
+symbol table must instantiate its own. This is fine if they are truly isolated,
+but in a number of scenarios, StatNames from different structures are joined
+together during stat construction. Comingling of StatNames from different symbol
+tables does not work, and the first evidence of this is usually an assertion on
+the `decode_map_` lookup in SymbolTableImpl::incRefCount.
+
+To avoid this assertion, we must ensure that the symbols being combined all come
+from the same symbol table. To facilitate this, a test-only global singleton can
+be instantiated, via either `Stats::TestUtil::TestSymbolTable` or
+`Stats::TestUtil::TestStore`. All such structures use a singleton symbol-table
+whose lifetime is a single test method. This should resolve the assertion.
