@@ -324,7 +324,7 @@ public:
   CustomListenerHooks(std::function<void()> workers_started_cb)
       : on_workers_started_cb_(workers_started_cb) {}
 
-  void onWorkersStarted() { on_workers_started_cb_(); }
+  void onWorkersStarted() override { on_workers_started_cb_(); }
 
 private:
   std::function<void()> on_workers_started_cb_;
