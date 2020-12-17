@@ -18,6 +18,7 @@ envoy_cc_mock(
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//test/test_common:printers_lib",
     ],
 )
 

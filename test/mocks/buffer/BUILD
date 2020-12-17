@@ -15,6 +15,7 @@ envoy_cc_mock(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
+        "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
     ],
 )

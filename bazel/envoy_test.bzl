@@ -209,10 +209,6 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    deps = deps + [
-        repository + "//test/test_common:printers_includes",
-    ]
-
     _envoy_cc_test_infrastructure_library(
         name,
         srcs,
