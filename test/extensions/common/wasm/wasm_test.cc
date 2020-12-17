@@ -1094,8 +1094,7 @@ TEST_P(WasmCommonTest, AllowLog) {
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
         EXPECT_CALL(*root_context,
-                    log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
-            .Times(1);
+                    log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")));
         EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(0);
         return root_context;
       });
@@ -1146,7 +1145,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
         EXPECT_CALL(*root_context,
                     log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
             .Times(0);
-        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(1);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout")));
         return root_context;
       });
   wasm->start(plugin);
@@ -1208,7 +1207,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
         EXPECT_CALL(*root_context,
                     log_(spdlog::level::info, Eq("after on_vm_start, before proxy_log")))
             .Times(0);
-        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(1);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout")));
         return root_context;
       });
   thread_local_wasm->start(plugin);
