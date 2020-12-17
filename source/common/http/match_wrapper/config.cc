@@ -4,8 +4,8 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
-#include "common/matcher/matcher.h"
 #include "common/config/utility.h"
+#include "common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Common {
@@ -82,10 +82,10 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
 
 /**
  * Static registration for the match wrapper filter. @see RegisterFactory.
- * Note that we register this as a filter in order to serve as a drop in wrapper for other HTTP filters.
- * While not a real filter, by being registered as one all the code paths that look up HTTP filters will
- * look up this filter factory instead, which does the work to create and associate a match tree with the
- * underlying filter.
+ * Note that we register this as a filter in order to serve as a drop in wrapper for other HTTP
+ * filters. While not a real filter, by being registered as one all the code paths that look up HTTP
+ * filters will look up this filter factory instead, which does the work to create and associate a
+ * match tree with the underlying filter.
  */
 REGISTER_FACTORY(MatchWrapperConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "common/protobuf/utility.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/dump_state_utils.h"
@@ -17,7 +17,7 @@
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
-#include "envoy/protobuf/message_validator.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Http {
