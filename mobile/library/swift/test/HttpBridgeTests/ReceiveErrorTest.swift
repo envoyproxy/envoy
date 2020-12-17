@@ -8,7 +8,7 @@ final class ReceiveErrorTests: XCTestCase {
     // swiftlint:disable:next line_length
     let apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
     // swiftlint:disable:next line_length
-    let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+    let localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
     let config =
     """
     static_resources:
@@ -35,13 +35,9 @@ final class ReceiveErrorTests: XCTestCase {
                       direct_response:
                         status: 503
             http_filters:
-              - name: envoy.filters.http.assertion
+              - name: envoy.filters.http.local_error
                 typed_config:
-                  "@type": \(assertionFilterType)
-                  match_config:
-                    http_request_generic_body_match:
-                      patterns:
-                        - string_match: match_me
+                  "@type": \(localErrorFilterType)
               - name: envoy.router
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -59,13 +55,21 @@ final class ReceiveErrorTests: XCTestCase {
       .build()
     client
       .newStreamPrototype()
+      .setOnResponseHeaders { _, _ in
+        XCTFail("Headers received instead of expected error")
+      }
+      .setOnResponseData { _, _ in
+        XCTFail("Data received instead of expected error")
+      }
       // The unmatched expecation will cause a local reply which gets translated in Envoy Mobile to
       // an error.
-      .setOnError { _ in
+      .setOnError { error in
+         XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
          expectation.fulfill()
       }
       .start()
       .sendHeaders(requestHeaders, endStream: true)
+
     XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 1), .completed)
   }
 }

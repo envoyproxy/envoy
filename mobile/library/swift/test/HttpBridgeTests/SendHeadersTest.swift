@@ -60,9 +60,13 @@ final class SendHeadersTests: XCTestCase {
       .build()
     client
       .newStreamPrototype()
-      .setOnResponseHeaders { responseHeaders, _ in
+      .setOnResponseHeaders { responseHeaders, endStream in
          XCTAssertEqual(200, responseHeaders.httpStatus)
+         XCTAssertTrue(endStream)
          expectation.fulfill()
+      }
+      .setOnError { _ in
+        XCTFail("Unexpected error")
       }
       .start()
       .sendHeaders(requestHeaders, endStream: true)

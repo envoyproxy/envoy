@@ -6,6 +6,7 @@ EXTENSIONS = {
     "envoy.filters.http.assertion":                   "@envoy_mobile//library/common/extensions/filters/http/assertion:config",
     "envoy.filters.http.buffer":                      "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.dynamic_forward_proxy":       "//source/extensions/filters/http/dynamic_forward_proxy:config",
+    "envoy.filters.http.local_error":                 "@envoy_mobile//library/common/extensions/filters/http/local_error:config",
     "envoy.filters.http.platform_bridge":             "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
     "envoy.filters.http.router":                      "//source/extensions/filters/http/router:config",
     "envoy.filters.network.http_connection_manager":  "//source/extensions/filters/network/http_connection_manager:config",

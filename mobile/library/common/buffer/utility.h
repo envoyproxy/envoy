@@ -23,6 +23,13 @@ Buffer::InstancePtr toInternalData(envoy_data data);
 envoy_data toBridgeData(Buffer::Instance&);
 
 /**
+ * Copy from string to envoy_data.
+ * @param str, the string to copy.
+ * @return envoy_data, the copy produced of the original string.
+ */
+envoy_data copyToBridgeData(absl::string_view);
+
+/**
  * Copy from Buffer::Instance to envoy_data.
  * @param data, the Buffer::Instance to copy.
  * @return envoy_data, the copy produced from the Buffer::Instance param.

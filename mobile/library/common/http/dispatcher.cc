@@ -9,6 +9,7 @@
 #include "library/common/buffer/bridge_fragment.h"
 #include "library/common/buffer/utility.h"
 #include "library/common/http/header_utility.h"
+#include "library/common/http/headers.h"
 #include "library/common/network/synthetic_address_impl.h"
 #include "library/common/thread/lock_guard.h"
 
@@ -35,32 +36,41 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
             direct_stream_.stream_handle_, end_stream, headers);
 
   ASSERT(http_dispatcher_.getStream(direct_stream_.stream_handle_));
-
-  uint64_t response_status = Utility::getResponseStatus(headers);
-  // Track success for later bookkeeping (stream could still be reset).
-  success_ = CodeUtility::is2xx(response_status);
-
   if (end_stream) {
     closeStream();
   }
 
-  // TODO: ***HACK*** currently Envoy sends local replies in cases where an error ought to be
-  // surfaced via the error path. There are ways we can clean up Envoy's local reply path to
-  // make this possible, but nothing expedient. For the immediate term this is our only real
-  // option. See https://github.com/lyft/envoy-mobile/issues/460
+  uint64_t response_status = Utility::getResponseStatus(headers);
 
-  // Error path: missing EnvoyUpstreamServiceTime implies this is a local reply, which we treat as
-  // a stream error.
-  if (!success_ && headers.get(Headers::get().EnvoyUpstreamServiceTime).empty()) {
-    ENVOY_LOG(debug, "[S{}] intercepted local response", direct_stream_.stream_handle_);
-    mapLocalResponseToError(headers);
+  // Presence of internal error header indicates an error that should be surfaced as an
+  // error callback (rather than an HTTP response).
+  const auto error_code_header = headers.get(InternalHeaders::get().ErrorCode);
+  if (!error_code_header.empty()) {
+    envoy_error_code_t error_code;
+    bool check = absl::SimpleAtoi(error_code_header[0]->value().getStringView(), &error_code);
+    RELEASE_ASSERT(check, "parse error reading error code");
+    error_code_ = error_code;
+
+    const auto error_message_header = headers.get(InternalHeaders::get().ErrorMessage);
+    if (!error_message_header.empty()) {
+      error_message_ =
+          Buffer::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
+    }
+
+    uint32_t attempt_count;
+    if (headers.EnvoyAttemptCount() &&
+        absl::SimpleAtoi(headers.EnvoyAttemptCount()->value().getStringView(), &attempt_count)) {
+      error_attempt_count_ = attempt_count;
+    }
+
     if (end_stream) {
       onError();
     }
     return;
   }
 
-  // Normal response path.
+  // Track success for later bookkeeping (stream could still be reset).
+  success_ = CodeUtility::is2xx(response_status);
 
   // Testing hook.
   http_dispatcher_.synchronizer_.syncPoint("dispatch_encode_headers");
@@ -74,26 +84,6 @@ void Dispatcher::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& h
   }
 }
 
-void Dispatcher::DirectStreamCallbacks::mapLocalResponseToError(const ResponseHeaderMap& headers) {
-  // Deal with a local response based on the HTTP status code received. Envoy Mobile treats
-  // successful local responses as actual success. Envoy Mobile surfaces non-200 local responses as
-  // errors via callbacks rather than an HTTP response. This is inline with behaviour of other
-  // mobile networking libraries.
-  switch (Utility::getResponseStatus(headers)) {
-  case 503:
-    error_code_ = ENVOY_CONNECTION_FAILURE;
-    break;
-  default:
-    error_code_ = ENVOY_UNDEFINED_ERROR;
-  }
-
-  uint32_t attempt_count;
-  if (headers.EnvoyAttemptCount() &&
-      absl::SimpleAtoi(headers.EnvoyAttemptCount()->value().getStringView(), &attempt_count)) {
-    error_attempt_count_ = attempt_count;
-  }
-}
-
 void Dispatcher::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "[S{}] response data for stream (length={} end_stream={})",
             direct_stream_.stream_handle_, data.length(), end_stream);
@@ -103,17 +93,10 @@ void Dispatcher::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool 
     closeStream();
   }
 
-  // Error path.
-  if (error_code_.has_value()) {
-    ASSERT(end_stream,
-           "local response has to end the stream with a single data frame. If Envoy changes "
-           "this expectation, this code needs to be updated.");
-    error_message_ = Buffer::Utility::toBridgeData(data);
+  if (error_code_) {
     onError();
     return;
   }
-
-  // Normal path.
 
   // Testing hook.
   if (end_stream) {

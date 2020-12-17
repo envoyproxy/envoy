@@ -39,7 +39,9 @@ extern const int kEnvoyFailure;
 typedef enum {
   ENVOY_UNDEFINED_ERROR,
   ENVOY_STREAM_RESET,
-  ENVOY_CONNECTION_FAILURE
+  ENVOY_CONNECTION_FAILURE,
+  ENVOY_BUFFER_LIMIT_EXCEEDED,
+  ENVOY_REQUEST_TIMEOUT,
 } envoy_error_code_t;
 
 /**

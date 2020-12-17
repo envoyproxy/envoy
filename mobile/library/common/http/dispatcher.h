@@ -127,7 +127,6 @@ private:
     void onComplete();
     void onCancel();
     void onError();
-    void mapLocalResponseToError(const ResponseHeaderMap& headers);
 
     // ResponseEncoder
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;

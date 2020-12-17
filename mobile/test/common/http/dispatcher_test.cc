@@ -773,7 +773,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   ASSERT_EQ(cc.on_complete_calls, 1);
 }
 
-TEST_F(DispatcherTest, EnvoyLocalReply) {
+TEST_F(DispatcherTest, EnvoyLocalReplyNotAnError) {
   ready();
 
   envoy_stream_t stream = 1;
@@ -781,9 +781,21 @@ TEST_F(DispatcherTest, EnvoyLocalReply) {
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0, 0};
   bridge_callbacks.context = &cc;
-  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void* {
-    EXPECT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
-    EXPECT_EQ(error.attempt_count, -1);
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void* {
+    EXPECT_TRUE(end_stream);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "503");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_error = [](envoy_error, void* context) -> void* {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
     return nullptr;
@@ -823,13 +835,13 @@ TEST_F(DispatcherTest, EnvoyLocalReply) {
   EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
   TestResponseHeaderMapImpl response_headers{{":status", "503"}};
   response_encoder_->encodeHeaders(response_headers, true);
-  ASSERT_EQ(cc.on_headers_calls, 0);
   // Ensure that the callbacks on the bridge_callbacks were called.
-  ASSERT_EQ(cc.on_complete_calls, 0);
-  ASSERT_EQ(cc.on_error_calls, 1);
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 1);
+  ASSERT_EQ(cc.on_error_calls, 0);
 }
 
-TEST_F(DispatcherTest, EnvoyLocalReplyNon503) {
+TEST_F(DispatcherTest, EnvoyLocalReplyNon503NotAnError) {
   ready();
 
   envoy_stream_t stream = 1;
@@ -837,9 +849,21 @@ TEST_F(DispatcherTest, EnvoyLocalReplyNon503) {
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0, 0};
   bridge_callbacks.context = &cc;
-  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void* {
-    EXPECT_EQ(error.error_code, ENVOY_UNDEFINED_ERROR);
-    EXPECT_EQ(error.attempt_count, -1);
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void* {
+    EXPECT_TRUE(end_stream);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "504");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_error = [](envoy_error, void* context) -> void* {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
     return nullptr;
@@ -879,13 +903,13 @@ TEST_F(DispatcherTest, EnvoyLocalReplyNon503) {
   EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
   TestResponseHeaderMapImpl response_headers{{":status", "504"}};
   response_encoder_->encodeHeaders(response_headers, true);
-  ASSERT_EQ(cc.on_headers_calls, 0);
   // Ensure that the callbacks on the bridge_callbacks were called.
-  ASSERT_EQ(cc.on_complete_calls, 0);
-  ASSERT_EQ(cc.on_error_calls, 1);
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 1);
+  ASSERT_EQ(cc.on_error_calls, 0);
 }
 
-TEST_F(DispatcherTest, EnvoyLocalReplyWithData) {
+TEST_F(DispatcherTest, EnvoyResponseWithErrorCode) {
   ready();
 
   envoy_stream_t stream = 1;
@@ -893,10 +917,27 @@ TEST_F(DispatcherTest, EnvoyLocalReplyWithData) {
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0, 0};
   bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool, void* context) -> void* {
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "218");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+    return nullptr;
+  };
+  bridge_callbacks.on_data = [](envoy_data c_data, bool, void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_data_calls++;
+    c_data.release(c_data.context);
+    return nullptr;
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void* {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+    return nullptr;
+  };
   bridge_callbacks.on_error = [](envoy_error error, void* context) -> void* {
     EXPECT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
-    EXPECT_EQ(Http::Utility::convertToString(error.message), "error message");
-    EXPECT_EQ(error.attempt_count, -1);
+    EXPECT_EQ(error.attempt_count, 123);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
     error.message.release(error.message.context);
@@ -932,70 +973,15 @@ TEST_F(DispatcherTest, EnvoyLocalReplyWithData) {
   send_headers_post_cb();
 
   // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
-  // 503 should have an ENVOY_CONNECTION_FAILURE error code. However, do not end the stream yet.
-  TestResponseHeaderMapImpl response_headers{{":status", "503"}};
-  response_encoder_->encodeHeaders(response_headers, false);
-  ASSERT_EQ(cc.on_headers_calls, 0);
-
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
-  Buffer::InstancePtr response_data{new Buffer::OwnedImpl("error message")};
-  response_encoder_->encodeData(*response_data, true);
-  ASSERT_EQ(cc.on_data_calls, 0);
-  // Ensure that the callbacks on the bridge_callbacks were called.
-  ASSERT_EQ(cc.on_complete_calls, 0);
-  ASSERT_EQ(cc.on_error_calls, 1);
-}
-
-TEST_F(DispatcherTest, EnvoyLocalReplyWithAttemptCount) {
-  ready();
-
-  envoy_stream_t stream = 1;
-  // Setup bridge_callbacks to handle the response headers.
-  envoy_http_callbacks bridge_callbacks;
-  callbacks_called cc = {0, 0, 0, 0, 0, 0};
-  bridge_callbacks.context = &cc;
-  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void* {
-    EXPECT_EQ(error.error_code, ENVOY_CONNECTION_FAILURE);
-    EXPECT_EQ(error.attempt_count, 123);
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_error_calls++;
-    return nullptr;
-  };
-
-  // Build a set of request headers.
-  TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
-
-  // Create a stream.
-  Event::PostCb start_stream_post_cb;
-  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
-
-  // Grab the response encoder in order to dispatch responses on the stream.
-  // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
-  // API.
-  EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder_ = &encoder;
-        return request_decoder_;
-      }));
-  start_stream_post_cb();
-
-  // Send request headers.
-  Event::PostCb send_headers_post_cb;
-  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&send_headers_post_cb));
-  http_dispatcher_.sendHeaders(stream, c_headers, true);
-
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  send_headers_post_cb();
-
-  // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
   // 503 should have an ENVOY_CONNECTION_FAILURE error code.
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
-  TestResponseHeaderMapImpl response_headers{{":status", "503"}, {"x-envoy-attempt-count", "123"}};
+  TestResponseHeaderMapImpl response_headers{
+      {":status", "218"},
+      {"x-internal-error-code", std::to_string(ENVOY_CONNECTION_FAILURE)},
+      {"x-internal-error-message", "no internet"},
+      {"x-envoy-attempt-count", "123"},
+  };
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 0);
   // Ensure that the callbacks on the bridge_callbacks were called.

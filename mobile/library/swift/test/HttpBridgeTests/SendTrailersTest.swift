@@ -73,6 +73,9 @@ final class SendTrailersTests: XCTestCase {
          XCTAssertEqual(200, responseHeaders.httpStatus)
          expectation.fulfill()
       }
+      .setOnError { _ in
+        XCTFail("Unexpected error")
+      }
       .start()
       .sendHeaders(requestHeaders, endStream: false)
       .sendData(body)

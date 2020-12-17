@@ -28,6 +28,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
   Envoy::Extensions::HttpFilters::DynamicForwardProxy::
       forceRegisterDynamicForwardProxyFilterFactory();
+  Envoy::Extensions::HttpFilters::LocalError::forceRegisterLocalErrorFilterFactory();
   Envoy::Extensions::HttpFilters::PlatformBridge::forceRegisterPlatformBridgeFilterFactory();
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
