@@ -40,8 +40,8 @@ public:
     NiceMock<Upstream::MockClusterManager> cm;
     cm.initializeThreadLocalClusters({"fake_cluster"});
     EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(&mock_pool_));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm, true, route_entry, Envoy::Http::Protocol::Http11,
-                                               nullptr);
+    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
+                                               Envoy::Http::Protocol::Http11, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;

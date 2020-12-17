@@ -222,9 +222,9 @@ protected:
   absl::Mutex lock_;
   Http::RequestHeaderMapPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
+  FakeHttpConnection& parent_;
 
 private:
-  FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};

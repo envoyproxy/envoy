@@ -46,6 +46,22 @@ public:
   std::string category() const override { return "envoy.stats_sinks"; }
 };
 
+class StatsConfigImpl : public StatsConfig {
+public:
+  StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
+  const std::list<Stats::SinkPtr>& sinks() const override { return sinks_; }
+  std::chrono::milliseconds flushInterval() const override { return flush_interval_; }
+  bool flushOnAdmin() const override { return flush_on_admin_; }
+
+  void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
+
+private:
+  std::list<Stats::SinkPtr> sinks_;
+  std::chrono::milliseconds flush_interval_;
+  bool flush_on_admin_{false};
+};
+
 /**
  * Utilities for creating a filter chain for a network connection.
  */
@@ -98,8 +114,7 @@ public:
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
-  std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
-  std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
+  StatsConfig& statsConfig() override { return *stats_config_; }
   const Watchdog& mainThreadWatchdogConfig() const override { return *main_thread_watchdog_; }
   const Watchdog& workerWatchdogConfig() const override { return *worker_watchdog_; }
 
@@ -109,8 +124,12 @@ private:
    */
   void initializeTracers(const envoy::config::trace::v3::Tracing& configuration, Instance& server);
 
-  void initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                            Instance& server);
+  /**
+   * Initialize stats configuration.
+   */
+  void initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                             Instance& server);
+
   /**
    * Initialize watchdog(s). Call before accessing any watchdog configuration.
    */
@@ -118,8 +137,7 @@ private:
                            Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
-  std::list<Stats::SinkPtr> stats_sinks_;
-  std::chrono::milliseconds stats_flush_interval_;
+  std::unique_ptr<StatsConfigImpl> stats_config_;
   std::unique_ptr<Watchdog> main_thread_watchdog_;
   std::unique_ptr<Watchdog> worker_watchdog_;
 };

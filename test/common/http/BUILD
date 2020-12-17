@@ -86,6 +86,7 @@ envoy_cc_fuzz_test(
     corpus = "codec_impl_corpus",
     deps = [
         ":codec_impl_fuzz_proto_cc_proto",
+        "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
@@ -402,12 +403,14 @@ envoy_cc_test(
     name = "mixed_conn_pool_test",
     srcs = ["mixed_conn_pool_test.cc"],
     deps = [
-        "//source/common/http:conn_pool_base_lib",
+        ":common_lib",
+        "//source/common/http:mixed_conn_pool",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",

@@ -25,7 +25,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // might repeat several times until the final OnMatch (or no match) is decided.
 //
 // This API is a work in progress.
-// [#not-implemented-hide:]
 message Matcher {
   // What to do if a match is successful.
   message OnMatch {
