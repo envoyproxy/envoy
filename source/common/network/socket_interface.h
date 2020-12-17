@@ -19,6 +19,7 @@ public:
   SocketInterfaceExtension(SocketInterface& sock_interface) : sock_interface_(sock_interface) {}
   // Server::BootstrapExtension
   void serverInitialized(Server::Configuration::ServerFactoryContext&) override {}
+
 protected:
   SocketInterface& sock_interface_;
 };

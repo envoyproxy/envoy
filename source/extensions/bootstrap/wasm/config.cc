@@ -36,8 +36,9 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     }
     if (config_.singleton()) {
       // Return a Wasm VM which will be stored as a singleton by the Server.
-      wasm_service_ = std::make_unique<WasmService>(plugin, Common::Wasm::getOrCreateThreadLocalPlugin(
-                                                   base_wasm, plugin, context.dispatcher()));
+      wasm_service_ = std::make_unique<WasmService>(
+          plugin,
+          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
       return;
     }
     // Per-thread WASM VM.
@@ -63,7 +64,7 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
 
 Server::BootstrapExtensionPtr
 WasmFactory::createBootstrapExtension(const Protobuf::Message& config,
-                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   auto typed_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::wasm::v3::WasmService&>(
           config, validation_visitor);

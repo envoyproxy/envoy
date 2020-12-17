@@ -39,8 +39,9 @@ public:
    * @param config the custom configuration for this bootstrap extension type.
    * @param context general filter context through which persistent resources can be accessed.
    */
-  virtual BootstrapExtensionPtr createBootstrapExtension(const Protobuf::Message& config,
-                      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message& config,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.bootstrap"; }
 };

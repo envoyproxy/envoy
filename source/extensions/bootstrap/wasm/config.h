@@ -41,15 +41,13 @@ public:
   std::string name() const override { return "envoy.bootstrap.wasm"; }
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
-                      ProtobufMessage::ValidationVisitor& validation_visitor) override;
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::wasm::v3::WasmService>();
   }
-
 };
 
-class WasmServiceExtension : public Server::BootstrapExtension,
-                    Logger::Loggable<Logger::Id::wasm>  {
+class WasmServiceExtension : public Server::BootstrapExtension, Logger::Loggable<Logger::Id::wasm> {
 public:
   WasmServiceExtension(const envoy::extensions::wasm::v3::WasmService& config) : config_(config) {}
   WasmService& wasmService() {
@@ -59,7 +57,6 @@ public:
   void serverInitialized(Server::Configuration::ServerFactoryContext& context) override;
 
 private:
-
   void createWasm(Server::Configuration::ServerFactoryContext& context);
 
   envoy::extensions::wasm::v3::WasmService config_;

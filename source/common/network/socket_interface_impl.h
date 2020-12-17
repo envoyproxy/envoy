@@ -19,7 +19,7 @@ public:
   // Server::Configuration::BootstrapExtensionFactory
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
-                      ProtobufMessage::ValidationVisitor& validation_visitor) override;
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {
