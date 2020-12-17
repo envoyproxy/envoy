@@ -82,9 +82,13 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
 }
 
 /**
- * Static registration for the Lua filter. @see RegisterFactory.
+ * Static registration for the match wrapper filter. @see RegisterFactory.
+ * Note that we register this as a filter in order to serve as a drop in wrapper for other HTTP filters.
+ * While not a real filter, by being registered as one all the code paths that look up HTTP filters will
+ * look up this filter factory instead, which does the work to create and associate a match tree with the
+ * underlying filter.
  */
-REGISTER_FACTORY(MatchWrapperConfig, Server::Configuration::NamedHttpFilterConfigFactory){"blah"};
+REGISTER_FACTORY(MatchWrapperConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace MatchWrapper
 } // namespace Http
