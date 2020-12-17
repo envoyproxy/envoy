@@ -12,7 +12,6 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
-#include "common/http/filter_manager.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
