@@ -24,7 +24,7 @@ public:
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(bool, hasActiveConnections, (), (const));
   MOCK_METHOD(Cancellable*, newStream, (ResponseDecoder & response_decoder, Callbacks& callbacks));
-  MOCK_METHOD(bool, maybePrefetch, (float));
+  MOCK_METHOD(bool, maybePreconnect, (float));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;

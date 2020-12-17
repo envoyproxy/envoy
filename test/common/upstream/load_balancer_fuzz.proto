@@ -27,8 +27,8 @@ message LbAction {
     // This updates the health flags of hosts at a certain priority level. The number of hosts in each priority level/in localities is static,
     // as untrusted upstreams cannot change that, and can only change their health flags.
     UpdateHealthFlags update_health_flags = 1;
-    // Prefetches a host using the encapsulated specific load balancer.
-    google.protobuf.Empty prefetch = 2;
+    // Preconnects a host using the encapsulated specific load balancer.
+    google.protobuf.Empty preconnect = 2;
     // Chooses a host using the encapsulated specific load balancer.
     google.protobuf.Empty choose_host = 3;
   }
