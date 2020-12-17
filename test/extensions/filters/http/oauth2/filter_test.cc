@@ -309,7 +309,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
 }
 
@@ -564,7 +564,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
 
   // This represents the beginning of the OAuth filter.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(first_request_headers, false));
 
   // This represents the callback request from the authorization server.
@@ -584,7 +584,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
                                                   "https://traffic.example.com" + TEST_CALLBACK));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
