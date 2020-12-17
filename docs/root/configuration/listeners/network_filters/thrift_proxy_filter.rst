@@ -1,62 +1,45 @@
 .. _config_network_filters_thrift_proxy:
 
-Thrift proxy
+Thrift 代理
 ============
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`
-* This filter should be configured with the name *envoy.filters.network.thrift_proxy*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`
+* 过滤器应该以名称 *envoy.filters.network.thrift_proxy* 来配置。
 
-Cluster Protocol Options
-------------------------
+集群协议选项
+--------------
 
-Thrift connections to upstream hosts can be configured by adding an entry to the appropriate
-Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`
-keyed by `envoy.filters.network.thrift_proxy`. The
-:ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
-message describes the available options.
+到上游主机的 Thrift 连接可以通过向适当的集群中的 :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>` 添加一个由 `envoy.filters.network.thrift_proxy` 作为键的记录来配置。
+:ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>` 消息中描述了可用的选项。
 
-Thrift Request Metadata
------------------------
+Thrift 请求元数据
+-------------------
 
-The :ref:`HEADER transport<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.HEADER>`
-and :ref:`TWITTER protocol<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>`
-support metadata. In particular, the
-`Header transport <https://github.com/apache/thrift/blob/master/doc/specs/HeaderFormat.md>`_
-supports informational key/value pairs and the Twitter protocol transmits
-`tracing and request context data <https://github.com/twitter/finagle/blob/master/finagle-thrift/src/main/thrift/tracing.thrift>`_.
+:ref:`头传输 <envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.HEADER>` 和 :ref:`TWITTER 协议<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>` 支持元数据。
+特别地 `头传输 <https://github.com/apache/thrift/blob/master/doc/specs/HeaderFormat.md>`_ 支持键值（key/value）对信息和 Twitter 协议传输支持 `追踪和请求上下文数据 <https://github.com/twitter/finagle/blob/master/finagle-thrift/src/main/thrift/tracing.thrift>`_ 。
 
-Header Transport Metadata
-~~~~~~~~~~~~~~~~~~~~~~~~~
+头传输元数据
+~~~~~~~~~~~~~~~~~~~
 
-Header transport key/value pairs are available for routing as
-:ref:`headers <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>`.
+头传输键值对可以作为路由 :ref:`头 <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>` 。
 
-Twitter Protocol Metadata
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Twitter 协议元数据
+~~~~~~~~~~~~~~~~~~~~
 
-Twitter protocol request contexts are converted into headers which are available for routing as
-:ref:`headers <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>`.
-In addition, the following fields are presented as headers:
+Twitter 协议请求上下文被转换为可作为 :ref:`头 <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>` 路由的头。此外，以下字段都可以作为头：
 
-Client Identifier
-    The ClientId's `name` field (nested in the RequestHeader `client_id` field) becomes the
-    `:client-id` header.
+客户端标识
+    ClientId 的 `name` 字段成为（嵌套在 RequestHeader 的 `client_id` 中） `:client-id` 头。
 
-Destination
-    The RequestHeader `dest` field becomes the `:dest` header.
+目的地
+    RequestHeader 的 `dest` 字段成为 `:dest` 头。
 
-Delegations
-    Each Delegation from the RequestHeader `delegations` field is added as a header. The header
-    name is the prefix `:d:` followed by the Delegation's `src`. The value is the Delegation's
-    `dst` field.
+授权（Delegations）
+    来自 RequestHeader `delegations` 字段中的每个 Delegation 作为头被添加，头名称的前缀是 `:d:` 后面紧跟 Delegation 的 `src` 。
+    值是 Delegation 的 `dst` 字段。
 
-Metadata Interoperability
-~~~~~~~~~~~~~~~~~~~~~~~~~
+元数据互操作性
+~~~~~~~~~~~~~~~~
 
-Request metadata that is available for routing (see above) is automatically converted between wire
-formats when translation between downstream and upstream connections occurs. Twitter protocol
-request contexts, client id, destination, and delegations are therefore presented as Header
-transport key/value pairs, named as above. Similarly, Header transport key/value pairs are
-presented as Twitter protocol RequestContext values, unless they match the special names described
-above. For instance, a downstream Header transport request with the info key ":client-id" is
-translated to an upstream Twitter protocol request with a ClientId value.
+当下游和上游连接之间发生转换时，可用于路由的请求元数据（见上下文）将在连接格式之间自动转换。Twitter 协议请求上下文、客户端标识、目的地和 delegations 被表示如上所述的为头传输键值对。
+类似地，头传输键值对可以被表示为 Twitter 协议请求上下文，除非他们与上面描述的特殊名称匹配。例如，带有信息键 “:client-id” 的下游头传输请求被转换为具有 ClientId 值的上游 Twitter 协议请求。
