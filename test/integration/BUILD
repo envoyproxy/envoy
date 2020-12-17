@@ -8,7 +8,6 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_hot_restart",
-    "envoy_select_new_codecs_in_integration_tests",
     "envoy_sh_test",
 )
 
@@ -64,6 +63,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -649,10 +649,6 @@ envoy_cc_test_library(
     hdrs = [
         "fake_upstream.h",
     ],
-    copts = envoy_select_new_codecs_in_integration_tests(
-        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
-        "@envoy",
-    ),
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/grpc:status",
@@ -670,9 +666,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
@@ -786,10 +780,6 @@ envoy_cc_test_library(
         "integration.h",
         "ssl_utility.h",
     ],
-    copts = envoy_select_new_codecs_in_integration_tests(
-        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
-        "@envoy",
-    ),
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":autonomous_upstream_lib",
@@ -825,9 +815,7 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
@@ -892,6 +880,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/grpc_http1_bridge/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],

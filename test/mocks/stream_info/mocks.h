@@ -22,6 +22,7 @@ public:
 
   // StreamInfo::StreamInfo
   MOCK_METHOD(void, setResponseFlag, (ResponseFlag response_flag));
+  MOCK_METHOD(void, setResponseCode, (uint32_t));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
   MOCK_METHOD(void, setConnectionTerminationDetails, (absl::string_view));
   MOCK_METHOD(bool, intersectResponseFlags, (uint64_t), (const));
