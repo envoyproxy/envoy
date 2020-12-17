@@ -28,12 +28,6 @@ consider the answers to these questions before sending a PR.
     important for this?)
 
 ## Style
-- If an enum is being introduced, should this be a oneof with empty messages
-  for future API growth?
-- When a new field is introduced for a distinct purpose, should this be a
-  message to allow for future API growth?
-- For time related fields, is a Duration or Timestamp WKT used rather than
-  raw integers for seconds etc?
 - Is the PR aligned with the [API style guidelines](STYLE.md)?
 
 ## Validation Rules
@@ -65,6 +59,10 @@ consider the answers to these questions before sending a PR.
 - Do we have good documentation showing what to plug into the extension point?
   (At minimum, it should have a comment pointing to the common protos to
   be plugged into the extension point.)
+- If an enum is being introduced, should this be a oneof with empty messages
+  for future API growth?
+- When a new field is introduced for a distinct purpose, should this be a
+  message to allow for future API growth?
 
 ## Consistency
 - Can the proposed API reuse part or all of other APIs?

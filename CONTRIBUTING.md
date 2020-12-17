@@ -233,6 +233,13 @@ and false.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
 
+# API changes
+
+If you change anything in the [api tree](https://github.com/envoyproxy/envoy/tree/master/api),
+please read the [API Review
+Checklist](https://github.com/envoyproxy/envoy/tree/master/api/review_checklist.md)
+and make sure that your changes have addressed all of the considerations listed there.
+
 # Adding new extensions
 
 For developers adding a new extension, one can take an existing extension as the starting point.
