@@ -1077,7 +1077,7 @@ TEST(Url, ParsingFails) {
 void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
                  absl::string_view expected_host_port, absl::string_view expected_path) {
   Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url)) << "Failed to initialize " << raw_url;
+  ASSERT_TRUE(url.initialize(raw_url, false)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.host_and_port(), expected_host_port);
   EXPECT_EQ(url.path_and_query_params(), expected_path);
@@ -1087,8 +1087,8 @@ void validateConnectUrl(absl::string_view raw_url) {
   Utility::Url url;
   ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
   EXPECT_TRUE(url.scheme().empty());
-  EXPECT_TRUE(url.pathAndQueryParams().empty());
-  EXPECT_EQ(url.hostAndPort(), raw_url);
+  EXPECT_TRUE(url.path_and_query_params().empty());
+  EXPECT_EQ(url.host_and_port(), raw_url);
 }
 
 void invalidConnectUrl(absl::string_view raw_url) {
@@ -1129,12 +1129,12 @@ TEST(Url, ParsingTest) {
   ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
 
   // Test with an ipv4 host address.
-  validateUrl("http://1.2.3.4/?query=param", "http", "1.2.3.4", "/?query=param");
-  validateUrl("http://1.2.3.4:80/?query=param", "http", "1.2.3.4:80", "/?query=param");
+  ValidateUrl("http://1.2.3.4/?query=param", "http", "1.2.3.4", "/?query=param");
+  ValidateUrl("http://1.2.3.4:80/?query=param", "http", "1.2.3.4:80", "/?query=param");
 
   // Test with an ipv6 address
-  validateUrl("http://[1::2:3]/?query=param", "http", "[1::2:3]", "/?query=param");
-  validateUrl("http://[1::2:3]:80/?query=param", "http", "[1::2:3]:80", "/?query=param");
+  ValidateUrl("http://[1::2:3]/?query=param", "http", "[1::2:3]", "/?query=param");
+  ValidateUrl("http://[1::2:3]:80/?query=param", "http", "[1::2:3]:80", "/?query=param");
 
   // Test url with query parameter but without slash
   ValidateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
