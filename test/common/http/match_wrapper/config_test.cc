@@ -16,13 +16,13 @@ namespace MatchWrapper {
 namespace {
 
 struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigFactory {
-  std::string name() const { return "test"; }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() {
+  std::string name() const override { return "test"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
   }
   Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::FactoryContext&) {
+                               Server::Configuration::FactoryContext&) override {
     return [](auto& callbacks) {
       callbacks.addStreamDecoderFilter(nullptr);
       callbacks.addStreamEncoderFilter(nullptr);
