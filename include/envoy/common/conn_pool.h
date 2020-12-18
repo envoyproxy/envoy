@@ -70,10 +70,10 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 
   /**
-   * Establishes an additional upstream connection, if existing connections do not meet both current
-   * and anticipated load.
+   * Creates an upstream connection, if existing connections do not meet both current and
+   * anticipated load.
    *
-   * @return true if a connection was established, false otherwise.
+   * @return true if a connection was preconnected, false otherwise.
    */
   virtual bool maybePreconnect(float preconnect_ratio) PURE;
 };

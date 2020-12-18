@@ -187,7 +187,7 @@ protected:
   // Creates up to 3 connections, based on the preconnect ratio.
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
-  // Creates up to 3 connections, based on the prefetch ratio.
+  // Creates up to 3 connections, based on the preconnect ratio.
   void tryCreateNewConnections();
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or

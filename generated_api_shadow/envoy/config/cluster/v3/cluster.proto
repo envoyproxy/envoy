@@ -599,7 +599,7 @@ message Cluster {
     // for example proxying HTTP/1.1 if keep-alive were false and each stream resulted in connection
     // termination. It would likely be overkill for long lived connections, such as TCP proxying SMTP
     // or regular HTTP/1.1 with keep-alive. For long lived traffic, a value of 1.05 would be more
-    // reasonable, where for every 100 connections, 5 pre-established connections would be in the queue
+    // reasonable, where for every 100 connections, 5 preconnected connections would be in the queue
     // in case of unexpected disconnects where the connection could not be reused.
     //
     // If this value is not set, or set explicitly to one, Envoy will fetch as many connections

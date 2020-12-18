@@ -65,11 +65,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
-  ENVOY_LOG_MISC(debug, "Using new codecs");
-  setNewCodecs();
-#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
