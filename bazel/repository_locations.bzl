@@ -305,8 +305,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     skywalking_data_collect_protocol = dict(
       project_name = "skywalking-data-collect-protocol",
-      project_desc = "tbd",
-      project_url = "https://github.com",
+      project_desc = "Data Collect Protocols of Apache SkyWalking",
+      project_url = "https://github.com/apache/skywalking-data-collect-protocol",
       name = "skywalking_data_collect_protocol",
       sha256 = "ca495537bb85dbe8df5984ac7b571a0b87660281be69be1f9a0fa16fbf58f953",
       urls = ["https://github.com/Shikugawa/skywalking-data-collect-protocol/archive/v8.1.0-bazel.tar.gz"],
