@@ -840,6 +840,33 @@ TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponse
   }
 }
 
+TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsReceived) {
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send some data straight away.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Wait a bit, no data should go through.
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
+
+  default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  tcp_client->close();
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

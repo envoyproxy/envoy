@@ -224,13 +224,13 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setGenericPoolReadyDeferrer({this, host, info.downstreamSslConnection()});
+  upstream_->setPoolCallbacksDeferrer({*this, host, info.downstreamSslConnection()});
 }
 
-void HttpConnPool::onGenericPoolReadyDeferred(
-    Upstream::HostDescriptionConstSharedPtr& host,
-    const Network::Address::InstanceConstSharedPtr& local_address,
-    Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+inline void
+HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
+                                 const Network::Address::InstanceConstSharedPtr& local_address,
+                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, local_address, ssl_info);
 }
 
