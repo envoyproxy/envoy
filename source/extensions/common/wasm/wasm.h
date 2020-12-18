@@ -4,7 +4,6 @@
 #include <chrono>
 #include <map>
 #include <memory>
-#include <unordered_map>
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
