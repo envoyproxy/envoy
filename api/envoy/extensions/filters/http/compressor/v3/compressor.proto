@@ -42,6 +42,10 @@ message Compressor {
     // "application/xhtml+xml", "image/svg+xml", "text/css", "text/html", "text/plain", "text/xml"
     // and their synonyms.
     repeated string content_type = 3;
+
+    // Runtime flag that controls whether we compress or not body if no content-length and/or transfer-encoding
+    // headers. If set to true (default value) we would try to compress such http messages.
+    config.core.v3.RuntimeFeatureFlag always_compress_content_if_exists = 4;
   }
 
   // Configuration for filter behavior on the request direction.
@@ -65,10 +69,6 @@ message Compressor {
     //    To avoid interfering with other compression filters in the same chain use this option in
     //    the filter closest to the upstream.
     bool remove_accept_encoding_header = 3;
-
-    // If true, response would be compressed even if content-length/transfer-encoding header is missing,
-    // unless response has no content (e.g. HEAD, 204 etc)
-    bool always_compress_content_if_exists = 4;
   }
 
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.

@@ -62,6 +62,7 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
+      always_compress_content_if_exists_(proto_config.always_compress_content_if_exists(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
       content_type_values_(contentTypeSet(proto_config.content_type())), stats_{generateStats(
                                                                              stats_prefix, scope)} {
@@ -109,10 +110,6 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
-      always_compress_content_if_exists_(
-          proto_config.has_response_direction_config()
-              ? proto_config.response_direction_config().always_compress_content_if_exists()
-              : false),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
 
 const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
@@ -143,7 +140,7 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
 }
 
 CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
-    : config_(std::move(config)), head_request_{false} {}
+    : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                           bool end_stream) {
@@ -159,14 +156,10 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
     headers.removeInline(accept_encoding_handle.handle());
   }
 
-  if (headers.Method() &&
-      headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Head) {
-    head_request_ = true;
-  }
-
   const auto& request_config = config_->requestDirectionConfig();
   if (!end_stream && request_config.compressionEnabled() &&
-      request_config.isMinimumContentLength(headers) &&
+      request_config.isMinimumContentLength(headers,
+                                            request_config.alwaysCompressContentIfExists()) &&
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
       isTransferEncodingAllowed(headers)) {
@@ -231,13 +224,10 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() &&
       config.isMinimumContentLength(headers, config.alwaysCompressContentIfExists());
-  const bool should_try_to_compress_content =
-      config.alwaysCompressContentIfExists() ? isResponseWithContent(headers) : true;
   const bool isCompressible = isEnabledAndContentLengthBigEnough &&
                               config.isContentTypeAllowed(headers) &&
                               !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
-                              !headers.getInline(response_content_encoding_handle.handle()) &&
-                              should_try_to_compress_content;
+                              !headers.getInline(response_content_encoding_handle.handle());
   if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
@@ -494,14 +484,6 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
     return content_type_values_.find(value) != content_type_values_.end();
   }
 
-  return true;
-}
-
-bool CompressorFilter::isResponseWithContent(Http::ResponseHeaderMap& headers) const {
-  const auto status = headers.Status();
-  if ((status != nullptr && status->value().getStringView() == "204") || head_request_) {
-    return false;
-  }
   return true;
 }
 

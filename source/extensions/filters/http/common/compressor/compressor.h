@@ -83,9 +83,13 @@ public:
     bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers,
                                 const bool ignore_chunked = false) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
+    bool alwaysCompressContentIfExists() const {
+      return always_compress_content_if_exists_.enabled();
+    }
 
   protected:
     const Runtime::FeatureFlag compression_enabled_;
+    const Runtime::FeatureFlag always_compress_content_if_exists_;
 
   private:
     static CompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -123,7 +127,6 @@ public:
     bool compressionEnabled() const override { return compression_enabled_.enabled(); }
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
     bool disableOnEtagHeader() const { return disable_on_etag_header_; }
-    bool alwaysCompressContentIfExists() const { return always_compress_content_if_exists_; }
     bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
 
   private:
@@ -139,7 +142,6 @@ public:
 
     const bool disable_on_etag_header_;
     const bool remove_accept_encoding_header_;
-    const bool always_compress_content_if_exists_;
     const ResponseCompressorStats response_stats_;
   };
 
@@ -216,7 +218,6 @@ private:
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
-  bool head_request_;
 };
 
 } // namespace Compressors
