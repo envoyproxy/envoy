@@ -116,6 +116,13 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
   request_encoder_ = nullptr;
+  // If we did not receive the CONNECT response yet we treat this as a pool
+  // failure, otherwise we forward the event downstream.
+  if (deferrer_ != nullptr) {
+    deferrer_->onGenericPoolFailure();
+    deferrer_.reset();
+    return;
+  }
   if (inform_downstream) {
     upstream_callbacks_.onEvent(event);
   }
@@ -224,7 +231,8 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setPoolCallbacksDeferrer({*this, host, info.downstreamSslConnection()});
+  upstream_->setPoolCallbacksDeferrer(std::make_unique<HttpConnPool::PoolCallbacksDeferrer>(
+      *this, host, info.downstreamSslConnection()));
 }
 
 inline void

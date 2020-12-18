@@ -66,7 +66,6 @@ public:
 
   class PoolCallbacksDeferrer {
   public:
-    PoolCallbacksDeferrer() = default;
     PoolCallbacksDeferrer(HttpConnPool& conn_pool, Upstream::HostDescriptionConstSharedPtr host,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info)
         : conn_pool_(&conn_pool), host_(host), ssl_info_(ssl_info) {}
@@ -137,7 +136,7 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
   virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
-  void setPoolCallbacksDeferrer(HttpConnPool::PoolCallbacksDeferrer&& deferrer) {
+  void setPoolCallbacksDeferrer(std::unique_ptr<HttpConnPool::PoolCallbacksDeferrer>&& deferrer) {
     deferrer_ = std::move(deferrer);
   }
 
@@ -157,10 +156,10 @@ private:
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
-        parent_.deferrer_.onGenericPoolFailure();
-      } else {
-        parent_.deferrer_.onGenericPoolReady(*parent_.request_encoder_);
+      } else if (parent_.deferrer_ != nullptr) {
+        parent_.deferrer_->onGenericPoolReady(*parent_.request_encoder_);
       }
+      parent_.deferrer_.reset();
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
@@ -181,7 +180,7 @@ private:
 
   // Used to defer onPoolGenericReady call to the time when the CONNECT
   // response is acknowledged.
-  HttpConnPool::PoolCallbacksDeferrer deferrer_;
+  std::unique_ptr<HttpConnPool::PoolCallbacksDeferrer> deferrer_;
 };
 
 class Http1Upstream : public HttpUpstream {
