@@ -974,7 +974,8 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
 
   // restriction enforced if allowed_capabilities is non-empty
-  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{{"foo", proxy_wasm::SanitizerConfig()}};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
+      {"foo", proxy_wasm::SanitizationConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1025,7 +1026,7 @@ TEST_P(WasmCommonTest, AllowModuleImplementedCapabilities) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
-      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()}};
+      {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1076,8 +1077,8 @@ TEST_P(WasmCommonTest, AllowLog) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
-      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()},
-      {"proxy_log", proxy_wasm::SanitizerConfig()}};
+      {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
+      {"proxy_log", proxy_wasm::SanitizationConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1127,8 +1128,8 @@ TEST_P(WasmCommonTest, AllowWASI) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
-      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()},
-      {"fd_write", proxy_wasm::SanitizerConfig()}};
+      {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
+      {"fd_write", proxy_wasm::SanitizationConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1178,8 +1179,8 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
-      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()},
-      {"fd_write", proxy_wasm::SanitizerConfig()}};
+      {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()},
+      {"fd_write", proxy_wasm::SanitizationConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);

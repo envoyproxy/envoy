@@ -71,7 +71,7 @@ public:
     envoy::extensions::wasm::v3::CapabilityRestrictionConfig cr_config;
     Protobuf::Map<std::string, SanitizationConfig> allowed_capabilities_;
     for (auto& capability : allowed_capabilities) {
-      // TODO(ryanapilado): populate SanitizationConfig when sanitization is implemented
+      // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
       allowed_capabilities_[capability.first] = SanitizationConfig();
     }
     *cr_config.mutable_allowed_capabilities() = allowed_capabilities_;

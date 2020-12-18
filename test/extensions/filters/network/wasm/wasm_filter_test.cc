@@ -198,10 +198,10 @@ TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
-      {"proxy_on_context_create", proxy_wasm::SanitizerConfig()},
-      {"proxy_get_property", proxy_wasm::SanitizerConfig()},
-      {"proxy_log", proxy_wasm::SanitizerConfig()},
-      {"proxy_on_new_connection", proxy_wasm::SanitizerConfig()}};
+      {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizationConfig()},
+      {"proxy_log", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_new_connection", proxy_wasm::SanitizationConfig()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
@@ -224,10 +224,10 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
-      {"proxy_on_context_create", proxy_wasm::SanitizerConfig()},
-      {"proxy_get_property", proxy_wasm::SanitizerConfig()},
-      {"proxy_log", proxy_wasm::SanitizerConfig()},
-      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizerConfig()}};
+      {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizationConfig()},
+      {"proxy_log", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizationConfig()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
@@ -250,10 +250,10 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
-      {"proxy_on_context_create", proxy_wasm::SanitizerConfig()},
-      {"proxy_get_property", proxy_wasm::SanitizerConfig()},
-      {"proxy_on_new_connection", proxy_wasm::SanitizerConfig()},
-      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizerConfig()}};
+      {"proxy_on_context_create", proxy_wasm::SanitizationConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_new_connection", proxy_wasm::SanitizationConfig()},
+      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizationConfig()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
