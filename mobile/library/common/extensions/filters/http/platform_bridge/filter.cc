@@ -313,7 +313,8 @@ PlatformBridgeFilter::onTrailers(Http::HeaderMap& trailers, Buffer::Instance* in
 
 Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeHeaders", filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeHeaders(end_stream:{})", filter_name_,
+            end_stream);
 
   // Delegate to shared implementation for request and response path.
   auto status = onHeaders(headers, end_stream, platform_filter_.on_request_headers);
@@ -326,7 +327,8 @@ Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeade
 
 Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})::encodeHeaders", filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})::encodeHeaders(end_stream:{})", filter_name_,
+            end_stream);
 
   // Presence of internal error header indicates an error that should be surfaced as an
   // error callback (rather than an HTTP response).
@@ -368,7 +370,8 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeData", filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeData(length:{}, end_stream:{})", filter_name_,
+            data.length(), end_stream);
 
   // Delegate to shared implementation for request and response path.
   Buffer::Instance* internal_buffer = nullptr;
@@ -385,7 +388,8 @@ Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, 
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(trace, "PlatformBridgeFilter({})::encodeData", filter_name_);
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})::encodeData(length:{}, end_stream:{})", filter_name_,
+            data.length(), end_stream);
 
   // Pass through if already mapped to error response.
   if (error_response_) {
