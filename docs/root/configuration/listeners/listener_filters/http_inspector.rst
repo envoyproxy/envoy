@@ -1,20 +1,17 @@
 .. _config_listener_filters_http_inspector:
 
-HTTP Inspector
-==============
+HTTP 检视
+==========
 
-HTTP Inspector listener filter allows detecting whether the application protocol appears to be HTTP, 
-and if it is HTTP, it detects the HTTP protocol (HTTP/1.x or HTTP/2) further. This can be used to select a
-:ref:`FilterChain <envoy_v3_api_msg_config.listener.v3.FilterChain>` via the :ref:`application_protocols <envoy_v3_api_field_config.listener.v3.FilterChainMatch.application_protocols>`
-of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`.
+HTTP 检视监听器过滤器允许对应用程序协议是否为 HTTP 进行检测，如果是 HTTP，会进一步检测 HTTP 协议版本（HTTP/1.x 还是 HTTP/2）。这可以用来通过 :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` 的  :ref:`application_protocols <envoy_v3_api_field_config.listener.v3.FilterChainMatch.application_protocols>` 来选择一个 :ref:`FilterChain <envoy_v3_api_msg_config.listener.v3.FilterChain>`。
 
-* :ref:`Listener filter v3 API reference <envoy_v3_api_msg_extensions.filters.listener.http_inspector.v3.HttpInspector>`
-* This filter should be configured with the name *envoy.filters.listener.http_inspector*.
+* :ref:`监听器过滤器 v3 API 参考 <envoy_v3_api_msg_extensions.filters.listener.http_inspector.v3.HttpInspector>`
+* 此过滤器的名称应该被配置为 *envoy.filters.listener.http_inspector*。
 
-Example
--------
+示例
+-----
 
-A sample filter configuration could be:
+过滤器配置的示例如下：
 
 .. code-block:: yaml
 
@@ -22,17 +19,17 @@ A sample filter configuration could be:
     - name: "envoy.filters.listener.http_inspector"
       typed_config: {}
 
-Statistics
-----------
+统计
+-----
 
-This filter has a statistics tree rooted at *http_inspector* with the following statistics: 
+此过滤器有一个以 *http_inspector* 为根的统计数，且有如下统计信息：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  read_error, Counter, Total read errors
-  http10_found, Counter, Total number of times HTTP/1.0 was found
-  http11_found, Counter, Total number of times HTTP/1.1 was found
-  http2_found, Counter, Total number of times HTTP/2 was found
-  http_not_found, Counter, Total number of times HTTP protocol was not found
+  read_error, Counter, 读取错误总数
+  http10_found, Counter, 发现 HTTP/1.0 的总次数
+  http11_found, Counter, 发现 HTTP/1.1 的总次数
+  http2_found, Counter, 发现 HTTP/1.2 的总次数
+  http_not_found, Counter, 未发现 HTTP 协议的总次数
