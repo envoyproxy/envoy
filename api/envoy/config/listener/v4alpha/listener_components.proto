@@ -203,9 +203,9 @@ message FilterChain {
     google.protobuf.Duration rebuild_timeout = 1;
   }
 
-  reserved 2;
+  reserved 2, 4;
 
-  reserved "tls_context";
+  reserved "tls_context", "use_proxy_proto";
 
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;
@@ -215,14 +215,6 @@ message FilterChain {
   // processed sequentially as connection events happen. Note: If the filter
   // list is empty, the connection will close by default.
   repeated Filter filters = 3;
-
-  // Whether the listener should expect a PROXY protocol V1 header on new
-  // connections. If this option is enabled, the listener will assume that that
-  // remote address of the connection is the one specified in the header. Some
-  // load balancers including the AWS ELB support this option. If the option is
-  // absent or set to false, Envoy will use the physical peer address of the
-  // connection as the remote address.
-  google.protobuf.BoolValue use_proxy_proto = 4;
 
   // [#not-implemented-hide:] filter chain metadata.
   core.v4alpha.Metadata metadata = 5;

@@ -218,7 +218,11 @@ message FilterChain {
   // load balancers including the AWS ELB support this option. If the option is
   // absent or set to false, Envoy will use the physical peer address of the
   // connection as the remote address.
-  google.protobuf.BoolValue use_proxy_proto = 4;
+  //
+  // This field is deprecated. Add a
+  // :ref:`PROXY protocol listener filter <config_listener_filters_proxy_protocol>`
+  // explicitly instead.
+  google.protobuf.BoolValue use_proxy_proto = 4 [deprecated = true];
 
   // [#not-implemented-hide:] filter chain metadata.
   core.v3.Metadata metadata = 5;
