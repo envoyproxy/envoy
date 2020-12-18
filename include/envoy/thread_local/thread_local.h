@@ -231,22 +231,17 @@ public:
 
 struct MainThread {
   using MainThreadSingleton = InjectableSingleton<MainThread>;
-  bool inMainThread() { return main_thread_id_ == std::this_thread::get_id(); }
-  static void init() {
-    static MainThread main_thread;
-    main_thread = MainThread();
-    MainThreadSingleton::initialize(&main_thread);
+  bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
+  static void init() { MainThreadSingleton::initialize(new MainThread()); }
+  static void clear() {
+    free(MainThreadSingleton::getExisting());
+    MainThreadSingleton::clear();
   }
-  static void clear() { MainThreadSingleton::clear(); }
   static bool isMainThread() { return MainThreadSingleton::get().inMainThread(); }
 
 private:
   std::thread::id main_thread_id_{std::this_thread::get_id()};
 };
-
-#define envoy_try                                                                                  \
-  ASSERT(ThreadLocal::MainThread::isMainThread());                                                 \
-  try
 
 } // namespace ThreadLocal
 } // namespace Envoy
