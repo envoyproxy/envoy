@@ -136,8 +136,8 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
   re2::StringPiece remove_subexpr, value_subexpr;
 
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (re2::RE2::FullMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
-                          &remove_subexpr, &value_subexpr) &&
+  if (re2::RE2::PartialMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
+                             &remove_subexpr, &value_subexpr) &&
       !remove_subexpr.empty()) {
 
     // value_subexpr is the optional second submatch. It is usually inside the first submatch
