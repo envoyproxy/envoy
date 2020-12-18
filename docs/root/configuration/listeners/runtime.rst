@@ -1,8 +1,8 @@
 .. _config_listeners_runtime:
 
-Runtime
+运行时
 -------
-The following runtime settings are supported:
+支持以下运行时设置:
 
 envoy.resource_limits.listener.<name of listener>.connection_limit
-    Sets a limit on the number of active connections to the specified listener.
+    给一个指定的监听器设置活动连接数限制
