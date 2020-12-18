@@ -380,7 +380,7 @@ typed_config:
       input:
         name: request-headers
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.input.http.v3.HttpRequestHeaderMatchInput
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
           header_name: match-header
       exact_match_map:
         map:
