@@ -80,12 +80,8 @@ public:
     const CompressorStats& stats() const { return stats_; }
     const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
     uint32_t minimumLength() const { return min_content_length_; }
-    bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers,
-                                const bool ignore_chunked = false) const;
+    bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
-    bool alwaysCompressContentIfExists() const {
-      return always_compress_content_if_exists_.enabled();
-    }
 
   protected:
     const Runtime::FeatureFlag compression_enabled_;
