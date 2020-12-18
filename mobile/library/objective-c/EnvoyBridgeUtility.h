@@ -83,12 +83,28 @@ static inline EnvoyHeaders *to_ios_headers(envoy_headers headers) {
     NSString *headerValue = [[NSString alloc] initWithBytes:header.value.bytes
                                                      length:header.value.length
                                                    encoding:NSUTF8StringEncoding];
+    // Ensure list is present in dictionary value
     NSMutableArray *headerValueList = headerDict[headerKey];
     if (headerValueList == nil) {
       headerValueList = [NSMutableArray new];
       headerDict[headerKey] = headerValueList;
     }
-    [headerValueList addObject:headerValue];
+
+    // These headers may contain commas in single values, in contravention of the RFC.
+    if ([headerKey caseInsensitiveCompare:@"cookie"] == NSOrderedSame ||
+        [headerKey caseInsensitiveCompare:@"proxy-authenticate"] == NSOrderedSame ||
+        [headerKey caseInsensitiveCompare:@"set-cookie"] == NSOrderedSame ||
+        [headerKey caseInsensitiveCompare:@"www-authenticate"] == NSOrderedSame) {
+      [headerValueList addObject:headerValue];
+    } else {
+      // Add trimmed, comma-separated values as individual members of the list.
+      NSArray *newValueList = [headerValue componentsSeparatedByString:@","];
+      for (NSString *value in newValueList) {
+        NSString *trimmedValue =
+            [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        [headerValueList addObject:trimmedValue];
+      }
+    }
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);
