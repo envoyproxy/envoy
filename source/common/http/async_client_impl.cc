@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "common/network/socket_impl.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/grpc/common.h"
@@ -81,7 +82,8 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSource()),
+      router_(parent.config_),
+      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
                                          options.hash_policy)),

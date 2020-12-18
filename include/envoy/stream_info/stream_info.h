@@ -452,29 +452,9 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @return the downstream local address. Note that this will never be nullptr.
+   * fixfix
    */
-  virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
-
-  /**
-   * @return the downstream directly connected address. This will never be nullptr. This is
-   * equivalent to the address of the physical connection.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr&
-  downstreamDirectRemoteAddress() const PURE;
-
-  /**
-   * @return the downstream remote address. Note that this will never be nullptr. This may be
-   * equivalent to downstreamDirectRemoteAddress, unless the remote address is inferred from a
-   * proxy proto, x-forwarded-for, etc.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const PURE;
-
-  /**
-   * Set the stream's downstream addresses as a set.
-   */
-  virtual void
-  setDownstreamAddresses(const Network::SocketAddressProviderConstSharedPtr& address_provider) PURE;
+  virtual const Network::SocketAddressProvider& downstreamAddressProvider() const PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.

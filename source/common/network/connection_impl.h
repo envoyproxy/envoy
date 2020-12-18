@@ -68,7 +68,7 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  SocketAddressProviderConstSharedPtr addressProvider() const override {
+  const SocketAddressProvider& addressProvider() const override {
     return socket_->addressProvider();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
@@ -78,7 +78,6 @@ public:
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
-  bool localAddressRestored() const override { return socket_->localAddressRestored(); }
   bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();

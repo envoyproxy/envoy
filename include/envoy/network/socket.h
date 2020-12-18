@@ -96,16 +96,6 @@ public:
    * Set the remote address of the socket.
    */
   virtual void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
-
-  /**
-   * @return the type (IP or pipe) of addresses used by the socket (subset of socket domain)
-   */
-  virtual Address::Type addressType() const PURE;
-
-  /**
-   * @return the IP version used by the socket if address type is IP, absl::nullopt otherwise
-   */
-  virtual absl::optional<Address::IpVersion> ipVersion() const PURE;
 };
 
 using SocketAddressProviderSharedPtr = std::shared_ptr<SocketAddressProvider>;
@@ -125,7 +115,8 @@ public:
 
   // fixfix
   virtual SocketAddressProvider& addressProvider() PURE;
-  virtual SocketAddressProviderConstSharedPtr addressProvider() const PURE;
+  virtual const SocketAddressProvider& addressProvider() const PURE;
+  virtual SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection

@@ -14,14 +14,15 @@ public:
   MockSocket();
   ~MockSocket() override;
 
+  SocketAddressProvider& addressProvider() override;
+  const SocketAddressProvider& addressProvider() const override;
+  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override;
   IoHandle& ioHandle() override;
   const IoHandle& ioHandle() const override;
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t len) override;
 
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
-  MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&), (override));
-  MOCK_METHOD(Network::SocketPtr, duplicate, (), ());
+  MOCK_METHOD(Network::SocketPtr, duplicate, (), (override));
   MOCK_METHOD(Socket::Type, socketType, (), (const, override));
   MOCK_METHOD(Address::Type, addressType, (), (const, override));
   MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const, override));

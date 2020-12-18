@@ -46,7 +46,10 @@ public:
 
   // Network::Socket
   SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  SocketAddressProviderConstSharedPtr addressProvider() const override { return address_provider_; }
+  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
+  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+    return address_provider_;
+  }
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.

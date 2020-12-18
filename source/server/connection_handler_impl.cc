@@ -460,9 +460,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-  // Refresh addresses in case they are modified by listener filters, such as proxy protocol or
-  // original_dst.
-  stream_info->setDownstreamAddresses(*socket);
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);

@@ -6,7 +6,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
-#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -72,8 +72,7 @@ public:
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::ResponseDecoder,
-                                        public Http::StreamCallbacks,
-                                        public Network::ConnectedSocketAddressProvider {
+                                        public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~HttpActiveHealthCheckSession() override;
 
@@ -106,17 +105,6 @@ private:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
-    // Network::ConnectedSocketAddressProvider
-    const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return local_address_;
-    }
-    const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
-      return local_address_;
-    }
-    const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
-      return local_address_;
-    }
-
     void onEvent(Network::ConnectionEvent event);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
@@ -137,7 +125,7 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::Address::InstanceConstSharedPtr local_address_;
+    Network::SocketAddressProviderConstSharedPtr local_address_provider_;
     bool expect_reset_{};
   };
 

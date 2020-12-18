@@ -188,7 +188,7 @@ public:
   virtual bool readEnabled() const PURE;
 
   // fixfix
-  virtual SocketAddressProviderConstSharedPtr addressProvider() const PURE;
+  virtual const SocketAddressProvider& addressProvider() const PURE;
 
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
@@ -270,11 +270,6 @@ public:
    */
   virtual uint32_t bufferLimit() const PURE;
 
-  /**
-   * @return boolean telling if the connection's local address has been restored to an original
-   *         destination address, rather than the address the connection was accepted at.
-   */
-  virtual bool localAddressRestored() const PURE;
 
   /**
    * @return boolean telling if the connection is currently above the high watermark.

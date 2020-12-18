@@ -11,6 +11,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/resolver.h"
+#include "envoy/network/socket.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
@@ -222,8 +223,9 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
-  MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&));
+  SocketAddressProvider& addressProvider() override;
+  const SocketAddressProvider& addressProvider() const override;
+  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override;
   MOCK_METHOD(IoHandle&, ioHandle, ());
   MOCK_METHOD(SocketPtr, duplicate, ());
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
@@ -246,7 +248,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   IoHandlePtr io_handle_;
-  Address::InstanceConstSharedPtr local_address_;
+  Network::SocketAddressProviderSharedPtr address_provider_;
   OptionsSharedPtr options_;
   bool socket_is_open_ = true;
 };
@@ -271,13 +273,9 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
-  MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(void, restoreLocalAddress, (const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(bool, localAddressRestored, (), (const));
-  MOCK_METHOD(void, setRemoteAddress, (const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));
+  SocketAddressProvider& addressProvider() override;
+  const SocketAddressProvider& addressProvider() const override;
+  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override;
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));
   MOCK_METHOD(absl::string_view, detectedTransportProtocol, (), (const));
   MOCK_METHOD(void, setRequestedApplicationProtocols, (const std::vector<absl::string_view>&));
@@ -307,8 +305,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
 
   IoHandlePtr io_handle_;
-  Address::InstanceConstSharedPtr local_address_;
-  Address::InstanceConstSharedPtr remote_address_;
+  Network::SocketAddressProviderSharedPtr address_provider_;
   bool is_closed_;
 };
 

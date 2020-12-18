@@ -1,6 +1,7 @@
 #include "test/mocks/stream_info/mocks.h"
 
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -18,9 +19,9 @@ namespace StreamInfo {
 MockStreamInfo::MockStreamInfo()
     : start_time_(ts_.systemTime()),
       filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
-      downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
-      downstream_direct_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
-      downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
+      downstream_address_provider_(std::make_shared<Network::SocketAddressProviderImpl>(
+          std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"),
+          std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"))) {
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
     response_flags_ |= response_flag;
   }));
@@ -61,22 +62,8 @@ MockStreamInfo::MockStreamInfo()
             upstream_local_address_ = upstream_local_address;
           }));
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
-  ON_CALL(*this, downstreamLocalAddress()).WillByDefault(ReturnRef(downstream_local_address_));
-  ON_CALL(*this, downstreamDirectRemoteAddress())
-      .WillByDefault(ReturnRef(downstream_direct_remote_address_));
-  ON_CALL(*this, setDownstreamRemoteAddress(_))
-      .WillByDefault(
-          Invoke([this](const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-            downstream_remote_address_ = downstream_remote_address;
-          }));
-  ON_CALL(*this, setDownstreamAddresses(_))
-      .WillByDefault(
-          Invoke([this](const Network::ConnectedSocketAddressProvider& address_provider) {
-            downstream_local_address_ = address_provider.localAddress();
-            downstream_direct_remote_address_ = address_provider.directRemoteAddress();
-            downstream_remote_address_ = address_provider.remoteAddress();
-          }));
-  ON_CALL(*this, downstreamRemoteAddress()).WillByDefault(ReturnRef(downstream_remote_address_));
+  ON_CALL(*this, downstreamAddressProvider())
+      .WillByDefault(ReturnPointee(downstream_address_provider_));
   ON_CALL(*this, setDownstreamSslConnection(_))
       .WillByDefault(Invoke(
           [this](const auto& connection_info) { downstream_connection_info_ = connection_info; }));

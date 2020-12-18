@@ -108,7 +108,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
-  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource());
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
   EXPECT_DEATH(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -124,7 +124,8 @@ public:
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  ConnectionImplTest() : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
+  ConnectionImplTest()
+      : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
 
   void setUpBasicConnection() {
     if (dispatcher_ == nullptr) {

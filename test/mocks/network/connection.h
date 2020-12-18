@@ -38,8 +38,6 @@ public:
   std::list<Network::ConnectionCallbacks*> callbacks_;
   std::list<Network::Connection::BytesSentCb> bytes_sent_callbacks_;
   uint64_t id_{next_id_++};
-  Address::InstanceConstSharedPtr remote_address_;
-  Address::InstanceConstSharedPtr local_address_;
   bool read_enabled_{true};
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Connection::State state_{Connection::State::Open};
@@ -66,11 +64,9 @@ public:
   MOCK_METHOD(void, readDisable, (bool disable));                                                  \
   MOCK_METHOD(void, detectEarlyCloseWhenReadDisabled, (bool));                                     \
   MOCK_METHOD(bool, readEnabled, (), (const));                                                     \
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, remoteAddress, (), (const));                 \
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, directRemoteAddress, (), (const));           \
+  MOCK_METHOD(const SocketAddressProvider&, addressProvider, (), (const));                         \
   MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,                         \
               unixSocketPeerCredentials, (), (const));                                             \
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));                  \
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));                           \
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));                                \
@@ -79,7 +75,6 @@ public:
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));                                            \
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));                                                 \
-  MOCK_METHOD(bool, localAddressRestored, (), (const));                                            \
   MOCK_METHOD(bool, aboveHighWatermark, (), (const));                                              \
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (const));     \
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());                                            \

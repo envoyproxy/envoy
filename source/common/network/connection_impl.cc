@@ -794,7 +794,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
                      std::move(transport_socket), stream_info_, false),
-      stream_info_(dispatcher.timeSource()) {
+      stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
@@ -810,8 +810,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 
     const Network::Address::InstanceConstSharedPtr* source = &source_address;
 
-    if (socket_->localAddress()) {
-      source = &socket_->localAddress();
+    if (socket_->addressProvider().localAddress()) {
+      source = &socket_->addressProvider().localAddress();
     }
 
     if (*source != nullptr) {
@@ -833,8 +833,9 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
+  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
+                 socket_->addressProvider().remoteAddress()->asString());
+  const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);

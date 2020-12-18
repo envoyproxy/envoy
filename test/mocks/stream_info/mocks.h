@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/stream_info/filter_state_impl.h"
@@ -65,13 +66,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamLocalAddress, (), (const));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamDirectRemoteAddress, (),
-              (const));
-  MOCK_METHOD(void, setDownstreamRemoteAddress, (const Network::Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamRemoteAddress, (),
-              (const));
-  MOCK_METHOD(void, setDownstreamAddresses, (const Network::ConnectedSocketAddressProvider&));
+  MOCK_METHOD(const Network::SocketAddressProvider&, downstreamAddressProvider, (), (const));
   MOCK_METHOD(void, setDownstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, downstreamSslConnection, (), (const));
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
@@ -125,9 +120,7 @@ public:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  Network::SocketAddressProviderSharedPtr downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   std::string requested_server_name_;
