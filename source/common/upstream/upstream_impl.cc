@@ -1433,16 +1433,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       existing_host->second->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
     }
 
-    if (existing_host_found && host->priority() != existing_host->second->priority()) {
-      // If the priority has changed, steal the host from it's original priority.
-      // We always do this as an in-place update, even if we're then going to go on to
-      // add a new host anyway due to `skip_inplace_host_update`.
-      // This prevents the priority that's losing this host having to know if we plan to steal
-      // the host instance or leave it alone and create a new one: we simply always steal it.
-      existing_host->second->priority(host->priority());
-      hosts_added_to_current_priority.emplace_back(existing_host->second);
-    }
-
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
     // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
@@ -1499,6 +1489,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
         // If metadata changed, we need to rebuild. See github issue #3810.
         hosts_changed = true;
+      }
+
+      // Did the priority change?
+      if (host->priority() != existing_host->second->priority()) {
+        existing_host->second->priority(host->priority());
+        hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
       final_hosts.push_back(existing_host->second);

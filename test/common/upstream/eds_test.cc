@@ -1030,6 +1030,74 @@ TEST_F(EdsTest, EndpointMoved) {
   }
 }
 
+// Verifies that if an endpoint is moved to a new priority and has its health check address altered
+// then nothing bad happens
+TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetCluster();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [&cluster_load_assignment](int port, int priority, int health_port) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+    endpoints->set_priority(priority);
+    auto* endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
+
+    auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+
+    endpoint->mutable_health_check_config()->set_port_value(health_port);
+  };
+
+  add_endpoint(80, 0, 80);
+  add_endpoint(81, 1, 81);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80, 0, 80);
+  add_endpoint(81, 0, 82);
+
+  // Changing a health check endpoint at the same time as priority is an add and immediate remove
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_EQ(added.size(), 1);
+    EXPECT_EQ(removed.size(), 1);
+  });
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    EXPECT_EQ(hosts[1]->address()->asString(), "1.2.3.4:81");
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+}
+
 // Validates that we correctly update the host list when a new overprovisioning factor is set.
 TEST_F(EdsTest, EndpointAddedWithNewOverprovisioningFactor) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
