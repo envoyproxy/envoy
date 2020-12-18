@@ -20,27 +20,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for restricting proxy-wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
-  // The proxy-wasm capabilities which will be exposed to the module. The capability names are
-  // given in the `proxy-wasm ABI <https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT>`.
-  // Additionally, the following WASI capabilities are implemented and can also be allowed:
-  // `fd_write` `fd_read`, `fd_seek`, `fd_close`, `fd_fdstat_get`, `environ_get`, `environ_sizes_get`,
-  // `args_get`, `args_sizes_get`, `proc_exit`, `clock_time_get`, `random_get`.
+  // The proxy-wasm capabilities which will be allowed. Capabilities are mapped by
+  // name. The *SanitizationConfig* which each capability maps to is currently unimplemented and ignored,
+  // and so should be left empty.
   //
-  // [#comment:TODO(ryanapilado): update once sanitization is implemented]
-  // Note: The value of each capability in the map is ignored and should be left empty.
+  // The capability names are given in the
+  // `proxy-wasm ABI <https://github.com/proxy-wasm/spec/tree/master/abi-versions/vNEXT>`_.
+  // Additionally, the following WASI capabilities from
+  // `this list <https://github.com/WebAssembly/WASI/blob/master/phases/snapshot/docs.md#modules>`_
+  // are implemented and can be allowed:
+  // *fd_write*, *fd_read*, *fd_seek*, *fd_close*, *fd_fdstat_get*, *environ_get*, *environ_sizes_get*,
+  // *args_get*, *args_sizes_get*, *proc_exit*, *clock_time_get*, *random_get*.
   map<string, SanitizationConfig> allowed_capabilities = 1;
 }
 
-// Configuration for sanitization of inputs to an allowed capability. This is currently unimplemented.
+// Configuration for sanitization of inputs to an allowed capability. NOTE: This is currently unimplemented.
 message SanitizationConfig {
+  // [#not-implemented-hide:]
   enum ListType {
     ALLOWLIST = 0;
     DENYLIST = 1;
   }
 
-  // The list of arguments will be allowed/denied when the capability is called.
+  // [#not-implemented-hide:]
+  // The list of arguments which will be allowed/denied when the capability is called.
   repeated string argument_list = 1;
 
+  // [#not-implemented-hide:]
   // Determines whether *argument_list* is treated as an allowlist or a denylist.
   ListType list_type = 2;
 }

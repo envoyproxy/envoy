@@ -543,6 +543,7 @@ deflater
 deletable
 deleter
 delim
+denylist
 deque
 deprecations
 dereference
@@ -589,6 +590,7 @@ enqueued
 enqueues
 enum
 enums
+environ
 epoll
 errno
 etag
