@@ -104,7 +104,7 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       "", "", "", GetParam(), "", false, envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
       local_info, nullptr);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_shared<WasmHandle>(std::make_unique<Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), "", "vm_configuration", "",
       allowed_capabilities, scope, cluster_manager, *dispatcher));
@@ -183,7 +183,7 @@ TEST_P(WasmCommonTest, Logging) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -255,7 +255,7 @@ TEST_P(WasmCommonTest, BadSignature) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -285,7 +285,7 @@ TEST_P(WasmCommonTest, Segv) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -329,7 +329,7 @@ TEST_P(WasmCommonTest, DivByZero) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -370,7 +370,7 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -411,7 +411,7 @@ TEST_P(WasmCommonTest, Utilities) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -477,7 +477,7 @@ TEST_P(WasmCommonTest, Stats) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -514,7 +514,7 @@ TEST_P(WasmCommonTest, Foreign) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -560,7 +560,7 @@ TEST_P(WasmCommonTest, OnForeign) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -608,7 +608,7 @@ TEST_P(WasmCommonTest, WASI) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -974,7 +974,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
 
   // restriction enforced if allowed_capabilities is non-empty
-  AllowedCapabilitiesMap allowed_capabilities{{"foo", std::vector<std::string>()}};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{{"foo", proxy_wasm::SanitizerConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1024,7 +1024,8 @@ TEST_P(WasmCommonTest, AllowModuleImplementedCapabilities) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities{{"proxy_on_vm_start", std::vector<std::string>()}};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
+      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1074,8 +1075,9 @@ TEST_P(WasmCommonTest, AllowLog) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities{{"proxy_on_vm_start", std::vector<std::string>()},
-                                              {"proxy_log", std::vector<std::string>()}};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
+      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()},
+      {"proxy_log", proxy_wasm::SanitizerConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1124,8 +1126,9 @@ TEST_P(WasmCommonTest, AllowWASI) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities{{"proxy_on_vm_start", std::vector<std::string>()},
-                                              {"fd_write", std::vector<std::string>()}};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
+      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()},
+      {"fd_write", proxy_wasm::SanitizerConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);
@@ -1174,8 +1177,9 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  AllowedCapabilitiesMap allowed_capabilities{{"proxy_on_vm_start", std::vector<std::string>()},
-                                              {"fd_write", std::vector<std::string>()}};
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities{
+      {"proxy_on_vm_start", proxy_wasm::SanitizerConfig()},
+      {"fd_write", proxy_wasm::SanitizerConfig()}};
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key,
       allowed_capabilities, scope, cluster_manager, *dispatcher);

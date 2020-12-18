@@ -100,7 +100,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
 }
 
 Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
-           absl::string_view vm_key, AllowedCapabilitiesMap allowed_capabilities,
+           absl::string_view vm_key, proxy_wasm::AllowedCapabilitiesMap allowed_capabilities,
            const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
            Event::Dispatcher& dispatcher)
     : WasmBase(createWasmVm(runtime), vm_id, vm_configuration, vm_key, allowed_capabilities),

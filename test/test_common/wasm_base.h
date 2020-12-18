@@ -60,7 +60,7 @@ public:
   void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root,
                  std::string root_id = "", std::string vm_configuration = "",
                  bool fail_open = false, std::string plugin_configuration = "",
-                 AllowedCapabilitiesMap allowed_capabilities = {}) {
+                 proxy_wasm::AllowedCapabilitiesMap allowed_capabilities = {}) {
     envoy::extensions::wasm::v3::VmConfig vm_config;
     vm_config.set_vm_id("vm_id");
     vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));

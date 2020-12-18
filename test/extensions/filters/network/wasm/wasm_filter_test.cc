@@ -18,11 +18,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Wasm {
 
-using Envoy::Extensions::Common::Wasm::AllowedCapabilitiesMap;
 using Envoy::Extensions::Common::Wasm::Context;
 using Envoy::Extensions::Common::Wasm::Plugin;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 using Envoy::Extensions::Common::Wasm::Wasm;
+using proxy_wasm::AllowedCapabilitiesMap;
 using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
@@ -198,10 +198,10 @@ TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
-      {"proxy_on_context_create", std::vector<std::string>()},
-      {"proxy_get_property", std::vector<std::string>()},
-      {"proxy_log", std::vector<std::string>()},
-      {"proxy_on_new_connection", std::vector<std::string>()}};
+      {"proxy_on_context_create", proxy_wasm::SanitizerConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizerConfig()},
+      {"proxy_log", proxy_wasm::SanitizerConfig()},
+      {"proxy_on_new_connection", proxy_wasm::SanitizerConfig()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
@@ -224,10 +224,10 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
-      {"proxy_on_context_create", std::vector<std::string>()},
-      {"proxy_get_property", std::vector<std::string>()},
-      {"proxy_log", std::vector<std::string>()},
-      {"proxy_on_downstream_connection_close", std::vector<std::string>()}};
+      {"proxy_on_context_create", proxy_wasm::SanitizerConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizerConfig()},
+      {"proxy_log", proxy_wasm::SanitizerConfig()},
+      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizerConfig()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 
@@ -250,10 +250,10 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
-      {"proxy_on_context_create", std::vector<std::string>()},
-      {"proxy_get_property", std::vector<std::string>()},
-      {"proxy_on_new_connection", std::vector<std::string>()},
-      {"proxy_on_downstream_connection_close", std::vector<std::string>()}};
+      {"proxy_on_context_create", proxy_wasm::SanitizerConfig()},
+      {"proxy_get_property", proxy_wasm::SanitizerConfig()},
+      {"proxy_on_new_connection", proxy_wasm::SanitizerConfig()},
+      {"proxy_on_downstream_connection_close", proxy_wasm::SanitizerConfig()}};
   setupConfig("", "logging", false, allowed_capabilities);
   setupFilter();
 

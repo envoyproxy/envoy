@@ -52,10 +52,10 @@ WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
             const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
             Event::Dispatcher& dispatcher, Server::ServerLifecycleNotifier& lifecycle_notifier,
             absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
-    AllowedCapabilitiesMap allowed_capabilities;
+    proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
     for (auto& capability : cr_config.allowed_capabilities()) {
-      // TODO(ryanapilado): populate vector when sanitization is implemented
-      allowed_capabilities[capability.first] = std::vector<std::string>();
+      // TODO(ryanapilado): populate struct when sanitization is implemented
+      allowed_capabilities[capability.first] = proxy_wasm::SanitizerConfig();
     }
     auto wasm = std::make_shared<Wasm>(vm_config.runtime(), vm_config.vm_id(),
                                        anyToBytes(vm_config.configuration()), vm_key,
