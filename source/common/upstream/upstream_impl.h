@@ -530,9 +530,9 @@ public:
                                     const ClusterStatNames& cluster_stat_names);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
-  static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
-                                                                  const std::string& stat_prefix,
-                                                                  bool track_remaining);
+  static ClusterCircuitBreakersStats
+  generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatName prefix, bool track_remaining,
+                               const ClusterCircuitBreakersStatNames& stat_names);
   static ClusterRequestResponseSizeStats
   generateRequestResponseSizeStats(Stats::Scope&,
                                    const ClusterRequestResponseSizeStatNames& stat_names);
@@ -548,7 +548,7 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
-  float perUpstreamPrefetchRatio() const override { return per_upstream_prefetch_ratio_; }
+  float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
@@ -644,7 +644,7 @@ public:
   absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
-  Http::Protocol
+  std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   Http::Http1::CodecStats& http1CodecStats() const override;
@@ -653,7 +653,8 @@ public:
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-                     const std::string& cluster_name, Stats::Scope& stats_scope);
+                     const std::string& cluster_name, Stats::Scope& stats_scope,
+                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
     ResourceManagerImplPtr load(const envoy::config::cluster::v3::Cluster& config,
                                 Runtime::Loader& runtime, const std::string& cluster_name,
                                 Stats::Scope& stats_scope,
@@ -662,6 +663,7 @@ private:
     using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
     Managers managers_;
+    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names_;
   };
 
   struct OptionalClusterStats {
@@ -681,7 +683,7 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
-  const float per_upstream_prefetch_ratio_;
+  const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;

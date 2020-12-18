@@ -300,6 +300,7 @@ public:
    */
   virtual const ClusterStatNames& clusterStatNames() const PURE;
   virtual const ClusterLoadReportStatNames& clusterLoadReportStatNames() const PURE;
+  virtual const ClusterCircuitBreakersStatNames& clusterCircuitBreakersStatNames() const PURE;
   virtual const ClusterRequestResponseSizeStatNames&
   clusterRequestResponseSizeStatNames() const PURE;
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
@@ -352,7 +353,7 @@ public:
    */
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                   ResourcePriority priority, Http::Protocol protocol,
+                   ResourcePriority priority, std::vector<Http::Protocol>& protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    ClusterConnectivityState& state) PURE;

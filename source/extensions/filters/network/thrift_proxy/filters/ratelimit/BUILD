@@ -36,6 +36,7 @@ envoy_cc_extension(
     deps = [
         ":ratelimit_lib",
         "//include/envoy/registry",
+        "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",

@@ -115,12 +115,16 @@ public:
   static std::string defaultHealthCheckFilter();
   // A string for a squash filter which can be used with addFilter()
   static std::string defaultSquashFilter();
+  // A string for startTls transport socket config.
+  static std::string startTlsConfig();
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type,
-                                  envoy::config::core::v3::ApiVersion api_version);
+                                  envoy::config::core::v3::ApiVersion resource_api_version,
+                                  envoy::config::core::v3::ApiVersion transport_api_version =
+                                      envoy::config::core::v3::ApiVersion::AUTO);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
                                                                 const std::string& address);
@@ -251,7 +255,7 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls();
+  void configureUpstreamTls(bool use_alpn = false);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -274,9 +278,6 @@ public:
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
-
-  // Set new codecs to use for upstream and downstream codecs.
-  void setNewCodecs();
 
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
