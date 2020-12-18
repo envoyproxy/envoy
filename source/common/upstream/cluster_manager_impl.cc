@@ -844,27 +844,27 @@ ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view 
   }
 }
 
-void ClusterManagerImpl::maybePrefetch(
+void ClusterManagerImpl::maybePreconnect(
     ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
-    std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
-  // TODO(alyssawilk) As currently implemented, this will always just prefetch
+    std::function<ConnectionPool::Instance*()> pick_preconnect_pool) {
+  // TODO(alyssawilk) As currently implemented, this will always just preconnect
   // one connection ahead of actually needed connections.
   //
   // Instead we want to track the following metrics across the entire connection
-  // pool and use the same algorithm we do for per-upstream prefetch:
-  // ((pending_streams_ + num_active_streams_) * global_prefetch_ratio >
+  // pool and use the same algorithm we do for per-upstream preconnect:
+  // ((pending_streams_ + num_active_streams_) * global_preconnect_ratio >
   //  (connecting_stream_capacity_ + num_active_streams_)))
-  //  and allow multiple prefetches per pick.
-  //  Also cap prefetches such that
-  //  num_unused_prefetch < num hosts
-  //  since if we have more prefetches than hosts, we should consider kicking into
-  //  per-upstream prefetch.
+  //  and allow multiple preconnects per pick.
+  //  Also cap preconnects such that
+  //  num_unused_preconnect < num hosts
+  //  since if we have more preconnects than hosts, we should consider kicking into
+  //  per-upstream preconnect.
   //
-  //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
+  //  Once we do this, this should loop capped number of times while shouldPreconnect is true.
   if (cluster_entry.cluster_info_->peekaheadRatio() > 1.0) {
-    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
-    if (prefetch_pool) {
-      prefetch_pool->maybePrefetch(cluster_entry.cluster_info_->peekaheadRatio());
+    ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
+    if (preconnect_pool) {
+      preconnect_pool->maybePreconnect(cluster_entry.cluster_info_->peekaheadRatio());
     }
   }
 }
@@ -876,13 +876,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   // Select a host and create a connection pool for it if it does not already exist.
   auto ret = connPool(priority, protocol, context, false);
 
-  // Now see if another host should be prefetched.
+  // Now see if another host should be preconnected.
   // httpConnPool is called immediately before a call for newStream. newStream doesn't
-  // have the load balancer context needed to make selection decisions so prefetching must be
+  // have the load balancer context needed to make selection decisions so preconnecting must be
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePrefetch(*this, [this, &priority, &protocol, &context]() {
+  maybePreconnect(*this, [this, &priority, &protocol, &context]() {
     return connPool(priority, protocol, context, true);
   });
 
@@ -896,13 +896,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   auto ret = tcpConnPool(priority, context, false);
 
   // tcpConnPool is called immediately before a call for newConnection. newConnection
-  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // doesn't have the load balancer context needed to make selection decisions so preconnecting must
   // be performed here in anticipation of the new connection.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  // Now see if another host should be prefetched.
-  maybePrefetch(*this,
-                [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
+  // Now see if another host should be preconnected.
+  maybePreconnect(*this,
+                  [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
 
   return ret;
 }

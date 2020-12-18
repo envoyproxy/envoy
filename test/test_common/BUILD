@@ -11,15 +11,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_basic_cc_library(
-    name = "printers_includes",
-    hdrs = ["printers.h"],
-    deps = [
-        ":printers_lib",
-        "//include/envoy/network:address_interface",
-    ],
-)
-
 envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
@@ -87,10 +78,8 @@ envoy_cc_test_library(
 
 envoy_cc_library(
     name = "printers_lib",
-    srcs = [
-        "printers.cc",
-        "printers.h",
-    ],
+    srcs = ["printers.cc"],
+    hdrs = ["printers.h"],
     deps = [
         "//include/envoy/network:address_interface",
         "//source/common/buffer:buffer_lib",
@@ -121,6 +110,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":file_system_for_test_lib",
+        ":printers_lib",
         ":resources_lib",
         ":test_time_lib",
         ":thread_factory_for_test_lib",
