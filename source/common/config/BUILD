@@ -141,8 +141,8 @@ envoy_cc_library(
     srcs = ["subscription_state.cc"],
     hdrs = ["subscription_state.h"],
     deps = [
+        ":ttl_lib",
         ":update_ack_lib",
-	":ttl_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -217,7 +217,7 @@ envoy_cc_library(
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
-	":watch_map_lib",
+        ":watch_map_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -352,8 +352,8 @@ envoy_cc_library(
     deps = [
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
-        ":legacy_grpc_subscription_lib",
         ":http_subscription_lib",
+        ":legacy_grpc_subscription_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",

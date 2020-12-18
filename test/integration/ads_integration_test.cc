@@ -409,7 +409,7 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
   // https://github.com/envoyproxy/envoy/issues/11477#issuecomment-657855029.
   if (sotw_or_delta_ == Grpc::SotwOrDelta::LegacySotw) {
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                            {"cluster_0"}, {}, {}, false));
+                                        {"cluster_0"}, {}, {}, false));
   }
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildTlsClusterLoadAssignment("cluster_0")},

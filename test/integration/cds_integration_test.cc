@@ -31,9 +31,10 @@ const int UpstreamIndex2 = 2;
 class CdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
   CdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            ConfigHelper::discoveredClustersBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC")) {
+      : HttpIntegrationTest(
+            Http::CodecClient::Type::HTTP2, ipVersion(),
+            ConfigHelper::discoveredClustersBootstrap(
+                sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC")) {
     if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
       config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
     }
@@ -110,7 +111,7 @@ public:
     std::string expected_method(
         sotwOrDelta() == Grpc::SotwOrDelta::Delta
             ? "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters"
-	    : "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters");
+            : "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters");
     EXPECT_EQ(xds_stream_->headers().get(path_string)[0]->value(), expected_method);
   }
 

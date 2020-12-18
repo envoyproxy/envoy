@@ -14,7 +14,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/config/watch_map.h"
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
@@ -22,6 +21,7 @@
 #include "common/config/grpc_stream.h"
 #include "common/config/ttl.h"
 #include "common/config/utility.h"
+#include "common/config/watch_map.h"
 #include "common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_map.h"
@@ -31,15 +31,16 @@ namespace Config {
 /**
  * ADS API implementation that fetches via gRPC.
  */
-class LegacyGrpcMuxImpl : public GrpcMux,
-                    public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>,
-                    public Logger::Loggable<Logger::Id::config> {
+class LegacyGrpcMuxImpl
+    : public GrpcMux,
+      public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>,
+      public Logger::Loggable<Logger::Id::config> {
 public:
   LegacyGrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
-              Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              envoy::config::core::v3::ApiVersion transport_api_version,
-              Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
+                    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+                    envoy::config::core::v3::ApiVersion transport_api_version,
+                    Random::RandomGenerator& random, Stats::Scope& scope,
+                    const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
   ~LegacyGrpcMuxImpl() override = default;
 
   void start() override;
@@ -47,27 +48,20 @@ public:
   // GrpcMux
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
-  bool paused(const std::string&) const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  bool paused(const std::string&) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder,
-			   std::chrono::milliseconds init_fetch_timeout,
-                           const bool use_namespace_matching = false) override;
+                  SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                  std::chrono::milliseconds init_fetch_timeout,
+                  const bool use_namespace_matching = false) override;
 
-  void updateWatch(const std::string&, Watch*,
-                           const std::set<std::string>&,
-                           const bool) override {
+  void updateWatch(const std::string&, Watch*, const std::set<std::string>&, const bool) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void removeWatch(const std::string& type_url, Watch* watch) override;
 
-  void disableInitFetchTimeoutTimer() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void disableInitFetchTimeoutTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -91,7 +85,7 @@ public:
     return grpc_stream_;
   }
 
-  bool isLegacy() const override { return true; } 
+  bool isLegacy() const override { return true; }
 
 private:
   void drainRequests();

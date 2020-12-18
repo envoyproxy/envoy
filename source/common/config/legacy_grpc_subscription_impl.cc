@@ -26,7 +26,7 @@ LegacyGrpcSubscriptionImpl::~LegacyGrpcSubscriptionImpl() {
 
 // Config::Subscription
 void LegacyGrpcSubscriptionImpl::start(const std::set<std::string>& resources,
-                                 const bool use_namespace_matching) {
+                                       const bool use_namespace_matching) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -35,8 +35,8 @@ void LegacyGrpcSubscriptionImpl::start(const std::set<std::string>& resources,
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ =
-      grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, init_fetch_timeout_, use_namespace_matching);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, init_fetch_timeout_,
+                               use_namespace_matching);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
@@ -62,8 +62,8 @@ void LegacyGrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::strin
 }
 
 // Config::SubscriptionCallbacks
-void LegacyGrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                          const std::string& version_info) {
+void LegacyGrpcSubscriptionImpl::onConfigUpdate(
+    const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
   disableInitFetchTimeoutTimer();
   // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
@@ -93,7 +93,7 @@ void LegacyGrpcSubscriptionImpl::onConfigUpdate(
 }
 
 void LegacyGrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
-                                                const EnvoyException* e) {
+                                                      const EnvoyException* e) {
   switch (reason) {
   case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
     stats_.update_failure_.inc();

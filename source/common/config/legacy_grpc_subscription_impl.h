@@ -15,19 +15,20 @@ namespace Config {
  * Adapter from typed Subscription to untyped GrpcMux. Also handles per-xDS API stats/logging.
  */
 class LegacyGrpcSubscriptionImpl : public Subscription,
-                             SubscriptionCallbacks,
-                             Logger::Loggable<Logger::Id::config> {
+                                   SubscriptionCallbacks,
+                                   Logger::Loggable<Logger::Id::config> {
 public:
   LegacyGrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
-                       OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-                       absl::string_view type_url, Event::Dispatcher& dispatcher,
-                       std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
+                             OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+                             absl::string_view type_url, Event::Dispatcher& dispatcher,
+                             std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
   ~LegacyGrpcSubscriptionImpl() override;
 
   // Config::Subscription
   void start(const std::set<std::string>& resource_names,
              const bool use_namespace_matching = false) override;
-  void updateResourceInterest(const std::set<std::string>& update_to_these_names, const bool use_namespace_matching) override;
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names,
+                              const bool use_namespace_matching) override;
   void requestOnDemandUpdate(const std::set<std::string>& add_these_names) override;
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

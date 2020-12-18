@@ -4,10 +4,10 @@
 
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_mux_impl.h"
-#include "common/config/legacy_grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
-#include "common/config/legacy_grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
+#include "common/config/legacy_grpc_mux_impl.h"
+#include "common/config/legacy_grpc_subscription_impl.h"
 #include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
 #include "common/config/xds_resource.h"
@@ -89,7 +89,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             Utility::configSourceInitialFetchTimeout(config),
             /*is_aggregated*/ false);
       }
-      
+
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<GrpcMuxSotw>(
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -101,7 +101,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
           Utility::configSourceInitialFetchTimeout(config),
-          /*is_aggregated*/ false); 
+          /*is_aggregated*/ false);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<GrpcMuxDelta>(
@@ -122,8 +122,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     if (cm_.adsMux()->isLegacy()) {
       return std::make_unique<LegacyGrpcSubscriptionImpl>(
-        cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
-        Utility::configSourceInitialFetchTimeout(config), true);
+          cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
+          Utility::configSourceInitialFetchTimeout(config), true);
     }
     return std::make_unique<GrpcSubscriptionImpl>(
         cm_.adsMux(), type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),

@@ -14,12 +14,11 @@
 namespace Envoy {
 namespace Config {
 
-LegacyGrpcMuxImpl::LegacyGrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
-                         Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-                         const Protobuf::MethodDescriptor& service_method,
-                         envoy::config::core::v3::ApiVersion transport_api_version,
-                         Random::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
+LegacyGrpcMuxImpl::LegacyGrpcMuxImpl(
+    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
+    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+    envoy::config::core::v3::ApiVersion transport_api_version, Random::RandomGenerator& random,
+    Stats::Scope& scope, const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
@@ -63,9 +62,10 @@ void LegacyGrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 }
 
 Watch* LegacyGrpcMuxImpl::addWatch(const std::string& type_url,
-                                      const std::set<std::string>& resources,
-                                      SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoder& resource_decoder, std::chrono::milliseconds, const bool) {
+                                   const std::set<std::string>& resources,
+                                   SubscriptionCallbacks& callbacks,
+                                   OpaqueResourceDecoder& resource_decoder,
+                                   std::chrono::milliseconds, const bool) {
   auto watch = std::make_unique<Watch>(callbacks, resource_decoder);
   watch->resource_names_ = resources;
   auto& watches_for_type = apiStateFor(type_url).watches_;
@@ -135,7 +135,7 @@ ScopedResume LegacyGrpcMuxImpl::pause(const std::vector<std::string> type_urls) 
   });
 }
 
-//bool LegacyGrpcMuxImpl::paused(const std::string& type_url) const {
+// bool LegacyGrpcMuxImpl::paused(const std::string& type_url) const {
 //  return apiStateFor(type_url).paused();
 //}
 
@@ -316,7 +316,7 @@ void LegacyGrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
 }
 
 void LegacyGrpcMuxImpl::expiryCallback(const std::string& type_url,
-                                 const std::vector<std::string>& expired) {
+                                       const std::vector<std::string>& expired) {
   // The TtlManager triggers a callback with a list of all the expired elements, which we need
   // to compare against the various watched resources to return the subset that each watch is
   // subscribed to.
