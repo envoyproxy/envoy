@@ -1095,6 +1095,33 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
 
     EXPECT_EQ(hosts[1]->address()->asString(), "1.2.3.4:81");
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+  }
+
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80, 0, 80);
+  add_endpoint(81, 1, 83);
+
+  // Changing a health check endpoint at the same time as priority is an add and immediate remove
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_EQ(added.size(), 1);
+    EXPECT_EQ(removed.size(), 1);
+  });
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 }
 
