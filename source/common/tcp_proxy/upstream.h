@@ -158,8 +158,8 @@ private:
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.deferrer_ != nullptr) {
         parent_.deferrer_->onGenericPoolReady(*parent_.request_encoder_);
+        parent_.deferrer_.reset();
       }
-      parent_.deferrer_.reset();
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);

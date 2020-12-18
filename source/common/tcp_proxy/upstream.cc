@@ -116,11 +116,10 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
   request_encoder_ = nullptr;
-  // If we did not receive the CONNECT response yet we treat this as a pool
+  // If we did not receive a valid CONNECT response yet we treat this as a pool
   // failure, otherwise we forward the event downstream.
   if (deferrer_ != nullptr) {
     deferrer_->onGenericPoolFailure();
-    deferrer_.reset();
     return;
   }
   if (inform_downstream) {
