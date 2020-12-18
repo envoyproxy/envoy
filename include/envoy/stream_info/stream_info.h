@@ -10,7 +10,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/http/request_id_extension.h"
-#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
@@ -464,12 +464,6 @@ public:
   downstreamDirectRemoteAddress() const PURE;
 
   /**
-   * @param downstream_remote_address sets the remote address of downstream connection.
-   */
-  virtual void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) PURE;
-
-  /**
    * @return the downstream remote address. Note that this will never be nullptr. This may be
    * equivalent to downstreamDirectRemoteAddress, unless the remote address is inferred from a
    * proxy proto, x-forwarded-for, etc.
@@ -480,7 +474,7 @@ public:
    * Set the stream's downstream addresses as a set.
    */
   virtual void
-  setDownstreamAddresses(const Network::ConnectedSocketAddressProvider& address_provider) PURE;
+  setDownstreamAddresses(const Network::SocketAddressProviderConstSharedPtr& address_provider) PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.

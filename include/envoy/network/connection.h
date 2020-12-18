@@ -73,9 +73,7 @@ enum class ConnectionCloseType {
 /**
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
-class Connection : public Event::DeferredDeletable,
-                   public FilterManager,
-                   public ConnectedSocketAddressProvider {
+class Connection : public Event::DeferredDeletable, public FilterManager {
 public:
   enum class State { Open, Closing, Closed };
 
@@ -188,6 +186,9 @@ public:
    * @return bool whether reading is enabled on the connection.
    */
   virtual bool readEnabled() const PURE;
+
+  // fixfix
+  virtual SocketAddressProviderConstSharedPtr addressProvider() const PURE;
 
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.

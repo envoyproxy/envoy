@@ -9,16 +9,19 @@
 namespace Envoy {
 namespace Network {
 
-SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
-    : io_handle_(ioHandleForAddr(sock_type, addr)), sock_type_(sock_type),
-      addr_type_(addr->type()) {}
+SocketImpl::SocketImpl(Socket::Type sock_type,
+                       const Address::InstanceConstSharedPtr& address_for_io_handle)
+    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle)), sock_type_(sock_type),
+      addr_type_(address_for_io_handle->type()),
+      address_provider_(std::make_shared<SocketAddressProviderImpl>(nullptr)) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address)
-    : io_handle_(std::move(io_handle)), local_address_(local_address) {
+    : io_handle_(std::move(io_handle)),
+      address_provider_(std::make_shared<SocketAddressProviderImpl>(local_address)) {
 
-  if (local_address_ != nullptr) {
-    addr_type_ = local_address_->type();
+  if (address_provider_->localAddress() != nullptr) {
+    addr_type_ = address_provider_->localAddress()->type();
     return;
   }
 
@@ -64,7 +67,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
 
   bind_result = io_handle_->bind(address);
   if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
-    local_address_ = io_handle_->localAddress();
+    address_provider_->setLocalAddress(io_handle_->localAddress());
   }
   return bind_result;
 }
@@ -74,7 +77,7 @@ Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->liste
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
   auto result = io_handle_->connect(address);
   if (address->type() == Address::Type::Ip) {
-    local_address_ = io_handle_->localAddress();
+    address_provider_->setLocalAddress(io_handle_->localAddress());
   }
   return result;
 }
@@ -96,8 +99,8 @@ Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
 absl::optional<Address::IpVersion> SocketImpl::ipVersion() const {
   if (addr_type_ == Address::Type::Ip) {
     // Always hit after socket is initialized, i.e., accepted or connected
-    if (local_address_ != nullptr) {
-      return local_address_->ip()->version();
+    if (address_provider_->localAddress() != nullptr) {
+      return address_provider_->localAddress()->ip()->version();
     } else {
       auto domain = io_handle_->domain();
       if (!domain.has_value()) {

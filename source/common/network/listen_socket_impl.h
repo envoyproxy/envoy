@@ -19,11 +19,12 @@ namespace Network {
 class ListenSocketImpl : public SocketImpl {
 protected:
   ListenSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
-      : SocketImpl(std::move(io_handle), local_address) {}
+      : SocketImpl(std::move(io_handle), local_address, nullptr) {}
 
   SocketPtr duplicate() override {
     // Using `new` to access a non-public constructor.
-    return absl::WrapUnique(new ListenSocketImpl(io_handle_->duplicate(), local_address_));
+    return absl::WrapUnique(
+        new ListenSocketImpl(io_handle_->duplicate(), address_provider_->localAddress()));
   }
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
@@ -86,33 +87,18 @@ public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address),
-        direct_remote_address_(remote_address) {}
+      : SocketImpl(std::move(io_handle), local_address, remote_address) {}
 
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(type, local_address), remote_address_(remote_address),
-        direct_remote_address_(remote_address) {
-    setLocalAddress(local_address);
+      : SocketImpl(type, local_address, remote_address) {
+    address_provider_->setLocalAddress(local_address);
   }
 
   // Network::Socket
   Socket::Type socketType() const override { return Socket::Type::Stream; }
 
   // Network::ConnectionSocket
-  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
-  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
-    return direct_remote_address_;
-  }
-  void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
-    setLocalAddress(local_address);
-    local_address_restored_ = true;
-  }
-  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
-    remote_address_ = remote_address;
-  }
-  bool localAddressRestored() const override { return local_address_restored_; }
-
   void setDetectedTransportProtocol(absl::string_view protocol) override {
     transport_protocol_ = std::string(protocol);
   }
@@ -138,9 +124,6 @@ public:
   }
 
 protected:
-  Address::InstanceConstSharedPtr remote_address_;
-  const Address::InstanceConstSharedPtr direct_remote_address_;
-  bool local_address_restored_{false};
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
   std::string server_name_;

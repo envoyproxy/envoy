@@ -7,16 +7,46 @@
 namespace Envoy {
 namespace Network {
 
-class SocketImpl : public virtual Socket {
+class SocketAddressProviderImpl : public SocketAddressProvider {
 public:
-  SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr);
+  SocketAddressProviderImpl(const Address::InstanceConstSharedPtr& local_address,
+                            const Address::InstanceConstSharedPtr& remote_address)
+      : local_address_(local_address), remote_address_(remote_address),
+        direct_remote_address_(remote_address) {}
 
-  // Network::Socket
+  // fixfix
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
   }
+  void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
+    setLocalAddress(local_address);
+    local_address_restored_ = true;
+  }
+  bool localAddressRestored() const override { return local_address_restored_; }
+  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
+    remote_address_ = remote_address;
+  }
+  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return direct_remote_address_;
+  }
 
+private:
+  Address::InstanceConstSharedPtr local_address_;
+  bool local_address_restored_{false};
+  Address::InstanceConstSharedPtr remote_address_;
+  const Address::InstanceConstSharedPtr direct_remote_address_;
+};
+
+class SocketImpl : public virtual Socket {
+public:
+  SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
+             const Address::InstanceConstSharedPtr& remote_address);
+
+  // Network::Socket
+  SocketAddressProvider& addressProvider() override { return *address_provider_; }
+  SocketAddressProviderConstSharedPtr addressProvider() const override { return address_provider_; }
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.
@@ -60,13 +90,14 @@ public:
   absl::optional<Address::IpVersion> ipVersion() const override;
 
 protected:
-  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);
+  SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
+             const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;
+  const SocketAddressProviderSharedPtr address_provider_;
 };
 
 } // namespace Network

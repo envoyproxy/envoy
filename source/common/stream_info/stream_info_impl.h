@@ -7,6 +7,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/network/socket.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
@@ -187,27 +188,23 @@ struct StreamInfoImpl : public StreamInfo {
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
   const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
-    return downstream_local_address_;
+    // fixfix null check.
+    return downstream_address_provider_->localAddress();
   }
 
   const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
-    return downstream_direct_remote_address_;
-  }
-
-  void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
-    downstream_remote_address_ = downstream_remote_address;
+    // fixfix null check.
+    return downstream_address_provider_->directRemoteAddress();
   }
 
   const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
-    return downstream_remote_address_;
+     // fixfix null check.
+    return downstream_address_provider_->remoteAddress();
   }
 
-  void
-  setDownstreamAddresses(const Network::ConnectedSocketAddressProvider& address_provider) override {
-    downstream_local_address_ = address_provider.localAddress();
-    downstream_direct_remote_address_ = address_provider.directRemoteAddress();
-    downstream_remote_address_ = address_provider.remoteAddress();
+  void setDownstreamAddresses(
+      const Network::SocketAddressProviderConstSharedPtr& address_provider) override {
+    downstream_address_provider_ = address_provider;
   }
 
   void
@@ -326,9 +323,7 @@ private:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  Network::SocketAddressProviderConstSharedPtr downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
