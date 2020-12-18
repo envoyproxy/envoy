@@ -12,9 +12,9 @@ namespace Network {
 SocketImpl::SocketImpl(Socket::Type sock_type,
                        const Address::InstanceConstSharedPtr& address_for_io_handle,
                        const Address::InstanceConstSharedPtr& remote_address)
-    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle)), sock_type_(sock_type),
-      addr_type_(address_for_io_handle->type()),
-      address_provider_(std::make_shared<SocketAddressProviderImpl>(nullptr, remote_address)) {}
+    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle)),
+      address_provider_(std::make_shared<SocketAddressProviderImpl>(nullptr, remote_address)),
+      sock_type_(sock_type), addr_type_(address_for_io_handle->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,

@@ -6,6 +6,7 @@
 #include "common/common/assert.h"
 #include "common/common/random_generator.h"
 #include "common/http/request_id_extension_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -74,24 +75,8 @@ public:
   }
   bool healthCheck() const override { return health_check_request_; }
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
-  const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
-    return downstream_local_address_;
-  }
-  const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
-    return downstream_direct_remote_address_;
-  }
-  void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
-    downstream_remote_address_ = downstream_remote_address;
-  }
-  const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
-    return downstream_remote_address_;
-  }
-  void
-  setDownstreamAddresses(const Network::ConnectedSocketAddressProvider& address_provider) override {
-    downstream_local_address_ = address_provider.localAddress();
-    downstream_direct_remote_address_ = address_provider.directRemoteAddress();
-    downstream_remote_address_ = address_provider.remoteAddress();
+  const Network::SocketAddressProvider& downstreamAddressProvider() const override {
+    return *downstream_address_provider_;
   }
   void
   setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
@@ -256,9 +241,8 @@ public:
   bool health_check_request_{};
   std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  Network::SocketAddressProviderSharedPtr downstream_address_provider_{
+      std::make_shared<Network::SocketAddressProviderImpl>(nullptr, nullptr)};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};

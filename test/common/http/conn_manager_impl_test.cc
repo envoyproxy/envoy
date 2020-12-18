@@ -1561,14 +1561,16 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
 
-        EXPECT_EQ(stream_info.downstreamRemoteAddress()->ip()->addressAsString(), xff_address);
-        EXPECT_EQ(stream_info.downstreamDirectRemoteAddress()->ip()->addressAsString(),
-                  local_address);
+        EXPECT_EQ(stream_info.downstreamAddressProvider().remoteAddress()->ip()->addressAsString(),
+                  xff_address);
+        EXPECT_EQ(
+            stream_info.downstreamAddressProvider().directRemoteAddress()->ip()->addressAsString(),
+            local_address);
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -1700,9 +1702,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
@@ -1750,9 +1752,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_EQ(nullptr, stream_info.routeEntry());
       }));
 
@@ -1847,9 +1849,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamSslConnection());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));

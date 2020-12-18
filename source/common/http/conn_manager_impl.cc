@@ -618,12 +618,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-  // Initially, the downstream remote address is the source address of the
-  // downstream connection. That can change later in the request's lifecycle,
-  // based on XFF processing, but setting the downstream remote address here
-  // prevents surprises for logging code in edge cases.
-  filter_manager_.streamInfo().setDownstreamAddresses(
-      connection_manager_.read_callbacks_->connection());
 
   filter_manager_.streamInfo().setDownstreamSslConnection(
       connection_manager_.read_callbacks_->connection().ssl());
@@ -822,7 +816,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
-  auto ip = connection()->localAddress()->ip();
+  auto ip = connection()->addressProvider().localAddress()->ip();
   if (ip == nullptr) {
     return 0;
   }
@@ -1010,12 +1004,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
-    filter_manager_.streamInfo().setDownstreamRemoteAddress(
+    ASSERT(false); // fixfix
+    /*filter_manager_.streamInfo().setDownstreamRemoteAddress(
         ConnectionManagerUtility::mutateRequestHeaders(
             *request_headers_, connection_manager_.read_callbacks_->connection(),
-            connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
+            connection_manager_.config_, *snapped_route_config_,
+       connection_manager_.local_info_));*/
   }
-  ASSERT(filter_manager_.streamInfo().downstreamRemoteAddress() != nullptr);
+  ASSERT(filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();

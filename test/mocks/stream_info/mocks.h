@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/request_id_extension.h"
-#include "envoy/network/listen_socket.h"
 #include "envoy/network/socket.h"
 #include "envoy/stream_info/stream_info.h"
 

@@ -111,18 +111,9 @@ protected:
       void readDisable(bool) override {}
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }
-      const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
-        return parent_.parent_.address();
-      }
-      const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
-        return parent_.parent_.address();
-      }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
       unixSocketPeerCredentials() const override {
         return absl::nullopt;
-      }
-      const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-        return parent_.parent_.address();
       }
       void setConnectionStats(const Network::Connection::ConnectionStats&) override {}
       Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
@@ -132,7 +123,6 @@ protected:
       void write(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void setBufferLimits(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       uint32_t bufferLimit() const override { return 65000; }
-      bool localAddressRestored() const override { return false; }
       bool aboveHighWatermark() const override { return false; }
       const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
         return options_;

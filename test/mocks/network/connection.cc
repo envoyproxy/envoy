@@ -54,6 +54,8 @@ void MockConnectionBase::runLowWatermarkCallbacks() {
 }
 
 template <class T> static void initializeMockConnection(T& connection) {
+  ON_CALL(connection, addressProvider())
+      .WillByDefault(ReturnPointee(connection.stream_info_.downstream_address_provider_));
   ON_CALL(connection, dispatcher()).WillByDefault(ReturnRef(connection.dispatcher_));
   ON_CALL(connection, readEnabled()).WillByDefault(ReturnPointee(&connection.read_enabled_));
   ON_CALL(connection, addConnectionCallbacks(_))
@@ -109,7 +111,7 @@ MockClientConnection::MockClientConnection() {
   stream_info_.downstream_address_provider_->setRemoteAddress(
       Utility::resolveUrl("tcp://10.0.0.1:443"));
   stream_info_.downstream_address_provider_->setLocalAddress(
-    Utility::resolveUrl("tcp://10.0.0.2:40000"));
+      Utility::resolveUrl("tcp://10.0.0.2:40000"));
   initializeMockConnection(*this);
 }
 

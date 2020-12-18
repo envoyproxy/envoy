@@ -63,7 +63,7 @@ public:
    */
   virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
 
-   /**
+  /**
    * Restores the local address of the socket. On accepted sockets the local address defaults to the
    * one at which the connection was received at, which is the same as the listener's address, if
    * the listener is bound to a specific address. Call this to restore the address to a value
@@ -139,7 +139,7 @@ public:
    */
   virtual Socket::Type socketType() const PURE;
 
-/**
+  /**
    * @return the type (IP or pipe) of addresses used by the socket (subset of socket domain)
    */
   virtual Address::Type addressType() const PURE;

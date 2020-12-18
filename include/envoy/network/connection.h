@@ -11,6 +11,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -189,6 +190,7 @@ public:
 
   // fixfix
   virtual const SocketAddressProvider& addressProvider() const PURE;
+  virtual SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const PURE;
 
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
@@ -269,7 +271,6 @@ public:
    * Get the value set with setBufferLimits.
    */
   virtual uint32_t bufferLimit() const PURE;
-
 
   /**
    * @return boolean telling if the connection is currently above the high watermark.

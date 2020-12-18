@@ -97,10 +97,10 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
+  const SocketAddressProviderSharedPtr address_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;
-  const SocketAddressProviderSharedPtr address_provider_;
 };
 
 } // namespace Network

@@ -57,10 +57,10 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
-  filter_callbacks_.connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443);
-  filter_callbacks_.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());

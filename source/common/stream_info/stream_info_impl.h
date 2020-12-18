@@ -3,6 +3,8 @@
 #include <chrono>
 #include <cstdint>
 
+#include "common/common/macros.h"
+#include "common/network/socket_impl.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
@@ -301,14 +303,21 @@ struct StreamInfoImpl : public StreamInfo {
   std::string route_name_;
 
 private:
-  // fixfix null check
+  static Network::SocketAddressProviderConstSharedPtr emptyDownstreamAddressProvider() {
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(
+        Network::SocketAddressProviderConstSharedPtr,
+        std::make_shared<Network::SocketAddressProviderImpl>(nullptr, nullptr));
+  }
+
   StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
                  const Network::SocketAddressProviderConstSharedPtr& downstream_address_provider,
                  FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::move(filter_state)),
-        downstream_address_provider_(downstream_address_provider),
+        downstream_address_provider_(downstream_address_provider != nullptr
+                                         ? downstream_address_provider
+                                         : emptyDownstreamAddressProvider()),
         request_id_extension_(Http::RequestIDExtensionFactory::noopInstance()) {}
 
   uint64_t bytes_received_{};

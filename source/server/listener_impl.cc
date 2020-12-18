@@ -109,7 +109,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
   }
 
   if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
-    local_address_ = socket_->localAddress();
+    local_address_ = socket_->addressProvider().localAddress();
   }
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
             local_address_->asString());

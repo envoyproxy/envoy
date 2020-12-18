@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "common/network/socket_impl.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/grpc/common.h"
