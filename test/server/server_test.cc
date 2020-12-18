@@ -511,6 +511,31 @@ TEST_P(ServerInstanceImplTest, NoLifecycleNotificationOnEarlyShutdown) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, ShutdownBeforeWorkersStarted) {
+  // Test that drainParentListeners() should never be called because we will shutdown
+  // early before the server starts worker threads.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/test_data/server/node_bootstrap.yaml");
+
+    auto post_init_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit,
+                                                      [&] { server_->shutdown(); });
+
+    // This shutdown notification should never be called because we will shutdown early.
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    server_->run();
+
+    post_init_handle = nullptr;
+    shutdown_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
