@@ -23,7 +23,7 @@ void MutationUtils::buildHttpHeaders(const Http::HeaderMap& headers_in,
 void MutationUtils::applyHeaderMutations(
     const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation, Http::HeaderMap& headers) {
   for (const auto& remove_header : mutation.remove_headers()) {
-    if (!remove_header.empty() && Http::HeaderUtility::isRemovableHeader(remove_header)) {
+    if (Http::HeaderUtility::isRemovableHeader(remove_header)) {
       headers.remove(LowerCaseString(remove_header));
     }
   }
