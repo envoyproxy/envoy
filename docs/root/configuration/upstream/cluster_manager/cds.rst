@@ -1,20 +1,17 @@
 .. _config_cluster_manager_cds:
 
-Cluster discovery service
+集群发现服务（CDS）
 =========================
 
-The cluster discovery service (CDS) is an optional API that Envoy will call to dynamically fetch
-cluster manager members. Envoy will reconcile the API response and add, modify, or remove known
-clusters depending on what is required.
+集群发现服务 (Cluster Discovery Service - CDS) 是 Envoy 调用的一个可选 API，用来动态获取集群管理器成员。Envoy 将协调 API 响应，并根据需要添加、修改或删除已知集群。
 
 .. note::
 
-  Any clusters that are statically defined within the Envoy configuration cannot be modified or
-  removed via the CDS API.
+  不能通过 CDS API 修改或删除 Envoy 配置中静态定义的任何群集。
 
 * :ref:`v3 CDS API <v2_grpc_streaming_endpoints>`
 
-Statistics
+统计
 ----------
 
-CDS has a :ref:`statistics <subscription_statistics>` tree rooted at *cluster_manager.cds.*
+CDS 有一个以 *cluster_manager.cds.* 为根的 :ref:`统计树 <subscription_statistics>` 。
