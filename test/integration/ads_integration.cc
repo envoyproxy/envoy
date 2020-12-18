@@ -24,7 +24,10 @@ AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion
     : HttpIntegrationTest(
           Http::CodecClient::Type::HTTP2, ipVersion(),
           ConfigHelper::adsBootstrap(
-              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC", api_version)) {
+              sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC", api_version)) {
+  if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
+  }
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;

@@ -78,7 +78,10 @@ public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
             Http::CodecClient::Type::HTTP2, ipVersion(),
-            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC")) {
+    if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
+    }
     use_lds_ = false;
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();

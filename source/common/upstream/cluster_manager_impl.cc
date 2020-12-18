@@ -334,23 +334,43 @@ ClusterManagerImpl::ClusterManagerImpl(
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
           dyn_resources.ads_config().set_node_on_first_message_only());
     } else {
-      ads_mux_ = std::make_shared<Config::GrpcMuxSotw>(
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->create(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              dyn_resources.ads_config().transport_api_version() ==
-                      envoy::config::core::v3::ApiVersion::V3
-                  // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
-                  // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
-                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"
-                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
-                    "StreamAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.legacy_sotw_xds")) {
+        ads_mux_ = std::make_shared<Config::LegacyGrpcMuxImpl>(local_info,
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->create(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                dyn_resources.ads_config().transport_api_version() ==
+                        envoy::config::core::v3::ApiVersion::V3
+                    // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                    // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
+                    ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"
+                    : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"),
+            dyn_resources.ads_config().transport_api_version(), random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::GrpcMuxSotw>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->create(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                dyn_resources.ads_config().transport_api_version() ==
+                        envoy::config::core::v3::ApiVersion::V3
+                    // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
+                    // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
+                    ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"
+                    : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                      "StreamAggregatedResources"),
+            dyn_resources.ads_config().transport_api_version(), random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      }
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();

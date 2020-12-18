@@ -124,6 +124,8 @@ public:
 
   using TypeUrlMap = absl::flat_hash_map<std::string, std::string>;
   static TypeUrlMap& typeUrlMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(TypeUrlMap, {}); }
+
+  virtual bool isLegacy() const { return false; }
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

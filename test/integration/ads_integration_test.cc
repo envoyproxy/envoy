@@ -407,10 +407,9 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
       {buildTlsCluster("cluster_0")}, {}, "2");
   // Inconsistent SotW and delta behaviors for warming, see
   // https://github.com/envoyproxy/envoy/issues/11477#issuecomment-657855029.
-  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta) {
-    // TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-    //    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-    //                                        {"cluster_0"}, {}, {}));
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::LegacySotw) {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                            {"cluster_0"}, {}, {}, false));
   }
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildTlsClusterLoadAssignment("cluster_0")},
@@ -596,11 +595,12 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 
   // CDS is resumed and EDS response was acknowledged.
-  //
-  // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
-  // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
-  // ACK goes out, they're both acknowledging version 3.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::LegacySotw) {
+    // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
+    // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
+    // ACK goes out, they're both acknowledging version 3.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
+  }
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"warming_cluster_2", "warming_cluster_1"}, {}, {}, false));
@@ -678,13 +678,12 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 
   // CDS is resumed and EDS response was acknowledged.
-  // TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-  //  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
-  // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
-  // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
-  // ACK goes out, they're both acknowledging version 3.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
-  //  }
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::LegacySotw) {
+    // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
+    // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
+    // ACK goes out, they're both acknowledging version 3.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
+  }
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
                                       {"warming_cluster_2"}, {}, {}, false));
@@ -974,8 +973,11 @@ public:
   AdsFailIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
+    if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
+    }
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1015,8 +1017,11 @@ public:
   AdsConfigIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
+    if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
+    }
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1154,7 +1159,7 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
   API_NO_BOOST(envoy::api::v2::DiscoveryRequest) sotw_request;
   API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_request;
   const envoy::api::v2::core::Node* node = nullptr;
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta) {
     EXPECT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, sotw_request));
     EXPECT_TRUE(sotw_request.has_node());
     node = &sotw_request.node();
@@ -1178,8 +1183,11 @@ public:
   AdsClusterFromFileIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::adsBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC",
                                 envoy::config::core::v3::ApiVersion::V3)) {
+    if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
+    }
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1496,13 +1504,12 @@ TEST_P(AdsClusterV2Test, DEPRECATED_FEATURE_TEST(CdsPausedDuringWarming)) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 
   // CDS is resumed and EDS response was acknowledged.
-  // TODO FIX ME XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-  //  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
-  // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
-  // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
-  // ACK goes out, they're both acknowledging version 3.
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}, false));
-  //  }
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::LegacySotw) {
+    // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
+    // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
+    // ACK goes out, they're both acknowledging version 3.
+    EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}, false));
+  }
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "3", {}, {}, {}, false));
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "2", {"warming_cluster_2", "warming_cluster_1"},
                                       {}, {}, false));

@@ -98,6 +98,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "legacy_grpc_subscription_lib",
+    srcs = ["legacy_grpc_subscription_impl.cc"],
+    hdrs = ["legacy_grpc_subscription_impl.h"],
+    deps = [
+        ":legacy_grpc_mux_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/grpc:async_client_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "delta_subscription_state_lib",
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
@@ -190,6 +202,31 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
         "//source/common/memory:utils_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "legacy_grpc_mux_lib",
+    srcs = ["legacy_grpc_mux_impl.cc"],
+    hdrs = ["legacy_grpc_mux_impl.h"],
+    deps = [
+        ":api_version_lib",
+        ":decoded_resource_lib",
+        ":grpc_stream_lib",
+        ":ttl_lib",
+        ":utility_lib",
+	":watch_map_lib",
+        "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/memory:utils_lib",
+        "//source/common/protobuf",
+        "@com_google_absl//absl/container:btree",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -315,6 +352,7 @@ envoy_cc_library(
     deps = [
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
+        ":legacy_grpc_subscription_lib",
         ":http_subscription_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",

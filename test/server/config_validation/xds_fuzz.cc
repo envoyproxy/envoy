@@ -59,9 +59,9 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
     : HttpIntegrationTest(
           Http::CodecClient::Type::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() ==
-                                             test::server::config_validation::Config::SOTW
-                                         ? "GRPC"
-                                         : "DELTA_GRPC",
+                                             test::server::config_validation::Config::DELTA
+                                         ? "DELTA_GRPC"
+                                         : "GRPC",
                                      api_version)),
       verifier_(input.config().sotw_or_delta()), actions_(input.actions()), version_(1),
       api_version_(api_version), ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
@@ -83,6 +83,7 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
  * Initialize an envoy configured with a fully dynamic bootstrap with ADS over gRPC.
  */
 void XdsFuzzTest::initialize() {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
     auto* grpc_service = ads_config->add_grpc_services();

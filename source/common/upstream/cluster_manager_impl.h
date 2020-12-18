@@ -27,6 +27,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/config/grpc_mux_impl.h"
+#include "common/config/legacy_grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"

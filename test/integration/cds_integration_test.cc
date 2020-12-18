@@ -33,7 +33,10 @@ public:
   CdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
                             ConfigHelper::discoveredClustersBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                                sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC")) {
+    if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
+    }
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
   }
@@ -105,9 +108,9 @@ public:
     EXPECT_TRUE(xds_stream_->waitForHeadersComplete());
     Envoy::Http::LowerCaseString path_string(":path");
     std::string expected_method(
-        sotwOrDelta() == Grpc::SotwOrDelta::Sotw
-            ? "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters"
-            : "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters");
+        sotwOrDelta() == Grpc::SotwOrDelta::Delta
+            ? "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters"
+	    : "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters");
     EXPECT_EQ(xds_stream_->headers().get(path_string)[0]->value(), expected_method);
   }
 
@@ -226,6 +229,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
 // resources it already has: the reconnected stream need not start with a state-of-the-world update.
 TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   SKIP_IF_XDS_IS(Grpc::SotwOrDelta::Sotw);
+  SKIP_IF_XDS_IS(Grpc::SotwOrDelta::LegacySotw);
 
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");

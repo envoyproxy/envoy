@@ -152,10 +152,10 @@ public:
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
                              const bool api_downgrade = false) {
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
-    } else {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
+    } else {
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
     }
   }
 

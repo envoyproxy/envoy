@@ -38,6 +38,10 @@ protected:
     // Setup two upstream hosts, one for each cluster.
     setUpstreamCount(2);
 
+    if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
+    }
+
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add the static cluster to serve SRDS.
       auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();

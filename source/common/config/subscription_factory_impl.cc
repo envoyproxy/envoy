@@ -4,7 +4,9 @@
 
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_mux_impl.h"
+#include "common/config/legacy_grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
+#include "common/config/legacy_grpc_subscription_impl.h"
 #include "common/config/http_subscription_impl.h"
 #include "common/config/type_to_endpoint.h"
 #include "common/config/utility.h"
@@ -73,6 +75,21 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           api_config_source.transport_api_version(), callbacks, resource_decoder, stats,
           Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC:
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.legacy_sotw_xds")) {
+        return std::make_unique<LegacyGrpcSubscriptionImpl>(
+            std::make_shared<Config::LegacyGrpcMuxImpl>(
+                local_info_,
+                Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                       api_config_source, scope, true)
+                    ->create(),
+                dispatcher_, sotwGrpcMethod(type_url, transport_api_version), transport_api_version,
+                api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
+                api_config_source.set_node_on_first_message_only()),
+            callbacks, resource_decoder, stats, type_url, dispatcher_,
+            Utility::configSourceInitialFetchTimeout(config),
+            /*is_aggregated*/ false);
+      }
+      
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<GrpcMuxSotw>(
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -84,7 +101,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
           Utility::configSourceInitialFetchTimeout(config),
-          /*is_aggregated*/ false);
+          /*is_aggregated*/ false); 
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<GrpcMuxDelta>(
@@ -103,6 +120,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
+    if (cm_.adsMux()->isLegacy()) {
+      return std::make_unique<LegacyGrpcSubscriptionImpl>(
+        cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
+        Utility::configSourceInitialFetchTimeout(config), true);
+    }
     return std::make_unique<GrpcSubscriptionImpl>(
         cm_.adsMux(), type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
         Utility::configSourceInitialFetchTimeout(config), true);
