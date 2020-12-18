@@ -25,6 +25,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -91,6 +92,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
 }
 
 // Test TLS upstream.
@@ -111,6 +115,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
   tcp_client->close();
 
   EXPECT_EQ("world", tcp_client->data());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -148,6 +155,86 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
+  autonomous_upstream_ = true;
+  initialize();
+  const int num_connections = 50;
+  std::vector<IntegrationTcpClientPtr> clients(num_connections);
+
+  for (int i = 0; i < num_connections; ++i) {
+    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
+  }
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
+  for (int i = 0; i < num_connections; ++i) {
+    IntegrationTcpClientPtr& tcp_client = clients[i];
+    // The autonomous upstream is an HTTP upstream, so send raw HTTP.
+    // This particular request will result in the upstream sending a response,
+    // and flush-closing due to the 'close_after_response' header.
+    ASSERT_TRUE(tcp_client->write(
+        "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
+        false));
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
+  }
+}
+
+TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::list<IntegrationTcpClientPtr> clients;
+
+  // The autonomous upstream parses HTTP, and HTTP headers and sends responses
+  // when full requests are received. basic_request will result in
+  // bidirectional data. request_with_close will result in bidirectional data,
+  // but also the upstream closing the connection.
+  const char* basic_request = "GET / HTTP/1.1\r\nHost: foo\r\ncontent-length: 0\r\n\r\n";
+  const char* request_with_close =
+      "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n";
+  TestRandomGenerator rand;
+
+  // Seed some initial clients
+  for (int i = 0; i < 5; ++i) {
+    clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+  }
+
+  // Now randomly write / add more connections / close.
+  for (int i = 0; i < 50; ++i) {
+    int action = rand.random() % 3;
+
+    if (action == 0) {
+      // Add a new connection.
+      clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+    }
+    if (clients.empty()) {
+      break;
+    }
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    if (action == 1) {
+      // Write to the first connection.
+      ASSERT_TRUE(tcp_client->write(basic_request, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->clearData(tcp_client->data().size());
+    } else if (action == 2) {
+      // Close the first connection.
+      ASSERT_TRUE(tcp_client->write(request_with_close, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->waitForHalfClose();
+      tcp_client->close();
+      clients.pop_front();
+    }
+  }
+
+  while (!clients.empty()) {
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    ASSERT_TRUE(tcp_client->write(request_with_close, false));
+    tcp_client->waitForData("\r\n\r\n", false);
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    clients.pop_front();
+  }
 }
 
 TEST_P(TcpProxyIntegrationTest, NoUpstream) {
