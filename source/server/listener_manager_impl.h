@@ -193,7 +193,7 @@ public:
   listeners(ListenerState state = ListenerState::ACTIVE) override;
   uint64_t numConnections() const override;
   bool removeListener(const std::string& listener_name) override;
-  void startWorkers(GuardDog& guard_dog) override;
+  void startWorkers(GuardDog& guard_dog, std::function<void()> callback) override;
   void stopListeners(StopListenersType stop_listeners_type) override;
   void stopWorkers() override;
   void beginListenerUpdate() override { error_state_tracker_.clear(); }

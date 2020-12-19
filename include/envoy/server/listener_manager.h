@@ -202,8 +202,9 @@ public:
   /**
    * Start all workers accepting new connections on all added listeners.
    * @param guard_dog supplies the guard dog to use for thread watching.
+   * @param callback supplies the callback to complete server initialization.
    */
-  virtual void startWorkers(GuardDog& guard_dog) PURE;
+  virtual void startWorkers(GuardDog& guard_dog, std::function<void()> callback) PURE;
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
