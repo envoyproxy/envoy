@@ -38,10 +38,10 @@ public:
   // Returns the next gRPC request proto to be sent off to the server, based on this object's
   // understanding of the current protocol state, and new resources that Envoy wants to request.
   // Returns a new'd pointer, meant to be owned by the caller.
-  void* getNextRequestAckless();
+  void* getNextRequestAckless() override;
   // The WithAck version first calls the Ack-less version, then adds in the passed-in ack.
   // Returns a new'd pointer, meant to be owned by the caller.
-  void* getNextRequestWithAck(const UpdateAck& ack);
+  void* getNextRequestWithAck(const UpdateAck& ack) override;
 
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 

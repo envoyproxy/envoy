@@ -199,6 +199,7 @@ void* DeltaSubscriptionState::getNextRequestAckless() { return getNextRequestInt
 void* DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest* request = getNextRequestInternal();
   request->set_response_nonce(ack.nonce_);
+  ENVOY_LOG(debug, "ACK for {} will have nonce {}", type_url(), ack.nonce_);
   if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
     // Don't needlessly make the field present-but-empty if status is ok.
     request->mutable_error_detail()->CopyFrom(ack.error_detail_);

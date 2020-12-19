@@ -140,10 +140,6 @@ ScopedResume LegacyGrpcMuxImpl::pause(const std::vector<std::string> type_urls) 
   });
 }
 
-// bool LegacyGrpcMuxImpl::paused(const std::string& type_url) const {
-//  return apiStateFor(type_url).paused();
-//}
-
 void LegacyGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
   TypeUrlMap& type_url_map = typeUrlMap();
   if (type_url_map.find(type_url) != type_url_map.end()) {
