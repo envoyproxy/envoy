@@ -260,6 +260,11 @@ private:
   const std::string public_key_;
 };
 
+class Timestamp {
+public:
+  enum Resolution { Millisecond, Nanosecond };
+};
+
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions
