@@ -15,20 +15,27 @@ static constexpr uint32_t RetryCount = 1;
 
 std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
                  Api::Api& api) {
+  std::string data;
   switch (source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename:
-    return api.fileSystem().fileReadToEnd(source.filename());
+    data = api.fileSystem().fileReadToEnd(source.filename());
+    break;
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes:
-    return source.inline_bytes();
+    data = source.inline_bytes();
+    break;
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineString:
-    return source.inline_string();
+    data = source.inline_string();
+    break;
   default:
     if (!allow_empty) {
       throw EnvoyException(
           fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
     }
-    return "";
   }
+  if (!allow_empty && data.empty()) {
+    throw EnvoyException("DataSource cannot be empty");
+  }
+  return data;
 }
 
 absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {

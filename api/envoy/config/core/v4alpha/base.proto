@@ -329,10 +329,10 @@ message DataSource {
     string filename = 1 [(validate.rules).string = {min_len: 1}];
 
     // Bytes inlined in the configuration.
-    bytes inline_bytes = 2 [(validate.rules).bytes = {min_len: 1}];
+    bytes inline_bytes = 2;
 
     // String inlined in the configuration.
-    string inline_string = 3 [(validate.rules).string = {min_len: 1}];
+    string inline_string = 3;
   }
 }
 
