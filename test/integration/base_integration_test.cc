@@ -65,11 +65,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
-  ENVOY_LOG_MISC(debug, "Using new codecs");
-  setNewCodecs();
-#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -218,6 +213,14 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
         });
   } else {
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
   }
 }
 
@@ -493,14 +496,12 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
       IsSubstring("", "", expected_error_substring, discovery_request.error_detail().message()));
   const std::set<std::string> resource_names_in_request(discovery_request.resource_names().cbegin(),
                                                         discovery_request.resource_names().cend());
-  // Sort to ignore ordering.
-  std::set<std::string> expected_sub{expected_resource_names.begin(),
-                                     expected_resource_names.end()};
-  std::set<std::string> actual_sub{discovery_request.resource_names().cbegin(),
-                                   discovery_request.resource_names().cend()};
-  auto sub_result = compareSets(expected_sub, actual_sub, "resource_names");
-  if (!sub_result) {
-    return sub_result;
+  std::set<std::string> expected_sub(expected_resource_names.begin(),
+                                     expected_resource_names.end());
+
+  if (auto resource_name_result =
+          compareSets(expected_sub, resource_names_in_request, "Sotw resource names")) {
+    return resource_name_result;
   }
   if (expected_version != discovery_request.version_info()) {
     return AssertionFailure() << fmt::format("version {} does not match expected {} in {}",

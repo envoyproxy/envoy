@@ -49,6 +49,8 @@ public:
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
+  // Returns the application protocol, or absl::nullopt for TCP.
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
   uint32_t currentUnusedCapacity() const {
     return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
   }
@@ -157,8 +159,8 @@ public:
   void scheduleOnUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
   // Called if this pool is likely to be picked soon, to determine if it's worth
-  // prefetching a connection.
-  bool maybePrefetch(float global_prefetch_ratio);
+  // preconnecting a connection.
+  bool maybePreconnect(float global_preconnect_ratio);
 
   virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
 
@@ -183,24 +185,26 @@ public:
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
 protected:
-  // Creates up to 3 connections, based on the prefetch ratio.
+  virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
+
+  // Creates up to 3 connections, based on the preconnect ratio.
   void tryCreateNewConnections();
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
   // to avoid starving this pool.
-  // Demand is determined either by perUpstreamPrefetchRatio() or global_prefetch_ratio
-  // if this is called by maybePrefetch()
-  bool tryCreateNewConnection(float global_prefetch_ratio = 0);
+  // Demand is determined either by perUpstreamPreconnectRatio() or global_preconnect_ratio
+  // if this is called by maybePreconnect()
+  bool tryCreateNewConnection(float global_preconnect_ratio = 0);
 
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
   bool connectingConnectionIsExcess() const;
 
   // A helper function which determines if a new incoming stream should trigger
-  // connection prefetch.
-  bool shouldCreateNewConnection(float global_prefetch_ratio) const;
+  // connection preconnect.
+  bool shouldCreateNewConnection(float global_preconnect_ratio) const;
 
-  float perUpstreamPrefetchRatio() const;
+  float perUpstreamPreconnectRatio() const;
 
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
@@ -211,8 +215,13 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void decrConnectingStreamCapacity(int32_t delta) {
+  void incrConnectingStreamCapacity(uint32_t delta) {
+    state_.incrConnectingStreamCapacity(delta);
+    connecting_stream_capacity_ += delta;
+  }
+  void decrConnectingStreamCapacity(uint32_t delta) {
     state_.decrConnectingStreamCapacity(delta);
+    ASSERT(connecting_stream_capacity_ > delta);
     connecting_stream_capacity_ -= delta;
   }
 
@@ -241,15 +250,15 @@ protected:
   // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
 
+  // The number of streams that can be immediately dispatched
+  // if all CONNECTING connections become connected.
+  uint32_t connecting_stream_capacity_{0};
+
 private:
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
-
-  // The number of streams that can be immediately dispatched
-  // if all CONNECTING connections become connected.
-  uint32_t connecting_stream_capacity_{0};
 
   void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;

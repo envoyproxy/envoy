@@ -43,7 +43,7 @@ public:
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
-    node_.set_id("node_name");
+    node_.set_id("fo0");
     node_.set_cluster("cluster_name");
     node_.mutable_locality()->set_zone("zone_name");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));

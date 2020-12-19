@@ -20,11 +20,12 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version)
-    : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, ipVersion(),
-          ConfigHelper::adsBootstrap(
-              sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC", api_version)) {
+AdsIntegrationTest::AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version, 
+		                       envoy::config::core::v3::ApiVersion transport_api_version)
+    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                          ConfigHelper::adsBootstrap(
+                              sotwOrDelta() == Grpc::SotwOrDelta::Delta ? "DELTA_GRPC" : "GRPC", \
+			      resource_api_version, transport_api_version)) {
   if (sotwOrDelta() != Grpc::SotwOrDelta::LegacySotw) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.legacy_sotw_xds", "false");
   }
@@ -32,7 +33,7 @@ AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
-  api_version_ = api_version;
+  api_version_ = resource_api_version;
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 }
 

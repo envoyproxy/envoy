@@ -201,18 +201,24 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("type_url_baz", {"z"}, "");
   grpc_mux_->start();
 
+  // Send another message for foo so that the node is cleared in the cached request.
+  // This is to test that the the node is set again in the first message below.
+  expectSendMessage("type_url_foo", {"z", "x", "y"}, "");
+  FakeGrpcSubscription foo_z_sub = makeWatch("type_url_foo", {"z"});
+
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
-      .Times(3);
+      .Times(4);
   EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer, enableTimer(_, _));
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_EQ(0, control_plane_pending_requests_.value());
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("type_url_foo", {"x", "y"}, "", true);
+  expectSendMessage("type_url_foo", {"z", "x", "y"}, "", true);
   expectSendMessage("type_url_bar", {}, "");
   expectSendMessage("type_url_baz", {"z"}, "");
+  expectSendMessage("type_url_foo", {"x", "y"}, "");
   timer->invokeCallback();
 
   expectSendMessage("type_url_baz", {}, "");
@@ -933,7 +939,7 @@ TEST_F(GrpcMuxImplTest, ConfigUpdateWithAliases) {
   response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
   response->mutable_resources()->at(0).add_aliases("prefix/domain2.test");
 
-  EXPECT_CALL(callbacks, onConfigUpdate(_, _, "1")).Times(1);
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _, "1"));
 
   grpc_mux->onDiscoveryResponse(std::move(response), control_plane_stats_);
 }
@@ -969,7 +975,7 @@ TEST_F(GrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   response->mutable_resources()->at(0).set_name("prefix/not-found");
   response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
 
-  EXPECT_CALL(callbacks, onConfigUpdate(_, _, "1")).Times(1);
+  EXPECT_CALL(callbacks, onConfigUpdate(_, _, "1"));
 
   grpc_mux->onDiscoveryResponse(std::move(response), control_plane_stats_);
 }

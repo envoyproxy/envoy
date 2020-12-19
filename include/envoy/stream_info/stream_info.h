@@ -237,6 +237,11 @@ public:
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
+   * @param code the HTTP response code to set for this request.
+   */
+  virtual void setResponseCode(uint32_t code) PURE;
+
+  /**
    * @param rc_details the response code details string to set for this request.
    * See ResponseCodeDetailValues above for well-known constants.
    */
