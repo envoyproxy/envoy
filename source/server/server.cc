@@ -87,7 +87,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      main_thread_id_(std::this_thread::get_id()), server_contexts_(*this) {
+      main_thread_id_(std::this_thread::get_id()), hooks_(hooks), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -609,15 +609,22 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*worker_guard_dog_);
-  initialization_timer_->complete();
-  // Update server stats as soon as initialization is done.
-  updateServerStats();
-  workers_started_ = true;
-  // At this point we are ready to take traffic and all listening ports are up. Notify our parent
-  // if applicable that they can stop listening and drain.
-  restarter_.drainParentListeners();
-  drain_manager_->startParentShutdownSequence();
+  // The callback will be called after workers are started.
+  listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
+    if (isShutdown()) {
+      return;
+    }
+
+    initialization_timer_->complete();
+    // Update server stats as soon as initialization is done.
+    updateServerStats();
+    workers_started_ = true;
+    hooks_.onWorkersStarted();
+    // At this point we are ready to take traffic and all listening ports are up. Notify our
+    // parent if applicable that they can stop listening and drain.
+    restarter_.drainParentListeners();
+    drain_manager_->startParentShutdownSequence();
+  });
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
