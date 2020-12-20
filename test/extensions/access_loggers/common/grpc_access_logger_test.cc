@@ -62,7 +62,7 @@ public:
                          dispatcher, scope, access_log_prefix, service_method,
                          transport_api_version) {}
 
-  int numInits() const { return num_inits; }
+  int numInits() const { return num_inits_; }
 
 private:
   void mockAddEntry(const std::string& key) {
@@ -92,9 +92,9 @@ private:
 
   bool isEmpty() override { return message_.fields().empty(); }
 
-  void initMessage() override { ++num_inits; }
+  void initMessage() override { ++num_inits_; }
 
-  int num_inits = 0;
+  int num_inits_ = 0;
 };
 
 class GrpcAccessLogTest : public testing::Test {
