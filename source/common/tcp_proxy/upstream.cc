@@ -7,6 +7,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -228,10 +229,19 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
   upstream_handle_ = nullptr;
+  Http::RequestEncoder* latched_encoder = &request_encoder;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setConnPoolCallbacks(
-      std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamSslConnection()));
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_upstream_wait_connect_response")) {
+    upstream_->setConnPoolCallbacks(
+        std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamSslConnection()));
+  } else {
+    callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
+                                   latched_encoder->getStream().connectionLocalAddress(),
+                                   info.downstreamSslConnection());
+  }
 }
 
 inline void

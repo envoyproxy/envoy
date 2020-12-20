@@ -216,6 +216,7 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+
     HttpProtocolIntegrationTest::initialize();
   }
 
@@ -312,7 +313,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectTerminationIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-using Params = std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type>;
+using Params = std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type, bool>;
 
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public testing::TestWithParam<Params>,
@@ -322,17 +323,25 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())) {}
 
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
-    return fmt::format("{}_{}",
-                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-                       std::get<1>(p.param) == FakeHttpConnection::Type::HTTP1 ? "HTTP1Upstream"
-                                                                               : "HTTP2Upstream");
+    return fmt::format(
+        "{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+        std::get<1>(p.param) == FakeHttpConnection::Type::HTTP1 ? "HTTP1Upstream" : "HTTP2Upstream",
+        std::get<2>(p.param) ? "WaitConnectResponse" : "DoNotWaitConnectResponse");
   }
 
   void SetUp() override {
     enable_half_close_ = true;
+    wait_for_connect_response_ = std::get<2>(GetParam());
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(std::get<1>(GetParam()));
 
+    if (wait_for_connect_response_) {
+      config_helper_.addRuntimeOverride(
+          "envoy.reloadable_features.http_upstream_wait_connect_response", "true");
+    } else {
+      config_helper_.addRuntimeOverride(
+          "envoy.reloadable_features.http_upstream_wait_connect_response", "false");
+    }
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
@@ -353,6 +362,7 @@ public:
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
   }
+  bool wait_for_connect_response_{};
 };
 
 TEST_P(TcpTunnelingIntegrationTest, Basic) {
@@ -811,6 +821,9 @@ TEST_P(TcpTunnelingIntegrationTest, DISABLED_TransferEncodingHeaderIgnoredHttp1)
 }
 
 TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponseIsReceived) {
+  if (!wait_for_connect_response_) {
+    return;
+  }
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
@@ -841,6 +854,9 @@ TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponse
 }
 
 TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsReceived) {
+  if (!wait_for_connect_response_) {
+    return;
+  }
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream.
@@ -886,7 +902,8 @@ INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                        testing::Values(FakeHttpConnection::Type::HTTP1,
-                                       FakeHttpConnection::Type::HTTP2)),
+                                       FakeHttpConnection::Type::HTTP2),
+                       testing::Values(false, true)),
     TcpTunnelingIntegrationTest::paramsToString);
 
 } // namespace
