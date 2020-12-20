@@ -867,6 +867,21 @@ TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsR
   }
 }
 
+TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
