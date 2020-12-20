@@ -421,13 +421,17 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
   if (end_stream_) {
     if (!buffered_body_ && saw_body_) {
       return luaL_error(state, "cannot call body() after body has been streamed");
-    } else if (callbacks_.bufferedBody() == nullptr) {
-      ENVOY_LOG(debug, "end stream. no body");
-      return 0;
     } else {
       if (body_wrapper_.get() != nullptr) {
         body_wrapper_.pushStack();
       } else {
+        if (callbacks_.bufferedBody() == nullptr) {
+          ENVOY_LOG(debug, "end stream. no body");
+
+          Buffer::OwnedImpl body("");
+          callbacks_.addData(body);
+        }
+
         body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
                                 state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
                             true);

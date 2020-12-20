@@ -181,7 +181,7 @@ public:
     function envoy_on_request(request_handle)
       request_handle:logTrace(request_handle:headers():get(":path"))
 
-      if request_handle:body() ~= nil then
+      if request_handle:body():length() ~= 0 then
         request_handle:logTrace(request_handle:body():length())
       else
         request_handle:logTrace("no body")
@@ -193,7 +193,7 @@ public:
     function envoy_on_request(request_handle)
       request_handle:logTrace(request_handle:headers():get(":path"))
 
-      if request_handle:body() ~= nil then
+      if request_handle:body():length() ~= 0 then
         request_handle:logTrace(request_handle:body():length())
       else
         request_handle:logTrace("no body")
