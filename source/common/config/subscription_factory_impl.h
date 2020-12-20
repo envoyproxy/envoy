@@ -17,8 +17,7 @@ class SubscriptionFactoryImpl : public SubscriptionFactory, Logger::Loggable<Log
 public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
-                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                          Runtime::Loader& runtime);
+                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
@@ -38,7 +37,6 @@ private:
   Upstream::ClusterManager& cm_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
-  Runtime::Loader& runtime_;
 };
 
 } // namespace Config

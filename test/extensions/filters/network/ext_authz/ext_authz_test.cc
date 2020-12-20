@@ -129,6 +129,7 @@ public:
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
+transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -137,6 +138,7 @@ failure_mode_allow: true
 stat_prefix: name
   )EOF";
   const std::string metadata_yaml_string_ = R"EOF(
+transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -154,6 +156,7 @@ filter_enabled_metadata:
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   std::string yaml_string = R"EOF(
+transport_api_version: V3
 grpc_service: {}
 stat_prefix: name
   )EOF";
@@ -263,7 +266,7 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
 

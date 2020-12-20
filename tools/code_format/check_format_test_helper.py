@@ -230,6 +230,7 @@ def runChecks():
                                 "Don't use mangled Protobuf names for enum constants")
   errors += checkUnfixableError("test_naming.cc",
                                 "Test names should be CamelCase, starting with a capital letter")
+  errors += checkUnfixableError("mock_method_n.cc", "use MOCK_METHOD() instead")
   errors += checkUnfixableError(
       "test/register_factory.cc",
       "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
@@ -303,6 +304,8 @@ def runChecks():
   errors += checkAndFixError(
       "cpp_std.cc",
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
+  errors += checkAndFixError("code_conventions.cc",
+                             "term .Times(1); should be replaced with preferred term ;")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("duration_value_zero.cc")

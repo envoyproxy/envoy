@@ -491,7 +491,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
 
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
@@ -595,7 +595,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+std::unique_ptr<GenericConnPool>
+Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
     factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
@@ -607,7 +608,7 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool() {
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
-  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_,
+  return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }
 
@@ -1212,7 +1213,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
+        code_stats.chargeBasicResponseStat(cluster_->statsScope(),
+                                           config_.stats_.stat_names_.retry_,
                                            static_cast<Http::Code>(response_code));
 
         if (!end_stream || !upstream_request.encodeComplete()) {
@@ -1532,7 +1534,14 @@ void Filter::doRetry() {
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  // Clusters can technically get removed by CDS during a retry. Make sure it still exists.
+  const auto cluster = config_.cm_.getThreadLocalCluster(route_entry_->clusterName());
+  std::unique_ptr<GenericConnPool> generic_conn_pool;
+  if (cluster != nullptr) {
+    cluster_ = cluster->info();
+    generic_conn_pool = createConnPool(*cluster);
+  }
+
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();

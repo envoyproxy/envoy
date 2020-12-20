@@ -127,7 +127,7 @@ As an example, here is a single overload action entry that enables timeout reduc
 It configures the overload manager to change the amount of time that HTTP connections are allowed
 to remain idle before being closed in response to heap size. When the heap usage is less than 85%,
 idle connections will time out at their usual time, which is configured through
-:ref:`RouteAction.idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>`.
+:ref:`HttpConnectionManager.common_http_protocol_options.idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`.
 When the heap usage is at or above 95%, idle connections will be closed after the specified
 `min_timeout`, here 2 seconds. If the heap usage is between 85% and 95%, the idle connection timeout
 will vary between those two based on the formula for the :ref:`scaled trigger <config_overload_manager_triggers>`
@@ -136,7 +136,7 @@ out after :math:`2s + (600s - 2s) \cdot (95\% - 92\%) / (95\% - 85\%) = 181.4s`.
 
 Note in the example that the minimum idle time is specified as an absolute duration. If, instead,
 `min_timeout: 2s` were to be replaced with `min_scale: { value: 10 }`, the minimum timer value
-would be computed based on the maximum (specified elsewhere). So if `RouteAction.idle_timeout` is
+would be computed based on the maximum (specified elsewhere). So if `idle_timeout` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
 Limiting Active Connections

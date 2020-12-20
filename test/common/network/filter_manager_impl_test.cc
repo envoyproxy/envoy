@@ -412,11 +412,11 @@ stat_prefix: name
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
-  EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(factory_context.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(&conn_pool));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
-                              nullptr, nullptr);
+                              nullptr, nullptr, "");
 
   conn_pool.poolReady(upstream_connection);
 

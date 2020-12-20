@@ -16,6 +16,8 @@ MockInstance::MockInstance()
       cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
+      router_context_(stats_store_.symbolTable()),
+      stats_config_(std::make_shared<NiceMock<Configuration::MockStatsConfig>>()),
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
       transport_socket_factory_context_(
@@ -24,6 +26,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, grpcContext()).WillByDefault(ReturnRef(grpc_context_));
   ON_CALL(*this, httpContext()).WillByDefault(ReturnRef(http_context_));
+  ON_CALL(*this, routerContext()).WillByDefault(ReturnRef(router_context_));
   ON_CALL(*this, dnsResolver()).WillByDefault(Return(dns_resolver_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
@@ -43,6 +46,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
+  ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(*stats_config_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
@@ -54,7 +58,7 @@ namespace Configuration {
 
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
-      grpc_context_(scope_.symbolTable()) {
+      grpc_context_(scope_.symbolTable()), router_context_(scope_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
@@ -71,8 +75,12 @@ MockServerFactoryContext::MockServerFactoryContext()
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
+  ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(stats_config_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
+
+MockStatsConfig::MockStatsConfig() = default;
+MockStatsConfig::~MockStatsConfig() = default;
 
 } // namespace Configuration
 } // namespace Server

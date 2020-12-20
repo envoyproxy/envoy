@@ -589,12 +589,12 @@ message Cluster {
   }
 
   // [#not-implemented-hide:]
-  message PrefetchPolicy {
+  message PreconnectPolicy {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.cluster.v3.Cluster.PrefetchPolicy";
+        "envoy.config.cluster.v3.Cluster.PreconnectPolicy";
 
     // Indicates how many streams (rounded up) can be anticipated per-upstream for each
-    // incoming stream. This is useful for high-QPS or latency-sensitive services. Prefetching
+    // incoming stream. This is useful for high-QPS or latency-sensitive services. Preconnecting
     // will only be done if the upstream is healthy.
     //
     // For example if this is 2, for an incoming HTTP/1.1 stream, 2 connections will be
@@ -603,46 +603,46 @@ message Cluster {
     // serve both the original and presumed follow-up stream.
     //
     // In steady state for non-multiplexed connections a value of 1.5 would mean if there were 100
-    // active streams, there would be 100 connections in use, and 50 connections prefetched.
+    // active streams, there would be 100 connections in use, and 50 connections preconnected.
     // This might be a useful value for something like short lived single-use connections,
     // for example proxying HTTP/1.1 if keep-alive were false and each stream resulted in connection
     // termination. It would likely be overkill for long lived connections, such as TCP proxying SMTP
     // or regular HTTP/1.1 with keep-alive. For long lived traffic, a value of 1.05 would be more
-    // reasonable, where for every 100 connections, 5 prefetched connections would be in the queue
+    // reasonable, where for every 100 connections, 5 preconnected connections would be in the queue
     // in case of unexpected disconnects where the connection could not be reused.
     //
     // If this value is not set, or set explicitly to one, Envoy will fetch as many connections
     // as needed to serve streams in flight. This means in steady state if a connection is torn down,
     // a subsequent streams will pay an upstream-rtt latency penalty waiting for streams to be
-    // prefetched.
+    // preconnected.
     //
-    // This is limited somewhat arbitrarily to 3 because prefetching connections too aggressively can
-    // harm latency more than the prefetching helps.
-    google.protobuf.DoubleValue per_upstream_prefetch_ratio = 1
+    // This is limited somewhat arbitrarily to 3 because preconnecting too aggressively can
+    // harm latency more than the preconnecting helps.
+    google.protobuf.DoubleValue per_upstream_preconnect_ratio = 1
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
 
     // Indicates how many many streams (rounded up) can be anticipated across a cluster for each
     // stream, useful for low QPS services. This is currently supported for a subset of
     // deterministic non-hash-based load-balancing algorithms (weighted round robin, random).
-    // Unlike per_upstream_prefetch_ratio this prefetches across the upstream instances in a
+    // Unlike per_upstream_preconnect_ratio this preconnects across the upstream instances in a
     // cluster, doing best effort predictions of what upstream would be picked next and
     // pre-establishing a connection.
     //
-    // For example if prefetching is set to 2 for a round robin HTTP/2 cluster, on the first
-    // incoming stream, 2 connections will be prefetched - one to the first upstream for this
+    // For example if preconnecting is set to 2 for a round robin HTTP/2 cluster, on the first
+    // incoming stream, 2 connections will be preconnected - one to the first upstream for this
     // cluster, one to the second on the assumption there will be a follow-up stream.
     //
-    // Prefetching will be limited to one prefetch per configured upstream in the cluster.
+    // Preconnecting will be limited to one preconnect per configured upstream in the cluster.
     //
     // If this value is not set, or set explicitly to one, Envoy will fetch as many connections
     // as needed to serve streams in flight, so during warm up and in steady state if a connection
-    // is closed (and per_upstream_prefetch_ratio is not set), there will be a latency hit for
+    // is closed (and per_upstream_preconnect_ratio is not set), there will be a latency hit for
     // connection establishment.
     //
-    // If both this and prefetch_ratio are set, Envoy will make sure both predicted needs are met,
-    // basically prefetching max(predictive-prefetch, per-upstream-prefetch), for each upstream.
+    // If both this and preconnect_ratio are set, Envoy will make sure both predicted needs are met,
+    // basically preconnecting max(predictive-preconnect, per-upstream-preconnect), for each upstream.
     // TODO(alyssawilk) per LB docs and LB overview docs when unhiding.
-    google.protobuf.DoubleValue predictive_prefetch_ratio = 2
+    google.protobuf.DoubleValue predictive_preconnect_ratio = 2
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
@@ -969,8 +969,8 @@ message Cluster {
   TrackClusterStats track_cluster_stats = 49;
 
   // [#not-implemented-hide:]
-  // Prefetch configuration for this cluster.
-  PrefetchPolicy prefetch_policy = 50;
+  // Preconnect configuration for this cluster.
+  PreconnectPolicy preconnect_policy = 50;
 
   // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
   // connection pool for every downstream connection

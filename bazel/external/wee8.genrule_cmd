@@ -49,6 +49,7 @@ if [[ $${ENVOY_MSAN-} == "1" ]]; then
 fi
 if [[ $${ENVOY_TSAN-} == "1" ]]; then
   WEE8_BUILD_ARGS+=" is_tsan=true"
+  export LDFLAGS="$${LDFLAGS} -L/opt/libcxx_tsan/lib -Wl,-rpath,/opt/libcxx_tsan/lib"
 fi
 
 # Debug/release build.

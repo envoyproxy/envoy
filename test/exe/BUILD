@@ -64,7 +64,6 @@ envoy_cc_test(
     srcs = ["main_common_test.cc"],
     data = [
         "//test/config/integration:google_com_proxy_port_0",
-        "//test/exe/testdata:test_with_kill_request_filter",
     ],
     deps = [
         "//source/common/api:api_lib",
@@ -76,11 +75,43 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "extra_extensions_test",
+    srcs = ["extra_extensions_test.cc"],
+    deps = [
+        # This dependency MUST be main_common_lib to meet the purpose of this test
+        "//source/exe:main_common_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "terminate_handler_test",
     srcs = ["terminate_handler_test.cc"],
     tags = ["backtrace"],
     deps = [
         "//source/exe:terminate_handler_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+# Due to the limitiations of how Windows signals work
+# this test cannot be executed through bazel and it must
+# be executed as a standalone executable.
+# e.g.: `./bazel-bin/test/exe/win32_outofproc_main_test.exe`
+envoy_cc_test(
+    name = "win32_outofproc_main_test",
+    srcs = ["win32_outofproc_main_test.cc"],
+    data = [
+        "//source/exe:envoy-static",
+        "//test/config/integration:google_com_proxy_port_0",
+    ],
+    # TODO(envoyproxy/windows-dev): Disable the manual tag.
+    tags = ["manual"],
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/exe:main_common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:contention_lib",
+        "//test/test_common:environment_lib",
     ],
 )

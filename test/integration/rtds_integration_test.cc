@@ -58,10 +58,11 @@ layered_runtime:
         resource_api_version: V3
         api_config_source:
           api_type: {}
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
-          set_node_on_first_message_only: false
+          set_node_on_first_message_only: true
   - name: some_admin_layer
     admin_layer: {{}}
 admin:

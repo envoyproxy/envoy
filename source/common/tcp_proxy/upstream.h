@@ -14,7 +14,7 @@ namespace TcpProxy {
 
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
               Upstream::LoadBalancerContext* context,
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
@@ -44,7 +44,7 @@ public:
   using TunnelingConfig =
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
-  HttpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+  HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                Http::CodecClient::Type type);

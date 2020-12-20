@@ -18,7 +18,7 @@ class ConnectTerminationIntegrationTest
 public:
   ConnectTerminationIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   void initialize() override {
@@ -186,6 +186,7 @@ TEST_P(ConnectTerminationIntegrationTest, BuggyHeaders) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
+  setUpstreamProtocol(upstreamProtocol());
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     protocol_options.mutable_common_http_protocol_options()
@@ -330,8 +331,8 @@ public:
   }
 
   void SetUp() override {
-    enable_half_close_ = true;
     wait_for_connect_response_ = std::get<2>(GetParam());
+    enableHalfClose(true);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(std::get<1>(GetParam()));
 
@@ -466,7 +467,7 @@ TEST_P(TcpTunnelingIntegrationTest, ResetStreamTest) {
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     return;
   }
-  enable_half_close_ = false;
+  enableHalfClose(false);
   initialize();
 
   // Establish a connection.
@@ -482,7 +483,7 @@ TEST_P(TcpTunnelingIntegrationTest, ResetStreamTest) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
