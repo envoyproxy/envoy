@@ -52,7 +52,6 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:http_cpp.wasm",
     ]),
     extension_name = "envoy.bootstrap.wasm",
-    external_deps = ["abseil_optional"],
     deps = [
         "//source/extensions/bootstrap/wasm:config",
         "//source/extensions/common/wasm:wasm_lib",

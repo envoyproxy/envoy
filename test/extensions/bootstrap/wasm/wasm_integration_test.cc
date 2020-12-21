@@ -4,8 +4,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Eq;
-
 namespace Envoy {
 namespace Extensions {
 namespace Wasm {
