@@ -307,16 +307,18 @@ TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
                             "FilterHeadersStatus::StopIteration after sending a local reply.";
 #ifdef NDEBUG
   EXPECT_LOG_CONTAINS("error", error, {
-      response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-      response->waitForEndStream();
-        });
+    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForEndStream();
+  });
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 #else
-  EXPECT_DEATH({
-    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
-    }, error);
+  EXPECT_DEATH(
+      {
+        response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        response->waitForEndStream();
+      },
+      error);
 #endif
 }
 
