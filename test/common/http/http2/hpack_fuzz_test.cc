@@ -24,11 +24,9 @@ std::vector<nghttp2_nv> createNameValueArray(const test::fuzz::Headers& input) {
   int i = 0;
   for (const auto& header : input.headers()) {
     // TODO(asraa): Consider adding flags in fuzzed input.
-    uint8_t flags = 0;
-    std::string key = LowerCaseString(header.key()).get();
     nva[i++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.key().data())),
                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.value().data())),
-                header.key().size(), header.value().size(), flags};
+                header.key().size(), header.value().size(), /*flags = */ 0};
   }
 
   return nva;
@@ -74,7 +72,7 @@ std::vector<nghttp2_nv> decodeHeaders(nghttp2_hd_inflater* inflater,
     // Decoding should not fail and data should not be left in slice.
     ASSERT(result >= 0);
 
-    slices[0].mem_ = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(slices[0].mem_) + result);
+    slices[0].mem_ = reinterpret_cast<uint8_t*>(slices[0].mem_) + result;
     slices[0].len_ -= result;
 
     if (inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
@@ -90,20 +88,13 @@ std::vector<nghttp2_nv> decodeHeaders(nghttp2_hd_inflater* inflater,
   return decoded_headers;
 }
 
-int nvCompare(const void* a_in, const void* b_in) {
-  const nghttp2_nv* a = reinterpret_cast<const nghttp2_nv*>(a_in);
-  const nghttp2_nv* b = reinterpret_cast<const nghttp2_nv*>(b_in);
-
-  absl::string_view a_str(reinterpret_cast<char*>(a->name), a->namelen);
-  absl::string_view b_str(reinterpret_cast<char*>(b->name), b->namelen);
-  if (a_str > b_str) {
-    return 1;
+struct NvComparator {
+  inline bool operator()(const nghttp2_nv& a, const nghttp2_nv& b) {
+    absl::string_view a_str(reinterpret_cast<char*>(a.name), a.namelen);
+    absl::string_view b_str(reinterpret_cast<char*>(b.name), b.namelen);
+    return a_str.compare(b_str);
   }
-  if (a_str < b_str) {
-    return -1;
-  }
-  return 0;
-}
+};
 
 DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
   // Validate headers.
@@ -139,8 +130,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
 
   // Verify that decoded == encoded.
   ASSERT(input_nv.size() == output_nv.size());
-  std::qsort(input_nv.data(), input_nv.size(), sizeof(nghttp2_nv), nvCompare);
-  std::qsort(output_nv.data(), output_nv.size(), sizeof(nghttp2_nv), nvCompare);
+  std::sort(input_nv.begin(), input_nv.end(), NvComparator());
+  std::sort(output_nv.begin(), output_nv.end(), NvComparator());
   for (size_t i = 0; i < input_nv.size(); i++) {
     absl::string_view in_name = {reinterpret_cast<char*>(input_nv[i].name), input_nv[i].namelen};
     absl::string_view out_name = {reinterpret_cast<char*>(output_nv[i].name), output_nv[i].namelen};
