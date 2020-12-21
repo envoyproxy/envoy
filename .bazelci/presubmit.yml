@@ -10,6 +10,7 @@ tasks:
     test_flags:
       - "--config=remote-clang-libc++"
       - "--config=remote-ci"
+      - "--define=wasm=disabled"
       - "--jobs=75"
   coverage:
     name: "Coverage"
@@ -21,5 +22,16 @@ tasks:
       - "//test/integration/..."
       - "//test/exe/..."
     test_flags:
+      - "--config=coverage"
+      - "--config=clang"
+  fuzz_coverage:
+    name: "Fuzz-Coverage"
+    platform: ubuntu1804
+    shell_commands:
+      - "bazel/setup_clang.sh /usr/lib/llvm-10"
+    test_targets:
+      - "//test/server:server_fuzz_test"
+    test_flags:
+      - "--config=fuzz-coverage"
       - "--config=coverage"
       - "--config=clang"

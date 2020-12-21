@@ -4,11 +4,12 @@
 Building
 ========
 
-The Envoy build system uses Bazel. In order to ease initial building and for a quick start, we
-provide an Ubuntu 16 based docker container that has everything needed inside of it to build
-and *statically link* Envoy, see :repo:`ci/README.md`.
+The Envoy build system uses `Bazel <https://bazel.build/>`_.
 
-In order to build manually, follow the instructions at :repo:`bazel/README.md`.
+In order to ease initial building and for a quick start, we provide an Ubuntu 16 based docker container that
+has everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
+
+In order to build without using the Docker container, follow the instructions at :repo:`bazel/README.md`.
 
 .. _install_requirements:
 
@@ -28,68 +29,6 @@ for more information on performing manual builds.
 Please note that for Clang/LLVM 8 and lower, Envoy may need to be built with `--define tcmalloc=gperftools`
 as the new tcmalloc code is not guaranteed to compile with lower versions of Clang.
 
-.. _install_binaries:
-
-Pre-built binaries
-------------------
-
-We build and tag Docker images with release versions when we do official releases. These images can
-be found in the following repositories:
-
-* `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_: Release binary with
-  symbols stripped on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_: Release
-  binary with debug symbols on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_: Release
-  binary with symbols stripped on top of a **glibc** alpine base.
-* `envoyproxy/envoy-alpine-debug <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug/tags/>`_:
-  *Deprecated in favor of envoyproxy/envoy-debug.* Release binary with debug symbols on top of a
-  Release binary with debug symbols on top of a **glibc** alpine base.
-
-.. note::
-
-  In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
-
-On every master commit we additionally create a set of development Docker images. These images can
-be found in the following repositories:
-
-* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: Release binary with
-  symbols stripped on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_: Release
-  binary with debug symbols on top of an Ubuntu Bionic base.
-* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: Release
-  binary with symbols stripped on top of a **glibc** alpine base.
-* `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_:
-  *Deprecated in favor of envoyproxy/envoy-debug-dev.* Release binary with debug symbols on top of a
-  **glibc** alpine base.
-
-In the above *dev* repositories, the *latest* tag points to the last Envoy SHA in master that passed
-tests.
-
-.. note::
-
-  The Envoy project considers master to be release candidate quality at all times, and many
-  organizations track and deploy master in production. We encourage you to do the same so that
-  issues can be reported as early as possible in the development process.
-
-Packaged Envoy pre-built binaries for a variety of platforms are available via
-`GetEnvoy.io <https://www.getenvoy.io/>`_.
-
-We will consider producing additional binary types depending on community interest in helping with
-CI, packaging, etc. Please open an `issue in GetEnvoy <https://github.com/tetratelabs/getenvoy/issues>`_
-for pre-built binaries for different platforms.
-
-.. _arm_binaries:
-
-ARM64 binaries
-^^^^^^^^^^^^^^
-
-`envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_,
-`envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_,
-`envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_ and
-`envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_ are Docker
-`multi-arch <https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/>`_ images
-and should run transparently on compatible ARM64 hosts.
 
 Modifying Envoy
 ---------------
@@ -101,4 +40,4 @@ Envoy binary, and putting the binary in an Ubuntu container.
 .. toctree::
     :maxdepth: 2
 
-    install/sandboxes/local_docker_build
+    building/local_docker_build

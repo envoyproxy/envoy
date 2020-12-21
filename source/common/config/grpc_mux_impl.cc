@@ -24,6 +24,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
       first_stream_request_(true), transport_api_version_(transport_api_version),
+      dispatcher_(dispatcher),
       enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {
   Config::Utility::checkLocalInfo("ads", local_info);
@@ -32,7 +33,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
-  ApiState& api_state = api_state_[type_url];
+  ApiState& api_state = apiStateFor(type_url);
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
 
@@ -47,8 +48,13 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     }
   }
 
-  if (skip_subsequent_node_ && !first_stream_request_) {
-    request.clear_node();
+  if (skip_subsequent_node_) {
+    if (first_stream_request_) {
+      // Node may have been cleared during a previous request.
+      request.mutable_node()->MergeFrom(local_info_.node());
+    } else {
+      request.clear_node();
+    }
   }
   VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
@@ -56,8 +62,8 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   first_stream_request_ = false;
 
   // clear error_detail after the request is sent if it exists.
-  if (api_state_[type_url].request_.has_error_detail()) {
-    api_state_[type_url].request_.clear_error_detail();
+  if (apiStateFor(type_url).request_.has_error_detail()) {
+    apiStateFor(type_url).request_.clear_error_detail();
   }
 }
 
@@ -73,10 +79,10 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   // convenient side-effect that we order messages on the channel based on
   // Envoy's internal dependency ordering.
   // TODO(gsagula): move TokenBucketImpl params to a config.
-  if (!api_state_[type_url].subscribed_) {
-    api_state_[type_url].request_.set_type_url(type_url);
-    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
-    api_state_[type_url].subscribed_ = true;
+  if (!apiStateFor(type_url).subscribed_) {
+    apiStateFor(type_url).request_.set_type_url(type_url);
+    apiStateFor(type_url).request_.mutable_node()->MergeFrom(local_info_.node());
+    apiStateFor(type_url).subscribed_ = true;
     subscriptions_.emplace_back(type_url);
     if (enable_type_url_downgrade_and_upgrade_) {
       registerVersionedTypeUrl(type_url);
@@ -98,14 +104,14 @@ ScopedResume GrpcMuxImpl::pause(const std::string& type_url) {
 
 ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   for (const auto& type_url : type_urls) {
-    ApiState& api_state = api_state_[type_url];
+    ApiState& api_state = apiStateFor(type_url);
     ENVOY_LOG(debug, "Pausing discovery requests for {} (previous count {})", type_url,
               api_state.pauses_);
     ++api_state.pauses_;
   }
   return std::make_unique<Cleanup>([this, type_urls]() {
     for (const auto& type_url : type_urls) {
-      ApiState& api_state = api_state_[type_url];
+      ApiState& api_state = apiStateFor(type_url);
       ENVOY_LOG(debug, "Resuming discovery requests for {} (previous count {})", type_url,
                 api_state.pauses_);
       ASSERT(api_state.paused());
@@ -155,16 +161,17 @@ void GrpcMuxImpl::onDiscoveryResponse(
               type_url);
     return;
   }
-  if (api_state_[type_url].watches_.empty()) {
+
+  if (apiStateFor(type_url).watches_.empty()) {
     // update the nonce as we are processing this response.
-    api_state_[type_url].request_.set_response_nonce(message->nonce());
+    apiStateFor(type_url).request_.set_response_nonce(message->nonce());
     if (message->resources().empty()) {
       // No watches and no resources. This can happen when envoy unregisters from a
       // resource that's removed from the server as well. For example, a deleted cluster
       // triggers un-watching the ClusterLoadAssignment watch, and at the same time the
       // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
       // this update. no need to send a discovery request, as we don't watch for anything.
-      api_state_[type_url].request_.set_version_info(message->version_info());
+      apiStateFor(type_url).request_.set_version_info(message->version_info());
     } else {
       // No watches and we have resources - this should not happen. send a NACK (by not
       // updating the version).
@@ -189,19 +196,36 @@ void GrpcMuxImpl::onDiscoveryResponse(
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
     OpaqueResourceDecoder& resource_decoder =
-        api_state_[type_url].watches_.front()->resource_decoder_;
+        apiStateFor(type_url).watches_.front()->resource_decoder_;
+
+    const auto scoped_ttl_update = apiStateFor(type_url).ttl_.scopedTtlUpdate();
+
     for (const auto& resource : message->resources()) {
-      if (message->type_url() != resource.type_url()) {
+      // TODO(snowp): Check the underlying type when the resource is a Resource.
+      if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
+          message->type_url() != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
                         resource.type_url(), message->type_url(), message->DebugString()));
       }
-      resources.emplace_back(
-          new DecodedResourceImpl(resource_decoder, resource, message->version_info()));
-      all_resource_refs.emplace_back(*resources.back());
-      resource_ref_map.emplace(resources.back()->name(), *resources.back());
+
+      auto decoded_resource =
+          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
+
+      if (decoded_resource->ttl()) {
+        apiStateFor(type_url).ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
+      } else {
+        apiStateFor(type_url).ttl_.clear(decoded_resource->name());
+      }
+
+      if (!isHeartbeatResource(type_url, *decoded_resource)) {
+        resources.emplace_back(std::move(decoded_resource));
+        all_resource_refs.emplace_back(*resources.back());
+        resource_ref_map.emplace(resources.back()->name(), *resources.back());
+      }
     }
-    for (auto watch : api_state_[type_url].watches_) {
+
+    for (auto watch : apiStateFor(type_url).watches_) {
       // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
       // Listener) even if the message does not have resources so that update_empty stat
       // is properly incremented and state-of-the-world semantics are maintained.
@@ -216,6 +240,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
           found_resources.emplace_back(it->second);
         }
       }
+
       // onConfigUpdate should be called only on watches(clusters/routes) that have
       // updates in the message for EDS/RDS.
       if (!found_resources.empty()) {
@@ -224,19 +249,19 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.
-    api_state_[type_url].request_.set_version_info(message->version_info());
+    apiStateFor(type_url).request_.set_version_info(message->version_info());
     Memory::Utils::tryShrinkHeap();
   } catch (const EnvoyException& e) {
-    for (auto watch : api_state_[type_url].watches_) {
+    for (auto watch : apiStateFor(type_url).watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
-    ::google::rpc::Status* error_detail = api_state_[type_url].request_.mutable_error_detail();
+    ::google::rpc::Status* error_detail = apiStateFor(type_url).request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
-  api_state_[type_url].request_.set_response_nonce(message->nonce());
-  ASSERT(api_state_[type_url].paused());
+  apiStateFor(type_url).request_.set_response_nonce(message->nonce());
+  ASSERT(apiStateFor(type_url).paused());
   queueDiscoveryRequest(type_url);
 }
 
@@ -253,7 +278,7 @@ void GrpcMuxImpl::onStreamEstablished() {
 
 void GrpcMuxImpl::onEstablishmentFailure() {
   for (const auto& api_state : api_state_) {
-    for (auto watch : api_state.second.watches_) {
+    for (auto watch : api_state.second->watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
     }
@@ -265,7 +290,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
     ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
     return; // Drop this request; the reconnect will enqueue a new one.
   }
-  ApiState& api_state = api_state_[queue_item];
+  ApiState& api_state = apiStateFor(queue_item);
   if (api_state.paused()) {
     ENVOY_LOG(trace, "API {} paused during queueDiscoveryRequest(), setting pending.", queue_item);
     api_state.pending_ = true;
@@ -273,6 +298,44 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
   }
   request_queue_->push(queue_item);
   drainRequests();
+}
+
+void GrpcMuxImpl::expiryCallback(const std::string& type_url,
+                                 const std::vector<std::string>& expired) {
+  // The TtlManager triggers a callback with a list of all the expired elements, which we need
+  // to compare against the various watched resources to return the subset that each watch is
+  // subscribed to.
+
+  // We convert the incoming list into a set in order to more efficiently perform this
+  // comparison when there are a lot of watches.
+  absl::flat_hash_set<std::string> all_expired;
+  all_expired.insert(expired.begin(), expired.end());
+
+  // Note: We can blindly dereference the lookup here since the only time we call this is in a
+  // callback that is created at the same time as we insert the ApiState for this type.
+  for (auto watch : api_state_.find(type_url)->second->watches_) {
+    Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
+
+    for (const auto& resource : expired) {
+      if (all_expired.find(resource) != all_expired.end()) {
+        found_resources_for_watch.Add(std::string(resource));
+      }
+    }
+
+    watch->callbacks_.onConfigUpdate({}, found_resources_for_watch, "");
+  }
+}
+
+GrpcMuxImpl::ApiState& GrpcMuxImpl::apiStateFor(const std::string& type_url) {
+  auto itr = api_state_.find(type_url);
+  if (itr == api_state_.end()) {
+    api_state_.emplace(
+        type_url, std::make_unique<ApiState>(dispatcher_, [this, type_url](const auto& expired) {
+          expiryCallback(type_url, expired);
+        }));
+  }
+
+  return *api_state_.find(type_url)->second;
 }
 
 void GrpcMuxImpl::drainRequests() {

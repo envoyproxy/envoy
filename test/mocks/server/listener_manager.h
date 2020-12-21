@@ -16,12 +16,12 @@ public:
                bool modifiable));
   MOCK_METHOD(void, createLdsApi,
               (const envoy::config::core::v3::ConfigSource& lds_config,
-               const udpa::core::v1::ResourceLocator*));
+               const xds::core::v3::ResourceLocator*));
   MOCK_METHOD(std::vector<std::reference_wrapper<Network::ListenerConfig>>, listeners,
               (ListenerState state));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(bool, removeListener, (const std::string& listener_name));
-  MOCK_METHOD(void, startWorkers, (GuardDog & guard_dog));
+  MOCK_METHOD(void, startWorkers, (GuardDog & guard_dog, std::function<void()> callback));
   MOCK_METHOD(void, stopListeners, (StopListenersType listeners_type));
   MOCK_METHOD(void, stopWorkers, ());
   MOCK_METHOD(void, beginListenerUpdate, ());

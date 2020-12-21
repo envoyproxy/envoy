@@ -103,7 +103,7 @@ public:
               request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
   }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   GrpcWebFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -255,6 +255,13 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
                      ->statsScope()
                      .counterFromString("grpc-web.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
+}
+
+TEST_P(GrpcWebFilterTest, ExternallyProvidedEncodingHeader) {
+  Http::TestRequestHeaderMapImpl request_headers{{"grpc-accept-encoding", "foo"}, {":path", "/"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ("foo", request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
 }
 
 TEST_P(GrpcWebFilterTest, Unary) {

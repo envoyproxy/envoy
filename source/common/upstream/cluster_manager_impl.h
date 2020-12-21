@@ -17,6 +17,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
@@ -40,35 +41,36 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                            Http::Context& http_context, Grpc::Context& grpc_context,
-                            AccessLog::AccessLogManager& log_manager,
-                            Singleton::Manager& singleton_manager)
+  ProdClusterManagerFactory(
+      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
+      const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
+      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
-        api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
-        runtime_(runtime), stats_(stats), tls_(tls), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), local_info_(local_info),
-        secret_manager_(secret_manager), log_manager_(log_manager),
+        api_(api), http_context_(http_context), grpc_context_(grpc_context),
+        router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
+        dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
+        local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
-  Http::ConnectionPool::InstancePtr allocateConnPool(
-      Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-      Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
-      const Network::TransportSocketOptionsSharedPtr& transport_socket_options) override;
+  Http::ConnectionPool::InstancePtr
+  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                   ResourcePriority priority, std::vector<Http::Protocol>& protocol,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   ClusterConnectivityState& state) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
+                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      ClusterConnectivityState& state) override;
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
@@ -82,6 +84,7 @@ protected:
   Api::Api& api_;
   Http::Context& http_context_;
   Grpc::Context& grpc_context_;
+  Router::Context& router_context_;
   Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
@@ -98,6 +101,27 @@ protected:
 class ClusterManagerImpl;
 
 /**
+ * Wrapper for a cluster owned by the cluster manager. Used by both the cluster manager and the
+ * cluster manager init helper which needs to pass clusters back to the cluster manager.
+ */
+class ClusterManagerCluster {
+public:
+  virtual ~ClusterManagerCluster() = default;
+
+  // Return the underlying cluster.
+  virtual Cluster& cluster() PURE;
+
+  // Return a new load balancer factory if the cluster has one.
+  virtual LoadBalancerFactorySharedPtr loadBalancerFactory() PURE;
+
+  // Return true if a cluster has already been added or updated.
+  virtual bool addedOrUpdated() PURE;
+
+  // Set when a cluster has been added or updated. This is only called a single time for a cluster.
+  virtual void setAddedOrUpdated() PURE;
+};
+
+/**
  * This is a helper class used during cluster management initialization. Dealing with primary
  * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
  */
@@ -107,8 +131,9 @@ public:
    * @param per_cluster_init_callback supplies the callback to call when a cluster has itself
    *        initialized. The cluster manager can use this for post-init processing.
    */
-  ClusterManagerInitHelper(ClusterManager& cm,
-                           const std::function<void(Cluster&)>& per_cluster_init_callback)
+  ClusterManagerInitHelper(
+      ClusterManager& cm,
+      const std::function<void(ClusterManagerCluster&)>& per_cluster_init_callback)
       : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
@@ -135,9 +160,9 @@ public:
     AllClustersInitialized
   };
 
-  void addCluster(Cluster& cluster);
+  void addCluster(ClusterManagerCluster& cluster);
   void onStaticLoadComplete();
-  void removeCluster(Cluster& cluster);
+  void removeCluster(ClusterManagerCluster& cluster);
   void setCds(CdsApi* cds);
   void setPrimaryClustersInitializedCb(ClusterManager::PrimaryClustersReadyCallback callback);
   void setInitializedCb(ClusterManager::InitializationCompleteCallback callback);
@@ -151,15 +176,15 @@ private:
 
   void initializeSecondaryClusters();
   void maybeFinishInitialize();
-  void onClusterInit(Cluster& cluster);
+  void onClusterInit(ClusterManagerCluster& cluster);
 
   ClusterManager& cm_;
-  std::function<void(Cluster& cluster)> per_cluster_init_callback_;
+  std::function<void(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
   ClusterManager::InitializationCompleteCallback initialized_callback_;
-  std::list<Cluster*> primary_init_clusters_;
-  std::list<Cluster*> secondary_init_clusters_;
+  std::list<ClusterManagerCluster*> primary_init_clusters_;
+  std::list<ClusterManagerCluster*> secondary_init_clusters_;
   State state_{State::Loading};
   bool started_secondary_initialize_{};
 };
@@ -198,7 +223,8 @@ public:
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context);
+                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Router::Context& router_context);
 
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
@@ -214,30 +240,20 @@ public:
     init_helper_.setInitializedCb(callback);
   }
 
-  ClusterInfoMap clusters() override {
-    // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    ClusterInfoMap clusters_map;
+  ClusterInfoMaps clusters() override {
+    ClusterInfoMaps clusters_maps;
     for (auto& cluster : active_clusters_) {
-      clusters_map.emplace(cluster.first, *cluster.second->cluster_);
+      clusters_maps.active_clusters_.emplace(cluster.first, *cluster.second->cluster_);
     }
-
-    return clusters_map;
+    for (auto& cluster : warming_clusters_) {
+      clusters_maps.warming_clusters_.emplace(cluster.first, *cluster.second->cluster_);
+    }
+    return clusters_maps;
   }
+
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
-  ThreadLocalCluster* get(absl::string_view cluster) override;
+  ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
-  using ClusterManager::httpConnPoolForCluster;
-
-  Http::ConnectionPool::Instance*
-  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                         absl::optional<Http::Protocol> downstream_protocol,
-                         LoadBalancerContext* context) override;
-  Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
-                                                       ResourcePriority priority,
-                                                       LoadBalancerContext* context) override;
-  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                               LoadBalancerContext* context) override;
-  Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
     if (resume_cds_ != nullptr) {
@@ -270,12 +286,48 @@ public:
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
+  const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
+    return cluster_load_report_stat_names_;
+  }
+  const ClusterCircuitBreakersStatNames& clusterCircuitBreakersStatNames() const override {
+    return cluster_circuit_breakers_stat_names_;
+  }
+  const ClusterRequestResponseSizeStatNames& clusterRequestResponseSizeStatNames() const override {
+    return cluster_request_response_size_stat_names_;
+  }
+  const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const override {
+    return cluster_timeout_budget_stat_names_;
+  }
+
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
                                                const HostVector& hosts_removed);
-  virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
-                                            const HostVector& hosts_added,
-                                            const HostVector& hosts_removed);
+
+  // Parameters for calling postThreadLocalClusterUpdate()
+  struct ThreadLocalClusterUpdateParams {
+    struct PerPriority {
+      PerPriority(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)
+          : priority_(priority), hosts_added_(hosts_added), hosts_removed_(hosts_removed) {}
+
+      const uint32_t priority_;
+      const HostVector hosts_added_;
+      const HostVector hosts_removed_;
+      PrioritySet::UpdateHostsParams update_hosts_params_;
+      LocalityWeightsConstSharedPtr locality_weights_;
+      uint32_t overprovisioning_factor_;
+    };
+
+    ThreadLocalClusterUpdateParams() = default;
+    ThreadLocalClusterUpdateParams(uint32_t priority, const HostVector& hosts_added,
+                                   const HostVector& hosts_removed)
+        : per_priority_update_params_{{priority, hosts_added, hosts_removed}} {}
+
+    std::vector<PerPriority> per_priority_update_params_;
+  };
+
+  virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
+                                            ThreadLocalClusterUpdateParams&& params);
 
 private:
   /**
@@ -346,6 +398,13 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
+      Http::ConnectionPool::Instance*
+      httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+                   LoadBalancerContext* context) override;
+      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
+                                                 LoadBalancerContext* context) override;
+      Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
+      Http::AsyncClient& httpAsyncClient() override;
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
@@ -361,8 +420,13 @@ private:
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
 
+    struct LocalClusterParams {
+      LoadBalancerFactorySharedPtr load_balancer_factory_;
+      ClusterInfoConstSharedPtr info_;
+    };
+
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
-                                  const absl::optional<std::string>& local_cluster_name);
+                                  const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
@@ -384,6 +448,8 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     absl::flat_hash_map<std::string, ClusterEntryPtr> thread_local_clusters_;
 
+    ClusterConnectivityState cluster_manager_state_;
+
     // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
     // to prevent lifetime/ownership issues when a cluster is dynamically removed.
     absl::node_hash_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
@@ -395,7 +461,7 @@ private:
     bool destroying_{};
   };
 
-  struct ClusterData {
+  struct ClusterData : public ClusterManagerCluster {
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const std::string& version_info, bool added_via_api, ClusterSharedPtr&& cluster,
                 TimeSource& time_source)
@@ -405,12 +471,19 @@ private:
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
-    LoadBalancerFactorySharedPtr loadBalancerFactory() {
+    // ClusterManagerCluster
+    Cluster& cluster() override { return *cluster_; }
+    LoadBalancerFactorySharedPtr loadBalancerFactory() override {
       if (thread_aware_lb_ != nullptr) {
         return thread_aware_lb_->factory();
       } else {
         return nullptr;
       }
+    }
+    bool addedOrUpdated() override { return added_or_updated_; }
+    void setAddedOrUpdated() override {
+      ASSERT(!added_or_updated_);
+      added_or_updated_ = true;
     }
 
     const envoy::config::cluster::v3::Cluster cluster_config_;
@@ -421,6 +494,7 @@ private:
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     SystemTime last_updated_;
+    bool added_or_updated_{};
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle,
@@ -471,24 +545,30 @@ private:
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
   using ClusterUpdatesMap = absl::node_hash_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
-  void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdates& updates);
-  bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable,
+  void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
+  bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
-  void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                   const std::string& version_info, bool added_via_api, ClusterMap& cluster_map);
-  void onClusterInit(Cluster& cluster);
+
+  /**
+   * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
+   * nullptr if cluster_map did not contain the same cluster.
+   */
+  ClusterDataPtr loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                             const std::string& version_info, bool added_via_api,
+                             ClusterMap& cluster_map);
+  void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
-  void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntryPtr& cluster_entry,
-                     std::function<ConnectionPool::Instance*()> prefetch_pool);
+  void clusterWarmingToActive(const std::string& cluster_name);
+  static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
+                              std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
   Random::RandomGenerator& random_;
 
 protected:
@@ -514,6 +594,13 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
+  Router::Context& router_context_;
+  ClusterStatNames cluster_stat_names_;
+  ClusterLoadReportStatNames cluster_load_report_stat_names_;
+  ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
+  ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
+  ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+
   Config::SubscriptionFactoryImpl subscription_factory_;
   ClusterSet primary_clusters_;
 };

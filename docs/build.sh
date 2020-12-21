@@ -81,7 +81,7 @@ mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 ./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
-./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
+PYTHONPATH=. ./docs/generate_external_dep_rst.py "${GENERATED_RST_DIR}"/intro/arch_overview/security
 
 function generate_api_rst() {
   local proto_target
@@ -141,6 +141,13 @@ cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
 cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
+
+copy_example_configs () {
+    mkdir -p "${GENERATED_RST_DIR}/start/sandboxes/_include"
+    cp -a "${SRC_DIR}"/examples/* "${GENERATED_RST_DIR}/start/sandboxes/_include"
+}
+
+copy_example_configs
 
 rsync -rav  "${API_DIR}/diagrams" "${GENERATED_RST_DIR}/api-docs"
 

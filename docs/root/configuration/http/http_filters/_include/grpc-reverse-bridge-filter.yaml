@@ -31,7 +31,7 @@ static_resources:
               - match:
                   prefix: "/route-with-filter-disabled"
                 route:
-                  host_rewrite: localhost
+                  host_rewrite_literal: localhost
                   cluster: grpc
                   timeout: 5.00s
                 # per_filter_config disables the filter for this route
@@ -42,7 +42,7 @@ static_resources:
               - match:
                   prefix: "/route-with-filter-enabled"
                 route:
-                  host_rewrite: localhost
+                  host_rewrite_literal: localhost
                   cluster: other
                   timeout: 5.00s
           http_filters:
@@ -72,7 +72,11 @@ static_resources:
     connect_timeout: 5.00s
     type: strict_dns
     lb_policy: round_robin
-    http2_protocol_options: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
     load_assignment:
       cluster_name: grpc
       endpoints:

@@ -778,6 +778,7 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   if (!hosts_source) {
     return nullptr;
   }
+
   auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
@@ -828,8 +829,8 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector&,
                                                                 const HostsSource&) {
-  // LeastRequestLoadBalancer can not do deterministic prefetching, because
-  // any other thread might select the least-requested-host between prefetch and
+  // LeastRequestLoadBalancer can not do deterministic preconnecting, because
+  // any other thread might select the least-requested-host between preconnect and
   // host-pick, and change the rq_active checks.
   return nullptr;
 }

@@ -7,11 +7,14 @@
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
 
 namespace Envoy {
+
+using ::Envoy::Http::Http2::Http2Frame;
 
 /**
  * HTTP codec client used during integration testing.
@@ -105,7 +108,6 @@ public:
 protected:
   void useAccessLog(absl::string_view format = "");
 
-  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
@@ -213,7 +215,7 @@ protected:
   void testGrpcRetry();
 
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
-                                    const std::string& via = "");
+                                    const std::string& via = "", bool disconnect_after_100 = false);
   void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
                             bool with_encoder_filter = false,
                             bool with_multiple_1xx_headers = false);
@@ -253,4 +255,20 @@ protected:
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };
+
+// Helper class for integration tests using raw HTTP/2 frames
+class Http2RawFrameIntegrationTest : public HttpIntegrationTest {
+public:
+  Http2RawFrameIntegrationTest(Network::Address::IpVersion version)
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, version) {}
+
+protected:
+  void startHttp2Session();
+  Http2Frame readFrame();
+  void sendFrame(const Http2Frame& frame);
+  virtual void beginSession();
+
+  IntegrationTcpClientPtr tcp_client_;
+};
+
 } // namespace Envoy

@@ -228,6 +228,30 @@ namespace Http {
 
 static const char kDefaultPath[] = "/";
 
+// If http_parser encounters an IP address [address] as the host it will set the offset and
+// length to point to 'address' rather than '[address]'. Fix this by adjusting the offset
+// and length to include the brackets.
+// @param absolute_url the absolute URL. This is usually of the form // http://host/path
+//        but may be host:port for CONNECT requests
+// @param offset the offset for the first character of the host. For IPv6 hosts
+//        this will point to the first character inside the brackets and will be
+//        adjusted to point at the brackets
+// @param len the length of the host-and-port field. For IPv6 hosts this will
+//        not include the brackets and will be adjusted to do so.
+bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64_t& len) {
+  // According to https://tools.ietf.org/html/rfc3986#section-3.2.2 the only way a hostname
+  // may begin with '[' is if it's an ipv6 address.
+  if (offset == 0 || *(absolute_url.data() + offset - 1) != '[') {
+    return false;
+  }
+  // Start one character sooner and end one character later.
+  offset--;
+  len += 2;
+  // HTTP parser ensures that any [ has a closing ]
+  ASSERT(absolute_url.length() >= offset + len);
+  return true;
+}
+
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   struct http_parser_url u;
   http_parser_url_init(&u);
@@ -244,20 +268,27 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
                               u.field_data[UF_SCHEMA].len);
 
-  uint16_t authority_len = u.field_data[UF_HOST].len;
+  uint64_t authority_len = u.field_data[UF_HOST].len;
   if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
     authority_len = authority_len + u.field_data[UF_PORT].len + 1;
   }
-  host_and_port_ =
-      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+
+  uint64_t authority_beginning = u.field_data[UF_HOST].off;
+  const bool is_ipv6 = maybeAdjustForIpv6(absolute_url, authority_beginning, authority_len);
+  host_and_port_ = absl::string_view(absolute_url.data() + authority_beginning, authority_len);
+  if (is_ipv6 && !parseAuthority(host_and_port_).is_ip_address_) {
+    return false;
+  }
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
-  // must start with
-  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
-  if (path_len > 0) {
-    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
-    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
+  // must start with. Determine if there's a non-zero path, and if so determine
+  // the length of the path, query params etc.
+  uint64_t path_etc_len = absolute_url.length() - (authority_beginning + hostAndPort().length());
+  if (path_etc_len > 0) {
+    uint64_t path_beginning = authority_beginning + hostAndPort().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_etc_len);
   } else if (!is_connect) {
+    ASSERT((u.field_set & (1 << UF_PATH)) == 0);
     path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
   return true;
@@ -819,6 +850,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote reset";
   case Http::StreamResetReason::RemoteRefusedStreamReset:
     return "remote refused stream reset";
+  case Http::StreamResetReason::ConnectError:
+    return "remote error with CONNECT request";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

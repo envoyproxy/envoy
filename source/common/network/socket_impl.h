@@ -17,6 +17,12 @@ public:
     local_address_ = local_address;
   }
 
+  SocketPtr duplicate() override {
+    // Implementing the functionality here for all sockets is tricky because it leads
+    // into object slicing issues.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {

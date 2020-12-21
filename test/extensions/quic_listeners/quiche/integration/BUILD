@@ -13,9 +13,13 @@ envoy_cc_test(
     size = "medium",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    # TODO(envoyproxy/windows-dev): diagnose msvc-cl build test failure
+    # TODO(envoyproxy/windows-dev): Diagnose why opt build test under Windows GCP RBE
+    # takes 10x as long as on linux (>300s vs ~30s). Shards = 2 solves for windows, see:
+    #   https://github.com/envoyproxy/envoy/pull/13713/files#r512160087
+    # Each of these tests exceeds 20s;
+    # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
     tags = [
-        "fails_on_windows",
+        "flaky_on_windows",
         "nofips",
     ],
     deps = [

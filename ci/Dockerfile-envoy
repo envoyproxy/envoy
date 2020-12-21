@@ -28,7 +28,7 @@ RUN mkdir -p /etc/envoy
 
 ARG ENVOY_BINARY_SUFFIX=_stripped
 ADD ${TARGETPLATFORM}/build_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
-ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
+ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 
 EXPOSE 10000
 

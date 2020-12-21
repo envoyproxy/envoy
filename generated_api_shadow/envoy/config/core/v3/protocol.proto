@@ -77,6 +77,10 @@ message HttpProtocolOptions {
   // .. warning::
   //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
   //   FIN packets, etc.
+  //
+  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
+  // is configured, this timeout is scaled for downstream connections according to the value for
+  // :ref:`HTTP_DOWNSTREAM_CONNECTION_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE>`.
   google.protobuf.Duration idle_timeout = 1;
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
@@ -270,7 +274,8 @@ message Http2ProtocolOptions {
   // be written into the socket). Exceeding this limit triggers flood mitigation and connection is
   // terminated. The ``http2.outbound_flood`` stat tracks the number of terminated connections due
   // to flood mitigation. The default limit is 10000.
-  // [#comment:TODO: implement same limits for upstream outbound frames as well.]
+  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
+  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_outbound_frames = 7 [(validate.rules).uint32 = {gte: 1}];
 
   // Limit the number of pending outbound downstream frames of types PING, SETTINGS and RST_STREAM,
@@ -278,7 +283,8 @@ message Http2ProtocolOptions {
   // this limit triggers flood mitigation and connection is terminated. The
   // ``http2.outbound_control_flood`` stat tracks the number of terminated connections due to flood
   // mitigation. The default limit is 1000.
-  // [#comment:TODO: implement same limits for upstream outbound frames as well.]
+  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
+  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_outbound_control_frames = 8 [(validate.rules).uint32 = {gte: 1}];
 
   // Limit the number of consecutive inbound frames of types HEADERS, CONTINUATION and DATA with an
@@ -287,7 +293,8 @@ message Http2ProtocolOptions {
   // stat tracks the number of connections terminated due to flood mitigation.
   // Setting this to 0 will terminate connection upon receiving first frame with an empty payload
   // and no end stream flag. The default limit is 1.
-  // [#comment:TODO: implement same limits for upstream inbound frames as well.]
+  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
+  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_consecutive_inbound_frames_with_empty_payload = 9;
 
   // Limit the number of inbound PRIORITY frames allowed per each opened stream. If the number
@@ -298,7 +305,8 @@ message Http2ProtocolOptions {
   //
   // the connection is terminated. The ``http2.inbound_priority_frames_flood`` stat tracks
   // the number of connections terminated due to flood mitigation. The default limit is 100.
-  // [#comment:TODO: implement same limits for upstream inbound frames as well.]
+  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
+  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_inbound_priority_frames_per_stream = 10;
 
   // Limit the number of inbound WINDOW_UPDATE frames allowed per DATA frame sent. If the number
@@ -312,7 +320,8 @@ message Http2ProtocolOptions {
   // the number of connections terminated due to flood mitigation. The default limit is 10.
   // Setting this to 1 should be enough to support HTTP/2 implementations with basic flow control,
   // but more complex implementations that try to estimate available bandwidth require at least 2.
-  // [#comment:TODO: implement same limits for upstream inbound frames as well.]
+  // NOTE: flood and abuse mitigation for upstream connections is presently enabled by the
+  // `envoy.reloadable_features.upstream_http2_flood_checks` flag.
   google.protobuf.UInt32Value max_inbound_window_update_frames_per_data_frame_sent = 11
       [(validate.rules).uint32 = {gte: 1}];
 

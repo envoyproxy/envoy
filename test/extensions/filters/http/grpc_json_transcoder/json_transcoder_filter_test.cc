@@ -860,6 +860,51 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   EXPECT_THAT(request, ProtoEq(expected_request));
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithNestedHttpBody) {
+  const std::string path = "/echoNestedBody?nested2.body.data=aGkh";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", path}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoNestedBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  const std::string path2 = "/echoNestedBody?nested2.body.data=oops%7b";
+  request_headers = {{":method", "POST"}, {":path", path2}, {"content-type", "text/plain"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(request_headers, true));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithNestedHttpBodys) {
+  const std::string path = "/echoNestedBody?nested1.body.data=oops%7b";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", path}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("POST", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoNestedBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryGetWithHttpBody) {
+  const std::string path = "/echoRawBody?data=oops%7b";
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", path}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ(path, request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("GET", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/EchoRawBody", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
@@ -1269,6 +1314,78 @@ INSTANTIATE_TEST_SUITE_P(
      "print_options":{"preserve_proto_field_names": true}
     })",
             R"({"id":"101","gender":"MALE","last_name":"Shakespeare"})"}));
+
+struct GrpcJsonTranscoderFilterUnescapeTestParam {
+  std::string config_json_;
+  std::string expected_arg_;
+};
+
+class GrpcJsonTranscoderFilterUnescapeTest
+    : public testing::TestWithParam<GrpcJsonTranscoderFilterUnescapeTestParam>,
+      public GrpcJsonTranscoderFilterTestBase {
+protected:
+  GrpcJsonTranscoderFilterUnescapeTest() {
+    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
+    TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
+    config_ = std::make_unique<JsonTranscoderConfig>(proto_config, *api_);
+    filter_ = std::make_unique<JsonTranscoderFilter>(*config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  std::unique_ptr<JsonTranscoderConfig> config_;
+  std::unique_ptr<JsonTranscoderFilter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+};
+
+TEST_P(GrpcJsonTranscoderFilterUnescapeTest, UnescapeSpec) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "text/plain"}, {":method", "POST"}, {":path", "/wildcard/%2f%23/%20%2523"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_data, true));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  decoder.decode(request_data, frames);
+
+  EXPECT_EQ(1, frames.size());
+
+  bookstore::EchoBodyRequest expected_request;
+  expected_request.set_arg(GetParam().expected_arg_);
+
+  bookstore::EchoBodyRequest request;
+  request.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
+}
+
+INSTANTIATE_TEST_SUITE_P(GrpcJsonTranscoderFilterUnescapeOptions,
+                         GrpcJsonTranscoderFilterUnescapeTest,
+                         ::testing::Values(
+                             GrpcJsonTranscoderFilterUnescapeTestParam{
+                                 R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"]
+    })",
+                                 "%2f%23/ %23"},
+                             GrpcJsonTranscoderFilterUnescapeTestParam{
+                                 R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "url_unescape_spec": "ALL_CHARACTERS_EXCEPT_SLASH"
+    })",
+                                 "%2f#/ %23"},
+                             GrpcJsonTranscoderFilterUnescapeTestParam{
+                                 R"({
+     "proto_descriptor": "{{ test_rundir }}/test/proto/bookstore.descriptor",
+     "services": ["bookstore.Bookstore"],
+     "url_unescape_spec": "ALL_CHARACTERS"
+    })",
+                                 "/#/ %23"}));
 
 } // namespace
 } // namespace GrpcJsonTranscoder

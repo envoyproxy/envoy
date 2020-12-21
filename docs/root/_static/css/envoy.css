@@ -23,3 +23,8 @@ table.docutils div.line-block {
   margin-left: 4px;
   padding: 4px;
 }
+
+/* make inline sidebars flow down the right of page */
+.rst-content .sidebar {
+  clear: right;
+}

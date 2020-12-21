@@ -85,9 +85,11 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
 
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
-  // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
-                             Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
+  if (headers.get(Http::CustomHeaders::get().GrpcAcceptEncoding).empty()) {
+    // Adds grpc-accept-encoding:identity
+    headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
+                               Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -201,7 +203,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
   }
 
   // Trailers are expected to come all in once, and will be encoded into one single trailers frame.
-  // Trailers in the trailers frame are separated by CRLFs.
+  // Trailers in the trailers frame are separated by `CRLFs`.
   Buffer::OwnedImpl temp;
   trailers.iterate([&temp](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     temp.add(header.key().getStringView().data(), header.key().size());

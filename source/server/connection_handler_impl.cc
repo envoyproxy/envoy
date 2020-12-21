@@ -1,5 +1,7 @@
 #include "server/connection_handler_impl.h"
 
+#include <chrono>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/exception.h"
@@ -65,6 +67,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   }
   if (disable_listeners_) {
     details.listener_->pauseListening();
+  }
+  if (auto* listener = details.listener_->listener(); listener != nullptr) {
+    listener->setRejectFraction(listener_reject_fraction_);
   }
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
@@ -145,6 +150,13 @@ void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& listener : listeners_) {
     listener.second.listener_->resumeListening();
+  }
+}
+
+void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
+  listener_reject_fraction_ = reject_fraction;
+  for (auto& listener : listeners_) {
+    listener.second.listener_->listener()->setRejectFraction(reject_fraction);
   }
 }
 
@@ -391,6 +403,17 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocke
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
 
+void ConnectionHandlerImpl::ActiveTcpListener::onReject(RejectCause cause) {
+  switch (cause) {
+  case RejectCause::GlobalCxLimit:
+    stats_.downstream_global_cx_overflow_.inc();
+    break;
+  case RejectCause::OverloadAction:
+    stats_.downstream_cx_overload_reject_.inc();
+    break;
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections,
     bool rebalanced) {
@@ -423,8 +446,25 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   }
 }
 
+void ConnectionHandlerImpl::ActiveTcpListener::pauseListening() {
+  if (listener_ != nullptr) {
+    listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
+  if (listener_ != nullptr) {
+    listener_->enable();
+  }
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  // Refresh addresses in case they are modified by listener filters, such as proxy protocol or
+  // original_dst.
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
@@ -442,6 +482,10 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
+  if (const auto timeout = filter_chain->transportSocketConnectTimeout();
+      timeout != std::chrono::milliseconds::zero()) {
+    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
+  }
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher_.timeSource(), std::move(stream_info)));

@@ -31,7 +31,7 @@ echo "Generating compilation database..."
 # Do not run clang-tidy against win32 impl
 # TODO(scw00): We should run clang-tidy against win32 impl once we have clang-cl support for Windows
 function exclude_win32_impl() {
-  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32
+  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32 | grep -v source/common/event/win32
 }
 
 # Do not run clang-tidy against macOS impl
@@ -81,8 +81,13 @@ function exclude_wasm_test_data() {
   grep -v wasm/test_data
 }
 
+# Exclude files which are part of the Wasm examples
+function exclude_wasm_examples() {
+  grep -v examples/wasm
+}
+
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data
+  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {
@@ -108,9 +113,7 @@ elif [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
   run_clang_tidy
 else
   if [[ -z "${DIFF_REF}" ]]; then
-    if [[ "${BUILD_REASON}" == "PullRequest" ]]; then
-      DIFF_REF="remotes/origin/${SYSTEM_PULLREQUEST_TARGETBRANCH}"
-    elif [[ "${BUILD_REASON}" == *CI ]]; then
+    if [[ "${BUILD_REASON}" == *CI ]]; then
       DIFF_REF="HEAD^"
     else
       DIFF_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)

@@ -83,10 +83,15 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
-    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed. These are typically
-    available via a package manager, but may not be available in default repositories depending on
-    OS version. To build against `libc++` build with the `--config=libc++` instead of the
-    `--config=clang` flag.
+    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
+    
+    #### Config Flag Choices
+    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:   
+    
+    - `--config=libc++` means using `clang` + `libc++`
+    - `--config=clang` means using `clang` + `libstdc++`
+    - no config flag means using `gcc` + `libstdc++`
+  
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
@@ -116,21 +121,33 @@ for how to update or override dependencies.
 
     ### Windows
 
+    > Note: These instructions apply to **Windows 10 SDK, version 1803 (10.0.17134.12)**. Earlier versions will not compile because the `afunix.h` header is not available. **The recommended Windows version is equal or later than Windows 10 SDK, version 1903 (10.0.18362.1)**
+
     Install bazelisk in the PATH using the `bazel.exe` executable name as described above in the first section.
 
     When building Envoy, Bazel creates very long path names. One way to work around these excessive path
-    lengths is to change the output base directory for bazel to a very short root path. The CI pipeline
-    for Windows uses `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
+    lengths is to change the output base directory for bazel to a very short root path. An example Bazel configuration
+    to help with this is to use `C:\_eb` as the bazel base path. This and other preferences should be set up by placing
     the following bazelrc configuration line in a system `%ProgramData%\bazel.bazelrc` file or the individual
     user's `%USERPROFILE%\.bazelrc` file (rather than including it on every bazel command line):
+
     ```
     startup --output_base=C:/_eb
     ```
+
+    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
+    is set.
 
     Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
     using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
     For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
+
+    > The paths in this document are given as
+    examples, make sure to verify you are using the correct paths for your environment. Also note
+    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
+    to do the equivalent if using a different shell.
 
     [python3](https://www.python.org/downloads/): Specifically, the Windows-native flavor distributed
     by python.org. The POSIX flavor available via MSYS2, the Windows Store flavor and other distributions
@@ -175,6 +192,7 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
+    set MSYS2_PATH_TYPE=inherit
     ```
 
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
@@ -201,17 +219,16 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
-    Lastly, persist environment variable changes. NOTE: The paths in this document are given as
-    examples, make sure to verify you are using the correct paths for your environment. Also note
-    that these examples assume using a `cmd.exe` shell to set environment variables etc., be sure
-    to do the equivalent if using a different shell.
+    Lastly, persist environment variable changes.
     ```
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
     setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
     setx BAZEL_VC "%BAZEL_VC%"
     setx TMPDIR "%TMPDIR%"
+    setx MSYS2_PATH_TYPE "%MSYS2_PATH_TYPE%"
     ```
+    > On Windows the supported/recommended shell to interact with bazel is MSYS2. This means that all the bazel commands (i.e. build, test) should be executed from MSYS2.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -608,7 +625,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
-  tcmalloc with `--define tcmalloc=gperftools` which is the default for non-x86 builds.
+  tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
 
 
@@ -641,17 +658,30 @@ The following optional features can be enabled on the Bazel build command-line:
 * Envoy can be linked to [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of
   [`zlib`](https://zlib.net) with `--define zlib=ng`.
 
-## Disabling extensions
+## Enabling and disabling extensions
 
 Envoy uses a modular build which allows extensions to be removed if they are not needed or desired.
 Extensions that can be removed are contained in
-[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl). Use the following
-procedure to customize the extensions for your build:
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+
+The extensions disabled by default can be enabled by adding the following parameter to Bazel, for example to enable
+`envoy.filters.http.kill_request` extension, add `--//source/extensions/filters/http/kill_request:enabled`.
+The extensions enabled by default can be disabled by adding the following parameter to Bazel, for example to disable
+`envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
+Note not all extensions can be disabled.
+
+If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
+`--@envoy//source/extensions/filters/http/kill_request:enabled`.
+
+You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
+
+## Customize extension build config
+
+You can also use the following procedure to customize the extensions for your build:
 
 * The Envoy build assumes that a Bazel repository named `@envoy_build_config` exists which
   contains the file `@envoy_build_config//:extensions_build_config.bzl`. In the default build,
   a synthetic repository is created containing [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
-  Thus, the default build has all extensions.
 * Start by creating a new Bazel workspace somewhere in the filesystem that your build can access.
   This workspace should contain:
   * Empty WORKSPACE file.
@@ -666,7 +696,7 @@ To have your local build use your overridden configuration repository there are 
 2. Use the following snippet in your WORKSPACE before you load the Envoy repository. E.g.,
 
 ```
-workspace(name = "envoy")
+workspace(name = "envoy_filter_example")
 
 local_repository(
     name = "envoy_build_config",
@@ -709,12 +739,17 @@ https://github.com/bazelbuild/bazel/issues/2805.
 
 # Coverage builds
 
-To generate coverage results, make sure you are using a clang toolchain and have `llvm-cov` and
+To generate coverage results, make sure you are using a Clang toolchain and have `llvm-cov` and
 `llvm-profdata` in your `PATH`. Then run:
 
 ```
 test/run_envoy_bazel_coverage.sh
 ```
+
+**Note** that it is important to ensure that the versions of `clang`, `llvm-cov` and `llvm-profdata`
+are consistent and that they match the most recent Clang/LLVM toolchain version in use by Envoy (see
+the [build container
+toolchain](https://github.com/envoyproxy/envoy-build-tools/blob/master/build_container/build_container_ubuntu.sh) for reference).
 
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.

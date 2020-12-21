@@ -11,10 +11,10 @@ envoy_package()
 
 wasm_rust_binary(
     name = "logging_rust.wasm",
-    srcs = ["logging_rust/src/lib.rs"],
+    srcs = ["logging_rust.rs"],
     deps = [
-        "//bazel/external/cargo:log",
-        "//bazel/external/cargo:proxy_wasm",
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
     ],
 )
 
@@ -72,53 +72,34 @@ envoy_cc_library(
 envoy_wasm_cc_binary(
     name = "asm2wasm_cpp.wasm",
     srcs = ["asm2wasm_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )
 
 envoy_wasm_cc_binary(
     name = "bad_signature_cpp.wasm",
     srcs = ["bad_signature_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )
 
 envoy_wasm_cc_binary(
     name = "emscripten_cpp.wasm",
     srcs = ["emscripten_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )
 
 envoy_wasm_cc_binary(
     name = "logging_cpp.wasm",
     srcs = ["logging_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )
 
 envoy_wasm_cc_binary(
     name = "missing_cpp.wasm",
     srcs = ["missing_cpp.cc"],
     linkopts = [
-        "--js-library external/proxy_wasm_cpp_sdk/proxy_wasm_intrinsics.js",
         "-s ERROR_ON_UNDEFINED_SYMBOLS=0",
-    ],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
     ],
 )
 
 envoy_wasm_cc_binary(
     name = "segv_cpp.wasm",
     srcs = ["segv_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )
 
 envoy_wasm_cc_binary(
@@ -132,15 +113,9 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "start_cpp.wasm",
     srcs = ["start_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )
 
 envoy_wasm_cc_binary(
     name = "stats_cpp.wasm",
     srcs = ["stats_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
-    ],
 )

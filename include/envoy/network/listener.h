@@ -94,8 +94,7 @@ public:
   /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
-   *         configuration is set, false otherwise. Note that this flag is deprecated and will be
-   *         removed from the v2 API.
+   *         configuration is set, false otherwise.
    */
   virtual bool handOffRestoredDestinationConnections() const PURE;
 
@@ -197,10 +196,14 @@ public:
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 
+  enum class RejectCause {
+    GlobalCxLimit,
+    OverloadAction,
+  };
   /**
    * Called when a new connection is rejected.
    */
-  virtual void onReject() PURE;
+  virtual void onReject(RejectCause cause) PURE;
 };
 
 /**
@@ -324,6 +327,12 @@ public:
    * Enable accepting new connections.
    */
   virtual void enable() PURE;
+
+  /**
+   * Set the fraction of incoming connections that will be closed immediately
+   * after being opened.
+   */
+  virtual void setRejectFraction(float reject_fraction) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;
@@ -368,9 +377,6 @@ public:
 
   /**
    * Make this listener readable at the beginning of the next event loop.
-   *
-   * @note: it may become readable during the current loop if feature
-   * ``envoy.reloadable_features.activate_fds_next_event_loop`` is disabled.
    */
   virtual void activateRead() PURE;
 };

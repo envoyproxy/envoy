@@ -34,6 +34,10 @@ static_resources:
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
       typed_config: {}
+    # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
+    # - name: envoy.filters.listener.proxy_protocol
+    #   typed_config:
+    #     "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
     per_connection_buffer_limit_bytes: 32768 # 32 KiB
     filter_chains:
     - filter_chain_match:
@@ -46,8 +50,6 @@ static_resources:
             tls_certificates:
             - certificate_chain: { filename: "certs/servercert.pem" }
               private_key: { filename: "certs/serverkey.pem" }
-      # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
-      # use_proxy_proto: true
       filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
@@ -85,9 +87,13 @@ static_resources:
                 socket_address:
                   address: 127.0.0.1
                   port_value: 8080
-    http2_protocol_options:
-      initial_stream_window_size: 65536 # 64 KiB
-      initial_connection_window_size: 1048576 # 1 MiB
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            initial_stream_window_size: 65536 # 64 KiB
+            initial_connection_window_size: 1048576 # 1 MiB
 
 layered_runtime:
   layers:

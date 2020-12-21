@@ -12,7 +12,7 @@ DEFINE_PROTO_FUZZER(const test::server::config_validation::XdsTestCase& input) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
-  XdsFuzzTest test(input, envoy::config::core::v3::ApiVersion::V2);
+  XdsFuzzTest test(input, envoy::config::core::v3::ApiVersion::V3);
   test.replay();
 }
 

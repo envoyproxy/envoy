@@ -9,6 +9,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
@@ -36,13 +37,14 @@ public:
   // Dispatcher
   const std::string& name() override { return name_; }
   TimeSource& timeSource() override { return time_system_; }
-  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                Network::TransportSocketPtr&& transport_socket,
-                                                StreamInfo::StreamInfo&) override {
+  Network::ServerConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo&) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();
-    return Network::ConnectionPtr{createServerConnection_()};
+    return Network::ServerConnectionPtr{createServerConnection_()};
   }
 
   Network::ClientConnectionPtr
@@ -95,14 +97,16 @@ public:
     }
   }
 
-  SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override {
+  SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
     return SignalEventPtr{listenForSignal_(signal_num, cb)};
   }
 
   // Event::Dispatcher
+  MOCK_METHOD(void, registerWatchdog,
+              (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
-  MOCK_METHOD(Network::Connection*, createServerConnection_, ());
+  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, ());
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
               (Network::Address::InstanceConstSharedPtr address,
                Network::Address::InstanceConstSharedPtr source_address,
@@ -123,7 +127,7 @@ public:
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
-  MOCK_METHOD(SignalEvent*, listenForSignal_, (int signal_num, SignalCb cb));
+  MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
   MOCK_METHOD(void, post, (std::function<void()> callback));
   MOCK_METHOD(void, run, (RunType type));
   MOCK_METHOD(const ScopeTrackedObject*, setTrackedObject, (const ScopeTrackedObject* object));
@@ -135,7 +139,7 @@ public:
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
-  MockBufferFactory buffer_factory_;
+  testing::NiceMock<MockBufferFactory> buffer_factory_;
 
 private:
   const std::string name_;
@@ -173,6 +177,15 @@ public:
 
   // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
   bool* timer_destroyed_{};
+};
+
+class MockScaledRangeTimerManager : public ScaledRangeTimerManager {
+public:
+  TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
+    return TimerPtr{createTimer_(minimum, std::move(callback))};
+  }
+  MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
+  MOCK_METHOD(void, setScaleFactor, (double), (override));
 };
 
 class MockSchedulableCallback : public SchedulableCallback {
@@ -214,6 +227,8 @@ public:
 
   MOCK_METHOD(void, activate, (uint32_t events));
   MOCK_METHOD(void, setEnabled, (uint32_t events));
+  MOCK_METHOD(void, registerEventIfEmulatedEdge, (uint32_t event));
+  MOCK_METHOD(void, unregisterEventIfEmulatedEdge, (uint32_t event));
 };
 
 } // namespace Event

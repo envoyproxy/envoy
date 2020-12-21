@@ -6,17 +6,10 @@
 #include "extensions/common/wasm/context.h"
 #include "extensions/common/wasm/ext/envoy_null_vm_wasm_api.h"
 #include "extensions/common/wasm/wasm_extension.h"
+#include "extensions/common/wasm/wasm_runtime_factory.h"
 #include "extensions/common/wasm/well_known_names.h"
 
-#include "include/proxy-wasm/null.h"
 #include "include/proxy-wasm/null_plugin.h"
-
-#if defined(ENVOY_WASM_V8)
-#include "include/proxy-wasm/v8.h"
-#endif
-#if defined(ENVOY_WASM_WAVM)
-#include "include/proxy-wasm/wavm.h"
-#endif
 
 using ContextBase = proxy_wasm::ContextBase;
 using Word = proxy_wasm::Word;
@@ -26,7 +19,25 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-void EnvoyWasmVmIntegration::error(absl::string_view message) { ENVOY_LOG(trace, message); }
+proxy_wasm::LogLevel EnvoyWasmVmIntegration::getLogLevel() {
+  switch (ENVOY_LOGGER().level()) {
+  case spdlog::level::trace:
+    return proxy_wasm::LogLevel::trace;
+  case spdlog::level::debug:
+    return proxy_wasm::LogLevel::debug;
+  case spdlog::level::info:
+    return proxy_wasm::LogLevel::info;
+  case spdlog::level::warn:
+    return proxy_wasm::LogLevel::warn;
+  case spdlog::level::err:
+    return proxy_wasm::LogLevel::error;
+  default:
+    return proxy_wasm::LogLevel::critical;
+  }
+}
+
+void EnvoyWasmVmIntegration::error(absl::string_view message) { ENVOY_LOG(error, message); }
+void EnvoyWasmVmIntegration::trace(absl::string_view message) { ENVOY_LOG(trace, message); }
 
 bool EnvoyWasmVmIntegration::getNullVmFunction(absl::string_view function_name, bool returns_word,
                                                int number_of_arguments,
@@ -62,34 +73,25 @@ bool EnvoyWasmVmIntegration::getNullVmFunction(absl::string_view function_name, 
   return false;
 }
 
-WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& scope) {
+WasmVmPtr createWasmVm(absl::string_view runtime) {
   if (runtime.empty()) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
                         "Failed to create Wasm VM with unspecified runtime");
     return nullptr;
-  } else if (runtime == WasmRuntimeNames::get().Null) {
-    auto wasm = proxy_wasm::createNullVm();
-    wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "null");
-    return wasm;
-#if defined(ENVOY_WASM_V8)
-  } else if (runtime == WasmRuntimeNames::get().V8) {
-    auto wasm = proxy_wasm::createV8Vm();
-    wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "v8");
-    return wasm;
-#endif
-#if defined(ENVOY_WASM_WAVM)
-  } else if (runtime == WasmRuntimeNames::get().Wavm) {
-    auto wasm = proxy_wasm::createWavmVm();
-    wasm->integration() = getWasmExtension()->createEnvoyWasmVmIntegration(scope, runtime, "wavm");
-    return wasm;
-#endif
-  } else {
+  }
+
+  auto runtime_factory = Registry::FactoryRegistry<WasmRuntimeFactory>::getFactory(runtime);
+  if (runtime_factory == nullptr) {
     ENVOY_LOG_TO_LOGGER(
         Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
         "Failed to create Wasm VM using {} runtime. Envoy was compiled without support for it",
         runtime);
     return nullptr;
   }
+
+  auto wasm = runtime_factory->createWasmVm();
+  wasm->integration() = std::make_unique<EnvoyWasmVmIntegration>();
+  return wasm;
 }
 
 } // namespace Wasm

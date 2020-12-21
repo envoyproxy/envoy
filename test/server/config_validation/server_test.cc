@@ -134,7 +134,7 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
 // as-is. (Note, /dev/stdout as an access log file is invalid on Windows, no equivalent /dev/
 // exists.)
 
-auto testing_values = ::testing::Values("front-proxy_front-envoy.yaml", "google_com_proxy.v2.yaml",
+auto testing_values = ::testing::Values("front-proxy_front-envoy.yaml", "envoyproxy_io_proxy.yaml",
 #ifndef WIN32
                                         "grpc-bridge_server_envoy-proxy.yaml",
 #endif

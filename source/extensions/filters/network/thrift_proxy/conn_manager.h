@@ -39,6 +39,7 @@ public:
   virtual TransportPtr createTransport() PURE;
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
+  virtual bool payloadPassthrough() const PURE;
 };
 
 /**
@@ -76,6 +77,7 @@ public:
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
+  bool passthroughEnabled() const override;
 
 private:
   struct ActiveRpc;
@@ -102,6 +104,7 @@ private:
 
     // DecoderCallbacks
     DecoderEventHandler& newDecoderEventHandler() override { return *this; }
+    bool passthroughEnabled() const override;
 
     ActiveRpc& parent_;
     DecoderPtr decoder_;
@@ -180,6 +183,7 @@ private:
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
+    FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus messageEnd() override;
     FilterStatus structBegin(absl::string_view name) override;
@@ -225,6 +229,7 @@ private:
       LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
 
+    bool passthroughSupported() const;
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
     void finalizeRequest();
 

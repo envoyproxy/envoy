@@ -9,15 +9,17 @@ envoy_package()
 
 filegroup(
     name = "configs",
-    srcs = glob(
+    srcs = [
+        "//examples/wasm-cc:configs",
+    ] + glob(
         [
             "**/*.yaml",
             "**/*.lua",
         ],
         exclude = [
             "cache/responses.yaml",
+            "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
-            "wasm/envoy.yaml",
             "**/*docker-compose*.yaml",
         ],
     ),

@@ -75,17 +75,6 @@ Sets the label `waiting:any` on a PR. When a new commit is pushed or any comment
 
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/15)
 
-### [CircleCI Retest](https://github.com/repokitteh/modules/blob/master/circleci.star)
-Restart failed CircleCI tests.
-
-Example:
-```
-/retest-circle
-```
-Restarts all failed CircleCI tests, as reported in the commit statuses.
-
-[Demo PR](https://github.com/envoyproxy/envoy/pull/12613#issuecomment-676141200)
-
 ### [Azure Pipelines Retest](https://github.com/envoyproxy/envoy/blob/master/ci/repokitteh/modules/azure_pipelines.star)
 Restart failed Azure pipelines.
 

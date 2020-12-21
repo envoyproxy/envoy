@@ -73,6 +73,7 @@ envoy_cc_library(
         "//source/common/config:api_type_oracle_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf:visitor_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

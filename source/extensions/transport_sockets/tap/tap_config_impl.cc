@@ -19,6 +19,9 @@ PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
       connection_(connection), statuses_(config_->createMatchStatusVector()) {
   config_->rootMatcher().onNewStream(statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
+    // TODO(mattklein123): For IP client connections, local address will not be populated until
+    // connection. We should re-emit connection information after connection so the streaming
+    // trace gets the local address.
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     fillConnectionInfo(*trace->mutable_socket_streamed_trace_segment()->mutable_connection());
     sink_handle_->submitTrace(std::move(trace));
@@ -26,8 +29,11 @@ PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
 }
 
 void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v3::Connection& connection) {
-  Network::Utility::addressToProtobufAddress(*connection_.localAddress(),
-                                             *connection.mutable_local_address());
+  if (connection_.localAddress() != nullptr) {
+    // Local address might not be populated before a client connection is connected.
+    Network::Utility::addressToProtobufAddress(*connection_.localAddress(),
+                                               *connection.mutable_local_address());
+  }
   Network::Utility::addressToProtobufAddress(*connection_.remoteAddress(),
                                              *connection.mutable_remote_address());
 }

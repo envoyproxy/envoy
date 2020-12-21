@@ -4,7 +4,6 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
-load(":crates.bzl", "raze_fetch_remote_crates")
 
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
@@ -13,7 +12,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
-    "envoy.watchdog.abort_action",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -99,7 +97,6 @@ def _go_deps(skip_targets):
 
 def _rust_deps():
     external_http_archive("io_bazel_rules_rust")
-    raze_fetch_remote_crates()
 
 def envoy_dependencies(skip_targets = []):
     # Setup Envoy developer tools.
@@ -164,6 +161,7 @@ def envoy_dependencies(skip_targets = []):
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emscripten_toolchain()
+    external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
     external_http_archive("com_github_google_flatbuffers")
@@ -183,6 +181,8 @@ def envoy_dependencies(skip_targets = []):
 
     _org_llvm_llvm()
     _com_github_wavm_wavm()
+    _com_github_wasmtime()
+    _com_github_wasm_c_api()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -346,36 +346,17 @@ def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
 def _com_google_cel_cpp():
     external_http_archive("com_google_cel_cpp")
     external_http_archive("rules_antlr")
-    external_http_archive(
-        name = "antlr4_runtimes",
-        build_file_content = """
-package(default_visibility = ["//visibility:public"])
-cc_library(
-    name = "cpp",
-    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
-    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
-    includes = ["runtime/Cpp/runtime/src"],
-)
-""",
-        patch_args = ["-p1"],
-        # Patches ASAN violation of initialization fiasco
-        patches = ["@envoy//bazel:antlr.patch"],
-    )
 
     # Parser dependencies
     # TODO: upgrade this when cel is upgraded to use the latest version
-    external_http_archive(
-        name = "rules_antlr",
-        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
-        strip_prefix = "rules_antlr-3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
-        urls = ["https://github.com/marcohu/rules_antlr/archive/3cc2f9502a54ceb7b79b37383316b23c4da66f9a.tar.gz"],
-    )
-
+    external_http_archive(name = "rules_antlr")
     external_http_archive(
         name = "antlr4_runtimes",
         build_file_content = """
@@ -387,12 +368,9 @@ cc_library(
     includes = ["runtime/Cpp/runtime/src"],
 )
 """,
-        sha256 = "46f5e1af5f4bd28ade55cb632f9a069656b31fc8c2408f9aa045f9b5f5caad64",
         patch_args = ["-p1"],
         # Patches ASAN violation of initialization fiasco
         patches = ["@envoy//bazel:antlr.patch"],
-        strip_prefix = "antlr4-4.7.2",
-        urls = ["https://github.com/antlr/antlr4/archive/4.7.2.tar.gz"],
     )
 
 def _com_github_nghttp2_nghttp2():
@@ -797,7 +775,7 @@ def _emscripten_toolchain():
             ".emscripten_sanity",
         ]),
         patch_cmds = [
-            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 1.39.6-upstream && ./emsdk activate --embedded 1.39.6-upstream || true",
+            "[[ \"$(uname -m)\" == \"x86_64\" ]] && ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7 || true",
         ],
     )
 
@@ -877,6 +855,18 @@ def _com_github_wavm_wavm():
     native.bind(
         name = "wavm",
         actual = "@envoy//bazel/foreign_cc:wavm",
+    )
+
+def _com_github_wasmtime():
+    external_http_archive(
+        name = "com_github_wasmtime",
+        build_file = "@envoy//bazel/external:wasmtime.BUILD",
+    )
+
+def _com_github_wasm_c_api():
+    external_http_archive(
+        name = "com_github_wasm_c_api",
+        build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
     )
 
 def _kafka_deps():

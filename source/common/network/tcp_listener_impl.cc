@@ -62,7 +62,11 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     if (rejectCxOverGlobalLimit()) {
       // The global connection limit has been reached.
       io_handle->close();
-      cb_.onReject();
+      cb_.onReject(TcpListenerCallbacks::RejectCause::GlobalCxLimit);
+      continue;
+    } else if (random_.bernoulli(reject_fraction_)) {
+      io_handle->close();
+      cb_.onReject(TcpListenerCallbacks::RejectCause::OverloadAction);
       continue;
     }
 
@@ -95,7 +99,7 @@ void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socke
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
   // loss of the trigger due to transient accept errors.
-  file_event_ = socket.ioHandle().createFileEvent(
+  socket.ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
@@ -106,17 +110,24 @@ void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socke
   }
 }
 
-TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                                 TcpListenerCallbacks& cb, bool bind_to_port, uint32_t backlog_size)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size) {
+TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
+                                 SocketSharedPtr socket, TcpListenerCallbacks& cb,
+                                 bool bind_to_port, uint32_t backlog_size)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size),
+      random_(random), reject_fraction_(0.0) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
   }
 }
 
-void TcpListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::Read); }
+void TcpListenerImpl::enable() { socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read); }
 
-void TcpListenerImpl::disable() { file_event_->setEnabled(0); }
+void TcpListenerImpl::disable() { socket_->ioHandle().enableFileEvents(0); }
+
+void TcpListenerImpl::setRejectFraction(const float reject_fraction) {
+  ASSERT(0 <= reject_fraction && reject_fraction <= 1);
+  reject_fraction_ = reject_fraction;
+}
 
 } // namespace Network
 } // namespace Envoy

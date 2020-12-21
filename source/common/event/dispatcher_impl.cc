@@ -58,6 +58,13 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactory
 
 DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
 
+void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                      std::chrono::milliseconds min_touch_interval) {
+  ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
+  watchdog_registration_ =
+      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
+}
+
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const absl::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
@@ -90,6 +97,7 @@ void DispatcherImpl::clearDeferredDeleteList() {
     current_to_delete_ = &to_delete_1_;
   }
 
+  touchWatchdog();
   deferred_deleting_ = true;
 
   // Calling clear() on the vector does not specify which order destructors run in. We want to
@@ -103,13 +111,13 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ConnectionPtr
+Network::ServerConnectionPtr
 DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
                                        Network::TransportSocketPtr&& transport_socket,
                                        StreamInfo::StreamInfo& stream_info) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
-                                                   std::move(transport_socket), stream_info, true);
+  return std::make_unique<Network::ServerConnectionImpl>(
+      *this, std::move(socket), std::move(transport_socket), stream_info, true);
 }
 
 Network::ClientConnectionPtr
@@ -140,17 +148,23 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
                    "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
                    "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
                    "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return Network::DnsResolverSharedPtr{new Network::AppleDnsResolverImpl(*this)};
+    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.randomGenerator(),
+                                                           api_.rootScope());
   }
 #endif
-  return Network::DnsResolverSharedPtr{
-      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
+  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, use_tcp_for_dns_lookups);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
-  return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
+  return FileEventPtr{new FileEventImpl(
+      *this, fd,
+      [this, cb](uint32_t events) {
+        touchWatchdog();
+        cb(events);
+      },
+      trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
@@ -162,8 +176,8 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
                                                     Network::TcpListenerCallbacks& cb,
                                                     bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(*this, std::move(socket), cb, bind_to_port,
-                                                    backlog_size);
+  return std::make_unique<Network::TcpListenerImpl>(
+      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
@@ -179,11 +193,19 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
 
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
   ASSERT(isThreadSafe());
-  return base_scheduler_.createSchedulableCallback(cb);
+  return base_scheduler_.createSchedulableCallback([this, cb]() {
+    touchWatchdog();
+    cb();
+  });
 }
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  return scheduler_->createTimer(cb, *this);
+  return scheduler_->createTimer(
+      [this, cb]() {
+        touchWatchdog();
+        cb();
+      },
+      *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -197,7 +219,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
 
 void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
-SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
+SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
@@ -237,23 +259,51 @@ void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
 }
 
 void DispatcherImpl::runPostCallbacks() {
-  while (true) {
-    // It is important that this declaration is inside the body of the loop so that the callback is
-    // destructed while post_lock_ is not held. If callback is declared outside the loop and reused
-    // for each iteration, the previous iteration's callback is destructed when callback is
-    // re-assigned, which happens while holding the lock. This can lead to a deadlock (via
-    // recursive mutex acquisition) if destroying the callback runs a destructor, which through some
-    // callstack calls post() on this dispatcher.
-    std::function<void()> callback;
-    {
-      Thread::LockGuard lock(post_lock_);
-      if (post_callbacks_.empty()) {
-        return;
-      }
-      callback = post_callbacks_.front();
-      post_callbacks_.pop_front();
-    }
-    callback();
+  // Clear the deferred delete list before running post callbacks to reduce non-determinism in
+  // callback processing, and more easily detect if a scheduled post callback refers to one of the
+  // objects that is being deferred deleted.
+  clearDeferredDeleteList();
+
+  std::list<std::function<void()>> callbacks;
+  {
+    // Take ownership of the callbacks under the post_lock_. The lock must be released before
+    // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute
+    // later in the event loop.
+    Thread::LockGuard lock(post_lock_);
+    callbacks = std::move(post_callbacks_);
+    // post_callbacks_ should be empty after the move.
+    ASSERT(post_callbacks_.empty());
+  }
+  // It is important that the execution and deletion of the callback happen while post_lock_ is not
+  // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
+  while (!callbacks.empty()) {
+    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
+    // executing a long list of callbacks.
+    touchWatchdog();
+    // Run the callback.
+    callbacks.front()();
+    // Pop the front so that the destructor of the callback that just executed runs before the next
+    // callback executes.
+    callbacks.pop_front();
+  }
+}
+
+void DispatcherImpl::runFatalActionsOnTrackedObject(
+    const FatalAction::FatalActionPtrList& actions) const {
+  // Only run if this is the dispatcher of the current thread and
+  // DispatcherImpl::Run has been called.
+  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+    return;
+  }
+
+  for (const auto& action : actions) {
+    action->run(current_object_);
+  }
+}
+
+void DispatcherImpl::touchWatchdog() {
+  if (watchdog_registration_) {
+    watchdog_registration_->touchWatchdog();
   }
 }
 

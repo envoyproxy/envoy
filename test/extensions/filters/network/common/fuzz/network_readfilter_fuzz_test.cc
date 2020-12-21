@@ -7,11 +7,13 @@
 #include "test/extensions/filters/network/common/fuzz/network_readfilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
         // This post-processor mutation is applied only when libprotobuf-mutator

@@ -35,6 +35,7 @@ public:
 
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
   FilterTrailersStatus onRequestTrailers(uint32_t) override;
+  FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
   FilterTrailersStatus onResponseTrailers(uint32_t) override;
   FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
   void onLog() override;
@@ -277,6 +278,15 @@ FilterTrailersStatus TestContext::onRequestTrailers(uint32_t) {
   return FilterTrailersStatus::Continue;
 }
 
+FilterHeadersStatus TestContext::onResponseHeaders(uint32_t, bool) {
+  root()->stream_context_id_ = id();
+  auto test = root()->test_;
+  if (test == "headers") {
+    CHECK_RESULT(addResponseHeader("test-status", "OK"));
+  }
+  return FilterHeadersStatus::Continue;
+}
+
 FilterTrailersStatus TestContext::onResponseTrailers(uint32_t) {
   auto value = getResponseTrailer("bogus-trailer");
   if (value && value->view() != "") {
@@ -328,6 +338,11 @@ void TestContext::onLog() {
     if (response_trailer && response_trailer->view() != "") {
       logWarn("response bogus-trailer found");
     }
+  } else if (test == "cluster_metadata") {
+      std::string cluster_metadata;
+      if (getValue({"cluster_metadata", "filter_metadata", "namespace", "key"}, &cluster_metadata)) {
+        logWarn("cluster metadata: " + cluster_metadata);
+      }
   } else if (test == "property") {
     setFilterState("wasm_state", "wasm_value");
     auto path = getRequestHeader(":path");
@@ -342,6 +357,10 @@ void TestContext::onLog() {
       int64_t responseCode;
       if (getValue({"response", "code"}, &responseCode)) {
         logWarn("response.code: " + std::to_string(responseCode));
+      }
+      std::string upstream_host_metadata;
+      if (getValue({"upstream_host_metadata", "filter_metadata", "namespace", "key"}, &upstream_host_metadata)) {
+        logWarn("upstream host metadata: " + upstream_host_metadata);
       }
       logWarn("state: " + getProperty({"wasm_state"}).value()->toString());
     } else {
@@ -541,7 +560,6 @@ void TestContext::onLog() {
           {{"source", "address"}, "127.0.0.1:0"},
           {{"destination", "address"}, "127.0.0.2:0"},
           {{"upstream", "address"}, "10.0.0.1:443"},
-          {{"cluster_metadata"}, ""},
           {{"route_metadata"}, ""},
       };
       for (const auto& property : properties) {

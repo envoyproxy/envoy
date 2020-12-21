@@ -8,7 +8,7 @@ find_shell_files () {
     shellfiles=()
     shellfiles+=("$(git grep "^#!/bin/bash" | cut -d: -f1)")
     shellfiles+=("$(git grep "^#!/bin/sh" | cut -d: -f1)")
-    shellfiles+=("$(find . -name "*.sh" | cut -d/ -f2-)")
+    shellfiles+=("$(git ls-files|grep '\.sh$')")
     shellfiles=("$(echo "${shellfiles[@]}" | tr ' ' '\n' | sort | uniq)")
     for file in "${shellfiles[@]}"; do
 	echo "$file"
@@ -16,10 +16,13 @@ find_shell_files () {
 }
 
 run_shellcheck_on () {
-    local file
-    file="$1"
-    echo "Shellcheck: ${file}"
-    shellcheck -f diff -x "$file"
+    local file op
+    op="$1"
+    file="$2"
+    if [ "$op" != "fix" ]; then
+	echo "Shellcheck: ${file}"
+    fi
+    shellcheck -x "$file"
 }
 
 run_shellchecks () {
@@ -34,7 +37,7 @@ run_shellchecks () {
 	<<< "$(echo -e "$found_shellfiles" | grep -vE "${EXCLUDED_SHELLFILES}")"
 
     for file in "${filtered_shellfiles[@]}"; do
-	run_shellcheck_on "$file" || {
+	run_shellcheck_on "$1" "$file" || {
 	    failed+=("$file")
 	}
     done
@@ -53,4 +56,4 @@ run_shellchecks () {
     fi
 }
 
-run_shellchecks
+run_shellchecks "${1:-check}"

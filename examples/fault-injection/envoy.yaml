@@ -30,7 +30,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.fault
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+              "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
               abort:
                 http_status: 503
                 percentage:
@@ -57,12 +57,6 @@ static_resources:
               socket_address:
                 address: backend
                 port_value: 80
-admin:
-  access_log_path: /dev/stdout
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 9901
 layered_runtime:
   layers:
   - name: disk_layer_0

@@ -61,6 +61,7 @@ public:
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Network::Socket& listen_socket)
       : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
+                                  quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
                                   quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
                                   helper, alarm_factory, &writer, /*owns_writer=*/false,
                                   supported_versions, listen_socket) {}
@@ -201,10 +202,10 @@ public:
       crypto_stream_ = test_crypto_stream;
     }
     quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, crypto_stream);
-    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
         std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
   bool installReadFilter() {
@@ -293,6 +294,10 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
       quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
   auto stream =
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
+
+  // Basic checks.
+  ASSERT_FALSE(envoy_quic_session_.startSecureTransport());
+
   // Receive a GET request on created stream.
   quic::QuicHeaderList headers;
   headers.OnHeaderBlockStart();

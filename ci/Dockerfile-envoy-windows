@@ -8,7 +8,7 @@ RUN setx path "%path%;c:\Program Files\envoy"
 ADD ["windows/amd64/envoy.exe", "C:/Program Files/envoy/"]
 
 RUN mkdir "C:\\ProgramData\\envoy"
-ADD ["configs/google_com_proxy.v2.yaml", "C:/ProgramData/envoy/envoy.yaml"]
+ADD ["configs/envoyproxy_io_proxy.yaml", "C:/ProgramData/envoy/envoy.yaml"]
 # Replace temp path with Windows temp path
 RUN powershell -Command "(cat C:\ProgramData\envoy\envoy.yaml -raw) -replace '/tmp/','C:\Windows\Temp\' | Set-Content -Encoding Ascii C:\ProgramData\envoy\envoy.yaml"
 

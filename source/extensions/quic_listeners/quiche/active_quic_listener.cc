@@ -55,7 +55,7 @@ ActiveQuicListener::ActiveQuicListener(
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
-      quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
+      absl::string_view(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(),
       std::make_unique<EnvoyQuicProofSource>(listen_socket_, listener_config.filterChainManager(),
                                              stats_),
@@ -110,11 +110,11 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
       quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(
                                                   data.receive_time_.time_since_epoch())
                                                   .count());
-  ASSERT(data.buffer_->getRawSlices().size() == 1);
-  Buffer::RawSliceVector slices = data.buffer_->getRawSlices(/*max_slices=*/1);
+  Buffer::RawSlice slice = data.buffer_->frontSlice();
+  ASSERT(data.buffer_->length() == slice.len_);
   // TODO(danzh): pass in TTL and UDP header.
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slices[0].mem_), slices[0].len_,
-                                  timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
+                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);

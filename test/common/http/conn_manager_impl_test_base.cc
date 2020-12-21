@@ -53,6 +53,10 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
   server_name_ = server_name;
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
+  ON_CALL(overload_manager_.overload_state_, createScaledTypedTimer_)
+      .WillByDefault([&](auto, auto callback) {
+        return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
+      });
   filter_callbacks_.connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443);
   filter_callbacks_.connection_.remote_address_ =

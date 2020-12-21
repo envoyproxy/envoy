@@ -58,63 +58,8 @@ whether the request path starts with `/v1/`:
     - const_expr:
        string_value: /v1/
 
-The following attributes are exposed to the language runtime:
+Envoy provides a number of :ref:`request attributes <arch_overview_request_attributes>`
+for expressive policies. Most attributes are optional and provide the default
+value based on the type of the attribute. CEL supports presence checks for
+attributes and maps using `has()` syntax, e.g. `has(request.referer)`.
 
-.. csv-table::
-   :header: Attribute, Type, Description
-   :widths: 1, 1, 2
-
-   request.path, string, The path portion of the URL
-   request.url_path, string, The path portion of the URL without the query string
-   request.host, string, The host portion of the URL
-   request.scheme, string, The scheme portion of the URL
-   request.method, string, Request method
-   request.headers, string map, All request headers
-   request.referer, string, Referer request header
-   request.useragent, string, User agent request header
-   request.time, timestamp, Time of the first byte received
-   request.duration, duration, Total duration of the request
-   request.id, string, Request ID
-   request.size, int, Size of the request body
-   request.total_size, int, Total size of the request including the headers
-   request.protocol, string, Request protocol e.g. "HTTP/2"
-   response.code, int, Response HTTP status code
-   response.code_details, string, Internal response code details (subject to change)
-   response.grpc_status, int, Response gRPC status code
-   response.headers, string map, All response headers
-   response.trailers, string map, All response trailers
-   response.size, int, Size of the response body
-   response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers
-   response.flags, int, Additional details about the response beyond the standard response code
-   source.address, string, Downstream connection remote address
-   source.port, int, Downstream connection remote port
-   destination.address, string, Downstream connection local address
-   destination.port, int, Downstream connection local port
-   metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Dynamic metadata
-   filter_state, map string to bytes, Filter state mapping data names to their serialized string value
-   connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
-   connection.requested_server_name, string, Requested server name in the downstream TLS connection
-   connection.tls_version, string, TLS version of the downstream TLS connection
-   connection.subject_local_certificate, string, The subject field of the local certificate in the downstream TLS connection
-   connection.subject_peer_certificate, string, The subject field of the peer certificate in the downstream TLS connection
-   connection.dns_san_local_certificate, string, The first DNS entry in the SAN field of the local certificate in the downstream TLS connection
-   connection.dns_san_peer_certificate, string, The first DNS entry in the SAN field of the peer certificate in the downstream TLS connection
-   connection.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the downstream TLS connection
-   connection.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the downstream TLS connection
-   connection.id, uint, Downstream connection ID
-   upstream.address, string, Upstream connection remote address
-   upstream.port, int, Upstream connection remote port
-   upstream.tls_version, string, TLS version of the upstream TLS connection
-   upstream.subject_local_certificate, string, The subject field of the local certificate in the upstream TLS connection
-   upstream.subject_peer_certificate, string, The subject field of the peer certificate in the upstream TLS connection
-   upstream.dns_san_local_certificate, string, The first DNS entry in the SAN field of the local certificate in the upstream TLS connection
-   upstream.dns_san_peer_certificate, string, The first DNS entry in the SAN field of the peer certificate in the upstream TLS connection
-   upstream.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the upstream TLS connection
-   upstream.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the upstream TLS connection
-   upstream.local_address, string, The local address of the upstream connection
-   upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
-
-
-Most attributes are optional and provide the default value based on the type of the attribute.
-CEL supports presence checks for attributes and maps using `has()` syntax, e.g.
-`has(request.referer)`.

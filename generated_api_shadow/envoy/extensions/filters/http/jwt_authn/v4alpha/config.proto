@@ -48,10 +48,11 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       http_uri:
 //         uri: https://example.com/.well-known/jwks.json
 //         cluster: example_jwks_cluster
+//         timeout: 1s
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtProvider";
@@ -94,6 +95,7 @@ message JwtProvider {
     //      http_uri:
     //        uri: https://www.googleapis.com/oauth2/v1/certs
     //        cluster: jwt.www.googleapis.com|443
+    //        timeout: 1s
     //      cache_duration:
     //        seconds: 300
     //
@@ -191,6 +193,10 @@ message JwtProvider {
   //       exp: 1501281058
   //
   string payload_in_metadata = 9;
+
+  // Specify the clock skew in seconds when verifying JWT time constraint,
+  // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
+  uint32 clock_skew_seconds = 10;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
@@ -205,6 +211,7 @@ message RemoteJwks {
   //    http_uri:
   //      uri: https://www.googleapis.com/oauth2/v1/certs
   //      cluster: jwt.www.googleapis.com|443
+  //      timeout: 1s
   //
   config.core.v4alpha.HttpUri http_uri = 1;
 
@@ -388,8 +395,18 @@ message RequirementRule {
   //
   config.route.v4alpha.RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
-  // Specify a Jwt Requirement. Please detail comment in message JwtRequirement.
-  JwtRequirement requires = 2;
+  // Specify a Jwt requirement.
+  // If not specified, Jwt verification is disabled.
+  oneof requirement_type {
+    // Specify a Jwt requirement. Please see detail comment in message JwtRequirement.
+    JwtRequirement requires = 2;
+
+    // Use requirement_name to specify a Jwt requirement.
+    // This requirement_name MUST be specified at the
+    // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
+    // in `JwtAuthentication`.
+    string requirement_name = 3 [(validate.rules).string = {min_len: 1}];
+  }
 }
 
 // This message specifies Jwt requirements based on stream_info.filterState.
@@ -437,6 +454,7 @@ message FilterStateRule {
 //          http_uri:
 //            uri: https://example.com/.well-known/jwks.json
 //            cluster: example_jwks_cluster
+//            timeout: 1s
 //      provider2:
 //        issuer: issuer2
 //        local_jwks:
@@ -462,6 +480,7 @@ message FilterStateRule {
 //              - provider_name: provider1
 //              - provider_name: provider2
 //
+// [#next-free-field: 6]
 message JwtAuthentication {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication";
@@ -480,6 +499,7 @@ message JwtAuthentication {
   //          http_uri:
   //            uri: https://example.com/.well-known/jwks.json
   //            cluster: example_jwks_cluster
+  //            timeout: 1s
   //      provider2:
   //        issuer: provider2
   //        local_jwks:
@@ -528,4 +548,28 @@ message JwtAuthentication {
   // <http://www.w3.org/TR/cors/#cross-origin-request-with-preflight>`_ regardless of JWT
   // requirements specified in the rules.
   bool bypass_cors_preflight = 4;
+
+  // A map of unique requirement_names to JwtRequirements.
+  // :ref:`requirement_name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.PerRouteConfig.requirement_name>`
+  // in `PerRouteConfig` uses this map to specify a JwtRequirement.
+  map<string, JwtRequirement> requirement_map = 5;
+}
+
+// Specify per-route config.
+message PerRouteConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig";
+
+  oneof requirement_specifier {
+    option (validate.required) = true;
+
+    // Disable Jwt Authentication for this route.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // Use requirement_name to specify a JwtRequirement.
+    // This requirement_name MUST be specified at the
+    // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
+    // in `JwtAuthentication`. If no, the requests using this route will be rejected with 403.
+    string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
+  }
 }

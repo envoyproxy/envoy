@@ -17,7 +17,7 @@ class HttpTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactor
 public:
   // TapConfigFactory
   Extensions::Common::Tap::TapConfigSharedPtr
-  createConfigFromProto(envoy::config::tap::v3::TapConfig&& proto_config,
+  createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
     return std::make_shared<HttpTapConfigImpl>(std::move(proto_config), admin_streamer);
   }

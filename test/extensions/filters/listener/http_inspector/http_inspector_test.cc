@@ -86,7 +86,7 @@ TEST_F(HttpInspectorTest, InlineReadIoError) {
       }));
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  EXPECT_CALL(socket_, close()).Times(1);
+  EXPECT_CALL(socket_, close());
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   // It's arguable if io error should bump the not_found counter
@@ -330,6 +330,17 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
+}
+
+TEST_F(HttpInspectorTest, ReadClosed) {
+  init();
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK));
+  EXPECT_CALL(socket_, close());
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  socket_.close();
+  file_event_callback_(Event::FileReadyType::Closed);
+  EXPECT_EQ(0, cfg_->stats().http2_found_.value());
 }
 
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {

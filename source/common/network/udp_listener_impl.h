@@ -24,12 +24,13 @@ class UdpListenerImpl : public BaseListenerImpl,
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                   UdpListenerCallbacks& cb, TimeSource& time_source);
-
   ~UdpListenerImpl() override;
+  uint32_t packetsDropped() { return packets_dropped_; }
 
   // Network::Listener Interface
   void disable() override;
   void enable() override;
+  void setRejectFraction(float) override {}
 
   // Network::UdpListener Interface
   Event::Dispatcher& dispatcher() override;
@@ -59,7 +60,6 @@ private:
   void disableEvent();
 
   TimeSource& time_source_;
-  Event::FileEventPtr file_event_;
 };
 
 class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {

@@ -3,60 +3,75 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/tcp/upstream.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "common/http/codec_client.h"
 
 namespace Envoy {
 namespace TcpProxy {
 
-// Interface for a generic ConnectionHandle, which can wrap a TcpConnectionHandle
-// or an HttpConnectionHandle
-class ConnectionHandle {
+class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  virtual ~ConnectionHandle() = default;
-  // Cancel the conn pool request and close any excess pending requests.
-  virtual void cancel() PURE;
-};
+  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+              Upstream::LoadBalancerContext* context,
+              Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
+  ~TcpConnPool() override;
 
-// An implementation of ConnectionHandle which works with the Tcp::ConnectionPool.
-class TcpConnectionHandle : public ConnectionHandle {
-public:
-  TcpConnectionHandle(Tcp::ConnectionPool::Cancellable* handle) : upstream_handle_(handle) {}
+  bool valid() const { return conn_pool_ != nullptr; }
 
-  void cancel() override {
-    upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess);
-  }
+  // GenericConnPool
+  void newStream(GenericConnectionPoolCallbacks& callbacks) override;
+
+  // Tcp::ConnectionPool::Callbacks
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                   Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
+  Tcp::ConnectionPool::Instance* conn_pool_{};
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
+  GenericConnectionPoolCallbacks* callbacks_{};
+  Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
 };
 
-class HttpConnectionHandle : public ConnectionHandle {
+class HttpUpstream;
+
+class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
-  HttpConnectionHandle(Http::ConnectionPool::Cancellable* handle) : upstream_http_handle_(handle) {}
-  void cancel() override {
-    upstream_http_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
-  }
+  using TunnelingConfig =
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+
+  HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+               Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
+               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+               Http::CodecClient::Type type);
+  ~HttpConnPool() override;
+
+  // HTTP/3 upstreams are not supported at the moment.
+  bool valid() const { return conn_pool_ != nullptr && type_ <= Http::CodecClient::Type::HTTP2; }
+
+  // GenericConnPool
+  void newStream(GenericConnectionPoolCallbacks& callbacks) override;
+
+  // Http::ConnectionPool::Callbacks,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Http::RequestEncoder& request_encoder,
+                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   absl::optional<Http::Protocol>) override;
 
 private:
-  Http::ConnectionPool::Cancellable* upstream_http_handle_{};
-};
-
-// Interface for a generic Upstream, which can communicate with a TCP or HTTP
-// upstream.
-class GenericUpstream {
-public:
-  virtual ~GenericUpstream() = default;
-  // Calls readDisable on the upstream connection. Returns false if readDisable could not be
-  // performed (e.g. if the connection is closed)
-  virtual bool readDisable(bool disable) PURE;
-  // Encodes data upstream.
-  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
-  // Adds a callback to be called when the data is sent to the kernel.
-  virtual void addBytesSentCallback(Network::Connection::BytesSentCb cb) PURE;
-  // Called when a Network::ConnectionEvent is received on the downstream connection, to allow the
-  // upstream to do any cleanup.
-  virtual Tcp::ConnectionPool::ConnectionData*
-  onDownstreamEvent(Network::ConnectionEvent event) PURE;
+  const std::string hostname_;
+  Http::CodecClient::Type type_;
+  Http::ConnectionPool::Instance* conn_pool_{};
+  Http::ConnectionPool::Cancellable* upstream_handle_{};
+  GenericConnectionPoolCallbacks* callbacks_{};
+  Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
+  std::unique_ptr<HttpUpstream> upstream_;
 };
 
 class TcpUpstream : public GenericUpstream {
@@ -74,15 +89,15 @@ private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
 
-class HttpUpstream : public GenericUpstream, Http::StreamCallbacks {
+class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
-  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
   ~HttpUpstream() override;
 
-  static bool isValidBytestreamResponse(const Http::ResponseHeaderMap& headers);
+  virtual bool isValidResponse(const Http::ResponseHeaderMap&) PURE;
 
   void doneReading();
   void doneWriting();
+  Http::ResponseDecoder& responseDecoder() { return response_decoder_; }
 
   // GenericUpstream
   bool readDisable(bool disable) override;
@@ -96,20 +111,23 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
-  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
+  virtual void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) PURE;
 
-  Http::ResponseDecoder& responseDecoder() { return response_decoder_; }
-
-private:
+protected:
+  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
+  Http::RequestEncoder* request_encoder_{};
+  const std::string hostname_;
+
+private:
   class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
     // Http::ResponseDecoder
     void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
-      if (!isValidBytestreamResponse(*headers) || end_stream) {
+      if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       }
     }
@@ -125,13 +143,27 @@ private:
   private:
     HttpUpstream& parent_;
   };
-
-  Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   DecoderShim response_decoder_;
-  Http::RequestEncoder* request_encoder_{};
-  const std::string hostname_;
+  Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   bool read_half_closed_{};
   bool write_half_closed_{};
+};
+
+class Http1Upstream : public HttpUpstream {
+public:
+  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
+
+  void encodeData(Buffer::Instance& data, bool end_stream) override;
+  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
+  bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
+};
+
+class Http2Upstream : public HttpUpstream {
+public:
+  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
+
+  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
+  bool isValidResponse(const Http::ResponseHeaderMap& headers) override;
 };
 
 } // namespace TcpProxy

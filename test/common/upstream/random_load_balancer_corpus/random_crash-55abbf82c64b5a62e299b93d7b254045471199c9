@@ -1,0 +1,41 @@
+load_balancer_test_case {
+common_lb_config {
+
+}
+actions {
+    update_health_flags {
+        host_priority: 0
+        num_healthy_hosts: 2
+        random_bytestring: 1
+    }
+}
+actions {
+    preconnect {
+
+    }
+}
+actions {
+    preconnect {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 250
+    random_bytestring: 1
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 250
+    random_bytestring: 1
+}
+seed_for_prng: 4
+}

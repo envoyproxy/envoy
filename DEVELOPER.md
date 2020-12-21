@@ -1,6 +1,7 @@
 # Developer documentation
 
-Envoy is built using the Bazel build system. CircleCI builds, tests, and runs coverage against all pull requests and the master branch.
+Envoy is built using the Bazel build system. Our CI on Azure Pipelines builds, tests, and runs coverage against
+all pull requests and the master branch.
 
 To get started building Envoy locally, see the [Bazel quick start](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers).
 To run tests, there are Bazel [targets](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#testing-envoy-with-bazel) for Google Test.

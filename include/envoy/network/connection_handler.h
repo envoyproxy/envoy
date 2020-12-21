@@ -95,6 +95,12 @@ public:
   virtual void enableListeners() PURE;
 
   /**
+   * Set the fraction of connections the listeners should reject.
+   * @param reject_fraction a value between 0 (reject none) and 1 (reject all).
+   */
+  virtual void setListenerRejectFraction(float reject_fraction) PURE;
+
+  /**
    * @return the stat prefix used for per-handler stats.
    */
   virtual const std::string& statPrefix() const PURE;

@@ -28,6 +28,24 @@ TEST(HeaderMapEqualIgnoreOrder, NotEqual) {
   EXPECT_FALSE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
 }
 
+TEST(HeaderMapEqualIgnoreOrder, MultiValue) {
+  {
+    Http::TestRequestHeaderMapImpl lhs{{"bar", "a"}, {"foo", "1"}, {"foo", "2"}};
+    Http::TestRequestHeaderMapImpl rhs{{"foo", "1"}, {"bar", "a"}, {"foo", "2"}};
+    EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
+  }
+  {
+    Http::TestRequestHeaderMapImpl lhs{{"bar", "a"}, {"foo", "1"}, {"foo", "2"}};
+    Http::TestRequestHeaderMapImpl rhs{{"foo", "2"}, {"bar", "a"}, {"foo", "1"}};
+    EXPECT_FALSE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
+  }
+  {
+    Http::TestRequestHeaderMapImpl lhs{{"bar", "a"}, {"foo", "1"}, {"foo", "2"}};
+    Http::TestRequestHeaderMapImpl rhs{{"foo", "1,2"}, {"bar", "a"}};
+    EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
+  }
+}
+
 TEST(ProtoEqIgnoreField, ActuallyEqual) {
   // Ignored field equal
   {

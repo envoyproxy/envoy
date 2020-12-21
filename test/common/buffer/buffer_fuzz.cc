@@ -126,6 +126,8 @@ public:
     return {{const_cast<char*>(start()), size_}};
   }
 
+  Buffer::RawSlice frontSlice() const override { return {const_cast<char*>(start()), size_}; }
+
   uint64_t length() const override { return size_; }
 
   void* linearize(uint32_t /*size*/) override {
@@ -162,6 +164,15 @@ public:
   }
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
+
+  void setWatermarks(uint32_t) override {
+    // Not implemented.
+    // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
+    // WatermarkBuffer implementations.
+    ASSERT(false);
+  }
+  uint32_t highWatermark() const override { return 0; }
+  bool highWatermarkTriggered() const override { return false; }
 
   absl::string_view asStringView() const { return {start(), size_}; }
 

@@ -279,6 +279,14 @@ protected:
     return scoped_runtime;
   }
 
+  ABSL_MUST_USE_RESULT
+  auto enableTlsInspectorInjectionForThisTest() {
+    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.disable_tls_inspector_injection", "false"}});
+    return scoped_runtime;
+  }
+
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
@@ -296,6 +304,7 @@ protected:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
+  NiceMock<testing::MockFunction<void()>> callback_;
 };
 
 } // namespace Server

@@ -66,7 +66,7 @@ public:
 };
 
 TEST_F(DubboDecoderStateMachineTest, EmptyData) {
-  EXPECT_CALL(protocol_, decodeHeader(_, _)).Times(1);
+  EXPECT_CALL(protocol_, decodeHeader(_, _));
   EXPECT_CALL(delegate_, newStream(_, _)).Times(0);
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
 
@@ -93,7 +93,7 @@ TEST_F(DubboDecoderStateMachineTest, RequestMessageCallbacks) {
 
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   DecoderStateMachine dsm(protocol_, delegate_);
   Buffer::OwnedImpl buffer;
@@ -108,7 +108,7 @@ TEST_F(DubboDecoderStateMachineTest, ResponseMessageCallbacks) {
 
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   DecoderStateMachine dsm(protocol_, delegate_);
   Buffer::OwnedImpl buffer;
@@ -121,7 +121,7 @@ TEST_F(DubboDecoderStateMachineTest, SerializeRpcInvocationException) {
   initHandler();
   initProtocolDecoder(MessageType::Request, 0);
 
-  EXPECT_CALL(delegate_, newStream(_, _)).Times(1);
+  EXPECT_CALL(delegate_, newStream(_, _));
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
@@ -141,7 +141,7 @@ TEST_F(DubboDecoderStateMachineTest, SerializeRpcResultException) {
   initHandler();
   initProtocolDecoder(MessageType::Response, 0);
 
-  EXPECT_CALL(delegate_, newStream(_, _)).Times(1);
+  EXPECT_CALL(delegate_, newStream(_, _));
   EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
   EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
@@ -235,7 +235,7 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
   EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   ResponseDecoder decoder(protocol_, response_callbacks_);
 
@@ -258,7 +258,7 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
   EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
-  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _));
 
   buffer_underflow = false;
   EXPECT_EQ(decoder.onData(buffer, buffer_underflow), FilterStatus::Continue);

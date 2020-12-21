@@ -49,28 +49,25 @@ protected:
   Stats::ScopeSharedPtr scope_;
 };
 
-TEST_F(BaseVmTest, NoRuntime) { EXPECT_EQ(createWasmVm("", scope_), nullptr); }
+TEST_F(BaseVmTest, NoRuntime) { EXPECT_EQ(createWasmVm(""), nullptr); }
 
-TEST_F(BaseVmTest, BadRuntime) {
-  EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid", scope_), nullptr);
-}
+TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid"), nullptr); }
 
 TEST_F(BaseVmTest, NullVmStartup) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->runtime() == "null");
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
   EXPECT_TRUE(wasm_vm->getCustomSection("user").empty());
-  EXPECT_EQ(getEnvoyWasmIntegration(*wasm_vm).runtime(), "envoy.wasm.runtime.null");
+  EXPECT_EQ(wasm_vm->runtime(), "null");
   std::function<void()> f;
-  EXPECT_FALSE(
-      getEnvoyWasmIntegration(*wasm_vm).getNullVmFunction("bad_function", false, 0, nullptr, &f));
+  EXPECT_FALSE(wasm_vm->integration()->getNullVmFunction("bad_function", false, 0, nullptr, &f));
 }
 
 TEST_F(BaseVmTest, NullVmMemory) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_EQ(wasm_vm->getMemorySize(), std::numeric_limits<uint64_t>::max());
   std::string d = "data";
   auto m = wasm_vm->getMemory(reinterpret_cast<uint64_t>(d.data()), d.size()).value();
@@ -137,21 +134,14 @@ protected:
 INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest, testing::Values(false, true));
 
 TEST_P(WasmVmTest, V8BadCode) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   EXPECT_FALSE(wasm_vm->load("bad code", GetParam()));
 }
 
 TEST_P(WasmVmTest, V8Code) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->runtime() == "v8");
 
@@ -164,21 +154,13 @@ TEST_P(WasmVmTest, V8Code) {
     EXPECT_TRUE(!wasm_vm->getCustomSection(wasm_vm->getPrecompiledSectionName()).empty());
   }
   EXPECT_THAT(wasm_vm->getCustomSection("producers"), HasSubstr("rustc"));
-  EXPECT_TRUE(wasm_vm->getCustomSection("emscripten_metadata").empty());
 
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm->clone() != nullptr);
 }
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -199,14 +181,7 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 }
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -234,14 +209,7 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 }
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -279,14 +247,7 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 }
 
 TEST_P(WasmVmTest, V8Memory) {
-#ifndef NDEBUG
-  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
-  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
-  if (GetParam() == 1) {
-    return;
-  }
-#endif
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(

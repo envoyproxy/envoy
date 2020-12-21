@@ -267,6 +267,10 @@ WASM_EXPORT(uint32_t, proxy_on_done, (uint32_t)) {
   return 0;
 }
 
+WASM_EXPORT(void, proxy_on_tick, (uint32_t)) {
+  proxy_done();
+}
+
 WASM_EXPORT(void, proxy_on_delete, (uint32_t)) {
   std::string message = "on_delete logging";
   proxy_log(LogLevel::info, message.c_str(), message.size());

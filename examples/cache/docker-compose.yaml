@@ -7,14 +7,8 @@ services:
       dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
-    expose:
-      - "8000"
-      - "8001"
     ports:
       - "8000:8000"
-      - "8001:8001"
-    environment:
-      - ENVOY_UID=0
 
   service1:
     build:
@@ -23,13 +17,9 @@ services:
     volumes:
       - ./responses.yaml:/etc/responses.yaml
     networks:
-      envoymesh:
-        aliases:
-          - service1
+      - envoymesh
     environment:
       - SERVICE_NAME=1
-    expose:
-      - "8000"
 
   service2:
     build:
@@ -38,13 +28,9 @@ services:
     volumes:
       - ./responses.yaml:/etc/responses.yaml
     networks:
-      envoymesh:
-        aliases:
-          - service2
+      - envoymesh
     environment:
       - SERVICE_NAME=2
-    expose:
-      - "8000"
 
 networks:
   envoymesh: {}

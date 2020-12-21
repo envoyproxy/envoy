@@ -9,20 +9,25 @@ exports_files(["protodoc_manifest.yaml"])
 
 envoy_package()
 
-# TODO(phlax): fix failing/excluded configs
-# the following config only fails on windows:
-#       dns-cache-circuit-breaker: "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
-
 filegroup(
     name = "configs",
     srcs = glob(
-        ["root/**/*.yaml"],
-        exclude = [
-            "root/intro/_include/life-of-a-request.yaml",
-            "root/intro/arch_overview/security/_include/ssl.yaml",
-            "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
-            "root/configuration/http/http_filters/_include/grpc-reverse-bridge-filter.yaml",
-            "root/configuration/http/http_filters/_include/grpc-transcoder-filter.yaml",
+        [
+            "root/**/*.yaml",
+            "root/**/*.pb",
         ],
-    ),
+        exclude = [
+            "root/**/envoy-dynamic*.yaml",
+            # TODO(phlax/windows-dev): figure out how to get this working on windows
+            #      "Error: unable to read file: /etc/ssl/certs/ca-certificates.crt"
+            "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
+            "root/intro/arch_overview/security/_include/ssl.yaml",
+        ],
+    ) + select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
+            "root/intro/arch_overview/security/_include/ssl.yaml",
+        ],
+    }),
 )

@@ -11,96 +11,110 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::Return;
 
 namespace Envoy {
 namespace TcpProxy {
 namespace {
 
-class HttpUpstreamTest : public testing::Test {
+template <typename T> class HttpUpstreamTest : public testing::Test {
 public:
   HttpUpstreamTest() {
     EXPECT_CALL(encoder_, getStream()).Times(AnyNumber());
     EXPECT_CALL(encoder_, encodeHeaders(_, false));
-    upstream_ = std::make_unique<HttpUpstream>(callbacks_, hostname_);
+    EXPECT_CALL(encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+    if (typeid(T) == typeid(Http1Upstream)) {
+      ON_CALL(encoder_, http1StreamEncoderOptions())
+          .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
+    }
+    EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
+    upstream_ = std::make_unique<T>(callbacks_, hostname_);
     upstream_->setRequestEncoder(encoder_, true);
   }
 
   Http::MockRequestEncoder encoder_;
+  Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
-  std::string hostname_{"default.host.com"};
+  std::string hostname_{"default.host.com:443"};
 };
 
-TEST_F(HttpUpstreamTest, WriteUpstream) {
-  EXPECT_CALL(encoder_, encodeData(BufferStringEqual("foo"), false));
-  Buffer::OwnedImpl buffer1("foo");
-  upstream_->encodeData(buffer1, false);
+using testing::Types;
 
-  EXPECT_CALL(encoder_, encodeData(BufferStringEqual("bar"), true));
+typedef Types<Http1Upstream, Http2Upstream> Implementations;
+
+TYPED_TEST_SUITE(HttpUpstreamTest, Implementations);
+
+TYPED_TEST(HttpUpstreamTest, WriteUpstream) {
+  EXPECT_CALL(this->encoder_, encodeData(BufferStringEqual("foo"), false));
+  Buffer::OwnedImpl buffer1("foo");
+  this->upstream_->encodeData(buffer1, false);
+
+  EXPECT_CALL(this->encoder_, encodeData(BufferStringEqual("bar"), true));
   Buffer::OwnedImpl buffer2("bar");
-  upstream_->encodeData(buffer2, true);
+  this->upstream_->encodeData(buffer2, true);
 
   // New upstream with no encoder
-  upstream_ = std::make_unique<HttpUpstream>(callbacks_, hostname_);
-  upstream_->encodeData(buffer2, true);
+  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->hostname_);
+  this->upstream_->encodeData(buffer2, true);
 }
 
-TEST_F(HttpUpstreamTest, WriteDownstream) {
-  EXPECT_CALL(callbacks_, onUpstreamData(BufferStringEqual("foo"), false));
+TYPED_TEST(HttpUpstreamTest, WriteDownstream) {
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("foo"), false));
   Buffer::OwnedImpl buffer1("foo");
-  upstream_->responseDecoder().decodeData(buffer1, false);
+  this->upstream_->responseDecoder().decodeData(buffer1, false);
 
-  EXPECT_CALL(callbacks_, onUpstreamData(BufferStringEqual("bar"), true));
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("bar"), true));
   Buffer::OwnedImpl buffer2("bar");
-  upstream_->responseDecoder().decodeData(buffer2, true);
+  this->upstream_->responseDecoder().decodeData(buffer2, true);
 }
 
-TEST_F(HttpUpstreamTest, InvalidUpgradeWithEarlyFin) {
-  EXPECT_CALL(callbacks_, onEvent(_));
+TYPED_TEST(HttpUpstreamTest, InvalidUpgradeWithEarlyFin) {
+  EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
-  upstream_->responseDecoder().decodeHeaders(std::move(headers), true);
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), true);
 }
 
-TEST_F(HttpUpstreamTest, InvalidUpgradeWithNon200) {
-  EXPECT_CALL(callbacks_, onEvent(_));
+TYPED_TEST(HttpUpstreamTest, InvalidUpgradeWithNon200) {
+  EXPECT_CALL(this->callbacks_, onEvent(_));
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "301"}}};
-  upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
 }
 
-TEST_F(HttpUpstreamTest, ReadDisable) {
-  EXPECT_CALL(encoder_.stream_, readDisable(true));
-  EXPECT_TRUE(upstream_->readDisable(true));
+TYPED_TEST(HttpUpstreamTest, ReadDisable) {
+  EXPECT_CALL(this->encoder_.stream_, readDisable(true));
+  EXPECT_TRUE(this->upstream_->readDisable(true));
 
-  EXPECT_CALL(encoder_.stream_, readDisable(false));
-  EXPECT_TRUE(upstream_->readDisable(false));
+  EXPECT_CALL(this->encoder_.stream_, readDisable(false));
+  EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder
-  upstream_ = std::make_unique<HttpUpstream>(callbacks_, hostname_);
-  EXPECT_FALSE(upstream_->readDisable(true));
+  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->hostname_);
+  EXPECT_FALSE(this->upstream_->readDisable(true));
 }
 
-TEST_F(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
-  upstream_->addBytesSentCallback([&](uint64_t) {});
+TYPED_TEST(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
+  this->upstream_->addBytesSentCallback([&](uint64_t) { return true; });
 }
 
-TEST_F(HttpUpstreamTest, DownstreamDisconnect) {
-  EXPECT_CALL(encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
-  EXPECT_CALL(callbacks_, onEvent(_)).Times(0);
-  EXPECT_TRUE(upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
+TYPED_TEST(HttpUpstreamTest, DownstreamDisconnect) {
+  EXPECT_CALL(this->encoder_.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(this->callbacks_, onEvent(_)).Times(0);
+  EXPECT_TRUE(this->upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
 }
 
-TEST_F(HttpUpstreamTest, UpstreamReset) {
-  EXPECT_CALL(encoder_.stream_, resetStream(_)).Times(0);
-  EXPECT_CALL(callbacks_, onEvent(_));
-  upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+TYPED_TEST(HttpUpstreamTest, UpstreamReset) {
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(this->callbacks_, onEvent(_));
+  this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
 }
 
-TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
-  EXPECT_CALL(callbacks_, onAboveWriteBufferHighWatermark());
-  upstream_->onAboveWriteBufferHighWatermark();
+TYPED_TEST(HttpUpstreamTest, UpstreamWatermarks) {
+  EXPECT_CALL(this->callbacks_, onAboveWriteBufferHighWatermark());
+  this->upstream_->onAboveWriteBufferHighWatermark();
 
-  EXPECT_CALL(callbacks_, onBelowWriteBufferLowWatermark());
-  upstream_->onBelowWriteBufferLowWatermark();
+  EXPECT_CALL(this->callbacks_, onBelowWriteBufferLowWatermark());
+  this->upstream_->onBelowWriteBufferLowWatermark();
 }
 
 } // namespace
