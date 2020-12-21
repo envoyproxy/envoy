@@ -538,7 +538,12 @@ jvm_http_filter_on_resume_response(envoy_headers* headers, envoy_data* data,
                                    context);
 }
 
-static void* jvm_on_error(envoy_error error, void* context) {
+static void* jvm_on_complete(void* context) {
+  jni_delete_global_ref(context);
+  return NULL;
+}
+
+static void* call_jvm_on_error(envoy_error error, void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_error");
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
@@ -561,22 +566,18 @@ static void* jvm_on_error(envoy_error error, void* context) {
                                          error.attempt_count);
 
   error.message.release(error.message.context);
-  // No further callbacks happen on this context. Delete the reference held by native code.
-  env->DeleteGlobalRef(j_context);
   env->DeleteLocalRef(jcls_JvmObserverContext);
   env->DeleteLocalRef(j_error_message);
-
   return result;
 }
 
-static void* jvm_on_complete(void* context) {
-  JNIEnv* env = get_env();
-  jobject j_context = static_cast<jobject>(context);
-  env->DeleteGlobalRef(j_context);
-  return NULL;
+static void* jvm_on_error(envoy_error error, void* context) {
+  void* result = call_jvm_on_error(error, context);
+  jni_delete_global_ref(context);
+  return result;
 }
 
-static void* jvm_on_cancel(void* context) {
+static void* call_jvm_on_cancel(void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_cancel");
 
   JNIEnv* env = get_env();
@@ -587,18 +588,22 @@ static void* jvm_on_cancel(void* context) {
       env->GetMethodID(jcls_JvmObserverContext, "onCancel", "()Ljava/lang/Object;");
   jobject result = env->CallObjectMethod(j_context, jmid_onCancel);
 
-  // No further callbacks happen on this context. Delete the reference held by native code.
-  env->DeleteGlobalRef(j_context);
   env->DeleteLocalRef(jcls_JvmObserverContext);
   return result;
 }
 
+static void* jvm_on_cancel(void* context) {
+  void* result = call_jvm_on_cancel(context);
+  jni_delete_global_ref(context);
+  return result;
+}
+
 static void jvm_http_filter_on_error(envoy_error error, const void* context) {
-  jvm_on_error(error, const_cast<void*>(context));
+  call_jvm_on_error(error, const_cast<void*>(context));
 }
 
 static void jvm_http_filter_on_cancel(const void* context) {
-  jvm_on_cancel(const_cast<void*>(context));
+  call_jvm_on_cancel(const_cast<void*>(context));
 }
 
 // JvmFilterFactoryContext
