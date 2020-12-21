@@ -229,6 +229,11 @@ EXTENSIONS = {
     "envoy.wasm.runtime.v8":                            "//source/extensions/wasm_runtime/v8:config",
     "envoy.wasm.runtime.wavm":                          "//source/extensions/wasm_runtime/wavm:config",
     "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
+
+    #
+    # IO socket
+    #
+    "envoy.io_socket.user_space_socket":                "//source/extentions/io_socket/buffered_io_socket:buffered_io_socket_handle_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

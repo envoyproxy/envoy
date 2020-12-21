@@ -1,16 +1,20 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "buffered_io_socket_handle_impl_test",
     srcs = ["buffered_io_socket_handle_impl_test.cc"],
+    extension_name = "envoy.io_socket.user_space_socket",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
@@ -19,9 +23,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "buffered_io_socket_handle_impl_platform_test",
     srcs = ["buffered_io_socket_handle_impl_platform_test.cc"],
+    extension_name = "envoy.io_socket.user_space_socket",
     tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:utility_lib",
@@ -31,9 +36,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "user_space_file_event_impl_test",
     srcs = ["user_space_file_event_impl_test.cc"],
+    extension_name = "envoy.io_socket.user_space_socket",
     deps = [
         "//include/envoy/event:file_event_interface",
         "//source/common/event:dispatcher_includes",

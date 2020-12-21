@@ -261,10 +261,12 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::setBlocking(bool) {
 absl::optional<int> BufferedIoSocketHandleImpl::domain() { return absl::nullopt; }
 
 Network::Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::localAddress() {
+  // TODO(lambdai): Rewrite when caller accept error as the return value.
   throw EnvoyException(fmt::format("getsockname failed for BufferedIoSocketHandleImpl"));
 }
 
 Network::Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::peerAddress() {
+  // TODO(lambdai): Rewrite when caller accept error as the return value.
   throw EnvoyException(fmt::format("getsockname failed for BufferedIoSocketHandleImpl"));
 }
 
