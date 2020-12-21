@@ -13,6 +13,7 @@
 
 namespace Envoy {
 namespace Stats {
+namespace TestUtil {
 
 class TestSymbolTableHelper {
 public:
@@ -28,9 +29,6 @@ private:
 // are constructed without any context, but StatNames that are symbolized from
 // one mock may need to be entered into stat storage in another one. Thus they
 // must be connected by global state.
-//
-// TODO(jmarantz): rename this as Stats::TestUtil::GlobalSymbolTable to clarify
-// the motivation, and rename the 10 call-sites for it.
 class TestSymbolTable {
 public:
   SymbolTable& operator*() { return global_.get().symbolTable(); }
@@ -39,8 +37,6 @@ public:
   const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
   Envoy::Test::Global<TestSymbolTableHelper> global_;
 };
-
-namespace TestUtil {
 
 /**
  * Calls fn for a sampling of plausible stat names given a number of clusters.

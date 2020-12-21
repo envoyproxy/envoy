@@ -70,12 +70,12 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
 
   /**
-   * Prefetches an upstream connection, if existing connections do not meet both current and
+   * Creates an upstream connection, if existing connections do not meet both current and
    * anticipated load.
    *
-   * @return true if a connection was prefetched, false otherwise.
+   * @return true if a connection was preconnected, false otherwise.
    */
-  virtual bool maybePrefetch(float prefetch_ratio) PURE;
+  virtual bool maybePreconnect(float preconnect_ratio) PURE;
 };
 
 enum class PoolFailureReason {

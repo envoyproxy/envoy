@@ -159,8 +159,8 @@ public:
   void scheduleOnUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
   // Called if this pool is likely to be picked soon, to determine if it's worth
-  // prefetching a connection.
-  bool maybePrefetch(float global_prefetch_ratio);
+  // preconnecting a connection.
+  bool maybePreconnect(float global_preconnect_ratio);
 
   virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
 
@@ -187,24 +187,24 @@ public:
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
-  // Creates up to 3 connections, based on the prefetch ratio.
+  // Creates up to 3 connections, based on the preconnect ratio.
   void tryCreateNewConnections();
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
   // to avoid starving this pool.
-  // Demand is determined either by perUpstreamPrefetchRatio() or global_prefetch_ratio
-  // if this is called by maybePrefetch()
-  bool tryCreateNewConnection(float global_prefetch_ratio = 0);
+  // Demand is determined either by perUpstreamPreconnectRatio() or global_preconnect_ratio
+  // if this is called by maybePreconnect()
+  bool tryCreateNewConnection(float global_preconnect_ratio = 0);
 
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
   bool connectingConnectionIsExcess() const;
 
   // A helper function which determines if a new incoming stream should trigger
-  // connection prefetch.
-  bool shouldCreateNewConnection(float global_prefetch_ratio) const;
+  // connection preconnect.
+  bool shouldCreateNewConnection(float global_preconnect_ratio) const;
 
-  float perUpstreamPrefetchRatio() const;
+  float perUpstreamPreconnectRatio() const;
 
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
