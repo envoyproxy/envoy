@@ -24,9 +24,10 @@ std::vector<nghttp2_nv> createNameValueArray(const test::fuzz::Headers& input) {
   int i = 0;
   for (const auto& header : input.headers()) {
     // TODO(asraa): Consider adding flags in fuzzed input.
+    const uint8_t flags = 0;
     nva[i++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.key().data())),
                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.value().data())),
-                header.key().size(), header.value().size(), /*flags = */ 0};
+                header.key().size(), header.value().size(), flags};
   }
 
   return nva;
