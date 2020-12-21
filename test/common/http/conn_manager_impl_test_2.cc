@@ -2356,7 +2356,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           object->dumpState(out);
           std::string state = out.str();
           EXPECT_THAT(state,
-                      testing::HasSubstr("filter_manager_callbacks_.requestHeaders():   empty"));
+                      testing::HasSubstr("filter_manager_callbacks_.requestHeaders():   null"));
           EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
           return nullptr;
         }))
