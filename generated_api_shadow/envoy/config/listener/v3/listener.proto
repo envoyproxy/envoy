@@ -114,6 +114,13 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
+  // If a connection is redirected using *iptables*, the port on which the proxy
+  // receives it might be different from the original destination address. When this flag is set to
+  // true, the listener hands off redirected connections to the listener associated with the
+  // original destination address. If there is no listener associated with the original destination
+  // address, the connection is handled by the listener that receives it. Defaults to false.
+  google.protobuf.BoolValue use_original_dst = 4;
+
   // The default filter chain if none of the filter chain matches. If no default filter chain is supplied,
   // the connection will be closed. The filter chain match is ignored in this field.
   FilterChain default_filter_chain = 25;
@@ -265,6 +272,4 @@ message Listener {
   // The maximum length a tcp listener's pending connections queue can grow to. If no value is
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.
   google.protobuf.UInt32Value tcp_backlog_size = 24;
-
-  google.protobuf.BoolValue hidden_envoy_deprecated_use_original_dst = 4 [deprecated = true];
 }

@@ -39,7 +39,6 @@ envoy_cc_mock(
         ":cluster_info_mocks",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
         "//test/mocks/network:transport_socket_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
@@ -53,7 +52,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:raw_buffer_socket_lib",
-        "//source/common/stats:isolated_store_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -211,6 +210,9 @@ envoy_cc_mock(
     hdrs = ["thread_local_cluster.h"],
     deps = [
         "//include/envoy/upstream:thread_local_cluster_interface",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:load_balancer_mocks",
     ],

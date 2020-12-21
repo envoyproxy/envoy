@@ -49,7 +49,6 @@ BAZEL_BUILD_OPTIONS=(
     -c opt
     --show_task_finish
     --verbose_failures
-    --define "wasm=disabled"
     "--test_output=errors"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")

@@ -5,6 +5,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/init/target.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -41,6 +42,12 @@ public:
    * @return CallbackHandle the handle which can remove that update callback.
    */
   virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
+
+  /**
+   * @return const Init::Target* A shared init target that can be used by multiple init managers.
+   * nullptr if the provider isn't dynamic.
+   */
+  virtual const Init::Target* initTarget() { return nullptr; }
 };
 
 using TlsCertificatePtr =
