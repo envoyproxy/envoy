@@ -10,6 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "extensions/access_loggers/common/grpc_access_logger.h"
@@ -31,23 +32,24 @@ class GrpcOpenTelemetryAccessLoggerImpl
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
-  GrpcOpenTelemetryAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client,
+  GrpcOpenTelemetryAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                                     std::chrono::milliseconds buffer_flush_interval_msec,
                                     uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                                    Stats::Scope& scope,
+                                    const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                                     envoy::config::core::v3::ApiVersion transport_api_version);
 
 private:
-  // Explanation.
-  static InstrumentationLibraryLogs initRoot() const;
+  void initRoot();
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
   void addEntry(opentelemetry::proto::logs::v1::ResourceLogs&& entry) override;
   bool isEmpty() override;
   void initMessage() override;
+  void clearMessage() override;
 
-  // Root for adding new log entries (see comment above about structure).
-  const opentelemetry::proto::logs::v1::InstrumentationLibraryLogs root_;
+  const std::string log_name_;
+  const LocalInfo::LocalInfo& local_info_;
+  opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;
 };
 
 class GrpcOpenTelemetryAccessLoggerCacheImpl
@@ -56,9 +58,12 @@ class GrpcOpenTelemetryAccessLoggerCacheImpl
           envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig> {
 public:
   // Inherited constructor.
-  using Common::GrpcAccessLoggerCache<GrpcOpenTelemetryAccessLoggerImpl,
-                                      envoy::extensions::access_loggers::grpc::v3::
-                                          CommonGrpcAccessLogConfig>::GrpcAccessLoggerCache;
+  // using Common::GrpcAccessLoggerCache<GrpcOpenTelemetryAccessLoggerImpl,
+  //                                     envoy::extensions::access_loggers::grpc::v3::
+  //                                         CommonGrpcAccessLogConfig>::GrpcAccessLoggerCache;
+  GrpcOpenTelemetryAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
+                                         Stats::Scope& scope, ThreadLocal::SlotAllocator& tls,
+                                         const LocalInfo::LocalInfo& local_info);
 
 private:
   // Common::GrpcAccessLoggerCache
@@ -67,6 +72,8 @@ private:
                Grpc::RawAsyncClientPtr&& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override;
+
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 /**

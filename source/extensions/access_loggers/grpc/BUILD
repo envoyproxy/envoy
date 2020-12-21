@@ -24,8 +24,6 @@ envoy_cc_library(
     ],
 )
 
-
-
 envoy_cc_library(
     name = "grpc_ot_access_log_lib",
     srcs = ["grpc_ot_access_log_impl.cc"],
@@ -33,6 +31,7 @@ envoy_cc_library(
     deps = [
       "//include/envoy/event:dispatcher_interface",
       "//include/envoy/grpc:async_client_manager_interface",
+      "//include/envoy/local_info:local_info_interface",
       "//include/envoy/thread_local:thread_local_interface",
       "//source/common/config:utility_lib",
       "//source/common/grpc:typed_async_client_lib",
