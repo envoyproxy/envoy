@@ -85,7 +85,7 @@ public:
 
   protected:
     const Runtime::FeatureFlag compression_enabled_;
-    const Runtime::FeatureFlag always_compress_content_if_exists_;
+    const Runtime::FeatureFlag do_not_compress_if_no_required_headers_;
 
   private:
     static CompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {

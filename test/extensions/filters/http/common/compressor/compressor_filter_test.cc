@@ -77,8 +77,14 @@ public:
   }
 
   void verifyCompressedData() {
-    EXPECT_EQ(expected_str_.length(), stats_.counter("test.test.total_uncompressed_bytes").value());
-    EXPECT_EQ(data_.length(), stats_.counter("test.test.total_compressed_bytes").value());
+    EXPECT_EQ(
+        expected_str_.length(),
+        stats_.counter(fmt::format("test.test.{}total_uncompressed_bytes", response_stats_prefix_))
+            .value());
+    EXPECT_EQ(
+        data_.length(),
+        stats_.counter(fmt::format("test.test.{}total_compressed_bytes", response_stats_prefix_))
+            .value());
   }
 
   void populateBuffer(uint64_t size) {
@@ -153,7 +159,8 @@ public:
         EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
       }
       verifyCompressedData();
-      EXPECT_EQ(1, stats_.counter("test.test.compressed").value());
+      EXPECT_EQ(
+          1, stats_.counter(fmt::format("test.test.{}compressed", response_stats_prefix_)).value());
     } else {
       EXPECT_EQ("", headers.get_("content-encoding"));
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -242,7 +249,7 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLength) {
   }
 }
 )EOF");
-  doRequestCompression({{":method", "post"}}, false);
+  doRequestNoCompression({{":method", "post"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "post"}};
   doResponseNoCompression(headers);
 }
@@ -252,7 +259,7 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLengthRuntimeDisabled) {
 {
   "request_direction_config": {
     "common_config": {
-      "always_compress_content_if_exists": {
+      "do_not_compress_if_no_required_headers": {
         "default_value": true,
         "runtime_key": "foo_key"
       }
@@ -270,9 +277,56 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLengthRuntimeDisabled) {
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
       .Times(1)
       .WillRepeatedly(Return(false));
-  doRequestNoCompression({{":method", "post"}});
+  doRequestCompression({{":method", "post"}}, false);
   Http::TestResponseHeaderMapImpl headers{{":method", "post"}};
   doResponseNoCompression(headers);
+}
+
+TEST_F(CompressorFilterTest, CompressResponseNoContentLength) {
+  setUpFilter(R"EOF(
+{
+  "response_direction_config": {},
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  response_stats_prefix_ = "response.";
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}};
+  doResponseNoCompression(headers);
+}
+
+TEST_F(CompressorFilterTest, CompressResponseNoContentLengthRuntimeDisabled) {
+  setUpFilter(R"EOF(
+{
+  "response_direction_config": {
+    "common_config": {
+      "do_not_compress_if_no_required_headers": {
+        "default_value": true,
+        "runtime_key": "foo_key"
+      }
+    }
+  },
+  "compressor_library": {
+    "name": "test",
+    "typed_config": {
+      "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+    }
+  }
+}
+)EOF");
+  response_stats_prefix_ = "response.";
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("", true)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
+      .Times(1)
+      .WillRepeatedly(Return(false));
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}};
+  doResponseCompression(headers, false);
 }
 
 TEST_F(CompressorFilterTest, CompressRequestWithTrailers) {
@@ -598,7 +652,7 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("transfer-encoding", "Chunked", "", true),
                     std::make_tuple("transfer-encoding", "chunked", "\"content_length\": 500,",
                                     true),
-                    std::make_tuple("", "", "\"content_length\": 500,", true),
+                    std::make_tuple("", "", "\"content_length\": 500,", false),
                     std::make_tuple("content-length", "501", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "499", "\"content_length\": 500,", false)));
 

@@ -62,7 +62,8 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
-      always_compress_content_if_exists_(proto_config.always_compress_content_if_exists(), runtime),
+      do_not_compress_if_no_required_headers_(proto_config.do_not_compress_if_no_required_headers(),
+                                              runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
       content_type_values_(contentTypeSet(proto_config.content_type())), stats_{generateStats(
                                                                              stats_prefix, scope)} {
@@ -507,12 +508,11 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     }
     return is_minimum_content_length;
   }
-  if (always_compress_content_if_exists_.enabled()) {
-    return true;
+  if (do_not_compress_if_no_required_headers_.enabled()) {
+    return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                     Http::Headers::get().TransferEncodingValues.Chunked);
   }
-
-  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
-                                   Http::Headers::get().TransferEncodingValues.Chunked);
+  return true;
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const {
