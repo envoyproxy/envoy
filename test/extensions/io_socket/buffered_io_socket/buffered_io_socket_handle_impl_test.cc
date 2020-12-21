@@ -532,7 +532,7 @@ TEST_F(BufferedIoSocketHandleTest, DrainToLowWaterMarkTriggerReadEvent) {
   }
   {
     SCOPED_TRACE("drain to low watermark.");
-    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(1);
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
     auto result = io_handle_->recv(buf_.data(), 232, 0);
     EXPECT_TRUE(io_handle_->isWritable());
     EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
@@ -540,7 +540,7 @@ TEST_F(BufferedIoSocketHandleTest, DrainToLowWaterMarkTriggerReadEvent) {
   }
   {
     SCOPED_TRACE("clean up.");
-    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(1);
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
     // Important: close before peer.
     io_handle_->close();
   }

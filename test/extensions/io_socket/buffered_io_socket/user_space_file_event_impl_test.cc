@@ -30,7 +30,7 @@ public:
   MOCK_METHOD(void, called, (uint32_t));
 };
 
-class MockReadWritable : public ReadWritable {
+class MockUserspaceIoHandle : public UserspaceIoHandle {
 public:
   MOCK_METHOD(void, setWriteEnd, ());
   MOCK_METHOD(bool, isWriteEndSet, ());
@@ -54,7 +54,7 @@ public:
   void clearReadWrite() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
 
 protected:
-  NiceMock<MockReadWritable> io_source_;
+  NiceMock<MockUserspaceIoHandle> io_source_;
   MockReadyCb ready_cb_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -66,10 +66,10 @@ TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
                                    Event::FileReadyType::Read | Event::FileReadyType::Write}) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
     clearReadWrite();
-    if (current_event | Event::FileReadyType::Read) {
+    if (current_event & Event::FileReadyType::Read) {
       setReadable();
     }
-    if (current_event | Event::FileReadyType::Write) {
+    if (current_event & Event::FileReadyType::Write) {
       setWritable();
     }
     MockReadyCb ready_cb;
@@ -92,7 +92,7 @@ TEST_F(UserSpaceFileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
 
   // Now disable Read.
   user_file_event_->setEnabled(Event::FileReadyType::Write);
-  EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write)).Times(1);
+  EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
@@ -129,7 +129,7 @@ TEST_F(UserSpaceFileEventImplTest, RescheduleIsDeduplicated) {
     user_file_event_->activate(event_rw);
 
     user_file_event_->activate(event_rw);
-    EXPECT_CALL(ready_cb_, called(event_rw)).Times(1);
+    EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
@@ -167,12 +167,12 @@ TEST_F(UserSpaceFileEventImplTest, ActivateWillSchedule) {
   }
   {
     user_file_event_->activate(Event::FileReadyType::Read);
-    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read)).Times(1);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
     user_file_event_->activate(Event::FileReadyType::Write);
-    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write)).Times(1);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
@@ -190,7 +190,7 @@ TEST_F(UserSpaceFileEventImplTest, ActivateDedup) {
     user_file_event_->activate(Event::FileReadyType::Write);
     user_file_event_->activate(Event::FileReadyType::Write);
     user_file_event_->activate(Event::FileReadyType::Read);
-    EXPECT_CALL(ready_cb_, called(event_rw)).Times(1);
+    EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
@@ -215,13 +215,13 @@ TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   {
     user_file_event_->activate(Event::FileReadyType::Read);
     user_file_event_->setEnabled(Event::FileReadyType::Write);
-    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write)).Times(1);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Write));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
     user_file_event_->activate(Event::FileReadyType::Write);
     user_file_event_->setEnabled(Event::FileReadyType::Read);
-    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read)).Times(1);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   // No event is delivered since it's either user disabled or io_handle doesn't provide pending
@@ -260,7 +260,7 @@ TEST_F(UserSpaceFileEventImplTest, EventClosedIsNotTriggeredUnlessManullyActivat
   {
     user_file_event_->activate(Event::FileReadyType::Closed);
     // Activate could deliver Closed event bit.
-    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Closed)).Times(1);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Closed));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {

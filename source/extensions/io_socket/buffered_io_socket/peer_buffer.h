@@ -59,9 +59,9 @@ public:
 /**
  * The interface for the peer as a writer and supplied read status query.
  */
-class ReadWritable : public WritablePeer {
+class UserspaceIoHandle : public WritablePeer {
 public:
-  ~ReadWritable() override = default;
+  ~UserspaceIoHandle() override = default;
 
   /**
    * Read the flag to indicate no further write. Used by early close detection.

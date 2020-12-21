@@ -30,7 +30,7 @@ namespace BufferedIoSocket {
  *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
 class BufferedIoSocketHandleImpl final : public Network::IoHandle,
-                                         public ReadWritable,
+                                         public UserspaceIoHandle,
                                          protected Logger::Loggable<Logger::Id::io> {
 public:
   BufferedIoSocketHandleImpl();
@@ -95,10 +95,10 @@ public:
 
   // WritablePeer
   void setWriteEnd() override {
-    read_end_stream_ = true;
+    receive_data_end_stream_ = true;
     setNewDataAvailable();
   }
-  bool isWriteEndSet() override { return read_end_stream_; }
+  bool isWriteEndSet() override { return receive_data_end_stream_; }
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
@@ -121,8 +121,8 @@ public:
   }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
-  // ReadWritable
-  bool isPeerShutDownWrite() const override { return read_end_stream_; }
+  // `UserspaceIoHandle`
+  bool isPeerShutDownWrite() const override { return receive_data_end_stream_; }
   bool isReadable() const override {
     return isPeerShutDownWrite() || pending_received_data_.length() > 0;
   }
@@ -147,7 +147,7 @@ private:
 
   // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
   // pending data to drain.
-  bool read_end_stream_{false};
+  bool receive_data_end_stream_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.

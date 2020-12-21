@@ -39,14 +39,14 @@ private:
 class UserSpaceFileEventImpl final : public Event::FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
   UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
-                         ReadWritable& io_source);
+                         UserspaceIoHandle& io_source);
 
   // Event::FileEvent
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
 
-  // UserspaceFileEvent acts always as edge triggered regardless the underlying OS is level or edge
-  // triggered. The event owner on windows platform should not emulate edge events.
+  // `UserspaceFileEvent` acts always as edge triggered regardless the underlying OS is level or
+  // edge triggered. The event owner on windows platform should not emulate edge events.
   void unregisterEventIfEmulatedEdge(uint32_t) override {}
   void registerEventIfEmulatedEdge(uint32_t) override {}
 
@@ -58,7 +58,7 @@ private:
   Event::SchedulableCallbackPtr schedulable_;
 
   // Supplies readable and writable status.
-  ReadWritable& io_source_;
+  UserspaceIoHandle& io_source_;
 };
 } // namespace BufferedIoSocket
 } // namespace IoSocket

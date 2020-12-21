@@ -65,7 +65,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                             Network::IoSocketError::deleteIoError)};
   }
   if (pending_received_data_.length() == 0) {
-    if (read_end_stream_) {
+    if (receive_data_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
       return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
@@ -96,7 +96,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
                                Network::IoSocketError::deleteIoError)};
   }
   if (pending_received_data_.length() == 0) {
-    if (read_end_stream_) {
+    if (receive_data_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
       return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
@@ -210,7 +210,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t le
   }
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
-    if (read_end_stream_) {
+    if (receive_data_end_stream_) {
       return {0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
     } else {
       return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
