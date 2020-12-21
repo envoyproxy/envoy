@@ -90,16 +90,18 @@ std::vector<nghttp2_nv> decodeHeaders(nghttp2_hd_inflater* inflater,
   return decoded_headers;
 }
 
-int nv_compare(const void* a_in, const void* b_in) {
+int nvCompare(const void* a_in, const void* b_in) {
   const nghttp2_nv* a = reinterpret_cast<const nghttp2_nv*>(a_in);
   const nghttp2_nv* b = reinterpret_cast<const nghttp2_nv*>(b_in);
 
   absl::string_view a_str(reinterpret_cast<char*>(a->name), a->namelen);
   absl::string_view b_str(reinterpret_cast<char*>(b->name), b->namelen);
-  if (a_str > b_str)
+  if (a_str > b_str) {
     return 1;
-  if (a_str < b_str)
+  }
+  if (a_str < b_str) {
     return -1;
+  }
   return 0;
 }
 
@@ -125,20 +127,20 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
   int rc = nghttp2_hd_deflate_new(&deflater, kHeaderTableSize);
   ASSERT(rc == 0);
   nghttp2_hd_inflater* inflater = nullptr;
-  rc = nghttp2_hd_inflate_new(&inflater) == 0;
+  rc = nghttp2_hd_inflate_new(&inflater);
   ASSERT(rc == 0);
 
   // Encode headers with nghttp2.
   const Buffer::OwnedImpl payload = encodeHeaders(deflater, input_nv);
-  ASSERT(payload.getRawSlices().size() != 0);
+  ASSERT(!payload.getRawSlices().empty());
 
   // Decode headers with nghttp2
   std::vector<nghttp2_nv> output_nv = decodeHeaders(inflater, payload, input.end_headers());
 
   // Verify that decoded == encoded.
   ASSERT(input_nv.size() == output_nv.size());
-  std::qsort(input_nv.data(), input_nv.size(), sizeof(nghttp2_nv), nv_compare);
-  std::qsort(output_nv.data(), output_nv.size(), sizeof(nghttp2_nv), nv_compare);
+  std::qsort(input_nv.data(), input_nv.size(), sizeof(nghttp2_nv), nvCompare);
+  std::qsort(output_nv.data(), output_nv.size(), sizeof(nghttp2_nv), nvCompare);
   for (size_t i = 0; i < input_nv.size(); i++) {
     absl::string_view in_name = {reinterpret_cast<char*>(input_nv[i].name), input_nv[i].namelen};
     absl::string_view out_name = {reinterpret_cast<char*>(output_nv[i].name), output_nv[i].namelen};
