@@ -18,18 +18,17 @@ namespace Generic {
 
 class TcpConnPoolTest : public ::testing::Test {
 public:
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  const std::string cluster_name_{"cluster_name"};
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
   GenericConnPoolFactory factory_;
   NiceMock<Envoy::Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
 };
 
-TEST_F(TcpConnPoolTest, TestNoMatchingClusterName) {
+TEST_F(TcpConnPoolTest, TestNoConnPool) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config;
   config.set_hostname("host");
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
-  EXPECT_EQ(nullptr, factory_.createGenericConnPool(cluster_name_, cluster_manager_, config,
-                                                    nullptr, callbacks_));
+  EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr,
+            factory_.createGenericConnPool(thread_local_cluster_, config, nullptr, callbacks_));
 }
 
 } // namespace Generic

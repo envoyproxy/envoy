@@ -53,9 +53,6 @@ public:
   virtual ~WasmExtension() = default;
 
   virtual void initialize() = 0;
-  virtual std::unique_ptr<EnvoyWasmVmIntegration>
-  createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
-                               absl::string_view short_runtime) = 0;
   virtual PluginHandleExtensionFactory pluginFactory() = 0;
   virtual WasmHandleExtensionFactory wasmFactory() = 0;
   virtual WasmHandleExtensionCloneFactory wasmCloneFactory() = 0;
@@ -100,9 +97,6 @@ public:
   EnvoyWasm() = default;
   ~EnvoyWasm() override = default;
   void initialize() override {}
-  std::unique_ptr<EnvoyWasmVmIntegration>
-  createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
-                               absl::string_view short_runtime) override;
   PluginHandleExtensionFactory pluginFactory() override;
   WasmHandleExtensionFactory wasmFactory() override;
   WasmHandleExtensionCloneFactory wasmCloneFactory() override;

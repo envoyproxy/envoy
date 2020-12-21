@@ -382,6 +382,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, Deduplication) {
   envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
   config.set_log_name("log-1");
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
+  config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
 
   expectClientCreation();
   GrpcAccessLoggerSharedPtr logger1 =

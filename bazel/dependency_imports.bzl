@@ -16,7 +16,7 @@ load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 
 # go version for rules_go
-GO_VERSION = "1.14.7"
+GO_VERSION = "1.15.5"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     rules_foreign_cc_dependencies()
@@ -56,6 +56,24 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         importpath = "golang.org/x/text",
         sum = "h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=",
         version = "v0.3.0",
+    )
+    go_repository(
+        name = "com_github_spf13_afero",
+        importpath = "github.com/spf13/afero",
+        sum = "h1:8q6vk3hthlpb2SouZcnBVKboxWQWMDNF38bwholZrJc=",
+        version = "v1.3.4",
+    )
+    go_repository(
+        name = "com_github_lyft_protoc_gen_star",
+        importpath = "github.com/lyft/protoc-gen-star",
+        sum = "h1:sImehRT+p7lW9n6R7MQc5hVgzWGEkDVZU4AsBQ4Isu8=",
+        version = "v0.5.1",
+    )
+    go_repository(
+        name = "com_github_iancoleman_strcase",
+        importpath = "github.com/iancoleman/strcase",
+        sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
+        version = "v0.0.0-20180726023541-3605ed457bf7",
     )
 
     config_validation_pip_install()
