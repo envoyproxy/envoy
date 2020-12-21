@@ -1434,6 +1434,14 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 443);
   EXPECT_EQ(header_map.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripAnyPort()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_any;
+  original_headers_any.setHost("host:9999");
+
+  TestRequestHeaderMapImpl header_map_any(original_headers_any);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_any, config_, 7777);
+  EXPECT_EQ(header_map_any.getHostValue(), "host");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed

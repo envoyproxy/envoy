@@ -249,6 +249,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
       merge_slashes_(config.merge_slashes()),
       strip_matching_port_(config.strip_matching_host_port()),
+      strip_any_port_(config.strip_any_host_port()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {

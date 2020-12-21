@@ -239,8 +239,9 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
     if (!absl::SimpleAtoi(port_str, &port)) {
       return;
     }
-    if (port != listener_port) {
-      // We would strip ports only if they are the same, as local port of the listener.
+    if (listener_port != 0 && port != listener_port) {
+      // We would strip ports only if they are the same, as local port of the listener or it is
+      // zero.
       return;
     }
     const absl::string_view host = original_host.substr(0, port_start);

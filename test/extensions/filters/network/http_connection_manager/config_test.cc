@@ -1080,6 +1080,42 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   EXPECT_FALSE(config.shouldStripMatchingPort());
 }
 
+// Validated that when configured, we remove any port.
+TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_any_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_TRUE(config.shouldStripAnyPort());
+}
+
+// Validated that when explicitly set false, we don't remove any port.
+TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_any_host_port: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_FALSE(config.shouldStripAnyPort());
+}
+
 // Validated that by default we allow requests with header names containing underscores.
 TEST_F(HttpConnectionManagerConfigTest, HeadersWithUnderscoresAllowedByDefault) {
   const std::string yaml_string = R"EOF(

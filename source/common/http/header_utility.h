@@ -174,7 +174,8 @@ public:
                                     const RequestOrResponseHeaderMap& headers);
 
   /**
-   * @brief Remove the port part from host/authority header if it is equal to provided port
+   * @brief Remove the port part from host/authority header if it is equal to provided port or
+   * provided port is 0.
    */
   static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
 

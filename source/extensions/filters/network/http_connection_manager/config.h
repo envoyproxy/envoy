@@ -170,6 +170,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   bool shouldStripMatchingPort() const override { return strip_matching_port_; }
+  bool shouldStripAnyPort() const override { return strip_any_port_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;
@@ -251,6 +252,7 @@ private:
   const bool normalize_path_;
   const bool merge_slashes_;
   const bool strip_matching_port_;
+  const bool strip_any_port_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;

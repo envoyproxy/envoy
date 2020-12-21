@@ -427,6 +427,10 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
 void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config,
                                                   uint32_t port) {
+  if (config.shouldStripAnyPort()) {
+    HeaderUtility::stripPortFromHost(request_headers, 0);
+    return;
+  }
   if (config.shouldStripMatchingPort()) {
     HeaderUtility::stripPortFromHost(request_headers, port);
   }
