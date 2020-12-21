@@ -624,14 +624,20 @@ TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
   // This will reset the loop interval timer, and should help us
   // synchronize with the guard dog.
   guard_dog_->forceCheckForTest();
-  // Touch the second_dog in case we overslept in the real time system
-  // and the guard dog timer goes off.
-  second_dog_->touch();
+
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the guard dog timer goes off.
+    second_dog_->touch();
+  }
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(51));
-  // Touch the second_dog in case we overslept in the real time system
-  // and the prior "touch" was consumed.
-  second_dog_->touch();
+
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the prior "touch" was consumed.
+    second_dog_->touch();
+  }
   guard_dog_->forceCheckForTest();
 
   EXPECT_THAT(events_, ElementsAre("MISS : 10"));
@@ -692,14 +698,20 @@ TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
   // This will reset the loop interval timer, and should help us
   // synchronize with the guard dog.
   guard_dog_->forceCheckForTest();
-  // Touch the second_dog in case we overslept in the real time system
-  // and the guard dog timer goes off.
-  second_dog_->touch();
+
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the guard dog timer goes off.
+    second_dog_->touch();
+  }
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(51));
-  // Touch the second_dog in case we overslept in the real time system
-  // and the prior "touch" was consumed.
-  second_dog_->touch();
+
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the prior "touch" was consumed.
+    second_dog_->touch();
+  }
   guard_dog_->forceCheckForTest();
 
   EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10"));
