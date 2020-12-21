@@ -12,6 +12,7 @@ import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/range.proto";
 
+import "google/api/expr/v1alpha1/syntax.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -1734,7 +1735,8 @@ message RateLimit {
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
     }
 
-    // The following descriptor entry is appended with a computed value.
+    // The following descriptor entry is appended with a value computed
+    // from a symbolic Common Expression Language expression.
     // See :ref:`attributes <arch_overview_attributes>` for the set of
     // available attributes.
     //
@@ -1748,14 +1750,17 @@ message RateLimit {
       // The key to use in the descriptor entry.
       string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
 
-      oneof expr_specifier {
-        // Expression string, e.g. "connection.requested_server_name".
-        string text = 2 [(validate.rules).string = {min_len: 1}];
-      }
-
       // If set to true, Envoy skips the descriptor if the expression evaluates to an error.
       // By default, the rate limit is not applied when an expression produces an error.
-      bool skip_if_error = 3;
+      bool skip_if_error = 2;
+
+      oneof expr_specifier {
+        // Expression in a text form, e.g. "connection.requested_server_name".
+        string text = 3 [(validate.rules).string = {min_len: 1}];
+
+        // Parsed expression in AST form.
+        google.api.expr.v1alpha1.Expr condition = 4;
+      }
     }
 
     oneof action_specifier {
