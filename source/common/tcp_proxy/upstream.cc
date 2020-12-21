@@ -242,10 +242,9 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   }
 }
 
-inline void
-HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
-                                 const Network::Address::InstanceConstSharedPtr& local_address,
-                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
+                                      const Network::Address::InstanceConstSharedPtr& local_address,
+                                      Ssl::ConnectionInfoConstSharedPtr ssl_info) {
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, local_address, ssl_info);
 }
 
