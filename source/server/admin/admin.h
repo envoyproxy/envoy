@@ -174,6 +174,7 @@ public:
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
   bool shouldStripMatchingPort() const override { return false; }
+  bool shouldStripAnyPort() const override { return false; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
