@@ -65,6 +65,9 @@ private:
   static const size_t RespParamStart{sizeof("RESP(") - 1};
   static const size_t TrailParamStart{sizeof("TRAILER(") - 1};
   static const size_t StartTimeParamStart{sizeof("START_TIME(") - 1};
+  static const size_t DownstreamPeerCertVStartParamStart{sizeof("DOWNSTREAM_PEER_CERT_V_START(") -
+                                                         1};
+  static const size_t DownstreamPeerCertVEndParamStart{sizeof("DOWNSTREAM_PEER_CERT_V_END(") - 1};
 };
 
 /**
@@ -384,6 +387,44 @@ private:
 class StartTimeFormatter : public FormatterProvider {
 public:
   StartTimeFormatter(const std::string& format);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+
+private:
+  const Envoy::DateFormatter date_formatter_;
+};
+
+/**
+ * FormatterProvider for downstream cert start time from ConnectionInfo.
+ */
+class DownstreamPeerCertVStartFormatter : public FormatterProvider {
+public:
+  DownstreamPeerCertVStartFormatter(const std::string& format);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+
+private:
+  const Envoy::DateFormatter date_formatter_;
+};
+
+/**
+ * FormatterProvider for downstream cert end time from ConnectionInfo.
+ */
+class DownstreamPeerCertVEndFormatter : public FormatterProvider {
+public:
+  DownstreamPeerCertVEndFormatter(const std::string& format);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
