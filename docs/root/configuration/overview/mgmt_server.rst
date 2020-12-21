@@ -1,64 +1,59 @@
-Management Server
------------------
+管理服务器
+-----------
 
 .. _config_overview_mgmt_con_issues:
 
-Management Server Unreachability
+管理服务器无法访问
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When an Envoy instance loses connectivity with the management server, Envoy will latch on to
-the previous configuration while actively retrying in the background to reestablish the
-connection with the management server.
+当 Envoy 实例与管理服务器失去连接时，Envoy 将锁定先前的配置，同时在后台积极重试以重新建立与管理服务器的连接。
 
-It is important that Envoy detects when a connection to a management server is unhealthy so that
-it can try to establish a new connection. Configuring either
+重要的是，Envoy 会探测与管理服务器的连接是否健康，以便于它可以尝试建立新的连接。建议在连接到管理服务器的集群中配置
 :ref:`TCP keep-alives <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.tcp_keepalive>`
-or :ref:`HTTP/2 keepalives <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`
-in the cluster that connects to the management server is recommended.
+或 :ref:`HTTP/2 keepalives <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`
+保持活动状态。
 
-Envoy debug logs the fact that it is not able to establish a connection with the management server
-every time it attempts a connection.
+Envoy 调试模式会如实记录它无法与管理服务器建立连接时每次尝试连接的日志。
 
-:ref:`connected_state <management_server_stats>` statistic provides a signal for monitoring this behavior.
+:ref:`connected_state <management_server_stats>` 统计提供了用于监控此行为的信号。
 
 .. _management_server_stats:
 
-Statistics
+统计
 ^^^^^^^^^^
 
-Management Server has a statistics tree rooted at *control_plane.* with the following statistics:
+管理服务器有一个以 *control_plane* 为根的统计树。统计信息如下：
 
 .. csv-table::
-   :header: Name, Type, Description
+   :header: 名字, 类型, 描述
    :widths: 1, 1, 2
 
-   connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
-   rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
-   pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
-   identifier, TextReadout, The identifier of the control plane instance that sent the last discovery response
+   connected_state, Gauge, 一个布尔值（1用于连接，0用于断开连接），表示与管理服务器的当前连接状态
+   rate_limit_enforced, Counter, 被管理服务器强制执行速率限制的总次数
+   pending_requests, Gauge, 实施速率限制时的待处理请求总数
+   identifier, TextReadout, 发送上一个发现响应的控制平面实例的标识符
 
 .. _subscription_statistics:
 
-xDS subscription statistics
+xDS 订阅统计
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Envoy discovers its various dynamic resources via discovery
-services referred to as *xDS*. Resources are requested via :ref:`subscriptions <xds_protocol>`,
-by specifying a filesystem path to watch, initiating gRPC streams or polling a REST-JSON URL.
+Envoy 通过被称为 *xDS* 的发现服务来发现其各种动态资源。通过 :ref:`订阅 <xds_protocol>` 请求的资源，
+通过指定的文件系统路径来监视、初始化 gRPC 流或轮询 REST-JSON URL。
 
-The following statistics are generated for all subscriptions.
+将为所有订阅生成以下统计信息。
 
 .. csv-table::
- :header: Name, Type, Description
+ :header: 名字, 类型, 描述
  :widths: 1, 1, 2
 
- config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
- init_fetch_timeout, Counter, Total :ref:`initial fetch timeouts <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`
- update_attempt, Counter, Total API fetches attempted
- update_success, Counter, Total API fetches completed successfully
- update_failure, Counter, Total API fetches that failed because of network errors
- update_rejected, Counter, Total API fetches that failed because of schema/validation errors
- update_time, Gauge, Timestamp of the last successful API fetch attempt as milliseconds since the epoch. Refreshed even after a trivial configuration reload that contained no configuration changes.
- version, Gauge, Hash of the contents from the last successful API fetch
- version_text, TextReadout, The version text from the last successful API fetch
- control_plane.connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
+ config_reload, Counter, 由于配置不同而导致重新加载配置的总 API 获取次数
+ init_fetch_timeout, Counter, 总 :ref:`初始提取超时 <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`
+ update_attempt, Counter, 尝试获取的 API 总数
+ update_success, Counter, 获取成功的 API 总数
+ update_failure, Counter, 由于网络错误而导致 API 获取失败的总数
+ update_rejected, Counter, 由于 schema/validation 错误而导致 API 获取失败的总数
+ update_time, Gauge, 上一次尝试获取成功的 API 的时间戳，以毫秒为单位。即使在不包含任何配置更改的配置重载后也会刷新。
+ version, Gauge, 上一次成功获取 API 的内容的哈希值
+ version_text, TextReadout, 上一次成功获取 API 的版本文本
+ control_plane.connected_state, Gauge, 布尔值（1表示已连接，0表示已断开连接），表示与管理服务器的当前连接状态
