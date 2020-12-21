@@ -8,6 +8,7 @@
 
 namespace Envoy {
 namespace Config {
+extern std::set<absl::string_view> exclude_v2_protos;
 
 class ApiTypeOracle {
 public:

@@ -22,6 +22,7 @@
 #include "yaml-cpp/yaml.h"
 
 using namespace std::chrono_literals;
+using namespace Envoy::Config;
 
 namespace Envoy {
 namespace {
@@ -647,14 +648,6 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      // To exclude rejecting below v2 protos.
-      std::set<absl::string_view> exclude_v2_protos{
-          "envoy.config.health_checker.redis.v2",
-          "envoy.config.filter.thrift.router.v2alpha1",
-          "envoy.config.resource_monitor.fixed_heap.v2alpha",
-          "envoy.config.resource_monitor.injected_resource.v2alpha",
-          "envoy.config.retry.omit_canary_hosts.v2",
-          "envoy.config.retry.previous_hosts.v2"};
       auto itr = exclude_v2_protos.find(any_full_name);
       if (itr == exclude_v2_protos.end()) {
         MessageUtil::onVersionUpgradeWarn(any_full_name);
