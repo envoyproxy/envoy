@@ -72,7 +72,6 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
                                  Network::IoSocketError::deleteIoError)};
     }
   }
-  absl::FixedArray<iovec> iov(num_slice);
   uint64_t bytes_offset = 0;
   for (uint64_t i = 0; i < num_slice && bytes_offset < max_length; i++) {
     auto bytes_to_read_in_this_slice =
@@ -142,11 +141,13 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
     return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                Network::IoSocketError::deleteIoError)};
   }
+
+  auto* const dest_buffer = writable_peer_->getWriteBuffer();
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
   uint64_t bytes_written = 0;
-  for (uint64_t i = 0; i < num_slice; i++) {
+  for (uint64_t i = 0; i < num_slice && !dest_buffer->highWatermarkTriggered(); i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      writable_peer_->getWriteBuffer()->add(slices[i].mem_, slices[i].len_);
+      dest_buffer->add(slices[i].mem_, slices[i].len_);
       bytes_written += slices[i].len_;
     }
   }
@@ -180,10 +181,20 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
     return {0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                Network::IoSocketError::deleteIoError)};
   }
-  uint64_t total_bytes_to_write = buffer.length();
-  writable_peer_->getWriteBuffer()->move(buffer);
+  uint64_t total_bytes_to_write = 0;
+  const uint64_t max_bytes_to_write = buffer.length();
+  while (writable_peer_->isWritable()) {
+    const auto& front_slice = buffer.frontSlice();
+    if (front_slice.len_ == 0) {
+      break;
+    } else {
+      writable_peer_->getWriteBuffer()->move(buffer, front_slice.len_);
+      total_bytes_to_write += front_slice.len_;
+    }
+  }
   writable_peer_->setNewDataAvailable();
-  ENVOY_LOG(trace, "socket {} writev {} bytes", static_cast<void*>(this), total_bytes_to_write);
+  ENVOY_LOG(trace, "socket {} writev {} bytes of {}", static_cast<void*>(this),
+            total_bytes_to_write, max_bytes_to_write);
   return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 

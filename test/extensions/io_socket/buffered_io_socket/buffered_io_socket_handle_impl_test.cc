@@ -331,6 +331,43 @@ TEST_F(BufferedIoSocketHandleTest, WriteAgain) {
   EXPECT_EQ(10, buf.length());
 }
 
+// Test write() moves the fragments in front until the destination is over high watermark.
+TEST_F(BufferedIoSocketHandleTest, PartialWrite) {
+  // Populate write destination with massive data so as to not writable.
+  io_handle_peer_->setWatermarks(128);
+  // Fragment contents                | a | bbbb...b | ccc |
+  // Len per fragment                 | 1 |  255     |  3  |
+  // Watermark locates at b area      |low  | high...      |
+  // Write                            | 1st          | 2nd |
+  Buffer::OwnedImpl pending_data("a");
+  auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
+      std::string(255, 'b'), [](const Buffer::OwnedBufferFragmentImpl*) {});
+  auto tail_frag =
+      Buffer::OwnedBufferFragmentImpl::create("ccc", [](const Buffer::OwnedBufferFragmentImpl*) {});
+  pending_data.addBufferFragment(*long_frag);
+  pending_data.addBufferFragment(*tail_frag);
+
+  // Partial write: the first two slices are moved because the second slice move reaches the high
+  // watermark.
+  auto result = io_handle_->write(pending_data);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.rc_, 256);
+  EXPECT_EQ(pending_data.length(), 3);
+  EXPECT_FALSE(io_handle_peer_->isWritable());
+
+  // Confirm that the further write return `EAGAIN`.
+  auto result2 = io_handle_->write(pending_data);
+  ASSERT_EQ(result2.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+
+  // Make the peer writable again.
+  Buffer::OwnedImpl black_hole_buffer;
+  io_handle_peer_->read(black_hole_buffer, 10240);
+  EXPECT_TRUE(io_handle_peer_->isWritable());
+  auto result3 = io_handle_->write(pending_data);
+  EXPECT_EQ(result3.rc_, 3);
+  EXPECT_EQ(0, pending_data.length());
+}
+
 TEST_F(BufferedIoSocketHandleTest, WriteErrorAfterShutdown) {
   Buffer::OwnedImpl buf("0123456789");
   // Write after shutdown.
@@ -357,6 +394,49 @@ TEST_F(BufferedIoSocketHandleTest, WritevAgain) {
   internal_buffer.add(std::string(256, ' '));
   auto result = io_handle_->writev(&slice, 1);
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+}
+
+// Test writev() copies the slices in front until the destination is over high watermark.
+TEST_F(BufferedIoSocketHandleTest, PartialWritev) {
+  // Populate write destination with massive data so as to not writable.
+  io_handle_peer_->setWatermarks(128);
+  // Slices contents                  | a | bbbb...b | ccc |
+  // Len per slice                    | 1 |  255     |  3  |
+  // Watermark locates at b area      |low  | high...      |
+  // Writev                           | 1st          | 2nd |
+  Buffer::OwnedImpl pending_data("a");
+  auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
+      std::string(255, 'b'), [](const Buffer::OwnedBufferFragmentImpl*) {});
+  auto tail_frag =
+      Buffer::OwnedBufferFragmentImpl::create("ccc", [](const Buffer::OwnedBufferFragmentImpl*) {});
+  pending_data.addBufferFragment(*long_frag);
+  pending_data.addBufferFragment(*tail_frag);
+
+  // Partial write: the first two slices are moved because the second slice move reaches the high
+  // watermark.
+  auto slices = pending_data.getRawSlices();
+  EXPECT_EQ(3, slices.size());
+  auto result = io_handle_->writev(slices.data(), slices.size());
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.rc_, 256);
+  pending_data.drain(result.rc_);
+  EXPECT_EQ(pending_data.length(), 3);
+  EXPECT_FALSE(io_handle_peer_->isWritable());
+
+  // Confirm that the further write return `EAGAIN`.
+  auto slices2 = pending_data.getRawSlices();
+  auto result2 = io_handle_->writev(slices2.data(), slices2.size());
+  ASSERT_EQ(result2.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+
+  // Make the peer writable again.
+  Buffer::OwnedImpl black_hole_buffer;
+  io_handle_peer_->read(black_hole_buffer, 10240);
+  EXPECT_TRUE(io_handle_peer_->isWritable());
+  auto slices3 = pending_data.getRawSlices();
+  auto result3 = io_handle_->writev(slices3.data(), slices3.size());
+  EXPECT_EQ(result3.rc_, 3);
+  pending_data.drain(result3.rc_);
+  EXPECT_EQ(0, pending_data.length());
 }
 
 TEST_F(BufferedIoSocketHandleTest, WritevErrorAfterShutdown) {
