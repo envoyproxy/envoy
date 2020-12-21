@@ -23,11 +23,10 @@ public:
   ~MockBootstrapExtensionFactory() override;
 
   MOCK_METHOD(BootstrapExtensionPtr, createBootstrapExtension,
-              (const Protobuf::Message&, Configuration::ServerFactoryContext& context), (override));
+              (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
   MOCK_METHOD(std::string, name, (), (const, override));
 };
-
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

@@ -1248,7 +1248,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message& config, ProtobufMessage::ValidationVisitor&) {
+      .WillOnce(Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext&) {
         const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
         EXPECT_NE(nullptr, proto);
         EXPECT_EQ(proto->a(), "foo");
@@ -1274,7 +1274,8 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([]() -> BootstrapExtensionPtr {
+      .WillOnce(Invoke([](const Protobuf::Message&,
+                          Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
         throw EnvoyException("Unable to initiate mock_bootstrap_extension.");
       }));
 
