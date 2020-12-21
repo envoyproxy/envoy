@@ -422,15 +422,19 @@ def _com_github_datadog_dd_opentracing_cpp():
 
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
-      name = "com_github_skyapm_cpp2sky",
-      build_file = "@envoy//bazel/external:cpp2sky.BUILD"
+        name = "com_github_skyapm_cpp2sky",
+        build_file = "@envoy//bazel/external:cpp2sky.BUILD",
     )
     external_http_archive(
-      name = "skywalking_data_collect_protocol",
+        name = "skywalking_data_collect_protocol",
     )
     native.bind(
-      name = "cpp2sky",
-      actual = "@com_github_skyapm_cpp2sky//:cpp2sky",
+        name = "cpp2sky",
+        actual = "@com_github_skyapm_cpp2sky//:cpp2sky",
+    )
+    native.bind(
+        name = "skywalking_data_collect_protocol_language_agent_tracing_protocol",
+        actual = "@skywalking_data_collect_protocol//language-agent:tracing_protocol_cc_proto",
     )
 
 def _com_github_tencent_rapidjson():

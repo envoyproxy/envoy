@@ -1,5 +1,3 @@
-#include "extensions/tracers/skywalking/skywalking_client_config.h"
-
 #include "test/mocks/common.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/utility.h"

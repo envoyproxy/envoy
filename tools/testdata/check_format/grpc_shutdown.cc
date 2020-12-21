@@ -1,7 +1,5 @@
 namespace Envoy {
 
-void foo() {
-  grpc_shutdown();
-}
+void foo() { grpc_shutdown(); }
 
 } // namespace Envoy
