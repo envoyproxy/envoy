@@ -11,11 +11,13 @@ namespace Quic {
 
 EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     const quic::QuicConnectionId& server_connection_id,
-    quic::QuicSocketAddress initial_peer_address, quic::QuicConnectionHelperInterface& helper,
-    quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
+    quic::QuicSocketAddress initial_self_address, quic::QuicSocketAddress initial_peer_address,
+    quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
+    quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Network::Socket& listen_socket)
-    : EnvoyQuicConnection(server_connection_id, initial_peer_address, helper, alarm_factory, writer,
-                          owns_writer, quic::Perspective::IS_SERVER, supported_versions,
+    : EnvoyQuicConnection(server_connection_id, initial_self_address, initial_peer_address, helper,
+                          alarm_factory, writer, owns_writer, quic::Perspective::IS_SERVER,
+                          supported_versions,
                           std::make_unique<Network::ConnectionSocketImpl>(
                               // Wraps the real IoHandle instance so that if the connection socket
                               // gets closed, the real IoHandle won't be affected.

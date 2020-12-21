@@ -58,6 +58,7 @@ envoy_cc_library(
         "//source/common/config:api_version_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:utility_lib",
+        "//source/common/config:watched_directory_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",

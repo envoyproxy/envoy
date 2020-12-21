@@ -8,14 +8,17 @@ import "google/protobuf/empty.proto";
 
 message UpdateHealthFlags {
   // The host priority determines what host set within the priority set which will get updated.
-  uint64 host_priority = 1;
+  uint32 host_priority = 1;
   // These will determine how many hosts will get placed into health hosts, degraded hosts, and
   // excluded hosts from the full host list.
   uint32 num_healthy_hosts = 2;
   uint32 num_degraded_hosts = 3;
   uint32 num_excluded_hosts = 4;
   // This is used to determine which hosts get marked as healthy, degraded, and excluded.
-  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 1, max_len: 256}];
+  // TODO: What should this be capped at? There might be some efficiency/code coverage trade off
+  // dependent on the amount of digits this random_bytestring is allowed to scale too.
+  repeated uint32 random_bytestring = 5
+      [(validate.rules).repeated = {min_items: 1, max_items: 60000}];
 }
 
 message LbAction {
@@ -24,21 +27,22 @@ message LbAction {
     // This updates the health flags of hosts at a certain priority level. The number of hosts in each priority level/in localities is static,
     // as untrusted upstreams cannot change that, and can only change their health flags.
     UpdateHealthFlags update_health_flags = 1;
-    // Prefetches a host using the encapsulated specific load balancer.
-    google.protobuf.Empty prefetch = 2;
+    // Preconnects a host using the encapsulated specific load balancer.
+    google.protobuf.Empty preconnect = 2;
     // Chooses a host using the encapsulated specific load balancer.
     google.protobuf.Empty choose_host = 3;
   }
 }
 
 message SetupPriorityLevel {
-  uint32 num_hosts_in_priority_level = 1 [(validate.rules).uint32.lte = 500];
-  uint32 num_hosts_locality_a = 2 [(validate.rules).uint32.lte = 500];
-  uint32 num_hosts_locality_b = 3 [(validate.rules).uint32.lte = 500];
+  uint32 num_hosts_in_priority_level = 1 [(validate.rules).uint32.lte = 60000];
+  uint32 num_hosts_locality_a = 2 [(validate.rules).uint32.lte = 60000];
+  uint32 num_hosts_locality_b = 3 [(validate.rules).uint32.lte = 60000];
   // Hard cap at 3 localities for simplicity
-  uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 500];
+  uint32 num_hosts_locality_c = 4 [(validate.rules).uint32.lte = 60000];
   // For choosing which hosts go in which locality
-  bytes random_bytestring = 5 [(validate.rules).bytes = {min_len: 1, max_len: 256}];
+  repeated uint32 random_bytestring = 5
+      [(validate.rules).repeated = {min_items: 1, max_items: 60000}];
 }
 
 // This message represents what LoadBalancerFuzzBase will interact with, performing setup of host sets and calling into load balancers.

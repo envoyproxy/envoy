@@ -21,6 +21,7 @@ public:
 
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
   MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&), (override));
+  MOCK_METHOD(Network::SocketPtr, duplicate, (), ());
   MOCK_METHOD(Socket::Type, socketType, (), (const, override));
   MOCK_METHOD(Address::Type, addressType, (), (const, override));
   MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const, override));

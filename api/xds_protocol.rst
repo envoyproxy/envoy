@@ -286,7 +286,12 @@ given type from multiple xDS servers, each xDS server will have a different noti
 Note that the version for a resource type is not a property of an individual xDS stream but rather
 a property of the resources themselves. If the stream becomes broken and the client creates a new
 stream, the client's initial request on the new stream should indicate the most recent version
-seen by the client on the previous stream.
+seen by the client on the previous stream. Servers may decide to optimize by not resending
+resources that the client had already seen on the previous stream, but only if they know that the
+client is not subscribing to a new resource that it was not previously subscribed to. For example,
+it is generally safe for servers to do this optimization for wildcard LDS and CDS requests, and it
+is safe to do in environments where the clients will always subscribe to exactly the same set of
+resources.
 
 An example EDS request might be:
 
@@ -650,6 +655,42 @@ routes are fetched through RDS if configured. Clusters are warmed when
 adding/removing/updating clusters. On the other hand, routes are not
 warmed, i.e., the management plane must ensure that clusters referenced
 by a route are in place, before pushing the updates for a route.
+
+.. _xds_protocol_TTL:
+
+TTL
+~~~
+
+In the event that the management server becomes unreachable, the last known configuration received
+by Envoy will persist until the connection is reestablished. For some services, this may not be
+desirable. For example, in the case of a fault injection service, a management server crash at the
+wrong time may leave Envoy in an undesirable state. The TTL setting allows Envoy to remove a set of
+resources after a specified period of time if contact with the management server is lost. This can
+be used, for example, to terminate a fault injection test when the management server can no longer
+be reached.
+
+For clients that support the *xds.config.supports-resource-ttl* client feature, A TTL field may
+be specified on each :ref:`Resource <envoy_api_msg_Resource>`. Each resource will have its own TTL
+expiry time, at which point the resource will be expired. Each xDS type may have different ways of
+handling such an expiry.
+
+To update the TTL associated with a *Resource*, the management server resends the resource with a
+new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.
+
+To allow for lightweight TTL updates ("heartbeats"), a response can be sent that provides a
+:ref:`Resource <envoy_api_msg_Resource>` with the :ref:`resource <envoy_api_field_Resource.resource>`
+unset and version matching the most recently sent version can be used to update the TTL. These
+resources will not be treated as resource updates, but only as TTL updates.
+
+SotW TTL
+^^^^^^^^
+
+In order to use TTL with SotW xDS, the relevant resources must be wrapped in a
+:ref:`Resource <envoy_api_msg_Resource>`. This allows setting the same TTL field that is used for
+Delta xDS with SotW, without changing the SotW API. Heartbeats are supported for SotW as well:
+any resource within the response that look like a heartbeat resource will only be used to update the TTL.
+
+This feature is gated by the *xds.config.supports-resource-in-sotw* client feature.
 
 .. _xds_protocol_ads:
 

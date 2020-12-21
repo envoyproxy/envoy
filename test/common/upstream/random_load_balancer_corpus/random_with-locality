@@ -8,16 +8,19 @@ actions {
         num_healthy_hosts: 2
         num_degraded_hosts: 3
         num_excluded_hosts: 4
-        random_bytestring: "\x01\x02\x03\x04\x05\x06"
+        random_bytestring: 1
+        random_bytestring: 2
+        random_bytestring: 1
+        random_bytestring: 2
     }
 }
 actions {
-    prefetch {
+    preconnect {
 
     }
 }
 actions {
-    prefetch {
+    preconnect {
 
     }
 }
@@ -36,14 +39,20 @@ setup_priority_levels {
     num_hosts_locality_a: 3
     num_hosts_locality_b: 4
     num_hosts_locality_c: 5
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 20
     num_hosts_locality_a: 3
     num_hosts_locality_b: 4
     num_hosts_locality_c: 5
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
 }
 seed_for_prng: 1
 }

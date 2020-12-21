@@ -34,7 +34,7 @@ match:
 transport_socket:
   name: tls
   typed_config:
-    "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
     common_tls_context:
       tls_certificates:
       - certificate_chain: { filename: "%s" }
@@ -120,11 +120,11 @@ transport_socket:
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             HttpIntegrationTest::createUpstreamTlsContext(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
+            endpoint->ip()->version(), upstreamConfig(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
+            endpoint->ip()->version(), upstreamConfig(), false));
       }
     }
   }

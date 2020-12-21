@@ -79,6 +79,12 @@ public:
   virtual const IoHandle& ioHandle() const PURE;
 
   /**
+   * Used to duplicate the underlying file descriptor of the socket.
+   * @return a pointer to the new Socket.
+   */
+  virtual std::unique_ptr<Socket> duplicate() PURE;
+
+  /**
    * @return the type (stream or datagram) of the socket.
    */
   virtual Socket::Type socketType() const PURE;

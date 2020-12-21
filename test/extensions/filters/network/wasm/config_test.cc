@@ -8,6 +8,7 @@
 #include "extensions/filters/network/wasm/config.h"
 #include "extensions/filters/network/wasm/wasm_filter.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
@@ -56,17 +57,8 @@ protected:
   Event::TimerCb retry_timer_cb_;
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8",
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm",
-#endif
-    "null");
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest, testing_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest,
+                         Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
   if (GetParam() == "null") {
@@ -180,7 +172,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  filter_config.wasm()->fail(proxy_wasm::FailState::RuntimeError, "");
+  filter_config.wasmForTest()->fail(proxy_wasm::FailState::RuntimeError, "");
   EXPECT_EQ(filter_config.createFilter(), nullptr);
 }
 

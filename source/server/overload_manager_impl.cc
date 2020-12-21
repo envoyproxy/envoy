@@ -1,11 +1,15 @@
 #include "server/overload_manager_impl.h"
 
+#include <chrono>
+
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/config/overload/v3/overload.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
@@ -16,6 +20,60 @@
 
 namespace Envoy {
 namespace Server {
+
+/**
+ * Thread-local copy of the state of each configured overload action.
+ */
+class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
+public:
+  ThreadLocalOverloadStateImpl(
+      Event::ScaledRangeTimerManagerPtr scaled_timer_manager,
+      const NamedOverloadActionSymbolTable& action_symbol_table,
+      const absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>& timer_minimums)
+      : action_symbol_table_(action_symbol_table), timer_minimums_(timer_minimums),
+        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
+        scaled_timer_action_(action_symbol_table.lookup(OverloadActionNames::get().ReduceTimeouts)),
+        scaled_timer_manager_(std::move(scaled_timer_manager)) {}
+
+  const OverloadActionState& getState(const std::string& action) override {
+    if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
+      return actions_[symbol->index()];
+    }
+    return always_inactive_;
+  }
+
+  Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
+                                    Event::TimerCb callback) override {
+    auto minimum_it = timer_minimums_.find(timer_type);
+    const Event::ScaledTimerMinimum minimum =
+        minimum_it != timer_minimums_.end()
+            ? minimum_it->second
+            : Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat::max()));
+    return scaled_timer_manager_->createTimer(minimum, std::move(callback));
+  }
+
+  Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
+                                    Event::TimerCb callback) override {
+    return scaled_timer_manager_->createTimer(minimum, std::move(callback));
+  }
+
+  void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
+    actions_[action.index()] = state;
+    if (scaled_timer_action_.has_value() && scaled_timer_action_.value() == action) {
+      scaled_timer_manager_->setScaleFactor(1 - state.value());
+    }
+  }
+
+private:
+  static const OverloadActionState always_inactive_;
+  const NamedOverloadActionSymbolTable& action_symbol_table_;
+  const absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>& timer_minimums_;
+  std::vector<OverloadActionState> actions_;
+  absl::optional<NamedOverloadActionSymbolTable::Symbol> scaled_timer_action_;
+  const Event::ScaledRangeTimerManagerPtr scaled_timer_manager_;
+};
+
+const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
 
 namespace {
 
@@ -56,8 +114,8 @@ public:
     } else if (value >= saturated_threshold_) {
       state_ = OverloadActionState::saturated();
     } else {
-      state_ = OverloadActionState((value - scaling_threshold_) /
-                                   (saturated_threshold_ - scaling_threshold_));
+      state_ = OverloadActionState(
+          UnitFloat((value - scaling_threshold_) / (saturated_threshold_ - scaling_threshold_)));
     }
     return state_.value() != old_state.value();
   }
@@ -70,34 +128,6 @@ private:
   OverloadActionState state_;
 };
 
-/**
- * Thread-local copy of the state of each configured overload action.
- */
-class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
-public:
-  ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table)
-      : action_symbol_table_(action_symbol_table),
-        actions_(action_symbol_table.size(), OverloadActionState(0)) {}
-
-  const OverloadActionState& getState(const std::string& action) override {
-    if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
-      return actions_[symbol->index()];
-    }
-    return always_inactive_;
-  }
-
-  void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
-    actions_[action.index()] = state;
-  }
-
-private:
-  static const OverloadActionState always_inactive_;
-  const NamedOverloadActionSymbolTable& action_symbol_table_;
-  std::vector<OverloadActionState> actions_;
-};
-
-const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{0.0};
-
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
   Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
                                           scope.symbolTable());
@@ -109,6 +139,49 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
   Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
                                           scope.symbolTable());
   return scope.gaugeFromStatName(stat_name.statName(), import_mode);
+}
+
+OverloadTimerType parseTimerType(
+    envoy::config::overload::v3::ScaleTimersOverloadActionConfig::TimerType config_timer_type) {
+  using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
+
+  switch (config_timer_type) {
+  case Config::HTTP_DOWNSTREAM_CONNECTION_IDLE:
+    return OverloadTimerType::HttpDownstreamIdleConnectionTimeout;
+  case Config::HTTP_DOWNSTREAM_STREAM_IDLE:
+    return OverloadTimerType::HttpDownstreamIdleStreamTimeout;
+  default:
+    throw EnvoyException(fmt::format("Unknown timer type {}", config_timer_type));
+  }
+}
+
+absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum>
+parseTimerMinimums(const ProtobufWkt::Any& typed_config,
+                   ProtobufMessage::ValidationVisitor& validation_visitor) {
+  using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
+  const Config action_config =
+      MessageUtil::anyConvertAndValidate<Config>(typed_config, validation_visitor);
+
+  absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum> timer_map;
+
+  for (const auto& scale_timer : action_config.timer_scale_factors()) {
+    const OverloadTimerType timer_type = parseTimerType(scale_timer.timer());
+
+    const Event::ScaledTimerMinimum minimum =
+        scale_timer.has_min_timeout()
+            ? Event::ScaledTimerMinimum(Event::AbsoluteMinimum(std::chrono::milliseconds(
+                  DurationUtil::durationToMilliseconds(scale_timer.min_timeout()))))
+            : Event::ScaledTimerMinimum(
+                  Event::ScaledMinimum(UnitFloat(scale_timer.min_scale().value() / 100.0)));
+
+    auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
+    if (!inserted) {
+      throw EnvoyException(fmt::format("Found duplicate entry for timer type {}",
+                                       Config::TimerType_Name(scale_timer.timer())));
+    }
+  }
+
+  return timer_map;
 }
 
 } // namespace
@@ -209,7 +282,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Api::Api& api)
-    : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
+    : started_(false), dispatcher_(dispatcher), tls_(slot_allocator),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, api, validation_visitor);
@@ -241,6 +314,13 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
     }
 
+    if (name == OverloadActionNames::get().ReduceTimeouts) {
+      timer_minimums_ = parseTimerMinimums(action.typed_config(), validation_visitor);
+    } else if (action.has_typed_config()) {
+      throw EnvoyException(fmt::format(
+          "Overload action \"{}\" has an unexpected value for the typed_config field", name));
+    }
+
     for (const auto& trigger : action.triggers()) {
       const std::string& resource = trigger.name();
 
@@ -258,8 +338,9 @@ void OverloadManagerImpl::start() {
   ASSERT(!started_);
   started_ = true;
 
-  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_);
+  tls_.set([this](Event::Dispatcher& dispatcher) {
+    return std::make_shared<ThreadLocalOverloadStateImpl>(createScaledRangeTimerManager(dispatcher),
+                                                          action_symbol_table_, timer_minimums_);
   });
 
   if (resources_.empty()) {
@@ -310,8 +391,11 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
   return true;
 }
 
-ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
-  return tls_->getTyped<ThreadLocalOverloadStateImpl>();
+ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() { return *tls_; }
+
+Event::ScaledRangeTimerManagerPtr
+OverloadManagerImpl::createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
+  return std::make_unique<Event::ScaledRangeTimerManagerImpl>(dispatcher);
 }
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure,
@@ -364,13 +448,11 @@ void OverloadManagerImpl::flushResourceUpdates() {
         absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>>();
     std::swap(*shared_updates, state_updates_to_flush_);
 
-    tls_->runOnAllThreads(
-        [updates = std::move(shared_updates)](ThreadLocal::ThreadLocalObjectSharedPtr object)
-            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    tls_.runOnAllThreads(
+        [updates = std::move(shared_updates)](OptRef<ThreadLocalOverloadStateImpl> overload_state) {
           for (const auto& [action, state] : *updates) {
-            object->asType<ThreadLocalOverloadStateImpl>().setState(action, state);
+            overload_state->setState(action, state);
           }
-          return object;
         });
   }
 

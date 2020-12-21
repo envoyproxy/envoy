@@ -6,16 +6,16 @@ actions {
     update_health_flags {
         host_priority: 0
         num_healthy_hosts: 256
-        random_bytestring: "\x01\x02\x03\x04\x45\x80"
+        random_bytestring: 1
     }
 }
 actions {
-    prefetch {
+    preconnect {
 
     }
 }
 actions {
-    prefetch {
+    preconnect {
 
     }
 }
@@ -31,11 +31,11 @@ actions {
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 256
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 256
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
 }
 seed_for_prng: 4
 }

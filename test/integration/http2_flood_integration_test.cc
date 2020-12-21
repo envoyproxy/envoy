@@ -100,20 +100,35 @@ public:
   }
 
 protected:
+  bool initializeUpstreamFloodTest();
+  std::vector<char> serializeFrames(const Http2Frame& frame, uint32_t num_frames);
   void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
                    Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat,
                    uint32_t num_frames);
+  void floodClient(const Http2Frame& frame, uint32_t num_frames, const std::string& flood_stat);
 
   void setNetworkConnectionBufferSize();
   void beginSession() override;
   void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
+  IntegrationStreamDecoderPtr prefillOutboundUpstreamQueue(uint32_t frame_count);
   void triggerListenerDrain();
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
+                                    "true");
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower upstream outbound frame limits to make tests run faster
+  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  initialize();
+  return true;
+}
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
   // nghttp2 library has its own internal mitigation for outbound control frames (see
@@ -137,7 +152,7 @@ void Http2FloodMitigationTest::beginSession() {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower outbound frame limits to make tests run faster
-  config_helper_.setOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  config_helper_.setDownstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
   // Set up a raw connection to easily send requests without reading responses. Also, set a small
   // TCP receive buffer to speed up connection backup.
@@ -150,15 +165,21 @@ void Http2FloodMitigationTest::beginSession() {
   startHttp2Session();
 }
 
-// Verify that the server detects the flood of the given frame.
-void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::string& flood_stat,
-                                           uint32_t num_frames) {
+std::vector<char> Http2FloodMitigationTest::serializeFrames(const Http2Frame& frame,
+                                                            uint32_t num_frames) {
   // make sure all frames can fit into 16k buffer
-  ASSERT_LE(num_frames, (16u * 1024u) / frame.size());
+  ASSERT(num_frames <= ((16u * 1024u) / frame.size()));
   std::vector<char> buf(num_frames * frame.size());
   for (auto pos = buf.begin(); pos != buf.end();) {
     pos = std::copy(frame.begin(), frame.end(), pos);
   }
+  return buf;
+}
+
+// Verify that the server detects the flood of the given frame.
+void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::string& flood_stat,
+                                           uint32_t num_frames) {
+  auto buf = serializeFrames(frame, num_frames);
 
   ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
 
@@ -167,6 +188,34 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
   test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1);
+}
+
+// Send header only request, flood client, and verify that the upstream is disconnected and client
+// receives 503.
+void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num_frames,
+                                           const std::string& flood_stat) {
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Make Envoy's writes into the upstream connection to return EAGAIN
+  writev_matcher_->setSourcePort(
+      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+
+  auto buf = serializeFrames(frame, num_frames);
+
+  writev_matcher_->setWritevReturnsEgain();
+  auto* upstream = fake_upstreams_.front().get();
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Upstream connection should be disconnected
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  // Downstream client should receive 503 since upstream did not send response headers yet
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  if (!flood_stat.empty()) {
+    EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
+  }
 }
 
 // Verify that the server detects the flood using specified request parameters.
@@ -220,6 +269,52 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   // Verify that pre-fill did not trigger flood protection
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
+}
+
+IntegrationStreamDecoderPtr
+Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
+  // This complex exchange below is to ensure that the upstream outbound queue is empty before
+  // forcing upstream socket to return EAGAIN. Envoy's upstream codec will send a few frames (i.e.
+  // SETTINGS and ACKs) after a new stream was established, and the test needs to make sure these
+  // are flushed into the socket. To do so the test goes through the following steps:
+  // 1. send request headers, do not end stream
+  // 2. wait for headers to be received by the upstream and send response headers without ending
+  // the stream
+  // 3. wait for the client to receive response headers
+  // 4. send 1 byte of data from the client
+  // 5. wait for 1 byte of data at the upstream. Receiving this DATA frame means that all other
+  // frames that Envoy sent before it were also received by the upstream and the Envoy's upstream
+  // outbound queue is empty.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  EXPECT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client_->sendData(*request_encoder_, 1, false);
+  EXPECT_TRUE(upstream_request_->waitForData(*dispatcher_, 1));
+
+  // Make Envoy's writes into the upstream connection to return EAGAIN
+  writev_matcher_->setSourcePort(
+      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+
+  auto buf = serializeFrames(Http2Frame::makePingFrame(), frame_count);
+
+  writev_matcher_->setWritevReturnsEgain();
+  auto* upstream = fake_upstreams_.front().get();
+  EXPECT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+  // Wait for pre-fill data to arrive to Envoy
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 500);
+  // Verify that pre-fill did not kill upstream connection.
+  EXPECT_TRUE(fake_upstream_connection_->connected());
+  return response;
 }
 
 void Http2FloodMitigationTest::triggerListenerDrain() {
@@ -435,8 +530,12 @@ typed_config:
 TEST_P(Http2FloodMitigationTest, Metadata) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_http2_protocol_options()->set_allow_metadata(true);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1054,6 +1153,377 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.invalid.header.field"));
   // expect Downstream Protocol Error
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("DPE"));
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamPingFlood) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  floodClient(Http2Frame::makePingFrame(), ControlFrameFloodLimit + 1,
+              "cluster.cluster_0.http2.outbound_control_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamSettings) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  floodClient(Http2Frame::makeEmptySettingsFrame(), ControlFrameFloodLimit + 1,
+              "cluster.cluster_0.http2.outbound_control_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamWindowUpdate) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  floodClient(Http2Frame::makeWindowUpdateFrame(0, 1), 4,
+              "cluster.cluster_0.http2.inbound_window_update_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->mutable_max_consecutive_inbound_frames_with_empty_payload()
+        ->set_value(0);
+    ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+  });
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  auto* upstream = fake_upstreams_.front().get();
+  auto buf = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0),
+                                               Http2Frame::HeadersFlags::None);
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
+}
+
+// Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
+TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // Send client request which will send an upstream request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send an upstream reply.
+  auto* upstream = fake_upstreams_.front().get();
+  const auto buf =
+      Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  response->waitForEndStream();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
+  EXPECT_EQ(
+      1,
+      test_server_->counter("cluster.cluster_0.upstream_cx_destroy_local_with_active_rq")->value());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+// Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
+TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->mutable_override_stream_error_on_invalid_http_message()
+        ->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // Send client request which will send an upstream request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send an upstream reply.
+  auto* upstream = fake_upstreams_.front().get();
+  const auto buf =
+      Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Make sure upstream and downstream got RST_STREAM from the server.
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  // Send another request from downstream on the same connection, and make sure
+  // a new request reaches upstream on its previous connection.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  const auto buf2 =
+      Http2Frame::makeHeadersFrameWithStatus("200", Http2Frame::makeClientStreamId(1));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf2.begin(), buf2.end())));
+
+  response2->waitForEndStream();
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
+  EXPECT_EQ(
+      0,
+      test_server_->counter("cluster.cluster_0.upstream_cx_destroy_local_with_active_rq")->value());
+  // Expect a local reset due to upstream reset before a response.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("upstream_reset_before_response_started"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("LR"));
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // Send client request which will send an upstream request.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Start the response with a 200 status.
+  auto* upstream = fake_upstreams_.front().get();
+  Http2Frame buf = Http2Frame::makeHeadersFrameWithStatus("200", Http2Frame::makeClientStreamId(0),
+                                                          Http2Frame::HeadersFlags::EndHeaders);
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Send empty data frames.
+  for (int i = 0; i < 2; i++) {
+    buf = Http2Frame::makeEmptyDataFrame(Http2Frame::makeClientStreamId(0));
+    ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForReset();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  auto* upstream = fake_upstreams_.front().get();
+  Http2Frame buf = Http2Frame::makeEmptyHeadersFrame(Http2Frame::makeClientStreamId(0));
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  for (int i = 0; i < 2; i++) {
+    buf = Http2Frame::makeEmptyContinuationFrame(Http2Frame::makeClientStreamId(0));
+    ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+  }
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityNoOpenStreams) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  // TODO(yanavlasov): The protocol constraint tracker for upstream connections considers the stream
+  // to be in the OPEN state after the server sends complete response headers. The correctness of
+  // this is debatable and needs to be revisited.
+
+  // The `floodClient` method sends request headers to open upstream connection, but upstream does
+  // not send any response. In this case the number of streams tracked by the upstream protocol
+  // constraints checker is still 0.
+  floodClient(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(1),
+                                            Http2Frame::makeClientStreamId(2)),
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM + 1,
+              "cluster.cluster_0.http2.inbound_priority_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneOpenStream) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send response header, but keep the stream open. This should bump the number of OPEN streams
+  // tracked by the upstream protocol constraints checker to 1.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  auto buf = serializeFrames(
+      Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                    Http2Frame::makeClientStreamId(1)),
+      Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 + 1);
+
+  auto* upstream = fake_upstreams_.front().get();
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Upstream connection should be disconnected
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  // Downstream client should get stream reset since upstream sent headers but did not complete the
+  // stream
+  response->waitForReset();
+  EXPECT_EQ(
+      1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
+}
+
+// Verify that protocol constraint tracker correctly applies limits to the CLOSED streams as well.
+TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneClosedStream) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Send response header and end the stream
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  auto frame = Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
+                                             Http2Frame::makeClientStreamId(1));
+  auto buf = serializeFrames(
+      frame, Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 + 1);
+
+  auto* upstream = fake_upstreams_.front().get();
+  ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
+
+  // Upstream connection should be disconnected
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  EXPECT_EQ(
+      1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
+}
+
+// Verify that the server can detect flooding by the RST_STREAM on stream idle timeout
+// after sending response headers.
+TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnStreamIdleTimeout) {
+  // Set large buffer limits so the test is not affected by the flow control.
+  config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* stream_idle_timeout = hcm.mutable_stream_idle_timeout();
+        std::chrono::milliseconds timeout(1000);
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        stream_idle_timeout->set_seconds(seconds.count());
+      });
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+  // pre-fill upstream connection 1 away from overflow
+  auto response = prefillOutboundUpstreamQueue(ControlFrameFloodLimit);
+
+  // Stream timeout should send 408 downstream and RST_STREAM upstream.
+  // Verify that when RST_STREAM overflows upstream queue it is handled correctly
+  // by causing upstream connection to be disconnected.
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForReset();
+  //  EXPECT_EQ("408", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+}
+
+// Verify that the server can detect flooding by the RST_STREAM sent to upstream when downstream
+// disconnects.
+TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnDownstreamRemoteClose) {
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+  // pre-fill 1 away from overflow
+  auto response = prefillOutboundUpstreamQueue(ControlFrameFloodLimit);
+
+  // Disconnect downstream connection. Envoy should send RST_STREAM to upstream which should
+  // overflow the queue and cause the entire upstream connection to be disconnected.
+  codec_client_->close();
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
+}
+
+// Verify that the server can detect flood of request METADATA frames
+TEST_P(Http2FloodMitigationTest, RequestMetadata) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  if (!initializeUpstreamFloodTest()) {
+    return;
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for HEADERS to show up at the upstream server.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Make Envoy's writes into the upstream connection to return EAGAIN, preventing proxying of the
+  // METADATA frames
+  writev_matcher_->setSourcePort(
+      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+
+  writev_matcher_->setWritevReturnsEgain();
+
+  // Send AllFrameFloodLimit + 1 number of METADATA frames from the downstream client to trigger the
+  // outbound upstream flood when they are proxied.
+  Http::MetadataMap metadata_map = {
+      {"header_key1", "header_value1"},
+      {"header_key2", "header_value2"},
+  };
+  for (uint32_t frame = 0; frame < AllFrameFloodLimit + 1; ++frame) {
+    codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  }
+
+  // Upstream connection should be disconnected
+  // Downstream client should receive 503 since upstream did not send response headers yet
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  response->waitForEndStream();
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  // Verify that the flood check was triggered.
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_flood")->value());
 }
 
 } // namespace Envoy

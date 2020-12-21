@@ -17,7 +17,7 @@ for FILE in "$@"; do
   *.pem|*.der)
     cp "$FILE" "$OUT_DIR/certs"
     ;;
-  *.lua)
+  *.lua|*.wasm)
     cp "$FILE" "$OUT_DIR/lib"
     ;;
   *.pb)
@@ -33,4 +33,4 @@ for FILE in "$@"; do
 done
 
 # tar is having issues with -C for some reason so just cd into OUT_DIR.
-(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.lua)
+(cd "$OUT_DIR"; tar -hcvf example_configs.tar -- *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua)

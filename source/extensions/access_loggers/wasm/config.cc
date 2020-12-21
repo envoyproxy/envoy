@@ -23,8 +23,6 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());
-  auto access_log =
-      std::make_shared<WasmAccessLog>(config.config().root_id(), nullptr, std::move(filter));
 
   // Create a base WASM to verify that the code loads before setting/cloning the for the
   // individual threads.
@@ -35,25 +33,15 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
       nullptr /* listener_metadata */);
 
-  auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
-    auto tls_slot = context.threadLocal().allocateSlot();
+  auto access_log = std::make_shared<WasmAccessLog>(plugin, nullptr, std::move(filter));
 
+  auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    tls_slot->set(
-        [base_wasm,
-         plugin](Event::Dispatcher& dispatcher) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
-          if (!base_wasm) {
-            // There is no way to prevent the connection at this point. The user could choose to use
-            // an HTTP Wasm plugin and only handle onLog() which would correctly close the
-            // connection in onRequestHeaders().
-            if (!plugin->fail_open_) {
-              ENVOY_LOG(critical, "Plugin configured to fail closed failed to load");
-            }
-            return nullptr;
-          }
-          return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(
-              Common::Wasm::getOrCreateThreadLocalWasm(base_wasm, plugin, dispatcher));
-        });
+    auto tls_slot =
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal());
+    tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
+      return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
+    });
     access_log->setTlsSlot(std::move(tls_slot));
   };
 

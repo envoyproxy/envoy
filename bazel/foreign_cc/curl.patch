@@ -18,12 +18,3 @@ index ec1cfa782..0c5a72f00 100644
 +      string(REGEX REPLACE "/MD" "/MT" ${flags_var} "${${flags_var}}")
 +    endif()
 +  endforeach()
-diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
-index 911c9096d..ba6af1bf1 100644
---- a/lib/CMakeLists.txt
-+++ b/lib/CMakeLists.txt
-@@ -91,4 +91,0 @@ add_library(
--if(MSVC AND NOT BUILD_SHARED_LIBS)
--  set_target_properties(${LIB_NAME} PROPERTIES STATIC_LIBRARY_FLAGS ${CMAKE_EXE_LINKER_FLAGS})
--endif()
--

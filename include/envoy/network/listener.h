@@ -94,8 +94,7 @@ public:
   /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
-   *         configuration is set, false otherwise. Note that this flag is deprecated and will be
-   *         removed from the v2 API.
+   *         configuration is set, false otherwise.
    */
   virtual bool handOffRestoredDestinationConnections() const PURE;
 
@@ -378,9 +377,6 @@ public:
 
   /**
    * Make this listener readable at the beginning of the next event loop.
-   *
-   * @note: it may become readable during the current loop if feature
-   * ``envoy.reloadable_features.activate_fds_next_event_loop`` is disabled.
    */
   virtual void activateRead() PURE;
 };

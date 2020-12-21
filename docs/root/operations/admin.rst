@@ -324,6 +324,8 @@ modify different aspects of the server:
    traffic direction are stopped, listener additions and modifications in that direction
    are not allowed.
 
+.. _operations_admin_interface_server_info:
+
 .. http:get:: /server_info
 
   Outputs a JSON message containing information about the running server.
@@ -403,11 +405,13 @@ modify different aspects of the server:
 
   Outputs all statistics on demand. This command is very useful for local debugging.
   Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
-  The output for each quantile will be in the form of (interval,cumulative) where interval value
-  represents the summary since last flush interval and cumulative value represents the
-  summary since the start of Envoy instance. "No recorded values" in the histogram output indicates
-  that it has not been updated with a value.
-  See :ref:`here <operations_stats>` for more information.
+  The output for each quantile will be in the form of (interval,cumulative) where the interval value
+  represents the summary since last flush. By default, a timer is setup to flush in intervals
+  defined by :ref:`stats_flush_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval>`,
+  defaulting to 5 seconds. If :ref:`stats_flush_on_admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_on_admin>`
+  is specified, stats are flushed when this endpoint is queried and a timer will not be used. The cumulative
+  value represents the summary since the start of Envoy instance. "No recorded values" in the histogram
+  output indicates that it has not been updated with a value. See :ref:`here <operations_stats>` for more information.
 
   .. http:get:: /stats?usedonly
 
@@ -508,9 +512,6 @@ modify different aspects of the server:
   take a global symbol table lock. During startup this is acceptable,
   but in response to user requests on high core-count machines, this
   can cause performance issues due to mutex contention.
-
-  This admin endpoint requires Envoy to be started with option
-  `--use-fake-symbol-table 0`.
 
   See :repo:`source/docs/stats.md` for more details.
 

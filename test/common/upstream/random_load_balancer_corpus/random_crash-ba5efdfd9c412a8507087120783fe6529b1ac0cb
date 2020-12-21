@@ -11,11 +11,11 @@ actions {
   }
 }
 actions {
-  prefetch {
+  preconnect {
   }
 }
 actions {
-  prefetch {
+  preconnect {
   }
 }
 actions {
@@ -28,11 +28,11 @@ actions {
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 2
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 9007199259945536
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
 }
 seed_for_prng: 6
 }

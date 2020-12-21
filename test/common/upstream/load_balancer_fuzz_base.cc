@@ -6,13 +6,28 @@ namespace Envoy {
 namespace Upstream {
 
 namespace {
-// TODO(zasweq): This will be relaxed in the future in order to fully represent the state space
-// possible within Load Balancing. In it's current state, it is too slow (particularly due to calls
-// to makeTestHost()) to scale up hosts. Once this is made more efficient, this number will be
-// increased.
-constexpr uint32_t MaxNumHostsPerPriorityLevel = 256;
+
+constexpr uint32_t MaxNumHostsPerPriorityLevel = 60000;
+
+// Helper function for converting repeated proto fields to byte vectors to pass into random subset
+std::vector<uint32_t>
+constructByteVectorForRandom(const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring) {
+  std::vector<uint32_t> random_bytestring_vector(random_bytestring.begin(),
+                                                 random_bytestring.end());
+  return random_bytestring_vector;
+}
 
 } // namespace
+
+HostVector
+LoadBalancerFuzzBase::initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info) {
+  HostVector hosts;
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
+  for (uint32_t i = 1; i <= 60000; ++i) {
+    hosts.push_back(makeTestHost(info, "tcp://127.0.0.1:" + std::to_string(i), *time_source));
+  }
+  return hosts;
+}
 
 void LoadBalancerFuzzBase::initializeASingleHostSet(
     const test::common::upstream::SetupPriorityLevel& setup_priority_level,
@@ -22,17 +37,21 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
                  priority_level, num_hosts_in_priority_level);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_level);
   uint32_t hosts_made = 0;
-  // Cap each host set at 256 hosts for efficiency - Leave port clause in for future changes
+  // Cap each host set at 60000 hosts - however, let port number enforce a max of 60k hosts across
+  // all priority levels.
   while (hosts_made < std::min(num_hosts_in_priority_level, MaxNumHostsPerPriorityLevel) &&
-         port < 65535) {
-    host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:" + std::to_string(port)));
+         port < 60000) {
+    // Make sure no health flags persisted from previous fuzz iterations
+    ASSERT(initialized_hosts_[port]->health() == Host::Health::Healthy);
+    host_set.hosts_.push_back(initialized_hosts_[port]);
     ++port;
     ++hosts_made;
   }
 
-  Fuzz::ProperSubsetSelector subset_selector(setup_priority_level.random_bytestring());
+  Fuzz::ProperSubsetSelector subset_selector(
+      constructByteVectorForRandom(setup_priority_level.random_bytestring()));
 
-  const std::vector<std::vector<uint8_t>> localities = subset_selector.constructSubsets(
+  const std::vector<std::vector<uint32_t>> localities = subset_selector.constructSubsets(
       {setup_priority_level.num_hosts_locality_a(), setup_priority_level.num_hosts_locality_b(),
        setup_priority_level.num_hosts_locality_c()},
       host_set.hosts_.size());
@@ -44,7 +63,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
   std::array<HostVector, 3> locality_indexes = {locality_a, locality_b, locality_c};
 
   for (uint8_t locality = 0; locality < locality_indexes.size(); locality++) {
-    for (uint8_t index : localities[locality]) {
+    for (uint32_t index : localities[locality]) {
       locality_indexes[locality].push_back(host_set.hosts_[index]);
       locality_indexes_[index] = locality;
     }
@@ -58,8 +77,16 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
 // Initializes random and fixed host sets
 void LoadBalancerFuzzBase::initializeLbComponents(
     const test::common::upstream::LoadBalancerTestCase& input) {
+  static NiceMock<MockClusterInfo> info;
+  static std::shared_ptr<MockClusterInfo> info_pointer{std::shared_ptr<MockClusterInfo>{}, &info};
+
+  // Will statically initialize 60000 hosts in this vector, so each fuzz run doesn't construct new
+  // hosts to use. This will require clearing of state after each run.
+  static HostVector initialized_hosts = initializeHostsForUseInFuzzing(info_pointer);
+  initialized_hosts_ = initialized_hosts;
+
   random_.initializeSeed(input.seed_for_prng());
-  uint16_t port = 80;
+  uint16_t port = 1;
   for (uint8_t priority_of_host_set = 0;
        priority_of_host_set < input.setup_priority_levels().size(); ++priority_of_host_set) {
     initializeASingleHostSet(input.setup_priority_levels().at(priority_of_host_set),
@@ -71,11 +98,10 @@ void LoadBalancerFuzzBase::initializeLbComponents(
 // Updating host sets is shared amongst all the load balancer tests. Since logically, we're just
 // setting the mock priority set to have certain values, and all load balancers interface with host
 // sets and their health statuses, this action maps to all load balancers.
-void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_priority,
-                                                        const uint32_t num_healthy_hosts,
-                                                        const uint32_t num_degraded_hosts,
-                                                        const uint32_t num_excluded_hosts,
-                                                        const std::string random_bytestring) {
+void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
+    const uint64_t host_priority, const uint32_t num_healthy_hosts,
+    const uint32_t num_degraded_hosts, const uint32_t num_excluded_hosts,
+    const Protobuf::RepeatedField<Protobuf::uint32>& random_bytestring) {
   const uint8_t priority_of_host_set = host_priority % num_priority_levels_;
   ENVOY_LOG_MISC(trace, "Updating health flags for host set at priority: {}", priority_of_host_set);
   MockHostSet& host_set = *priority_set_.getMockHostSet(priority_of_host_set);
@@ -99,13 +125,13 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
     EXCLUDED = 2,
   };
 
-  Fuzz::ProperSubsetSelector subset_selector(random_bytestring);
+  Fuzz::ProperSubsetSelector subset_selector(constructByteVectorForRandom(random_bytestring));
 
-  const std::vector<std::vector<uint8_t>> subsets = subset_selector.constructSubsets(
+  const std::vector<std::vector<uint32_t>> subsets = subset_selector.constructSubsets(
       {num_healthy_hosts, num_degraded_hosts, num_excluded_hosts}, host_set_size);
 
   // Healthy hosts are first subset
-  for (uint8_t index : subsets.at(HealthStatus::HEALTHY)) {
+  for (uint32_t index : subsets.at(HealthStatus::HEALTHY)) {
     host_set.healthy_hosts_.push_back(host_set.hosts_[index]);
     // No health flags for healthy
   }
@@ -113,7 +139,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
                  absl::StrJoin(subsets.at(HealthStatus::HEALTHY), " "));
 
   // Degraded hosts are second subset
-  for (uint8_t index : subsets.at(HealthStatus::DEGRADED)) {
+  for (uint32_t index : subsets.at(HealthStatus::DEGRADED)) {
     host_set.degraded_hosts_.push_back(host_set.hosts_[index]);
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
@@ -125,7 +151,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
                  absl::StrJoin(subsets.at(HealthStatus::DEGRADED), " "));
 
   // Excluded hosts are third subset
-  for (uint8_t index : subsets.at(HealthStatus::EXCLUDED)) {
+  for (uint32_t index : subsets.at(HealthStatus::EXCLUDED)) {
     host_set.excluded_hosts_.push_back(host_set.hosts_[index]);
     // Health flags are not currently directly used by most load balancers, but
     // they may be added and also are used by other components.
@@ -156,8 +182,8 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   // Iterate through subsets
   for (uint8_t health_status = 0; health_status < locality_health_statuses.size();
        health_status++) {
-    for (uint8_t index : subsets.at(health_status)) { // Each subset logically represents a health
-                                                      // status
+    for (uint32_t index : subsets.at(health_status)) { // Each subset logically represents a health
+                                                       // status
       // If the host is in a locality, we have to update the corresponding health status host vector
       if (!(locality_indexes_.find(index) == locality_indexes_.end())) {
         // After computing the host index subsets, we want to propagate these changes to a host set
@@ -188,7 +214,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(const uint64_t host_prio
   host_set.runCallbacks({}, {});
 }
 
-void LoadBalancerFuzzBase::prefetch() {
+void LoadBalancerFuzzBase::preconnect() {
   // TODO: context, could generate it in proto action
   lb_->peekAnotherHost(nullptr);
 }
@@ -213,8 +239,8 @@ void LoadBalancerFuzzBase::replay(
                                    event.update_health_flags().random_bytestring());
       break;
     }
-    case test::common::upstream::LbAction::kPrefetch:
-      prefetch();
+    case test::common::upstream::LbAction::kPreconnect:
+      preconnect();
       break;
     case test::common::upstream::LbAction::kChooseHost:
       chooseHost();

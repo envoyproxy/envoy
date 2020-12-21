@@ -7,15 +7,18 @@ load_balancer_test_case {
   actions {
     update_health_flags {
       num_healthy_hosts: 2
-      random_bytestring: "\001\002\003\004"
+      random_bytestring: 1
+      random_bytestring: 2
+      random_bytestring: 3
+      random_bytestring: 4
     }
   }
   actions {
-    prefetch {
+    preconnect {
     }
   }
   actions {
-    prefetch {
+    preconnect {
     }
   }
   actions {
@@ -25,16 +28,25 @@ load_balancer_test_case {
   actions {
     update_health_flags {
       num_healthy_hosts: 2
-      random_bytestring: "\001\002\003\004"
+      random_bytestring: 1
+      random_bytestring: 2
+      random_bytestring: 3
+      random_bytestring: 4
     }
   }
   setup_priority_levels {
     num_hosts_in_priority_level: 536903638
-    random_bytestring: "\001\002"
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 3
+    random_bytestring: 4
   }
   setup_priority_levels {
     num_hosts_in_priority_level: 32726
-    random_bytestring: "\001\002"
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 3
+    random_bytestring: 4
   }
   seed_for_prng: 88
 }

@@ -36,14 +36,15 @@ private:
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint32_t index);
     ~SlotImpl() override { parent_.removeSlot(index_); }
-    Event::PostCb wrapCallback(Event::PostCb&& cb);
+    Event::PostCb wrapCallback(const Event::PostCb& cb);
+    Event::PostCb dataCallback(const UpdateCb& cb);
     static bool currentThreadRegisteredWorker(uint32_t index);
     static ThreadLocalObjectSharedPtr getWorker(uint32_t index);
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
     void runOnAllThreads(const UpdateCb& cb) override;
-    void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) override;
+    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
 

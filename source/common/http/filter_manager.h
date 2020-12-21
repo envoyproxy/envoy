@@ -1,31 +1,139 @@
 #pragma once
 
+#include <memory>
+
+#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/grpc/common.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
+#include "common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Http {
 
 class FilterManager;
 
+class HttpMatchingDataImpl : public HttpMatchingData {
+public:
+  static absl::string_view name() { return "http"; }
+
+  void onRequestHeaders(const Http::RequestHeaderMap& request_headers) {
+    request_headers_ = &request_headers;
+  }
+
+  void onResponseHeaders(const Http::ResponseHeaderMap& response_headers) {
+    response_headers_ = &response_headers;
+  }
+
+  Http::RequestHeaderMapOptConstRef requestHeaders() const override {
+    if (request_headers_) {
+      return absl::make_optional(std::cref(*request_headers_));
+    }
+
+    return absl::nullopt;
+  }
+
+  Http::ResponseHeaderMapOptConstRef responseHeaders() const override {
+    if (response_headers_) {
+      return absl::make_optional(std::cref(*response_headers_));
+    }
+
+    return absl::nullopt;
+  }
+
+private:
+  const Http::RequestHeaderMap* request_headers_{};
+  const Http::ResponseHeaderMap* response_headers_{};
+};
+
+using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
+
+template <class HeaderType>
+class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
+public:
+  explicit HttpHeadersDataInputBase(const std::string& name) : name_(name) {}
+
+  virtual absl::optional<std::reference_wrapper<const HeaderType>>
+  headerMap(const HttpMatchingData& data) const PURE;
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) override {
+    const auto maybe_headers = headerMap(data);
+
+    if (!maybe_headers) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+    }
+
+    auto header = maybe_headers->get().get(name_);
+    if (header.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+
+    if (header_as_string_result_) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              header_as_string_result_->result()};
+    }
+
+    header_as_string_result_ = HeaderUtility::getAllOfHeaderAsString(header, ",");
+
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            header_as_string_result_->result()};
+  }
+
+private:
+  const LowerCaseString name_;
+  absl::optional<HeaderUtility::GetAllOfHeaderAsStringResult> header_as_string_result_;
+};
+
+class HttpRequestHeadersDataInput : public HttpHeadersDataInputBase<RequestHeaderMap> {
+public:
+  explicit HttpRequestHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
+
+  absl::optional<std::reference_wrapper<const RequestHeaderMap>>
+  headerMap(const HttpMatchingData& data) const override {
+    return data.requestHeaders();
+  }
+};
+
+class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
+public:
+  explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
+
+  absl::optional<std::reference_wrapper<const ResponseHeaderMap>>
+  headerMap(const HttpMatchingData& data) const override {
+    return data.responseHeaders();
+  }
+};
+
+class SkipAction : public Matcher::ActionBase<
+                       envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
+
 /**
  * Base class wrapper for both stream encoder and decoder filters.
+ *
+ * This class is responsible for performing matching and updating match data when a match tree is
+ * configured for the associated filter. When not using a match tree, only minimal overhead (i.e.
+ * memory overhead of unused fields) should apply.
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter)
+  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                         HttpMatchingDataImplSharedPtr matching_data)
       : parent_(parent), iteration_state_(IterationState::Continue),
+        match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)),
         iterate_from_current_filter_(false), headers_continued_(false),
         continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
-        decode_headers_called_(false), encode_headers_called_(false) {}
+        decode_headers_called_(false), encode_headers_called_(false), match_tree_evaluated_(false),
+        skip_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -45,8 +153,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   void commonContinue();
   virtual bool canContinue() PURE;
-  virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
-  virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
+  virtual Buffer::InstancePtr createBuffer() PURE;
+  virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool complete() PURE;
   virtual bool has100Continueheaders() PURE;
   virtual void do100ContinueHeaders() PURE;
@@ -95,6 +203,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     return saved_response_metadata_.get();
   }
 
+  void evaluateMatchTreeWithNewData(std::function<void(HttpMatchingDataImpl&)> update_func);
+
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
   // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
@@ -112,6 +222,10 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   };
   FilterManager& parent_;
   IterationState iteration_state_;
+
+  Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree_;
+  HttpMatchingDataImplSharedPtr matching_data_;
+
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
   // current filter instead of the next one. If true, filter iteration starts with the current
@@ -124,6 +238,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const bool dual_filter_ : 1;
   bool decode_headers_called_ : 1;
   bool encode_headers_called_ : 1;
+  bool match_tree_evaluated_ : 1;
+  bool skip_ : 1;
 };
 
 /**
@@ -133,13 +249,16 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+                            Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                            HttpMatchingDataImplSharedPtr matching_data, bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
+                               std::move(matching_data)),
+        handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override;
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override { return false; }
   void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
@@ -184,7 +303,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void setDecoderBufferLimit(uint32_t limit) override;
   uint32_t decoderBufferLimit() override;
-  bool recreateStream() override;
+  bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
@@ -219,13 +338,16 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+                            Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                            HttpMatchingDataImplSharedPtr matching_data, bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_tree),
+                               std::move(matching_data)),
+        handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override { return true; }
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override;
   void do100ContinueHeaders() override;
@@ -330,6 +452,11 @@ public:
    * in the case of multiple upstream calls.
    */
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
+
+  /**
+   * Updates response code stats based on the details in the headers.
+   */
+  virtual void chargeStats(const ResponseHeaderMap& headers) PURE;
 
   // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
   // callbacks instead of via the encode/decode callbacks on the filters.
@@ -512,14 +639,50 @@ public:
 
   // Http::FilterChainFactoryCallbacks
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, false);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
+  }
+  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
+                              Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
+    if (match_tree) {
+      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
+      addStreamDecoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), false);
+      return;
+    }
+
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
-    addStreamEncoderFilterWorker(filter, false);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
+  }
+  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
+                              Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
+    if (match_tree) {
+      addStreamEncoderFilterWorker(filter, std::move(match_tree),
+                                   std::make_shared<HttpMatchingDataImpl>(), false);
+      return;
+    }
+
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, true);
-    addStreamEncoderFilterWorker(filter, true);
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
+  }
+  void addStreamFilter(StreamFilterSharedPtr filter,
+                       Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
+    // Note that we share the match data and tree between the two filters to allow things like
+    // matching on both request and response data.
+    // TODO(snowp): The match tree might be fully evaluated twice, ideally we should expose
+    // the result to both filters after the first match evaluation.
+    if (match_tree) {
+      auto matching_data = std::make_shared<HttpMatchingDataImpl>();
+      addStreamDecoderFilterWorker(filter, match_tree, matching_data, true);
+      addStreamEncoderFilterWorker(filter, std::move(match_tree), std::move(matching_data), true);
+      return;
+    }
+
+    addStreamDecoderFilterWorker(filter, nullptr, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, nullptr, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
@@ -601,8 +764,12 @@ public:
   void decodeMetadata(MetadataMap& metadata_map) { decodeMetadata(nullptr, metadata_map); }
 
   // TODO(snowp): Make private as filter chain construction is moved into FM.
-  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
-  void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
+  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
+                                    Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                                    HttpMatchingDataImplSharedPtr matching_data, bool dual_filter);
+  void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
+                                    Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                                    HttpMatchingDataImplSharedPtr matching_data, bool dual_filter);
 
   void disarmRequestTimeout();
 
@@ -771,8 +938,8 @@ private:
   // processing the next filter. The storage is created on demand. We need to store metadata
   // temporarily in the filter in case the filter has stopped all while processing headers.
   std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
-  Buffer::WatermarkBufferPtr buffered_response_data_;
-  Buffer::WatermarkBufferPtr buffered_request_data_;
+  Buffer::InstancePtr buffered_response_data_;
+  Buffer::InstancePtr buffered_request_data_;
   uint32_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;

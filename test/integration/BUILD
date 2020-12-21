@@ -8,7 +8,6 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_hot_restart",
-    "envoy_select_new_codecs_in_integration_tests",
     "envoy_sh_test",
 )
 
@@ -64,10 +63,17 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "alpn_integration_test",
+    srcs = ["alpn_integration_test.cc"],
+    deps = [":http_integration_lib"],
 )
 
 envoy_cc_test(
@@ -135,6 +141,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
+    # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -318,7 +325,6 @@ envoy_cc_test(
         "http2_flood_integration_test.cc",
     ],
     shard_count = 4,
-    tags = ["flaky_on_windows"],
     deps = [
         ":autonomous_upstream_lib",
         ":http_integration_lib",
@@ -343,7 +349,6 @@ envoy_cc_test(
         "http2_integration_test.h",
     ],
     shard_count = 4,
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -372,8 +377,6 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
-    # Consistently times out in CI on Windows, but observed to pass locally
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
@@ -434,14 +437,15 @@ envoy_cc_test(
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 5,
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/common/http/http2:http2_frame",
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
@@ -457,7 +461,6 @@ envoy_cc_test(
         "http2_upstream_integration_test.cc",
         "http2_upstream_integration_test.h",
     ],
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
@@ -564,8 +567,6 @@ envoy_cc_test(
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 2,
-    # Consistently fails in CI on Windows, but observed to pass locally
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//test/integration/filters:backpressure_filter_config_lib",
@@ -610,9 +611,11 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
     ],
 )
@@ -646,10 +649,6 @@ envoy_cc_test_library(
     hdrs = [
         "fake_upstream.h",
     ],
-    copts = envoy_select_new_codecs_in_integration_tests(
-        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
-        "@envoy",
-    ),
     deps = [
         "//include/envoy/api:api_interface",
         "//include/envoy/grpc:status",
@@ -667,9 +666,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
@@ -713,6 +710,7 @@ envoy_cc_test_library(
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
@@ -782,10 +780,6 @@ envoy_cc_test_library(
         "integration.h",
         "ssl_utility.h",
     ],
-    copts = envoy_select_new_codecs_in_integration_tests(
-        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
-        "@envoy",
-    ),
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":autonomous_upstream_lib",
@@ -821,9 +815,7 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
@@ -873,7 +865,6 @@ envoy_cc_test(
         "integration_test.h",
     ],
     shard_count = 2,
-    # Times out on Windows
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
@@ -883,11 +874,13 @@ envoy_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:process_context_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/grpc_http1_bridge/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
@@ -919,8 +912,6 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
-    # Consistently fails in CI on Windows, but observed to pass locally
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -982,7 +973,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
-    # Consistently timing out on Windows, observed to pass locally
+    # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test, hangs at
+    # IpVersionsClientType/LoadStatsIntegrationTest.NoLocalLocality/3
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -1005,8 +997,6 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
-    # Alternately timing out and failing in CI on windows; observed to pass locally
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":integration_lib",
@@ -1040,7 +1030,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_protocol_integration_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
@@ -1059,10 +1048,14 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -1129,8 +1122,13 @@ envoy_cc_test(
         "sds_dynamic_integration_test.cc",
     ],
     data = [
+        "sds_dynamic_key_rotation_setup.sh",
         "//test/config/integration/certs",
     ],
+    # TODO(envoyproxy/windows-dev): The key rotation in SdsDynamicKeyRotationIntegrationTest via
+    # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
+    # correctly handle symlinks.
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
@@ -1187,8 +1185,6 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         ":integration_lib",
         ":tcp_proxy_integration_proto_cc_proto",
@@ -1223,13 +1219,12 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -1303,6 +1298,7 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
+    # TODO(envoyproxy/windows-dev): Investigate flakes in #14286.
     tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -1552,7 +1548,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
         "//test/test_common:logging_lib",
-        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -1577,5 +1572,21 @@ envoy_cc_test(
         ":integration_lib",
         "//test/common/http/http2:http2_frame",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "cluster_upstream_extension_integration_test",
+    srcs = [
+        "cluster_upstream_extension_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/protobuf",
+        "//test/integration/upstreams:per_host_upstream_config",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

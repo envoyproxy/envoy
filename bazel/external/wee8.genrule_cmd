@@ -19,7 +19,7 @@ pushd $$ROOT/wee8
 rm -rf out/wee8
 
 # Export compiler configuration.
-export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis"
+export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32"
 if [[ ( `uname` == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *"clang"* ]]; then
   export IS_CLANG=true
   export CC=$${CC:-clang}
@@ -49,6 +49,7 @@ if [[ $${ENVOY_MSAN-} == "1" ]]; then
 fi
 if [[ $${ENVOY_TSAN-} == "1" ]]; then
   WEE8_BUILD_ARGS+=" is_tsan=true"
+  export LDFLAGS="$${LDFLAGS} -L/opt/libcxx_tsan/lib -Wl,-rpath,/opt/libcxx_tsan/lib"
 fi
 
 # Debug/release build.

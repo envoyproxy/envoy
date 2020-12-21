@@ -79,8 +79,12 @@ static_resources:
               socket_address:
                 address: 10.1.2.11
                 port_value: 10002
-    http2_protocol_options:
-      max_concurrent_streams: 100
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            max_concurrent_streams: 100
   - name: some_statsd_sink
     connect_timeout: 5s
     # The rest of the configuration for statsd sink cluster.
