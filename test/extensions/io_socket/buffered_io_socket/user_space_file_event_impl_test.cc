@@ -51,7 +51,7 @@ public:
 
   void setWritable() { EXPECT_CALL(io_source_, isPeerWritable()).WillRepeatedly(Return(true)); }
   void setReadable() { EXPECT_CALL(io_source_, isReadable()).WillRepeatedly(Return(true)); }
-  void clearWriteReable() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
+  void clearReadWrite() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
 
 protected:
   NiceMock<MockReadWritable> io_source_;
@@ -61,11 +61,11 @@ protected:
   std::unique_ptr<UserSpaceFileEventImpl> user_file_event_;
 };
 
-TEST_F(UserSpaceFileEventImplTest, TestEnabledEventsTriggeredAfterCreate) {
+TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
   for (const auto current_event : {Event::FileReadyType::Read, Event::FileReadyType::Write,
                                    Event::FileReadyType::Read | Event::FileReadyType::Write}) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
-    clearWriteReable();
+    clearReadWrite();
     if (current_event | Event::FileReadyType::Read) {
       setReadable();
     }
@@ -82,7 +82,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledEventsTriggeredAfterCreate) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestReadEventNotDeliveredAfterDisabledRead) {
+TEST_F(UserSpaceFileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
   setWritable();
   setReadable();
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
@@ -96,7 +96,7 @@ TEST_F(UserSpaceFileEventImplTest, TestReadEventNotDeliveredAfterDisabledRead) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestRescheduleAfterTriggered) {
+TEST_F(UserSpaceFileEventImplTest, RescheduleAfterTriggered) {
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
@@ -121,7 +121,7 @@ TEST_F(UserSpaceFileEventImplTest, TestRescheduleAfterTriggered) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestRescheduleIsDeduplicated) {
+TEST_F(UserSpaceFileEventImplTest, RescheduleIsDeduplicated) {
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
@@ -140,7 +140,7 @@ TEST_F(UserSpaceFileEventImplTest, TestRescheduleIsDeduplicated) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents) {
+TEST_F(UserSpaceFileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
   for (const auto current_event : {Event::FileReadyType::Read, Event::FileReadyType::Write,
                                    Event::FileReadyType::Read | Event::FileReadyType::Write}) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
@@ -157,7 +157,7 @@ TEST_F(UserSpaceFileEventImplTest, TestDefaultReturnAllEnabledReadAndWriteEvents
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestActivateWillSchedule) {
+TEST_F(UserSpaceFileEventImplTest, ActivateWillSchedule) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
@@ -177,7 +177,7 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateWillSchedule) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestActivateDedup) {
+TEST_F(UserSpaceFileEventImplTest, ActivateDedup) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
@@ -199,7 +199,7 @@ TEST_F(UserSpaceFileEventImplTest, TestActivateDedup) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
+TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
@@ -227,7 +227,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
   // No event is delivered since it's either user disabled or io_handle doesn't provide pending
   // data.
   {
-    clearWriteReable();
+    clearReadWrite();
     setReadable();
     user_file_event_->activate(Event::FileReadyType::Read);
     user_file_event_->setEnabled(Event::FileReadyType::Write);
@@ -235,7 +235,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
-    clearWriteReable();
+    clearReadWrite();
     setWritable();
     user_file_event_->activate(Event::FileReadyType::Write);
     user_file_event_->setEnabled(Event::FileReadyType::Read);
@@ -248,7 +248,7 @@ TEST_F(UserSpaceFileEventImplTest, TestEnabledClearActivate) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, TestEventClosedIsNotTriggeredUnlessManullyActivated) {
+TEST_F(UserSpaceFileEventImplTest, EventClosedIsNotTriggeredUnlessManullyActivated) {
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);

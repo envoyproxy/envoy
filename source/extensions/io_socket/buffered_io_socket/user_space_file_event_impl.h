@@ -24,7 +24,7 @@ class EventListenerImpl {
 public:
   ~EventListenerImpl() = default;
 
-  void clearEphemeralEvents(uint32_t enabled_events);
+  void clearEphemeralEvents();
   void onEventActivated(uint32_t activated_events);
 
   uint32_t getAndClearEphemeralEvents() { return std::exchange(ephemeral_events_, 0); }

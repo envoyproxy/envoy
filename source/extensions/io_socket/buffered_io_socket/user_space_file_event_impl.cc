@@ -23,7 +23,7 @@ UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Ev
   setEnabled(events);
 }
 
-void EventListenerImpl::clearEphemeralEvents(uint32_t) {
+void EventListenerImpl::clearEphemeralEvents() {
   // Clear ephemeral events to align with FileEventImpl::setEnable().
   ephemeral_events_ = 0;
 }
@@ -44,7 +44,7 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
-  event_listener_.clearEphemeralEvents(events);
+  event_listener_.clearEphemeralEvents();
   bool was_enabled = schedulable_->enabled();
   // Recalculate activated events.
   uint32_t events_to_notify = 0;

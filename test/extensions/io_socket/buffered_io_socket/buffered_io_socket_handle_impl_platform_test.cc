@@ -46,7 +46,7 @@ public:
   MockFileEventCallback cb_;
 };
 
-TEST_F(BufferedIoSocketHandlePlatformTest, TestCreatePlatformDefaultTriggerTypeFailOnWindows) {
+TEST_F(BufferedIoSocketHandlePlatformTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
   // schedulable_cb will be destroyed by IoHandle.
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
