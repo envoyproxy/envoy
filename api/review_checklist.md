@@ -31,6 +31,8 @@ consider the answers to these questions before sending a PR.
 - Is the PR aligned with the [API style guidelines](STYLE.md)?
 
 ## Validation Rules
+- Does the field have protocgen-validate rules to enforce constraints on
+  its value?
 - Is the field mandatory? Does it have the required rule?
 - Is the field numeric? Is it bounded correctly?
 - Is the field repeated? Does it have the correct min/max items numbers? Are
@@ -45,15 +47,16 @@ consider the answers to these questions before sending a PR.
   work necessary to add support for the newer replacement field acceptable to
   known xDS clients in this time frame?
 - No deprecations are allowed when an alternative is "not ready yet" in any
-  major known xDS client (Envoy or gRPC at this point). If you are not sure
-  about the current state of a feature in the major known xDS clients, ask
-  one of the API shepherds.
+  major known xDS client (Envoy or gRPC at this point), unless the
+  maintainers of that xDS client have signed off on the change. If you are not
+  sure about the current state of a feature in the major known xDS clients,
+  ask one of the API shepherds.
 - Is this deprecated field documented in a way that points to the preferred
   newer method of configuration?
 
 ## Extensibility
 - Is this feature being directly added into the API itself, or is it being
-  introduced via an extension point?
+  introduced via an extension point (i.e., using `TypedExtensionConfig`)?
 - If not via an extension point, why not?
 - If no appropriate extension point currently exists, is this a good
   opportunity to add one?  Can we move some existing "core" functionality
@@ -72,6 +75,11 @@ consider the answers to these questions before sending a PR.
   - Example: Can it use common types such as matcher or number?
 - Are there similar structures that already exist?
 - Is the naming convention consistent with other APIs?
+- If there are new proto messages being added, are they in the right
+  place in the tree? Consider not just the current users of this proto
+  but also other possible uses in the future. Would it make more sense
+  to make the proto a generic type and put it in a common location, so
+  that it can be used in other places in the future?
 
 ## Interactions With Other Features
 - Will this feature interact in strange ways with other features, either
@@ -84,14 +92,18 @@ consider the answers to these questions before sending a PR.
   please document each combination that won't work and justify why this is
   okay.  Is there some other way to structure this feature that would not
   cause conflicts with other features?
+- If this change involves extension configuration, how will it interact
+  with ECDS?
 
 ## Genericness
-- Is this an Envoy-specific or proxy-specific feature?  How will it apply to xDS clients other than Envoy (e.g., gRPC)?
+- Is this an Envoy-specific or proxy-specific feature? How will it apply to
+  xDS clients other than Envoy (e.g., gRPC)?
 
 ## Dependencies
 - Does this feature pull in any new dependencies for clients?
 - Are these dependencies optional or required?
-- Will the dependencies cause problems for any known xDS clients?
+- Will the dependencies cause problems for any known xDS clients (e.g.,
+  [Envoy's dependency policy](https://github.com/envoyproxy/envoy/blob/master/DEPENDENCY_POLICY.md))?
 
 ## Failure Modes
 - What is the failure mode if this feature is configured but is not working
@@ -109,6 +121,11 @@ consider the answers to these questions before sending a PR.
   efficiency is not needed now, it may be something we will need in the future,
   and we will save pain in the long run if we structure the API in a way that
   gives us the flexibility to change the implementation later.)
+- How does this feature affect config size? For example, instead of
+  adding a huge mandatory proto to every single route entry, consider
+  ways of setting it at the virtual host level and then overriding only
+  the parts that change on a per-route basis.
+- Will the change require multiple round trips via the REST API?
 
 ## Monitoring
 - Is there any behavior associated with this feature that will require
