@@ -39,6 +39,7 @@ Bug Fixes
 * config: validate that upgrade configs have a non-empty :ref:`upgrade_type <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.upgrade_type>`, fixing a bug where an errant "-" could result in unexpected behavior.
 * dns: fix a bug where custom resolvers provided in configuration were not preserved after network issues.
 * dns_filter: correctly associate DNS response IDs when multiple queries are received.
+* grpc mux: fix sending node again after stream is reset when ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` is set.
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
 * http: reject requests with missing required headers after filter chain processing.
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
@@ -105,6 +106,7 @@ Deprecated
 * compression: the fields :ref:`content_length <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.content_length>`, :ref:`content_type <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.content_type>`, :ref:`disable_on_etag_header <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.disable_on_etag_header>`, :ref:`remove_accept_encoding_header <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.remove_accept_encoding_header>` and :ref:`runtime_enabled <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.runtime_enabled>` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>` message have been deprecated in favor of :ref:`response_direction_config <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.response_direction_config>`.
 * formatter: :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` is now deprecated in favor of :ref:`text_format_source <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format_source>`. To migrate existing text format strings, use the :ref:`inline_string <envoy_v3_api_field_config.core.v3.DataSource.inline_string>` field.
 * gzip: :ref:`HTTP Gzip filter <config_http_filters_gzip>` is rejected now unless explicitly allowed with :ref:`runtime override <config_runtime_deprecation>` `envoy.deprecated_features.allow_deprecated_gzip_http_filter` set to `true`.
+* listener: :ref:`use_proxy_proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` has been deprecated in favor of adding a :ref:`PROXY protocol listener filter <config_listener_filters_proxy_protocol>` explicitly.
 * logging: the `--log-format-prefix-with-location` option is removed.
 * ratelimit: the :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` action is deprecated in favor of the more generic :ref:`metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>` action.
 * stats: the `--use-fake-symbol-table` option is removed.
