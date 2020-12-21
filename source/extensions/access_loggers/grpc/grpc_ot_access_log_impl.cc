@@ -7,6 +7,7 @@
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"
+#include "envoy/local_info/local_info.h"
 
 #include "common/config/utility.h"
 #include "common/grpc/typed_async_client.h"
@@ -19,8 +20,9 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 
 GrpcOpenTelemetryAccessLoggerImpl::GrpcOpenTelemetryAccessLoggerImpl(
-    Grpc::RawAsyncClientPtr&& client, std::chrono::milliseconds buffer_flush_interval_msec,
-    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher, Stats::Scope& scope,
+    Grpc::RawAsyncClientPtr&& client, std::string log_name,
+    std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
     envoy::config::core::v3::ApiVersion transport_api_version)
     : GrpcAccessLogger(
           std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
@@ -29,13 +31,16 @@ GrpcOpenTelemetryAccessLoggerImpl::GrpcOpenTelemetryAccessLoggerImpl(
                                  "opentelemetry.proto.collector.logs.v1.LogsService.Export")
               .getMethodDescriptorForVersion(transport_api_version),
           transport_api_version),
-      root_(initRoot()) {}
+      log_name_(log_name), local_info_(local_info) {
+  initRoot();
+}
 
-InstrumentationLibraryLogs GrpcOpenTelemetryAccessLoggerImpl::initRoot() {
-  InstrumentationLibraryLogs root;
-  root.mutable_instrumentation_library()->set_name("envoy");
-  root.mutable_instrumentation_library()->set_version("v3"); // TODO: Get real API version.
-  return root;
+// See comment about the structure of repeated fields in the header file.
+void GrpcOpenTelemetryAccessLoggerImpl::initRoot() {
+  root_ = message_.add_resource_logs()->add_instrumentation_library_logs();
+  // No reason to clear and refill these every time.
+  root_->mutable_instrumentation_library()->set_name("envoy");
+  root_->mutable_instrumentation_library()->set_version("v1");
 }
 
 void GrpcOpenTelemetryAccessLoggerImpl::addEntry(
@@ -51,22 +56,26 @@ void GrpcOpenTelemetryAccessLoggerImpl::addEntry(
 bool GrpcOpenTelemetryAccessLoggerImpl::isEmpty() { return root_->logs().empty(); }
 
 void GrpcOpenTelemetryAccessLoggerImpl::initMessage() {
-  fmt::print("iitamark init before\n");
-  // See comment about structure of repeated fields.
-  message_.add_resource_logs()->mutable_instrumentation_library_logs()->Add(
-      opentelemetry::proto::logs::v1::InstrumentationLibraryLogs(root_));
-  // root_->mutable_instrumentation_library()->set_name("envoy");
-  // root_->mutable_instrumentation_library()->set_version("v3"); // GetAPI.
-  fmt::print("iitamark init after\n");
+  // auto* resource = message_.mutable_resource_logs(0)->mutable_resource();
+  // resource->add_attributes() ..
+  (void)log_name_;
+  (void)local_info_;
 }
+
+void GrpcOpenTelemetryAccessLoggerImpl::clearMessage() { root_->clear_logs(); }
+
+GrpcOpenTelemetryAccessLoggerCacheImpl::GrpcOpenTelemetryAccessLoggerCacheImpl(
+    Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
+    ThreadLocal::SlotAllocator& tls, const LocalInfo::LocalInfo& local_info)
+    : GrpcAccessLoggerCache(async_client_manager, scope, tls), local_info_(local_info) {}
 
 GrpcOpenTelemetryAccessLoggerImpl::SharedPtr GrpcOpenTelemetryAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     Grpc::RawAsyncClientPtr&& client, std::chrono::milliseconds buffer_flush_interval_msec,
     uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher, Stats::Scope& scope) {
   return std::make_shared<GrpcOpenTelemetryAccessLoggerImpl>(
-      std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-      Config::Utility::getAndCheckTransportVersion(config));
+      std::move(client), config.log_name(), buffer_flush_interval_msec, max_buffer_size_bytes,
+      dispatcher, local_info_, scope, Config::Utility::getAndCheckTransportVersion(config));
 }
 
 } // namespace GrpcCommon

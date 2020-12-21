@@ -122,6 +122,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/extensions/access_loggers/grpc:grpc_ot_access_log_lib",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
