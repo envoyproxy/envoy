@@ -2213,7 +2213,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
         "%%|%%123456000|1522796769%%123|1%%1522796769",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__APPLE__)
   {
     const std::string format = "%START_TIME(%E4n)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
