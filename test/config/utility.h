@@ -255,7 +255,7 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls();
+  void configureUpstreamTls(bool use_alpn = false);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -278,9 +278,6 @@ public:
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
-
-  // Set new codecs to use for upstream and downstream codecs.
-  void setNewCodecs();
 
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,

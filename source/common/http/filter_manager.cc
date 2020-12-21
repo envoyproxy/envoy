@@ -844,16 +844,14 @@ void FilterManager::sendLocalReplyViaFilterChain(
                  absl::string_view& content_type) -> void {
             // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
             // opt refs.
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
-                                     ? &filter_manager_callbacks_.requestHeaders()->get()
-                                     : nullptr,
-                                 response_headers, stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 stream_info_, code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
-            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders()->get(), end_stream);
+            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             // TODO: Start encoding from the last decoder filter that saw the
@@ -885,10 +883,8 @@ void FilterManager::sendDirectLocalReply(
           },
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
-                                     ? &filter_manager_callbacks_.requestHeaders()->get()
-                                     : nullptr,
-                                 response_headers, stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 stream_info_, code, body, content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
             // Move the response headers into the FilterManager to make sure they're visible to
@@ -1248,11 +1244,11 @@ bool FilterManager::createFilterChain() {
   bool upgrade_rejected = false;
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
-    upgrade = filter_manager_callbacks_.requestHeaders()->get().Upgrade();
+    upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
 
     // Treat CONNECT requests as a special upgrade case.
     if (!upgrade && HeaderUtility::isConnect(*filter_manager_callbacks_.requestHeaders())) {
-      upgrade = filter_manager_callbacks_.requestHeaders()->get().Method();
+      upgrade = filter_manager_callbacks_.requestHeaders()->Method();
     }
   }
 
