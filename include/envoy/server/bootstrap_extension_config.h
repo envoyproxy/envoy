@@ -40,11 +40,11 @@ public:
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException. The returned pointer should never be nullptr.
    * @param config the custom configuration for this bootstrap extension type.
-   * @param validation_visitor message validation visitor instance.
+   * @param context is the context to use for the extension. Note that the clusterManager is not
+   *    yet initialized at this point and **must not** be used.
    */
-  virtual BootstrapExtensionPtr
-  createBootstrapExtension(const Protobuf::Message& config,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual BootstrapExtensionPtr createBootstrapExtension(const Protobuf::Message& config,
+                                                         ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.bootstrap"; }
 };

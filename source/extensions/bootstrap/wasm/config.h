@@ -41,7 +41,7 @@ public:
   std::string name() const override { return "envoy.bootstrap.wasm"; }
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) override;
+                           Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::wasm::v3::WasmService>();
   }

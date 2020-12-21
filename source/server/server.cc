@@ -431,8 +431,8 @@ void InstanceImpl::initialize(const Options& options,
     auto config = Config::Utility::translateAnyToFactoryConfig(
         bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
-    bootstrap_extensions_.push_back(factory.createBootstrapExtension(
-        *config, messageValidationContext().staticValidationVisitor()));
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
   }
 
   // Register the fatal actions.

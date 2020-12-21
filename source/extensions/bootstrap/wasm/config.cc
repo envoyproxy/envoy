@@ -65,10 +65,10 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
 
 Server::BootstrapExtensionPtr
 WasmFactory::createBootstrapExtension(const Protobuf::Message& config,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+                                      Server::Configuration::ServerFactoryContext& context) {
   auto typed_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::wasm::v3::WasmService&>(
-          config, validation_visitor);
+          config, context.messageValidationContext().staticValidationVisitor());
 
   return std::make_unique<WasmServiceExtension>(typed_config);
 }
