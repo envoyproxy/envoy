@@ -1,6 +1,7 @@
 #include "mocks.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 
@@ -23,10 +24,7 @@ MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
 
 MockFilterManagerCallbacks::MockFilterManagerCallbacks() {
   ON_CALL(*this, responseHeaders()).WillByDefault(Invoke([this]() -> ResponseHeaderMapOptRef {
-    if (response_headers_) {
-      return absl::make_optional(std::ref(*response_headers_));
-    }
-    return absl::nullopt;
+    return makeOptRefFromPtr(response_headers_.get());
   }));
 }
 MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
