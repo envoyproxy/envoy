@@ -110,7 +110,8 @@ match:
   hasSidecar: "true"
 transport_socket:
   name: "foo"
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
     id: "abc"
  )EOF"});
 
@@ -125,7 +126,8 @@ match:
   sidecar: "true"
 transport_socket:
   name: "foo"
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
     id: "sidecar")EOF",
         R"EOF(
 name: "http_socket"
@@ -133,7 +135,8 @@ match:
   protocol: "http"
 transport_socket:
   name: "foo"
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
     id: "http"
  )EOF"});
 
@@ -161,7 +164,8 @@ match:
   protocol: "http"
 transport_socket:
   name: "foo"
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
     id: "sidecar_http"
  )EOF",
         R"EOF(
@@ -170,7 +174,8 @@ match:
   sidecar: "true"
 transport_socket:
   name: "foo"
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
     id: "sidecar"
  )EOF"});
   envoy::config::core::v3::Metadata metadata;
@@ -188,7 +193,8 @@ name: "match_all"
 match: {}
 transport_socket:
   name: "foo"
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
     id: "match_all"
  )EOF"});
   envoy::config::core::v3::Metadata metadata;

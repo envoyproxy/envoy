@@ -10,10 +10,11 @@
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 
-#include "common/event/dispatcher_impl.h"
+#include "common/common/random_generator.h"
 #include "common/network/address_impl.h"
 #include "common/network/apple_dns_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
@@ -31,6 +32,8 @@ using testing::Return;
 using testing::SaveArg;
 using testing::StrEq;
 using testing::WithArgs;
+
+struct _DNSServiceRef_t {};
 
 namespace Envoy {
 namespace Network {
@@ -200,6 +203,8 @@ TEST_F(AppleDnsImplTest, LocalResolution) {
 // error conditions, and callback firing.
 class AppleDnsImplFakeApiTest : public testing::Test {
 public:
+  AppleDnsImplFakeApiTest() : initialize_failure_timer_(new Event::MockTimer) {}
+
   ~AppleDnsImplFakeApiTest() override {
     if (resolver_) {
       EXPECT_CALL(dns_service_, dnsServiceRefDeallocate(_));
@@ -209,37 +214,50 @@ public:
   void createResolver() {
     file_event_ = new NiceMock<Event::MockFileEvent>;
 
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(initialize_failure_timer_));
     EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_))
-        .WillOnce(Return(kDNSServiceErr_NoError));
+        .WillOnce(DoAll(
+            WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
+            Return(kDNSServiceErr_NoError)));
     EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
+    EXPECT_CALL(*initialize_failure_timer_, disableTimer());
 
-    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_);
+    resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
   }
 
 protected:
   MockDnsService dns_service_;
   TestThreadsafeSingletonInjector<Network::DnsService> dns_service_injector_{&dns_service_};
+  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::AppleDnsResolverImpl> resolver_{};
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::MockTimer* initialize_failure_timer_;
   NiceMock<Event::MockFileEvent>* file_event_;
   Event::FileReadyCb file_ready_cb_;
+  Random::RandomGeneratorImpl random_;
 };
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInConnectionCreation) {
-  ON_CALL(dns_service_, dnsServiceCreateConnection(_))
-      .WillByDefault(Return(kDNSServiceErr_Unknown));
-  EXPECT_DEATH(std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_),
-               "error=-65537 in DNSServiceCreateConnection");
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(initialize_failure_timer_));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_Unknown));
+  EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
+
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
+
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.connection_failure")->value());
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
-  ON_CALL(dns_service_, dnsServiceCreateConnection(_))
-      .WillByDefault(Return(kDNSServiceErr_NoError));
-  ON_CALL(dns_service_, dnsServiceRefSockFD(_)).WillByDefault(Return(-1));
-  EXPECT_DEATH(std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_),
-               "error in DNSServiceRefSockFD");
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(initialize_failure_timer_));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_NoError));
+  EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(-1));
+  EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
+
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
+
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.socket_failure")->value());
 }
 
 TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
@@ -260,8 +278,11 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
+  EXPECT_CALL(*initialize_failure_timer_, disableTimer());
 
   file_ready_cb_(Event::FileReadyType::Read);
+
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.processing_failure")->value());
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResultWithPendingQueries) {
@@ -282,6 +303,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResultWithPendingQueries) {
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
                                     StrEq(hostname.c_str()), _, _))
       .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
 
   auto query =
       resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
@@ -312,6 +334,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResultWithPendingQueries) {
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
+  EXPECT_CALL(*initialize_failure_timer_, disableTimer());
 
   file_ready_cb_(Event::FileReadyType::Read);
 
@@ -321,6 +344,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResultWithPendingQueries) {
 TEST_F(AppleDnsImplFakeApiTest, SynchronousErrorInGetAddrInfo) {
   createResolver();
 
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, _, _, _, _, _, _))
       .WillOnce(Return(kDNSServiceErr_Unknown));
   // The Query's sd ref will be deallocated.
@@ -348,6 +372,7 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
 
   // The query's ref is going to be deallocated when the query is destroyed.
   EXPECT_CALL(dns_service_, dnsServiceRefDeallocate(_));
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -386,6 +411,7 @@ TEST_F(AppleDnsImplFakeApiTest, IncorrectInterfaceIndexReturned) {
 
   Network::Address::Ipv4Instance address(&addr4);
 
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -421,10 +447,15 @@ TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithError) {
   // to be deallocated due to the error.
   EXPECT_CALL(dns_service_, dnsServiceRefDeallocate(_)).Times(2);
   // A new main ref is created on error.
-  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_NoError));
+  EXPECT_CALL(*initialize_failure_timer_, disableTimer());
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_))
+      .WillOnce(DoAll(
+          WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
+          Return(kDNSServiceErr_NoError)));
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -468,6 +499,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -510,6 +542,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -538,6 +571,8 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
+  EXPECT_CALL(*initialize_failure_timer_, disableTimer());
+
   reply_callback(nullptr, 0, 0, kDNSServiceErr_Unknown, hostname.c_str(), nullptr, 30, query);
 
   dns_callback_executed.WaitForNotification();
@@ -565,6 +600,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   absl::Notification dns_callback_executed2;
 
   // Start first query.
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -584,6 +620,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
   ASSERT_NE(nullptr, query);
 
   // Start second query.
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4, StrEq(hostname2.c_str()), _, _))
@@ -632,6 +669,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   absl::Notification dns_callback_executed2;
 
   // Start first query.
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -653,6 +691,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   ASSERT_NE(nullptr, query);
 
   // Start second query.
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4, StrEq(hostname2.c_str()), _, _))
@@ -680,6 +719,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
   EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
+  EXPECT_CALL(*initialize_failure_timer_, disableTimer());
 
   // The second query fails.
   reply_callback2(nullptr, 0, 0, kDNSServiceErr_Unknown, hostname2.c_str(), nullptr, 30, query2);
@@ -700,6 +740,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
   DNSServiceGetAddrInfoReply reply_callback;
   absl::Notification dns_callback_executed;
 
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -735,6 +776,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
   Network::Address::Ipv4Instance address(&addr4);
   DNSServiceGetAddrInfoReply reply_callback;
 
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).WillOnce(Return(false));
   EXPECT_CALL(dns_service_,
               dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
                                     kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
@@ -749,6 +791,83 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
   EXPECT_DEATH(reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError,
                               hostname.c_str(), nullptr, 30, query),
                "invalid to add null address");
+}
+
+TEST_F(AppleDnsImplFakeApiTest, ErrorInConnectionCreationImmediateCallback) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(initialize_failure_timer_));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_Unknown));
+  EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
+
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
+
+  EXPECT_CALL(*initialize_failure_timer_, enabled()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_NoError));
+  EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(-1));
+  EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
+
+  absl::Notification dns_callback_executed;
+  EXPECT_EQ(nullptr,
+            resolver_->resolve("foo.com", Network::DnsLookupFamily::Auto,
+                               [&dns_callback_executed](DnsResolver::ResolutionStatus status,
+                                                        std::list<DnsResponse>&& response) -> void {
+                                 EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                                 EXPECT_TRUE(response.empty());
+                                 dns_callback_executed.Notify();
+                               }));
+  dns_callback_executed.WaitForNotification();
+}
+
+TEST_F(AppleDnsImplFakeApiTest, ErrorInConnectionCreationQueryDispatched) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(initialize_failure_timer_));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_)).WillOnce(Return(kDNSServiceErr_Unknown));
+  EXPECT_CALL(*initialize_failure_timer_, enableTimer(_, _));
+
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, random_, stats_store_);
+
+  file_event_ = new NiceMock<Event::MockFileEvent>;
+  EXPECT_CALL(*initialize_failure_timer_, enabled())
+      .Times(2)
+      .WillOnce(Return(true))
+      .WillOnce(Return(false));
+  EXPECT_CALL(dns_service_, dnsServiceCreateConnection(_))
+      .WillOnce(DoAll(
+          WithArgs<0>(Invoke([](DNSServiceRef* ref) -> void { *ref = new _DNSServiceRef_t{}; })),
+          Return(kDNSServiceErr_NoError)));
+  EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
+  EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
+      .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
+  EXPECT_CALL(*initialize_failure_timer_, disableTimer());
+
+  absl::Notification dns_callback_executed;
+  const std::string hostname = "foo.com";
+  DNSServiceGetAddrInfoReply reply_callback;
+  sockaddr_in addr4;
+  addr4.sin_family = AF_INET;
+  EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
+  addr4.sin_port = htons(6502);
+  Network::Address::Ipv4Instance address(&addr4);
+
+  EXPECT_CALL(dns_service_,
+              dnsServiceGetAddrInfo(_, kDNSServiceFlagsShareConnection | kDNSServiceFlagsTimeout, 0,
+                                    kDNSServiceProtocol_IPv4, StrEq(hostname.c_str()), _, _))
+      .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
+
+  auto query =
+      resolver_->resolve(hostname, Network::DnsLookupFamily::V4Only,
+                         [&dns_callback_executed](DnsResolver::ResolutionStatus status,
+                                                  std::list<DnsResponse>&& response) -> void {
+                           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+                           EXPECT_EQ(1, response.size());
+                           dns_callback_executed.Notify();
+                         });
+  EXPECT_NE(nullptr, query);
+
+  // The query's sd ref will be deallocated on completion.
+  EXPECT_CALL(dns_service_, dnsServiceRefDeallocate(_));
+  reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
+                 address.sockAddr(), 30, query);
+
+  dns_callback_executed.WaitForNotification();
 }
 
 } // namespace

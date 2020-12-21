@@ -44,7 +44,7 @@ public:
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
     node_.set_id("fo0");
-    EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
+    EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
@@ -116,7 +116,7 @@ public:
           last_cluster_names_.end()) {
         envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
-        response->add_resources()->PackFrom(API_DOWNGRADE(*load_assignment));
+        response->add_resources()->PackFrom(*load_assignment);
       }
     }
     const auto decoded_resources =

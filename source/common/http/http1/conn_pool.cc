@@ -23,35 +23,22 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
-                           Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-    : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                           transport_socket_options, random_generator, {Protocol::Http11}) {}
-
-ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
-
-Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
-  return std::make_unique<ActiveClient>(*this);
-}
-
-ConnPoolImpl::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
+ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
     : RequestEncoderWrapper(parent.codec_client_->newStream(*this)),
       ResponseDecoderWrapper(response_decoder), parent_(parent) {
   RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
 }
 
-ConnPoolImpl::StreamWrapper::~StreamWrapper() {
+ActiveClient::StreamWrapper::~StreamWrapper() {
   // Upstream connection might be closed right after response is complete. Setting delay=true
   // here to attach pending requests in next dispatcher loop to handle that case.
   // https://github.com/envoyproxy/envoy/issues/2715
-  parent_.parent().onStreamClosed(parent_, true);
+  parent_.parent_.onStreamClosed(parent_, true);
 }
 
-void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
+void ActiveClient::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
-void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
+void ActiveClient::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
     close_connection_ =
         HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
@@ -76,10 +63,9 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
-void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
+void ActiveClient::StreamWrapper::onDecodeComplete() {
   ASSERT(!decode_complete_);
   decode_complete_ = encode_complete_;
-
   ENVOY_CONN_LOG(debug, "response complete", *parent_.codec_client_);
 
   if (!parent_.stream_wrapper_->encode_complete_) {
@@ -90,44 +76,60 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
     parent_.codec_client_->close();
   } else {
     auto* pool = &parent_.parent();
-    pool->dispatcher_.post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->scheduleOnUpstreamReady();
     parent_.stream_wrapper_.reset();
 
     pool->checkForDrained();
   }
 }
 
-ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : Envoy::Http::ActiveClient(
-          parent, parent.host_->cluster().maxRequestsPerConnection(),
-          1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
-      ) {
-  parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
+void ActiveClient::StreamWrapper::onResetStream(StreamResetReason, absl::string_view) {
+  parent_.codec_client_->close();
 }
 
-bool ConnPoolImpl::ActiveClient::closingWithIncompleteStream() const {
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
+    : Envoy::Http::ActiveClient(
+          parent, parent.host()->cluster().maxRequestsPerConnection(),
+          1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
+      ) {
+  parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
+}
+
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data)
+    : Envoy::Http::ActiveClient(
+          parent, parent.host()->cluster().maxRequestsPerConnection(),
+          1, // HTTP1 always has a concurrent-request-limit of 1 per connection.
+          data) {
+  parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
+}
+
+bool ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
 }
 
-RequestEncoder& ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
+RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
   ASSERT(!stream_wrapper_);
   stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, *this);
   return *stream_wrapper_;
-}
-
-CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           data.host_description_, dispatcher_, random_generator_)};
-  return codec;
 }
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
-  return std::make_unique<Http::Http1::ProdConnPoolImpl>(
-      dispatcher, random_generator, host, priority, options, transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state) {
+  return std::make_unique<FixedHttpConnPoolImpl>(
+      std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
+      random_generator, state,
+      [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
+      [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
+        CodecClientPtr codec{new CodecClientProd(
+            CodecClient::Type::HTTP1, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator())};
+        return codec;
+      },
+      std::vector<Protocol>{Protocol::Http11});
 }
 
 } // namespace Http1

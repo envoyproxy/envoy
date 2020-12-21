@@ -27,12 +27,12 @@ MATCHER(IsInvalidAddress, "") {
 
 MATCHER(IsNotSupportedResult, "") { return arg.errno_ == SOCKET_ERROR_NOT_SUP; }
 
-ABSL_MUST_USE_RESULT std::pair<Buffer::SlicePtr, Buffer::RawSlice> allocateOneSlice(uint64_t size) {
-  auto owned_slice = Buffer::OwnedSlice::create(size);
-  Buffer::RawSlice slice = owned_slice->reserve(size);
+ABSL_MUST_USE_RESULT std::pair<Buffer::Slice, Buffer::RawSlice> allocateOneSlice(uint64_t size) {
+  Buffer::Slice mutable_slice(size);
+  auto slice = mutable_slice.reserve(size);
   EXPECT_NE(nullptr, slice.mem_);
   EXPECT_EQ(size, slice.len_);
-  return {std::move(owned_slice), slice};
+  return {std::move(mutable_slice), slice};
 }
 
 class MockFileEventCallback {

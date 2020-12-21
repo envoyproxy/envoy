@@ -41,6 +41,7 @@ stages:
 
       - job: docs
         dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+        condition: ne(variables['PostSubmit'], true)
         pool:
           vmImage: "ubuntu-18.04"
         steps:
@@ -59,33 +60,13 @@ stages:
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
             displayName: "Generate docs"
 
-          - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+          - script: |
+              ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
             displayName: "Upload Docs to GCS"
             env:
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
               GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathtoPublish: "$(Build.SourcesDirectory)/generated/docs"
-              artifactName: docs
-
-          - task: InstallSSHKey@0
-            inputs:
-              hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
-              sshPublicKey: "$(DocsPublicKey)"
-              sshPassphrase: "$(SshDeployKeyPassphrase)"
-              sshKeySecureFile: "$(DocsPrivateKey)"
-            condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
-
-          - script: docs/publish.sh
-            displayName: "Publish to GitHub"
-            workingDirectory: $(Build.SourcesDirectory)
-            env:
-              AZP_BRANCH: $(Build.SourceBranch)
-              AZP_SHA1: $(Build.SourceVersion)
-            condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
 
       - job: dependencies
         dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
@@ -305,6 +286,43 @@ stages:
               artifactName: docker
             condition: always()
 
+  - stage: docs
+    dependsOn: ["docker"]
+    condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
+    jobs:
+      - job: publish
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - task: Cache@2
+            inputs:
+              key: "docs | ./WORKSPACE | **/*.bzl"
+              path: $(Build.StagingDirectory)/repository_cache
+            continueOnError: true
+
+          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+            displayName: "Generate docs"
+
+          - task: InstallSSHKey@0
+            inputs:
+              hostName: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ=="
+              sshPublicKey: "$(DocsPublicKey)"
+              sshPassphrase: "$(SshDeployKeyPassphrase)"
+              sshKeySecureFile: "$(DocsPrivateKey)"
+
+          - script: docs/publish.sh
+            displayName: "Publish to GitHub"
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              AZP_BRANCH: $(Build.SourceBranch)
+              AZP_SHA1: $(Build.SourceVersion)
+
   - stage: verify
     dependsOn: ["docker"]
     jobs:
@@ -369,12 +387,22 @@ stages:
           - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
             displayName: "Run Windows CI"
             env:
+              CI_TARGET: "windows"
               ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+              SLACK_TOKEN: $(SLACK_TOKEN)
+              REPO_URI: $(Build.Repository.Uri)
+              BUILD_URI: $(Build.BuildUri)
               ENVOY_RBE: "true"
-              BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
+              BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
+              testRunTitle: "windows"
+              searchFolder: $(Build.StagingDirectory)/tmp
+            condition: always()
           - task: PublishBuildArtifacts@1
             inputs:
               pathtoPublish: "$(Build.StagingDirectory)/envoy"

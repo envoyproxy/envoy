@@ -33,11 +33,12 @@ namespace {
 RawConnectionDriver::DoWriteCallback writeBufferCallback(Buffer::Instance& data) {
   auto shared_data = std::make_shared<Buffer::OwnedImpl>();
   shared_data->move(data);
-  return [shared_data](Network::ClientConnection& client) {
+  return [shared_data](Buffer::Instance& dest) {
     if (shared_data->length() > 0) {
-      client.write(*shared_data, false);
+      dest.add(*shared_data);
       shared_data->drain(shared_data->length());
     }
+    return false;
   };
 }
 
@@ -89,7 +90,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
-      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80", time_system)};
   Http::CodecClientProd client(
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
@@ -144,11 +145,15 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
                                          Network::Address::IpVersion version,
                                          Event::Dispatcher& dispatcher,
                                          Network::TransportSocketPtr transport_socket)
-    : dispatcher_(dispatcher) {
+    : dispatcher_(dispatcher), remaining_bytes_to_send_(0) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  callbacks_ = std::make_unique<ConnectionCallbacks>(
-      [this, write_request_callback]() { write_request_callback(*client_); });
+  callbacks_ = std::make_unique<ConnectionCallbacks>([this, write_request_callback]() {
+    Buffer::OwnedImpl buffer;
+    const bool close_after = write_request_callback(buffer);
+    remaining_bytes_to_send_ += buffer.length();
+    client_->write(buffer, close_after);
+  });
 
   if (transport_socket == nullptr) {
     transport_socket = Network::Test::createRawBufferSocket();
@@ -165,6 +170,10 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, DoWriteCallback write_re
   client_->addConnectionCallbacks(*callbacks_);
   client_->addReadFilter(
       Network::ReadFilterSharedPtr{new ForwardingFilter(*this, response_data_callback)});
+  client_->addBytesSentCallback([&](uint64_t bytes) {
+    remaining_bytes_to_send_ -= bytes;
+    return true;
+  });
   client_->connect();
 }
 
@@ -182,6 +191,8 @@ void RawConnectionDriver::waitForConnection() {
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_.run(run_type); }
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
+
+bool RawConnectionDriver::allBytesSent() const { return remaining_bytes_to_send_ == 0; }
 
 WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}

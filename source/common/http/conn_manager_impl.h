@@ -26,7 +26,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -158,7 +158,6 @@ private:
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
     void completeRequest();
 
-    void chargeStats(const ResponseHeaderMap& headers);
     const Network::Connection* connection();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -228,6 +227,7 @@ private:
     void setResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers) override {
       response_trailers_ = std::move(response_trailers);
     }
+    void chargeStats(const ResponseHeaderMap& headers) override;
 
     // TODO(snowp): Create shared OptRef/OptConstRef helpers
     Http::RequestHeaderMapOptRef requestHeaders() override {
@@ -314,6 +314,8 @@ private:
     void onIdleTimeout();
     // Per-stream request timeout callback.
     void onRequestTimeout();
+    // Per-stream request header timeout callback.
+    void onRequestHeaderTimeout();
     // Per-stream alive duration reached.
     void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
@@ -354,11 +356,18 @@ private:
     Tracing::SpanPtr active_span_;
     ResponseEncoder* response_encoder_{};
     Stats::TimespanPtr request_response_timespan_;
-    // Per-stream idle timeout.
+    // Per-stream idle timeout. This timer gets reset whenever activity occurs on the stream, and,
+    // when triggered, will close the stream.
     Event::TimerPtr stream_idle_timer_;
-    // Per-stream request timeout.
+    // Per-stream request timeout. This timer is enabled when the stream is created and disabled
+    // when the stream ends. If triggered, it will close the stream.
     Event::TimerPtr request_timer_;
-    // Per-stream alive duration.
+    // Per-stream request header timeout. This timer is enabled when the stream is created and
+    // disabled when the downstream finishes sending headers. If triggered, it will close the
+    // stream.
+    Event::TimerPtr request_header_timer_;
+    // Per-stream alive duration. This timer is enabled once when the stream is created and, if
+    // triggered, will close the stream.
     Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;

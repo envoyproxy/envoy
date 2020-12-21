@@ -63,7 +63,10 @@ using BufferingStreamDecoderPtr = std::unique_ptr<BufferingStreamDecoder>;
  */
 class RawConnectionDriver {
 public:
-  using DoWriteCallback = std::function<void(Network::ClientConnection&)>;
+  // Callback that is executed to write data to connection. The provided buffer
+  // should be populated with the data to write. If the callback returns true,
+  // the connection will be closed after writing.
+  using DoWriteCallback = std::function<bool(Buffer::Instance&)>;
   using ReadCallback = std::function<void(Network::ClientConnection&, const Buffer::Instance&)>;
 
   RawConnectionDriver(uint32_t port, DoWriteCallback write_request_callback,
@@ -86,6 +89,7 @@ public:
   void waitForConnection();
 
   bool closed() { return callbacks_->closed(); }
+  bool allBytesSent() const;
 
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
@@ -137,6 +141,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
+  uint64_t remaining_bytes_to_send_;
 };
 
 /**
@@ -186,6 +191,10 @@ class ConnectionStatusCallbacks : public Network::ConnectionCallbacks {
 public:
   bool connected() const { return connected_; }
   bool closed() const { return closed_; }
+  void reset() {
+    connected_ = false;
+    closed_ = false;
+  }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {

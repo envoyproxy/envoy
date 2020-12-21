@@ -39,7 +39,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class LogicalDnsClusterTest : public testing::Test {
+class LogicalDnsClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
   LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
 
@@ -193,7 +193,7 @@ protected:
     tls_.shutdownThread();
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};

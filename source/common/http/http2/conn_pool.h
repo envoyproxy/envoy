@@ -12,64 +12,37 @@ namespace Http {
 namespace Http2 {
 
 /**
- * Implementation of a "connection pool" for HTTP/2. This mainly handles stats as well as
- * shifting to a new connection if we reach max streams on the primary. This is a base class
- * used for both the prod implementation as well as the testing one.
+ * Implementation of an active client for HTTP/2
  */
-class ConnPoolImpl : public Envoy::Http::HttpConnPoolImplBase {
+class ActiveClient : public CodecClientCallbacks,
+                     public Http::ConnectionCallbacks,
+                     public Envoy::Http::ActiveClient {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
-               Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+  ActiveClient(HttpConnPoolImplBase& parent);
+  ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+               Upstream::Host::CreateConnectionData& data);
+  ~ActiveClient() override = default;
 
-  ~ConnPoolImpl() override;
+  // ConnPoolImpl::ActiveClient
+  bool closingWithIncompleteStream() const override;
+  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
-  // ConnPoolImplBase
-  Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
+  // CodecClientCallbacks
+  void onStreamDestroy() override;
+  void onStreamReset(Http::StreamResetReason reason) override;
 
-  class ActiveClient : public CodecClientCallbacks,
-                       public Http::ConnectionCallbacks,
-                       public Envoy::Http::ActiveClient {
-  public:
-    ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent);
-    ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
-                 Upstream::Host::CreateConnectionData& data);
-    ~ActiveClient() override = default;
+  // Http::ConnectionCallbacks
+  void onGoAway(Http::GoAwayErrorCode error_code) override;
 
-    ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
-
-    // ConnPoolImpl::ActiveClient
-    bool closingWithIncompleteStream() const override;
-    RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
-
-    // CodecClientCallbacks
-    void onStreamDestroy() override;
-    void onStreamReset(Http::StreamResetReason reason) override;
-
-    // Http::ConnectionCallbacks
-    void onGoAway(Http::GoAwayErrorCode error_code) override;
-
-    bool closed_with_active_rq_{};
-  };
-};
-
-/**
- * Production implementation of the HTTP/2 connection pool.
- */
-class ProdConnPoolImpl : public ConnPoolImpl {
-public:
-  using ConnPoolImpl::ConnPoolImpl;
-
-private:
-  CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
+  bool closed_with_active_rq_{};
 };
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 Upstream::ClusterConnectivityState& state);
 
 } // namespace Http2
 } // namespace Http

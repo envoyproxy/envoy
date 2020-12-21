@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "test/common/upstream/health_check_fuzz.pb.validate.h"
-#include "test/common/upstream/health_checker_impl_test_utils.h"
+#include "test/common/upstream/health_check_fuzz_test_utils.h"
 #include "test/fuzz/common.pb.h"
 
 namespace Envoy {
@@ -114,7 +114,7 @@ public:
   void expectClientCreate();
   void expectStreamCreate();
 
-  std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
+  std::shared_ptr<NiceMock<TestGrpcHealthCheckerImpl>> health_checker_;
 };
 
 } // namespace Upstream

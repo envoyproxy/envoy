@@ -9,20 +9,21 @@ namespace Extensions {
 namespace StatSinks {
 namespace Wasm {
 
-using Envoy::Extensions::Common::Wasm::WasmHandle;
+using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
+using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 
 class WasmStatSink : public Stats::Sink {
 public:
-  WasmStatSink(absl::string_view root_id, Common::Wasm::WasmHandleSharedPtr singleton)
-      : root_id_(root_id), singleton_(std::move(singleton)) {}
+  WasmStatSink(const PluginSharedPtr& plugin, PluginHandleSharedPtr singleton)
+      : plugin_(plugin), singleton_(singleton) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
-    singleton_->wasm()->onStatsUpdate(root_id_, snapshot);
+    singleton_->wasm()->onStatsUpdate(plugin_, snapshot);
   }
 
-  void setSingleton(Common::Wasm::WasmHandleSharedPtr singleton) {
+  void setSingleton(PluginHandleSharedPtr singleton) {
     ASSERT(singleton != nullptr);
-    singleton_ = std::move(singleton);
+    singleton_ = singleton;
   }
 
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
@@ -31,8 +32,8 @@ public:
   }
 
 private:
-  std::string root_id_;
-  Common::Wasm::WasmHandleSharedPtr singleton_;
+  PluginSharedPtr plugin_;
+  PluginHandleSharedPtr singleton_;
 };
 
 } // namespace Wasm

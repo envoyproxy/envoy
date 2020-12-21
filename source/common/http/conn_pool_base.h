@@ -34,8 +34,15 @@ public:
   HttpAttachContext context_;
 };
 
-// An implementation of Envoy::ConnectionPool::ConnPoolImplBase for shared code
-// between HTTP/1.1 and HTTP/2
+class ActiveClient;
+
+/* An implementation of Envoy::ConnectionPool::ConnPoolImplBase for shared code
+ * between HTTP/1.1 and HTTP/2
+ *
+ * NOTE: The connection pool does NOT do DNS resolution. It assumes it is being given a numeric IP
+ *       address. Higher layer code should handle resolving DNS on error and creating a new pool
+ *       bound to a different IP address.
+ */
 class HttpConnPoolImplBase : public Envoy::ConnectionPool::ConnPoolImplBase,
                              public Http::ConnectionPool::Instance {
 public:
@@ -44,7 +51,9 @@ public:
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                        Random::RandomGenerator& random_generator,
+                       Upstream::ClusterConnectivityState& state,
                        std::vector<Http::Protocol> protocol);
+  ~HttpConnPoolImplBase() override;
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
@@ -52,11 +61,10 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks) override;
-  bool maybePrefetch(float ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(ratio);
+  bool maybePreconnect(float ratio) override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(ratio);
   }
   bool hasActiveConnections() const override;
-  Http::Protocol protocol() const override { return protocol_; }
 
   // Creates a new PendingStream and enqueues it into the queue.
   ConnectionPool::Cancellable*
@@ -71,17 +79,18 @@ public:
                    Envoy::ConnectionPool::AttachContext& context) override;
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
+  Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
 protected:
+  friend class ActiveClient;
   Random::RandomGenerator& random_generator_;
-  Http::Protocol protocol_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t concurrent_stream_limit)
+  ActiveClient(HttpConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+               uint32_t concurrent_stream_limit)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             concurrent_stream_limit) {
     // The static cast makes sure we call the base class host() and not
@@ -89,6 +98,13 @@ public:
     Upstream::Host::CreateConnectionData data =
         static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)->host()->createConnection(
             parent.dispatcher(), parent.socketOptions(), parent.transportSocketOptions());
+    initialize(data, parent);
+  }
+
+  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
+               uint64_t concurrent_stream_limit, Upstream::Host::CreateConnectionData& data)
+      : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
+                                            concurrent_stream_limit) {
     initialize(data, parent);
   }
 
@@ -104,15 +120,50 @@ public:
          &parent_.host()->cluster().stats().bind_errors_, nullptr});
   }
 
+  absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(), event);
   }
-  size_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
+  uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
+  HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
+};
+
+/* An implementation of Envoy::ConnectionPool::ConnPoolImplBase for HTTP/1 and HTTP/2
+ */
+class FixedHttpConnPoolImpl : public HttpConnPoolImplBase {
+public:
+  using CreateClientFn =
+      std::function<Envoy::ConnectionPool::ActiveClientPtr(HttpConnPoolImplBase* pool)>;
+  using CreateCodecFn = std::function<CodecClientPtr(Upstream::Host::CreateConnectionData& data,
+                                                     HttpConnPoolImplBase* pool)>;
+
+  FixedHttpConnPoolImpl(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+                        Event::Dispatcher& dispatcher,
+                        const Network::ConnectionSocket::OptionsSharedPtr& options,
+                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                        Random::RandomGenerator& random_generator,
+                        Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
+                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol)
+      : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
+                             random_generator, state, protocol),
+        codec_fn_(codec_fn), client_fn_(client_fn) {}
+
+  CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
+    return codec_fn_(data, this);
+  }
+
+  Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
+    return client_fn_(this);
+  }
+
+protected:
+  const CreateCodecFn codec_fn_;
+  const CreateClientFn client_fn_;
 };
 
 } // namespace Http

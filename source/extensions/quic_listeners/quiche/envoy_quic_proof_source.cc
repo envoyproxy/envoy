@@ -36,7 +36,7 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
 
 void EnvoyQuicProofSource::signPayload(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
-    const std::string& hostname, uint16_t signature_algorithm, quiche::QuicheStringPiece in,
+    const std::string& hostname, uint16_t signature_algorithm, absl::string_view in,
     std::unique_ptr<quic::ProofSource::SignatureCallback> callback) {
   CertConfigWithFilterChain res =
       getTlsCertConfigAndFilterChain(server_address, client_address, hostname);

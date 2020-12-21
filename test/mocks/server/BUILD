@@ -38,6 +38,14 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "fatal_action_factory_mocks",
+    hdrs = ["fatal_action_factory.h"],
+    deps = [
+        "//include/envoy/server:fatal_action_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "options_mocks",
     srcs = ["options.cc"],
     hdrs = ["options.h"],
@@ -161,7 +169,7 @@ envoy_cc_mock(
     srcs = ["overload_manager.cc"],
     hdrs = ["overload_manager.h"],
     deps = [
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//test/mocks/event:event_mocks",
     ],
 )
@@ -174,6 +182,7 @@ envoy_cc_mock(
         "//include/envoy/server:instance_interface",
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
+        "//source/common/router:context_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
@@ -207,7 +216,7 @@ envoy_cc_mock(
     hdrs = ["main.h"],
     deps = [
         "//include/envoy/server:configuration_interface",
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
     ],
 )
 
@@ -216,6 +225,7 @@ envoy_cc_mock(
     srcs = ["factory_context.cc"],
     hdrs = ["factory_context.h"],
     deps = [
+        "//source/common/router:context_lib",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:overload_manager_mocks",
@@ -270,6 +280,7 @@ envoy_cc_mock(
     hdrs = ["filter_chain_factory_context.h"],
     deps = [
         "//include/envoy/server:filter_config_interface",
+        "//source/common/router:context_lib",
         "//test/mocks/server:factory_context_mocks",
     ],
 )
@@ -306,6 +317,7 @@ envoy_cc_mock(
         "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:filter_chain_factory_context_mocks",
         "//test/mocks/server:guard_dog_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",

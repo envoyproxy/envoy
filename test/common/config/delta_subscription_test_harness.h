@@ -144,7 +144,7 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(API_DOWNGRADE(*load_assignment));
+        resource->mutable_resource()->PackFrom(*load_assignment);
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;

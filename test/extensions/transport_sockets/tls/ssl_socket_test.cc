@@ -398,23 +398,17 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->subjectLocalCertificate());
       }
       if (!options.expectedPeerCert().empty()) {
-        std::string urlencoded =
-            absl::StrReplaceAll(options.expectedPeerCert(), {{TestEnvironment::newLine, "%0A"},
-                                                             {" ", "%20"},
-                                                             {"+", "%2B"},
-                                                             {"/", "%2F"},
-                                                             {"=", "%3D"}});
+        std::string urlencoded = absl::StrReplaceAll(
+            options.expectedPeerCert(),
+            {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
       }
       if (!options.expectedPeerCertChain().empty()) {
-        std::string cert_chain =
-            absl::StrReplaceAll(options.expectedPeerCertChain(), {{TestEnvironment::newLine, "%0A"},
-                                                                  {" ", "%20"},
-                                                                  {"+", "%2B"},
-                                                                  {"/", "%2F"},
-                                                                  {"=", "%3D"}});
+        std::string cert_chain = absl::StrReplaceAll(
+            options.expectedPeerCertChain(),
+            {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
@@ -903,22 +897,27 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 
   // From test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem.
   server_cert->mutable_certificate_chain()->set_inline_bytes(
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem")));
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::substitute(
+              "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"),
+          true, false));
 
   // From test/extensions/transport_sockets/tls/test_data/san_dns_key.pem.
-  server_cert->mutable_private_key()->set_inline_bytes(
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem")));
+  server_cert->mutable_private_key()->set_inline_bytes(TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"),
+      true, false));
 
   // From test/extensions/transport_sockets/tls/test_data/ca_certificates.pem.
   filter_chain->mutable_hidden_envoy_deprecated_tls_context()
       ->mutable_common_tls_context()
       ->mutable_validation_context()
       ->mutable_trusted_ca()
-      ->set_inline_bytes(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir "
-          "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem")));
+      ->set_inline_bytes(TestEnvironment::readFileToStringForTest(
+          TestEnvironment::substitute(
+              "{{ test_rundir "
+              "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem"),
+          true, false));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -926,13 +925,16 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 
   // From test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem.
   client_cert->mutable_certificate_chain()->set_inline_bytes(
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem")));
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::substitute(
+              "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"),
+          true, false));
 
   // From test/extensions/transport_sockets/tls/test_data/san_uri_key.pem.
-  client_cert->mutable_private_key()->set_inline_bytes(
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem")));
+  client_cert->mutable_private_key()->set_inline_bytes(TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"),
+      true, false));
 
   TestUtilOptionsV2 test_options(listener, client_ctx, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -1015,7 +1017,8 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: "spiffe://lyft.com/test-team"
+      match_subject_alt_names:
+        exact: "spiffe://lyft.com/test-team"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
@@ -1030,7 +1033,8 @@ TEST_P(SslSocketTest, Ipv4San) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
-      verify_subject_alt_name: "127.0.0.1"
+      match_subject_alt_names:
+        exact: "127.0.0.1"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1053,7 +1057,8 @@ TEST_P(SslSocketTest, Ipv6San) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
-      verify_subject_alt_name: "::1"
+      match_subject_alt_names:
+        exact: "::1"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1233,9 +1238,10 @@ TEST_P(SslSocketTest, GetPeerCert) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  std::string expected_peer_cert =
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
+  std::string expected_peer_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"),
+      true, false);
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
@@ -1271,9 +1277,10 @@ TEST_P(SslSocketTest, GetPeerCertAcceptUntrusted) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  std::string expected_peer_cert =
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
+  std::string expected_peer_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"),
+      true, false);
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
@@ -1356,10 +1363,11 @@ TEST_P(SslSocketTest, GetPeerCertChain) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  std::string expected_peer_cert_chain =
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+  std::string expected_peer_cert_chain = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute(
           "{{ test_rundir "
-          "}}/test/extensions/transport_sockets/tls/test_data/no_san_chain.pem"));
+          "}}/test/extensions/transport_sockets/tls/test_data/no_san_chain.pem"),
+      true, false);
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerCertChain(expected_peer_cert_chain));
 }
@@ -1455,7 +1463,8 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: "example.com"
+      match_subject_alt_names:
+        exact: "example.com"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
@@ -1482,7 +1491,8 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: "example.com"
+      match_subject_alt_names:
+        exact: "example.com"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
@@ -1896,10 +1906,11 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/password_protected_key.pem"));
-  client_cert->mutable_password()->set_inline_string(
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+  client_cert->mutable_password()->set_inline_string(TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute(
           "{{ test_rundir "
-          "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt")));
+          "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt"),
+      true, false));
 
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -4719,6 +4730,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   auto transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
+  EXPECT_EQ(true, transport_socket->canFlushClose());
   Buffer::OwnedImpl buffer;
   Network::IoResult result = transport_socket->doRead(buffer);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
@@ -4754,6 +4766,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   auto transport_socket = client_ssl_socket_factory.createTransportSocket(nullptr);
   EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
   EXPECT_EQ(nullptr, transport_socket->ssl());
+  EXPECT_EQ(true, transport_socket->canFlushClose());
   Buffer::OwnedImpl buffer;
   Network::IoResult result = transport_socket->doRead(buffer);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
@@ -4893,7 +4906,7 @@ protected:
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_(_, _, _))
-        .Times(2)
+        .Times(4)
         .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) -> Buffer::Instance* {
           client_write_buffer = new MockWatermarkBuffer(below_low, above_high, above_overflow);

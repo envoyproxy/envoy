@@ -28,7 +28,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: UDP
         address: 127.0.0.1
@@ -62,7 +62,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: UDP
         address: 127.0.0.1
@@ -88,7 +88,7 @@ TEST(XRayTracerConfigTest, ProtocolNotUDPThrows) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: TCP
         address: 127.0.0.1
@@ -113,7 +113,7 @@ TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: UDP
         address: 127.0.0.1

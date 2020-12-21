@@ -149,12 +149,15 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                                      const std::string& resource, bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
-    if (!server_.clusterManager().clusters().empty()) {
+    // TODO(mattklein123): Add ability to see warming clusters in admin output.
+    auto all_clusters = server_.clusterManager().clusters();
+    if (!all_clusters.active_clusters_.empty()) {
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
+    UNREFERENCED_PARAMETER(name);
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
@@ -194,12 +197,15 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
                                            bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
-    if (!server_.clusterManager().clusters().empty()) {
+    // TODO(mattklein123): Add ability to see warming clusters in admin output.
+    auto all_clusters = server_.clusterManager().clusters();
+    if (!all_clusters.active_clusters_.empty()) {
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
+    UNREFERENCED_PARAMETER(name);
     ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
@@ -218,8 +224,10 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
 
 ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
-
-  for (const auto& [name, cluster_ref] : server_.clusterManager().clusters()) {
+  // TODO(mattklein123): Add ability to see warming clusters in admin output.
+  auto all_clusters = server_.clusterManager().clusters();
+  for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
+    UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

@@ -77,7 +77,8 @@ public:
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                   const StreamInfo::StreamInfo& info) override;
+                   const StreamInfo::StreamInfo& info,
+                   absl::optional<Http::Protocol> protocol) override;
   UpstreamToDownstream& upstreamToDownstream() override { return *this; }
 
   void clearRequestEncoder();
@@ -131,7 +132,7 @@ private:
   Event::TimerPtr per_try_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
-  Buffer::WatermarkBufferPtr buffered_request_body_;
+  Buffer::InstancePtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   DownstreamWatermarkManager downstream_watermark_manager_{*this};
   Tracing::SpanPtr span_;

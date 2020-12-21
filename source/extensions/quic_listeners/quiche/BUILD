@@ -212,6 +212,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_storage_impl_lib",
         "@com_googlesource_quiche//:quic_core_http_client_lib",
     ],

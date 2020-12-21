@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/filter/http/grpc_http1_bridge/v2/config.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -418,6 +419,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
 
+const ::envoy::config::filter::http::grpc_http1_bridge::v2::Config _grpc_http1_bridge_dummy;
+
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
 TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
@@ -483,6 +486,38 @@ TEST_P(IntegrationTest, TestSmuggling) {
   }
 }
 
+TEST_P(IntegrationTest, TestPipelinedResponses) {
+  initialize();
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+
+  ASSERT_TRUE(tcp_client->write(
+      "POST /test/long/url HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked\r\n\r\n"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
+  ASSERT_THAT(data, HasSubstr("POST"));
+
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"
+      "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n"));
+
+  tcp_client->waitForData("0\r\n\r\n", false);
+  std::string response = tcp_client->data();
+
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
+  EXPECT_THAT(response, EndsWith("0\r\n\r\n"));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value(), 1);
+}
+
 TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -521,8 +556,12 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http_protocol_options()->set_allow_chunked_length(true);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http_protocol_options()
+          ->set_allow_chunked_length(true);
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
     }
   });
 
@@ -1396,7 +1435,10 @@ TEST_P(IntegrationTest, TestFlood) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {
@@ -1442,7 +1484,10 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
   uint32_t bytes_to_send = 0;
   raw_connection->readDisable(true);
   // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
-  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) {
+    bytes_to_send -= bytes;
+    return true;
+  });
 
   // Keep sending requests until flood protection kicks in and kills the connection.
   while (raw_connection->state() == Network::Connection::State::Open) {
@@ -1506,6 +1551,38 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
+}
+
+// Expect that if an upgrade was not expected, the HCM correctly removes upgrade headers from the
+// response and the response encoder does not drop trailers.
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: websocket\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n"
+                                              "trailer1:t2\r\n"
+                                              "\r\n",
+                                              false));
+
+  // Expect that upgrade headers are dropped and trailers are sent.
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  EXPECT_NE(response->trailers(), nullptr);
 }
 
 TEST_P(IntegrationTest, ConnectWithNoBody) {

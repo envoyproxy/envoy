@@ -26,7 +26,7 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
   tls_slot_->set([this](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), GrpcCommon::GrpcAccessLoggerType::TCP, scope_));
+        config_.common_config(), Common::GrpcAccessLoggerType::TCP, scope_));
   });
 }
 

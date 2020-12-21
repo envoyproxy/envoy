@@ -439,13 +439,6 @@ public:
   }
 
   /**
-   * Returns the closest thing to a sensible "name" field for the given xDS resource.
-   * @param resource the resource to extract the name of.
-   * @return the resource's name.
-   */
-  static std::string xdsResourceName(const ProtobufWkt::Any& resource);
-
-  /**
    * Returns a "novel" IPv4 loopback address, if available.
    * For many tests, we want a loopback address other than 127.0.0.1 where possible. For some
    * platforms such as macOS, only 127.0.0.1 is available for IPv4 loopback.
@@ -864,6 +857,11 @@ public:
     HeaderMapImpl::copyFrom(*header_map_, rhs);
     header_map_->verifyByteSizeInternalForTest();
   }
+  void copyFrom(const TestHeaderMapImplBase& rhs) { copyFrom(*rhs.header_map_); }
+  void copyFrom(const HeaderMap& rhs) {
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
+  }
   TestHeaderMapImplBase& operator=(const TestHeaderMapImplBase& rhs) {
     if (this == &rhs) {
       return *this;
@@ -1041,6 +1039,7 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 namespace Api {
 ApiPtr createApiForTest();
+ApiPtr createApiForTest(Filesystem::Instance& filesystem);
 ApiPtr createApiForTest(Random::RandomGenerator& random);
 ApiPtr createApiForTest(Stats::Store& stat_store);
 ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& random);

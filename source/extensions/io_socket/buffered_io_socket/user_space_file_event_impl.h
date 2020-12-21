@@ -45,6 +45,11 @@ public:
   void activate(uint32_t events) override;
   void setEnabled(uint32_t events) override;
 
+  // UserspaceFileEvent acts always as edge triggered regardless the underlying OS is level or edge
+  // triggered. The event owner on windows platform should not emulate edge events.
+  void unregisterEventIfEmulatedEdge(uint32_t) override {}
+  void registerEventIfEmulatedEdge(uint32_t) override {}
+
 private:
   // Used to populate the event operations of enable and activate.
   EventListenerImpl event_listener_;

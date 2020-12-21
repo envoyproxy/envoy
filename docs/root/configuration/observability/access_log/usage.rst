@@ -187,6 +187,10 @@ The following command operators are supported:
     HTTP response code. Note that a response code of '0' means that the server never sent the
     beginning of a response. This generally means that the (downstream) client disconnected.
 
+    Note that in the case of 100-continue responses, only the response code of the final headers
+    will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
+    If a 100-continue results in a disconnect, the 100 will be logged.
+
   TCP
     Not implemented ("-").
 
@@ -318,7 +322,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -328,7 +332,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
@@ -338,7 +342,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -348,7 +352,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS%

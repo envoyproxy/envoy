@@ -4,6 +4,7 @@
 
 #include "exe/platform_impl.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/tools/router_check/router.h"
 
 int main(int argc, char* argv[]) {
@@ -12,6 +13,8 @@ int main(int argc, char* argv[]) {
   const bool enforce_coverage = options.failUnder() != 0.0;
   // We need this to ensure WSAStartup is called on Windows
   Envoy::PlatformImpl platform_impl_;
+  // Until we remove v2 API, the tool will warn but not fail.
+  Envoy::TestDeprecatedV2Api _deprecated_v2_api;
 
   try {
     Envoy::RouterCheckTool checktool =

@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/regex.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -62,11 +63,10 @@ public:
    * tags, such as "_rq_(\\d)xx$", will probably stay as regexes.
    */
   struct Descriptor {
-    Descriptor(const std::string& name, const std::string& regex, const std::string& substr = "")
-        : name_(name), regex_(regex), substr_(substr) {}
     const std::string name_;
     const std::string regex_;
     const std::string substr_;
+    const Regex::Type re_type_;
   };
 
   // Cluster name tag
@@ -130,6 +130,7 @@ public:
 
 private:
   void addRegex(const std::string& name, const std::string& regex, const std::string& substr = "");
+  void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
 
   // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;

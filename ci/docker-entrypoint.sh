@@ -24,7 +24,7 @@ if [ "$ENVOY_UID" != "0" ]; then
     fi
     # Ensure the envoy user is able to write to container logs
     chown envoy:envoy /dev/stdout /dev/stderr
-    su-exec envoy "${@}"
+    exec su-exec envoy "${@}"
 else
     exec "${@}"
 fi

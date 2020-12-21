@@ -39,7 +39,7 @@ public:
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo&) override {
+                   const StreamInfo::StreamInfo&, absl::optional<Http::Protocol>) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
@@ -53,8 +53,8 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   }
 
   ConnectionPool::PoolFailureReason reason_;
-  ReadyWatcher pool_failure_;
-  ReadyWatcher pool_ready_;
+  testing::NiceMock<ReadyWatcher> pool_failure_;
+  testing::NiceMock<ReadyWatcher> pool_ready_;
   Http::RequestEncoder* outer_encoder_{};
   Upstream::HostDescriptionConstSharedPtr host_;
 };

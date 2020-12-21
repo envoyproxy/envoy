@@ -73,7 +73,10 @@ public:
 
 class OAuth2Test : public testing::Test {
 public:
-  OAuth2Test() : request_(&cm_.async_client_) { init(); }
+  OAuth2Test() : request_(&cm_.thread_local_cluster_.async_client_) {
+    factory_context_.cluster_manager_.initializeClusters({"auth.example.com"}, {});
+    init();
+  }
 
   void init() {
     // Set up the OAuth client
@@ -140,7 +143,8 @@ public:
 
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
-  ON_CALL(factory_context_.cluster_manager_, get(_)).WillByDefault(Return(nullptr));
+  ON_CALL(factory_context_.cluster_manager_, clusters())
+      .WillByDefault(Return(Upstream::ClusterManager::ClusterInfoMaps()));
 
   EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
                             "OAuth2 filter: unknown cluster 'auth.example.com' in config. Please "
@@ -170,7 +174,7 @@ TEST_F(OAuth2Test, RequestSignout) {
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 }
 
@@ -200,7 +204,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
   };
 
   // cookie-validation mocking
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   // Sanitized return reference mocking
@@ -246,12 +250,12 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   };
 
   // explicitly tell the validator to fail the validation
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 }
 
@@ -271,13 +275,13 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
       {Http::Headers::get().ContentType.get(), "text/plain"},
   };
 
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
   EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 1);
@@ -299,7 +303,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   };
 
   // Deliberately fail the HMAC Validation check.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
@@ -323,7 +327,7 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
   };
 
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
@@ -410,14 +414,14 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
   };
 
   // Succeed the HMAC validation.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
   EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 }
 
@@ -443,7 +447,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
   };
 
   // Succeed the HMAC validation.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
@@ -451,7 +455,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
 
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
   Http::TestRequestHeaderMapImpl final_request_headers{
@@ -498,7 +502,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   };
 
   // Succeed the HMAC validation.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
 
   std::string legit_token{"legit_token"};
@@ -553,14 +557,14 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   };
 
   // Fail the validation to trigger the OAuth flow.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   // Check that the redirect includes the escaped parameter characters, '?', '&' and '='.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
 
   // This represents the beginning of the OAuth filter.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(first_request_headers, false));
 
   // This represents the callback request from the authorization server.
@@ -573,7 +577,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   };
 
   // Deliberately fail the HMAC validation check.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
@@ -625,7 +629,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
   };
 
   // Fail the validation to trigger the OAuth flow.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
@@ -651,7 +655,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
   };
 
   // Fail the validation to trigger the OAuth flow.
-  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,

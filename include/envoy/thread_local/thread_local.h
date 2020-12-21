@@ -7,29 +7,12 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/thread_local/thread_local_object.h"
+
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace ThreadLocal {
-
-/**
- * All objects that are stored via the ThreadLocal interface must derive from this type.
- */
-class ThreadLocalObject {
-public:
-  virtual ~ThreadLocalObject() = default;
-
-  /**
-   * Return the object casted to a concrete type. See getTyped() below for comments on the casts.
-   */
-  template <class T> T& asType() {
-    ASSERT(dynamic_cast<T*>(this) != nullptr);
-    return *static_cast<T*>(this);
-  }
-};
-
-using ThreadLocalObjectSharedPtr = std::shared_ptr<ThreadLocalObject>;
-
-template <class T = ThreadLocalObject> class TypedSlot;
 
 /**
  * An individual allocated TLS slot. When the slot is destroyed the stored thread local will

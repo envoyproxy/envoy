@@ -33,6 +33,8 @@ EPIPE
 HEXDIG
 HEXDIGIT
 OWS
+Preconnecting
+STATNAME
 SkyWalking
 TIDs
 ceil
@@ -240,6 +242,7 @@ Postgre
 Postgres
 Prereq
 QDCOUNT
+QPACK
 QUIC
 QoS
 RAII
@@ -317,6 +320,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TP
 TPM
 TSAN
 TSI
@@ -898,6 +902,10 @@ precompile
 precompiled
 precompute
 precomputed
+preconnect
+preconnected
+preconnecting
+preconnects
 predeclared
 prefetch
 prefetched
@@ -1209,6 +1217,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wasmtime
 websocket
 wepoll
 whitespace
@@ -1220,6 +1229,7 @@ workspace
 writev
 xDS
 xDSes
+xdstp
 xeon
 xform
 xhtml
