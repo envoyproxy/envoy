@@ -134,6 +134,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   bool shouldStripMatchingPort() const override { return strip_matching_port_; }
+  bool shouldStripAnyPort() const override { return strip_any_port_; }
   RequestIDExtensionSharedPtr requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -200,6 +201,7 @@ public:
   bool normalize_path_ = false;
   bool merge_slashes_ = false;
   bool strip_matching_port_ = false;
+  bool strip_any_port_ = false;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
