@@ -114,6 +114,11 @@ MEMCPY_WHITELIST = ("./source/common/common/mem_block_builder.h",
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
 
+# Header files that can throw exceptions. These should be limited; the only
+# valid situation identified so far is template functions used for config
+# processing.
+EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
+
 # We want all URL references to exist in repository_locations.bzl files and have
 # metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
 # we have some exceptions for either infrastructure files or places we fall
@@ -152,6 +157,7 @@ VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
 INVALID_REFLINK = re.compile(".* ref:.*")
+OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
@@ -431,11 +437,11 @@ class FormatChecker:
 
   def denylistedForExceptions(self, file_path):
     # Returns true when it is a non test header file or the file_path is in DENYLIST or
-    # it is under toos/testdata subdirectory.
+    # it is under tools/testdata subdirectory.
     if file_path.endswith(DOCS_SUFFIX):
       return False
 
-    return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
+    return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
 
   def allowlistedForBuildUrls(self, file_path):
@@ -775,6 +781,9 @@ class FormatChecker:
       # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
       # with a lowercase letter.
       reportError("Test names should be CamelCase, starting with a capital letter")
+    if OLD_MOCK_METHOD_REGEX.search(line):
+      reportError("The MOCK_METHODn() macros should not be used, use MOCK_METHOD() instead")
+
     if not self.allowlistedForSerializeAsString(file_path) and "SerializeAsString" in line:
       # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
       # use MessageUtil::hash instead.
