@@ -335,9 +335,9 @@ TEST_F(BufferedIoSocketHandleTest, WriteAgain) {
 TEST_F(BufferedIoSocketHandleTest, PartialWrite) {
   // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
-  // Fragment contents                | a | bbbb...b | ccc |
+  // Fragment contents                | a |`bbbb...b`|`ccc`|
   // Len per fragment                 | 1 |  255     |  3  |
-  // Watermark locates at b area      |low  | high...      |
+  // Watermark boundary at b area     | low | high         |
   // Write                            | 1st          | 2nd |
   Buffer::OwnedImpl pending_data("a");
   auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
@@ -400,9 +400,9 @@ TEST_F(BufferedIoSocketHandleTest, WritevAgain) {
 TEST_F(BufferedIoSocketHandleTest, PartialWritev) {
   // Populate write destination with massive data so as to not writable.
   io_handle_peer_->setWatermarks(128);
-  // Slices contents                  | a | bbbb...b | ccc |
+  // Slices contents                  | a |`bbbb...b`|`ccc`|
   // Len per slice                    | 1 |  255     |  3  |
-  // Watermark locates at b area      |low  | high...      |
+  // Watermark boundary at b area     | low | high         |
   // Writev                           | 1st          | 2nd |
   Buffer::OwnedImpl pending_data("a");
   auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
