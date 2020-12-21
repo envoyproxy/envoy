@@ -33,7 +33,7 @@ routing PRs, questions, etc. to the right place.
   * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
-* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
+* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@rockybars.com)
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
