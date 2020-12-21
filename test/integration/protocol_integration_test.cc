@@ -291,7 +291,6 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
 // Tests a filter that returns a FilterHeadersStatus::Continue after a local reply. In debug mode,
 // this fails on ENVOY_BUG. In opt mode, the status is corrected and the failure is logged.
 TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
-#ifdef NDEBUG
   config_helper_.addFilter(R"EOF(
   name: continue-after-local-reply-filter
   typed_config:
@@ -303,16 +302,21 @@ TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
 
   // Send a headers only request.
   IntegrationStreamDecoderPtr response;
-  EXPECT_LOG_CONTAINS("error",
-                      "envoy bug failure: !state_.local_complete_ || status != "
-                      "FilterHeadersStatus::Continue. Details: Filters should not return "
-                      "FilterHeadersStatus::Continue after sending a local reply.",
-                      {
-                        response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-                        response->waitForEndStream();
-                      });
+  const std::string error = "envoy bug failure: !state_.local_complete_ || status == "
+                            "FilterHeadersStatus::StopIteration. Details: Filters should return "
+                            "FilterHeadersStatus::StopIteration after sending a local reply.";
+#ifdef NDEBUG
+  EXPECT_LOG_CONTAINS("error", error, {
+      response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+      response->waitForEndStream();
+        });
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+#else
+  EXPECT_DEATH({
+    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForEndStream();
+    }, error);
 #endif
 }
 
