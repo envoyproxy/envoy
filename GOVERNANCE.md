@@ -108,7 +108,8 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * Do a new PR to setup the next version
   * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
-    release version number in the filename, and add an entry for the new file in the `toctree` in 
+    release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
+    Add an entry for the new file in the `toctree` in
     [version_history.rst](docs/root/version_history/version_history.rst).
   * Create a new "current" version history file at the [release
   notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use

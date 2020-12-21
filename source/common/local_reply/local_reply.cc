@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
+
 #include "common/access_log/access_log_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/config/datasource.h"
@@ -20,8 +22,8 @@ public:
       : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
-  BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config)
-      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config)),
+  BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config, Api::Api& api)
+      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, api)),
         content_type_(
             !config.content_type().empty()
                 ? config.content_type()
@@ -65,7 +67,8 @@ public:
     }
 
     if (config.has_body_format_override()) {
-      body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override());
+      body_formatter_ =
+          std::make_unique<BodyFormatter>(config.body_format_override(), context.api());
     }
 
     header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
@@ -74,7 +77,7 @@ public:
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
                        Http::ResponseHeaderMap& response_headers,
                        const Http::ResponseTrailerMap& response_trailers,
-                       StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
+                       StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
     if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
@@ -90,7 +93,7 @@ public:
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();
       response_headers.setStatus(std::to_string(enumToInt(code)));
-      stream_info.response_code_ = static_cast<uint32_t>(code);
+      stream_info.setResponseCode(static_cast<uint32_t>(code));
     }
 
     if (body_formatter_) {
@@ -118,7 +121,7 @@ public:
           config,
       Server::Configuration::FactoryContext& context)
       : body_formatter_(config.has_body_format()
-                            ? std::make_unique<BodyFormatter>(config.body_format())
+                            ? std::make_unique<BodyFormatter>(config.body_format(), context.api())
                             : std::make_unique<BodyFormatter>()) {
     for (const auto& mapper : config.mappers()) {
       mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));
@@ -126,14 +129,14 @@ public:
   }
 
   void rewrite(const Http::RequestHeaderMap* request_headers,
-               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfoImpl& stream_info,
+               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
                Http::Code& code, std::string& body,
                absl::string_view& content_type) const override {
     // Set response code to stream_info and response_headers due to:
     // 1) StatusCode filter is using response_code from stream_info,
     // 2) %RESP(:status)% is from Status() in response_headers.
     response_headers.setStatus(std::to_string(enumToInt(code)));
-    stream_info.response_code_ = static_cast<uint32_t>(code);
+    stream_info.setResponseCode(static_cast<uint32_t>(code));
 
     if (request_headers == nullptr) {
       request_headers = Http::StaticEmptyHeaders::get().request_headers.get();

@@ -33,6 +33,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
+        "//source/common/config:utility_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/protobuf:utility_lib",
         "@com_google_absl//absl/types:optional",

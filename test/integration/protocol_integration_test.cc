@@ -2022,10 +2022,10 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
+TEST_P(DownstreamProtocolIntegrationTest, TestPreconnect) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_prefetch_policy()->mutable_per_upstream_prefetch_ratio()->set_value(1.5);
+    cluster->mutable_preconnect_policy()->mutable_per_upstream_preconnect_ratio()->set_value(1.5);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2033,7 +2033,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   FakeHttpConnectionPtr fake_upstream_connection_two;
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    // For HTTP/1.1 there should be a prefetched connection.
+    // For HTTP/1.1 there should be a preconnected connection.
     ASSERT_TRUE(
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_two));
   } else {
