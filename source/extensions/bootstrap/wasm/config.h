@@ -54,7 +54,7 @@ public:
     ASSERT(wasm_service_ != nullptr);
     return *wasm_service_;
   }
-  void serverInitialized(Server::Configuration::ServerFactoryContext& context) override;
+  void onServerInitialized(Server::Configuration::ServerFactoryContext& context) override;
 
 private:
   void createWasm(Server::Configuration::ServerFactoryContext& context);

@@ -14,7 +14,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
-void WasmServiceExtension::serverInitialized(Server::Configuration::ServerFactoryContext& context) {
+void WasmServiceExtension::onServerInitialized(
+    Server::Configuration::ServerFactoryContext& context) {
   createWasm(context);
 }
 

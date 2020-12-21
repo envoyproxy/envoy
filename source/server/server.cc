@@ -537,10 +537,6 @@ void InstanceImpl::initialize(const Options& options,
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
 
-  for (auto&& bootstrap_extension : bootstrap_extensions_) {
-    bootstrap_extension->serverInitialized(serverFactoryContext());
-  }
-
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config() ||
@@ -571,6 +567,11 @@ void InstanceImpl::initialize(const Options& options,
     // Just setup the timer.
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
+
+  // Now that we are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onServerInitialized(serverFactoryContext());
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are

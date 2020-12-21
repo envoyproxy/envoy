@@ -1154,6 +1154,12 @@ void ConfigHelper::addListenerFilter(const std::string& filter_yaml) {
   }
 }
 
+void ConfigHelper::addBootstrapExtension(const std::string& config) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* extension = bootstrap_.add_bootstrap_extensions();
+  TestUtility::loadFromYaml(config, *extension);
+}
+
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
   return loadFilter<

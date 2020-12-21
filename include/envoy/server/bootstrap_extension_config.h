@@ -18,9 +18,9 @@ public:
 
   /**
    * Called when server is done initializing and we have the ServerFactoryContext available.
-   * @param context general filter context through which persistent resources can be accessed.
+   * @param context is the context to use for the extension.
    */
-  virtual void serverInitialized(Configuration::ServerFactoryContext& context) PURE;
+  virtual void onServerInitialized(Configuration::ServerFactoryContext& context) PURE;
 };
 
 using BootstrapExtensionPtr = std::unique_ptr<BootstrapExtension>;
