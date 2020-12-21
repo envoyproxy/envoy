@@ -831,10 +831,9 @@ TEST_F(OwnedImplTest, ReserveCommit) {
     {
       expectSlices({{1, 16383, 16384}}, buffer);
       auto reservation = buffer.reserveApproximately(32768);
-      EXPECT_EQ(3, reservation.numSlices());
+      EXPECT_EQ(2, reservation.numSlices());
       EXPECT_EQ(16383, reservation.slices()[0].len_);
       EXPECT_EQ(16384, reservation.slices()[1].len_);
-      EXPECT_EQ(16384, reservation.slices()[2].len_);
     }
 
     // Append a fragment to the buffer, and then request a small reservation. The buffer
@@ -845,6 +844,7 @@ TEST_F(OwnedImplTest, ReserveCommit) {
       buffer.addBufferFragment(fragment);
       EXPECT_EQ(13, buffer.length());
       auto reservation = buffer.reserveApproximately(1);
+      EXPECT_EQ(1, reservation.numSlices());
       EXPECT_NE(slice1, reservation.slices()[0].mem_);
       reservation.commit(1);
       expectSlices({{1, 16383, 16384}, {12, 0, 12}, {1, 16383, 16384}}, buffer);

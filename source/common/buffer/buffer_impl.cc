@@ -311,6 +311,7 @@ Reservation OwnedImpl::reserveApproximately(uint64_t length) {
   }
 
   uint64_t bytes_remaining = length;
+  uint64_t reserved = 0;
   auto& reservation_slices = reservation.bufferImplUseOnlySlices();
   auto& reservation_owned_slices = reservation.bufferImplUseOnlyOwnedSlices();
 
@@ -323,23 +324,32 @@ Reservation OwnedImpl::reserveApproximately(uint64_t length) {
     reservation_slices.push_back(slice);
     reservation_owned_slices.push_back(nullptr);
     bytes_remaining -= slice.len_;
+    reserved += slice.len_;
   }
 
   while (bytes_remaining != 0) {
-    uint64_t size = Slice::default_slice_size_;
-    if (bytes_remaining > size && (reservation_slices.size() + 1) == reservation.NUM_ELEMENTS_) {
-      size = bytes_remaining;
+    const uint64_t size = Slice::default_slice_size_;
+
+    // If the next slice would go over the desired size, and the amount already reserved is already
+    // at least one full slice in size, stop allocating slices. This prevents returning a
+    // reservation larger than requested, which could go above the watermark limits for a watermark
+    // buffer, unless the size would be very small (less than 1 full slice).
+    if (size > bytes_remaining && reserved >= size) {
+      break;
     }
+
     Slice slice(size);
     reservation_slices.push_back(slice.reserve(size));
     reservation_owned_slices.emplace_back(std::make_unique<SliceDataImpl>(std::move(slice)));
     bytes_remaining -= std::min(reservation_slices.back().len_, bytes_remaining);
+    reserved += reservation_slices.back().len_;
+
+    ASSERT(reservation_slices.size() <= reservation.MAX_SLICES_,
+           "The absl::InlineVector should be sized so that out-of-line storage isn't needed.");
   }
 
-  reservation.bufferImplUseOnlySetLength(length);
+  reservation.bufferImplUseOnlySetLength(reserved);
 
-  ASSERT(reservation_slices.size() <= reservation.NUM_ELEMENTS_,
-         "The absl::InlineVector should be sized so that out-of-line storage isn't needed.");
   ASSERT(reservation_slices.size() == reservation_owned_slices.size());
   return reservation;
 }

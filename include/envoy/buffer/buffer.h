@@ -10,6 +10,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
 #include "common/common/byte_order.h"
 #include "common/common/utility.h"
 
@@ -204,27 +205,21 @@ public:
   virtual Reservation reserveApproximately(uint64_t preferred_length) PURE;
 
   /**
+   * The maximum size that should be passed to `reserveApproximately` to result
+   * in maximum performance.
+   */
+  static constexpr uint64_t MAX_RESERVATION_SIZE = 128 * 1024;
+
+  /**
    * Reserve space in the buffer in a single slice.
    * @param length the exact length of the reservation.
    * @param separate_slice specifies whether the reserved space must be in a separate slice
    *   from any other data in this buffer.
-   * @return a `Reservation` which has exactly one slice in it.
+   * @return a `ReservationSingleSlice` which has exactly one slice in it.
    */
   virtual ReservationSingleSlice reserveSingleSlice(uint64_t length,
                                                     bool separate_slice = false) PURE;
 
-private:
-  friend Reservation;
-  friend ReservationSingleSlice;
-
-  /**
-   * Called by a `Reservation` to commit `length` bytes of the
-   * reservation.
-   */
-  virtual void commit(uint64_t length, absl::Span<RawSlice> slices,
-                      absl::Span<SliceDataPtr> owned_slices) PURE;
-
-public:
   /**
    * Search for an occurrence of data within the buffer.
    * @param data supplies the data to search for.
@@ -429,6 +424,17 @@ public:
    * the low watermark.
    */
   virtual bool highWatermarkTriggered() const PURE;
+
+private:
+  friend Reservation;
+  friend ReservationSingleSlice;
+
+  /**
+   * Called by a `Reservation` to commit `length` bytes of the
+   * reservation.
+   */
+  virtual void commit(uint64_t length, absl::Span<RawSlice> slices,
+                      absl::Span<SliceDataPtr> owned_slices) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
@@ -464,12 +470,7 @@ using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
 class Reservation final {
 public:
   Reservation(Reservation&&) = default;
-
-  ~Reservation() {
-    if (!slices_.empty()) {
-      commit(0);
-    }
-  }
+  ~Reservation() = default;
 
   /**
    * @return an array of `RawSlice` of length `numSlices()`.
@@ -495,14 +496,14 @@ public:
    * @note No other methods should be called on the object after `commit()` is called.
    */
   void commit(uint64_t length) {
+    ASSERT(length <= length_);
     buffer_.commit(length, absl::MakeSpan(slices_), absl::MakeSpan(owned_slices_));
     slices_.clear();
     owned_slices_.clear();
   }
 
-  // Tuned to allow reads of 128k, using 16k slices, and including one partially-used
-  // initial slice from a previous allocation.
-  static constexpr uint32_t NUM_ELEMENTS_ = 9;
+  // Tuned to allow reads of 128k, using 16k slices.
+  static constexpr uint32_t MAX_SLICES_ = 8;
 
 private:
   Reservation(Instance& buffer) : buffer_(buffer) {}
@@ -514,12 +515,12 @@ private:
   uint64_t length_;
 
   // The RawSlices in the reservation, usable by operations such as `::readv()`.
-  absl::InlinedVector<RawSlice, NUM_ELEMENTS_> slices_;
+  absl::InlinedVector<RawSlice, MAX_SLICES_> slices_;
 
   // An array of the same length as `slices_`, in which each element is either nullptr
   // if no operation needs to be performed to transfer ownership during commit/destructor,
   // or a pointer to the object that needs to be moved/deleted.
-  absl::InlinedVector<SliceDataPtr, NUM_ELEMENTS_> owned_slices_;
+  absl::InlinedVector<SliceDataPtr, MAX_SLICES_> owned_slices_;
 
 public:
   // The following are for use only by implementations of Buffer. Because c++
@@ -540,12 +541,7 @@ public:
 class ReservationSingleSlice final {
 public:
   ReservationSingleSlice(ReservationSingleSlice&&) = default;
-
-  ~ReservationSingleSlice() {
-    if (slice_.mem_ != nullptr) {
-      commit(0);
-    }
-  }
+  ~ReservationSingleSlice() = default;
 
   /**
    * @return an array of `RawSlice` of length `numSlices()`.
