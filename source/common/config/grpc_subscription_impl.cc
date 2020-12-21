@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Config {
 
+constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::milliseconds(50);
+
 GrpcSubscriptionImpl::GrpcSubscriptionImpl(
     GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats, absl::string_view type_url,
@@ -78,23 +80,9 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
 
-  if (update_duration > updateDurationLogThreshold()) {
-    // Figure out the total size of all resource names plus delimiters
-    int name_size = 0;
-    std::for_each(resources.begin(), resources.end(),
-                  [&name_size](const Config::DecodedResource& resource) {
-                    name_size += resource.name().size() + 2;
-                  });
-    std::string resource_names;
-    resource_names.reserve(name_size);
-    for (const auto& resource : resources) {
-      resource_names.append(resource.get().name());
-      if (&resource != &resources.back()) {
-        resource_names.append(", ");
-      }
-    }
+  if (update_duration > UpdateDurationLogThreshold) {
     ENVOY_LOG(debug, "gRPC config update took {} ms! Resources names: {}", update_duration.count(),
-              resource_names);
+              absl::StrJoin(resources, ",", ResourceNameFormatter()));
   }
 }
 
@@ -148,13 +136,6 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();
   }
-}
-
-// Returns the threshold used to trigger logging of long config updates.
-// TODO(adamsjob): make the threshold configurable, either through runtime or bootstrap
-std::chrono::milliseconds& GrpcSubscriptionImpl::updateDurationLogThreshold() {
-  static std::chrono::milliseconds* threshold_ms = new std::chrono::milliseconds(50);
-  return *threshold_ms;
 }
 
 } // namespace Config

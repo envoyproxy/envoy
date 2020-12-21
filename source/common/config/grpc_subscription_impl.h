@@ -43,7 +43,6 @@ public:
 
 private:
   void disableInitFetchTimeoutTimer();
-  std::chrono::milliseconds& updateDurationLogThreshold();
 
   GrpcMuxSharedPtr grpc_mux_;
   SubscriptionCallbacks& callbacks_;
@@ -57,6 +56,12 @@ private:
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   const bool is_aggregated_;
+
+  struct ResourceNameFormatter {
+    void operator()(std::string* out, const Config::DecodedResourceRef& resource) {
+      out->append(resource.get().name());
+    }
+  };
 };
 
 using GrpcSubscriptionImplPtr = std::unique_ptr<GrpcSubscriptionImpl>;
