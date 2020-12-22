@@ -1,4 +1,4 @@
-#include <array>
+#include <vector>
 
 #include "common/common/safe_memcpy.h"
 #include "common/grpc/common.h"
@@ -16,9 +16,9 @@ namespace Envoy {
 
 TEST(SafeMemcpyTest, CopyUint8) {
   const uint8_t src[] = {0, 1, 1, 2, 3, 5, 8, 13};
-  uint64_t dst;
+  uint8_t dst[8];
   safeMemcpy(&dst, &src);
-  EXPECT_EQ(dst, 282583128934413);
+  EXPECT_THAT(dst, ElementsAre(0, 1, 1, 2, 3, 5, 8, 13));
 }
 
 TEST(SafeMemcpyUnsafeSrcTest, CopyUint8Pointer) {
@@ -33,15 +33,11 @@ TEST(SafeMemcpyUnsafeSrcTest, CopyUint8Pointer) {
 }
 
 TEST(SafeMemcpyUnsafeDstTest, PrependGrpcFrameHeader) {
-  uint8_t* dst = new uint8_t[8];
-  uint8_t src[8];
-  for (int i = 0; i < 8; ++i) {
-    src[i] = i;
-  }
-  safeMemcpyUnsafeSrc(dst, &src);
-  for (int i = 0; i < 8; ++i) {
-    EXPECT_THAT(dst[i], i);
-  }
+  const uint8_t src[] = {1, 2, 3, 4};
+  uint8_t* dst = new uint8_t[4];
+  memset(dst, 0, 4);
+  safeMemcpyUnsafeDst(dst, &src);
+  EXPECT_THAT(std::vector(dst, dst + sizeof(src)), ElementsAre(1, 2, 3, 4));
   delete[] dst;
 }
 
