@@ -9,6 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Router {
@@ -45,15 +46,13 @@ public:
    * @param descriptor supplies the descriptor to optionally fill.
    * @param local_service_cluster supplies the name of the local service cluster.
    * @param headers supplies the header for the request.
-   * @param remote_address supplies the trusted downstream address for the connection.
-   * @param dynamic_metadata supplies the dynamic metadata for the request
+   * @param info stream info associated with the request
    * @return true if the RateLimitAction populated the descriptor.
    */
-  virtual bool
-  populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
-                     const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                     const Network::Address::Instance& remote_address,
-                     const envoy::config::core::v3::Metadata* dynamic_metadata) const PURE;
+  virtual bool populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
+                                  const std::string& local_service_cluster,
+                                  const Http::HeaderMap& headers,
+                                  const StreamInfo::StreamInfo& info) const PURE;
 };
 
 using RateLimitActionPtr = std::unique_ptr<RateLimitAction>;
@@ -81,14 +80,13 @@ public:
    * @param descriptors supplies the descriptor array to optionally fill.
    * @param local_service_cluster supplies the name of the local service cluster.
    * @param headers supplies the header for the request.
-   * @param remote_address supplies the trusted downstream address for the connection.
-   * @param dynamic_metadata supplies the dynamic metadata for the request.
+   * @param info stream info associated with the request
    */
-  virtual void
-  populateDescriptors(const RouteEntry& route, std::vector<RateLimit::Descriptor>& descriptors,
-                      const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                      const Network::Address::Instance& remote_address,
-                      const envoy::config::core::v3::Metadata* dynamic_metadata) const PURE;
+  virtual void populateDescriptors(const RouteEntry& route,
+                                   std::vector<RateLimit::Descriptor>& descriptors,
+                                   const std::string& local_service_cluster,
+                                   const Http::HeaderMap& headers,
+                                   const StreamInfo::StreamInfo& info) const PURE;
 };
 
 /**

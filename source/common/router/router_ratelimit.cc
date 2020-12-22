@@ -47,8 +47,7 @@ bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
                                              RateLimit::Descriptor& descriptor,
                                              const std::string& local_service_cluster,
                                              const Http::HeaderMap&,
-                                             const Network::Address::Instance&,
-                                             const envoy::config::core::v3::Metadata*) const {
+                                             const StreamInfo::StreamInfo&) const {
   descriptor.entries_.push_back({"source_cluster", local_service_cluster});
   return true;
 }
@@ -56,8 +55,7 @@ bool SourceClusterAction::populateDescriptor(const Router::RouteEntry&,
 bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& route,
                                                   RateLimit::Descriptor& descriptor,
                                                   const std::string&, const Http::HeaderMap&,
-                                                  const Network::Address::Instance&,
-                                                  const envoy::config::core::v3::Metadata*) const {
+                                                  const StreamInfo::StreamInfo&) const {
   descriptor.entries_.push_back({"destination_cluster", route.clusterName()});
   return true;
 }
@@ -65,8 +63,7 @@ bool DestinationClusterAction::populateDescriptor(const Router::RouteEntry& rout
 bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
                                               RateLimit::Descriptor& descriptor, const std::string&,
                                               const Http::HeaderMap& headers,
-                                              const Network::Address::Instance&,
-                                              const envoy::config::core::v3::Metadata*) const {
+                                              const StreamInfo::StreamInfo&) const {
   const auto header_value = headers.get(header_name_);
 
   // If header is not present in the request and if skip_if_absent is true skip this descriptor,
@@ -84,20 +81,20 @@ bool RequestHeadersAction::populateDescriptor(const Router::RouteEntry&,
 bool RemoteAddressAction::populateDescriptor(const Router::RouteEntry&,
                                              RateLimit::Descriptor& descriptor, const std::string&,
                                              const Http::HeaderMap&,
-                                             const Network::Address::Instance& remote_address,
-                                             const envoy::config::core::v3::Metadata*) const {
-  if (remote_address.type() != Network::Address::Type::Ip) {
+                                             const StreamInfo::StreamInfo& info) const {
+  const Network::Address::InstanceConstSharedPtr& remote_address = info.downstreamRemoteAddress();
+  if (remote_address->type() != Network::Address::Type::Ip) {
     return false;
   }
 
-  descriptor.entries_.push_back({"remote_address", remote_address.ip()->addressAsString()});
+  descriptor.entries_.push_back({"remote_address", remote_address->ip()->addressAsString()});
   return true;
 }
 
 bool GenericKeyAction::populateDescriptor(const Router::RouteEntry&,
                                           RateLimit::Descriptor& descriptor, const std::string&,
-                                          const Http::HeaderMap&, const Network::Address::Instance&,
-                                          const envoy::config::core::v3::Metadata*) const {
+                                          const Http::HeaderMap&,
+                                          const StreamInfo::StreamInfo&) const {
   descriptor.entries_.push_back({descriptor_key_, descriptor_value_});
   return true;
 }
@@ -112,15 +109,15 @@ MetaDataAction::MetaDataAction(
       default_value_(action.default_value()),
       source_(envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC) {}
 
-bool MetaDataAction::populateDescriptor(
-    const Router::RouteEntry& route, RateLimit::Descriptor& descriptor, const std::string&,
-    const Http::HeaderMap&, const Network::Address::Instance&,
-    const envoy::config::core::v3::Metadata* dynamic_metadata) const {
+bool MetaDataAction::populateDescriptor(const Router::RouteEntry& route,
+                                        RateLimit::Descriptor& descriptor, const std::string&,
+                                        const Http::HeaderMap&,
+                                        const StreamInfo::StreamInfo& info) const {
   const envoy::config::core::v3::Metadata* metadata_source;
 
   switch (source_) {
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
-    metadata_source = dynamic_metadata;
+    metadata_source = &info.dynamicMetadata();
     break;
   case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
     metadata_source = &route.metadata();
@@ -152,8 +149,7 @@ HeaderValueMatchAction::HeaderValueMatchAction(
 bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
                                                 RateLimit::Descriptor& descriptor,
                                                 const std::string&, const Http::HeaderMap& headers,
-                                                const Network::Address::Instance&,
-                                                const envoy::config::core::v3::Metadata*) const {
+                                                const StreamInfo::StreamInfo&) const {
   if (expect_match_ == Http::HeaderUtility::matchHeaders(headers, action_headers_)) {
     descriptor.entries_.push_back({"header_match", descriptor_value_});
     return true;
@@ -161,6 +157,29 @@ bool HeaderValueMatchAction::populateDescriptor(const Router::RouteEntry&,
     return false;
   }
 }
+
+/*
+bool ExpressionAction::populateDescriptor(const Router::RouteEntry&,
+                                                RateLimit::Descriptor& descriptor,
+                                                const std::string&, const Http::HeaderMap& headers,
+
+                                                const StreamInfo::StreamInfo& info) const {
+  ProtobufWkt::Arena arena;
+  auto activation =
+      createActivation(arena, info, request_headers, nullptr, nullptr);
+  auto eval_status = expr.Evaluate(*activation, &arena);
+  if (!eval_status.ok()) {
+    return {};
+  }
+
+  if (expect_match_ == Http::HeaderUtility::matchHeaders(headers, action_headers_)) {
+    descriptor.entries_.push_back({"header_match", descriptor_value_});
+    return true;
+  } else {
+    return false;
+  }
+} // namespace Router
+*/
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config)
@@ -208,23 +227,23 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
   }
 }
 
-void RateLimitPolicyEntryImpl::populateDescriptors(
-    const Router::RouteEntry& route, std::vector<RateLimit::Descriptor>& descriptors,
-    const std::string& local_service_cluster, const Http::HeaderMap& headers,
-    const Network::Address::Instance& remote_address,
-    const envoy::config::core::v3::Metadata* dynamic_metadata) const {
+void RateLimitPolicyEntryImpl::populateDescriptors(const Router::RouteEntry& route,
+                                                   std::vector<RateLimit::Descriptor>& descriptors,
+                                                   const std::string& local_service_cluster,
+                                                   const Http::HeaderMap& headers,
+                                                   const StreamInfo::StreamInfo& info) const {
   RateLimit::Descriptor descriptor;
   bool result = true;
   for (const RateLimitActionPtr& action : actions_) {
-    result = result && action->populateDescriptor(route, descriptor, local_service_cluster, headers,
-                                                  remote_address, dynamic_metadata);
+    result = result &&
+             action->populateDescriptor(route, descriptor, local_service_cluster, headers, info);
     if (!result) {
       break;
     }
   }
 
   if (limit_override_) {
-    limit_override_.value()->populateOverride(descriptor, dynamic_metadata);
+    limit_override_.value()->populateOverride(descriptor, &info.dynamicMetadata());
   }
 
   if (result) {

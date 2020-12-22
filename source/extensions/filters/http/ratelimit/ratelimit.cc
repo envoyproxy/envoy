@@ -234,8 +234,7 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   headers, *callbacks_->streamInfo().downstreamRemoteAddress(),
-                                   &callbacks_->streamInfo().dynamicMetadata());
+                                   headers, callbacks_->streamInfo());
   }
 }
 
