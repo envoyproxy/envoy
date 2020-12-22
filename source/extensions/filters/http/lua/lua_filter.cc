@@ -11,6 +11,7 @@
 #include "common/config/datasource.h"
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/escaping.h"
 
@@ -428,7 +429,11 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
         if (callbacks_.bufferedBody() == nullptr) {
           ENVOY_LOG(debug, "end stream. no body");
 
-          Buffer::OwnedImpl body("");
+          if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lua_always_wrap_body")) {
+            return 0;
+          }
+
+          Buffer::OwnedImpl body(EMPTY_STRING);
           callbacks_.addData(body);
         }
 
