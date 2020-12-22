@@ -52,6 +52,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/sni_dynamic_forward_proxy:90.9"
 "source/extensions/health_checkers:95.9"
 "source/extensions/health_checkers/redis:95.9"
+"source/extensions/io_socket/buffered_io_socket:96.0" # Death tests don't report LCOV
 "source/extensions/quic_listeners:85.0"
 "source/extensions/quic_listeners/quiche:84.8"
 "source/extensions/stat_sinks/statsd:85.2"

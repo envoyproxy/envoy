@@ -10,7 +10,6 @@
 
 #include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
 
-#include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -228,7 +227,8 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t le
                                  Network::IoSocketError::deleteIoError)};
     }
   }
-  auto max_bytes_to_read = std::min(pending_received_data_.length(), length);
+  // Specify uint64_t since the latter length may not have the same type.
+  auto max_bytes_to_read = std::min<uint64_t>(pending_received_data_.length(), length);
   pending_received_data_.copyOut(0, max_bytes_to_read, buffer);
   if (!(flags & MSG_PEEK)) {
     pending_received_data_.drain(max_bytes_to_read);
