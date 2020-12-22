@@ -46,6 +46,7 @@ envoy_cc_extension(
     ],
     security_posture = "unknown",
     status = "alpha",
+    undocumented = True,
     deps = [
         ":peer_buffer_lib",
         ":users_space_file_event_lib",
