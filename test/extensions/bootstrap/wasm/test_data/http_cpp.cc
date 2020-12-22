@@ -1,11 +1,7 @@
 // NOLINT(namespace-envoy)
 #include <string>
 
-#ifndef NULL_PLUGIN
 #include "proxy_wasm_intrinsics.h"
-#else
-#include "include/proxy-wasm/null_plugin.h"
-#endif
 
 template <typename T> std::unique_ptr<T> wrap_unique(T* ptr) { return std::unique_ptr<T>(ptr); }
 
@@ -33,18 +29,17 @@ WASM_EXPORT(void, proxy_on_tick, (uint32_t)) {
   }
 }
 
-WASM_EXPORT(void, proxy_on_http_call_response, (uint32_t context_id, uint32_t token, uint32_t headers,
-                                            uint32_t body_size, uint32_t trailers)) {
+WASM_EXPORT(void, proxy_on_http_call_response, (uint32_t, uint32_t, uint32_t headers, uint32_t, uint32_t)) {
   if (headers != 0) {
     auto status = getHeaderMapValue(WasmHeaderMapType::HttpCallResponseHeaders, "status");
     if ("200" == status->view()) {
       proxy_set_tick_period_milliseconds(0);
-    } else {
-      // Request failed - very possibly because of the integration test not being ready.
-      // Try again to prevent flakes.
-      proxy_set_tick_period_milliseconds(100);
+      return;
     }
   }
+  // Request failed - very possibly because of the integration test not being ready.
+  // Try again to prevent flakes.
+  proxy_set_tick_period_milliseconds(100);
 }
 
 END_WASM_PLUGIN

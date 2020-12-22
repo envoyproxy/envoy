@@ -1,5 +1,6 @@
 #include "extensions/common/wasm/wasm.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/integration/http_protocol_integration.h"
 
 #include "gtest/gtest.h"
@@ -9,11 +10,14 @@ namespace Extensions {
 namespace Wasm {
 namespace {
 
-class WasmIntegrationTest : public HttpProtocolIntegrationTest {
+class WasmIntegrationTest : public HttpIntegrationTest, public testing::TestWithParam<std::string> {
 public:
+  WasmIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(GetParam().upstream_protocol);
+    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
   }
 
   void cleanup() {
@@ -45,12 +49,12 @@ typed_config:
       value: ""
     vm_config:
       vm_id: "my_vm_id"
-      runtime: "envoy.wasm.runtime.v8"
+      runtime: "envoy.wasm.runtime.{}"
       code:
         local:
           filename: {}
   )EOF",
-                                                     httpwasm));
+                                                     GetParam(), httpwasm));
     HttpIntegrationTest::initialize();
   }
 
@@ -59,9 +63,9 @@ typed_config:
   IntegrationStreamDecoderPtr response_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, WasmIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmIntegrationTest,
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
   initialize();
