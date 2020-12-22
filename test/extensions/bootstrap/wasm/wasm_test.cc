@@ -69,7 +69,7 @@ public:
   std::string vm_id_;
   std::string vm_configuration_;
   std::string vm_key_;
-  Extensions::Common::Wasm::AllowedCapabilitiesMap allowed_capabilities;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   std::string plugin_configuration_;
   std::shared_ptr<Extensions::Common::Wasm::Plugin> plugin_;
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
