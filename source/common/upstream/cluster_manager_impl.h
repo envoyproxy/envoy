@@ -562,8 +562,8 @@ private:
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
-  static void maybePrefetch(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
-                            std::function<ConnectionPool::Instance*()> prefetch_pool);
+  static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
+                              std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;

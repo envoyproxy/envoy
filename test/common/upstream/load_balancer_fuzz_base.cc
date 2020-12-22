@@ -214,7 +214,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
   host_set.runCallbacks({}, {});
 }
 
-void LoadBalancerFuzzBase::prefetch() {
+void LoadBalancerFuzzBase::preconnect() {
   // TODO: context, could generate it in proto action
   lb_->peekAnotherHost(nullptr);
 }
@@ -239,8 +239,8 @@ void LoadBalancerFuzzBase::replay(
                                    event.update_health_flags().random_bytestring());
       break;
     }
-    case test::common::upstream::LbAction::kPrefetch:
-      prefetch();
+    case test::common::upstream::LbAction::kPreconnect:
+      preconnect();
       break;
     case test::common::upstream::LbAction::kChooseHost:
       chooseHost();

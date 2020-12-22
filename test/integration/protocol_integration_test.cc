@@ -34,6 +34,7 @@
 #include "test/mocks/upstream/retry_priority.h"
 #include "test/mocks/upstream/retry_priority_factory.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
@@ -285,6 +286,40 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   // Make sure that the body was injected to the response.
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response->body(), "body");
+}
+
+// Tests a filter that returns a FilterHeadersStatus::Continue after a local reply. In debug mode,
+// this fails on ENVOY_BUG. In opt mode, the status is corrected and the failure is logged.
+TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
+  config_helper_.addFilter(R"EOF(
+  name: continue-after-local-reply-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send a headers only request.
+  IntegrationStreamDecoderPtr response;
+  const std::string error = "envoy bug failure: !state_.local_complete_ || status == "
+                            "FilterHeadersStatus::StopIteration. Details: Filters should return "
+                            "FilterHeadersStatus::StopIteration after sending a local reply.";
+#ifdef NDEBUG
+  EXPECT_LOG_CONTAINS("error", error, {
+    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    response->waitForEndStream();
+  });
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+#else
+  EXPECT_DEATH(
+      {
+        response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+        response->waitForEndStream();
+      },
+      error);
+#endif
 }
 
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
@@ -1993,10 +2028,10 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
+TEST_P(DownstreamProtocolIntegrationTest, TestPreconnect) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_prefetch_policy()->mutable_per_upstream_prefetch_ratio()->set_value(1.5);
+    cluster->mutable_preconnect_policy()->mutable_per_upstream_preconnect_ratio()->set_value(1.5);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2004,7 +2039,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
   FakeHttpConnectionPtr fake_upstream_connection_two;
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    // For HTTP/1.1 there should be a prefetched connection.
+    // For HTTP/1.1 there should be a preconnected connection.
     ASSERT_TRUE(
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_two));
   } else {

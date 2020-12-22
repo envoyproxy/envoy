@@ -50,7 +50,7 @@ struct ToolConfig {
 private:
   ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
              std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers, int random_value);
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
 };
 
 /**

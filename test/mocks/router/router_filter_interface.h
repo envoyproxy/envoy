@@ -54,7 +54,7 @@ public:
 
   envoy::extensions::filters::http::router::v3::Router router_proto;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
   FilterConfig config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
