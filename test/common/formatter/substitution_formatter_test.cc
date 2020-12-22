@@ -2215,7 +2215,10 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   // The %E formatting option in Absl::FormatTime() behaves differently for non Linux platforms.
-  // See: https://github.com/abseil/abseil-cpp/issues/869.
+  //
+  // See:
+  // https://github.com/abseil/abseil-cpp/issues/869
+  // https://github.com/google/cctz/issues/180
 #if !defined(WIN32) && !defined(__APPLE__)
   {
     const std::string format = "%START_TIME(%E4n)%";
