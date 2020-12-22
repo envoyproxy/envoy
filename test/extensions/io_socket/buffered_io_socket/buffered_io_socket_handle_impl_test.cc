@@ -341,11 +341,12 @@ TEST_F(BufferedIoSocketHandleTest, PartialWrite) {
   // Write                            | 1st          | 2nd |
   Buffer::OwnedImpl pending_data("a");
   auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
-      std::string(255, 'b'), [](const Buffer::OwnedBufferFragmentImpl*) {});
-  auto tail_frag =
-      Buffer::OwnedBufferFragmentImpl::create("ccc", [](const Buffer::OwnedBufferFragmentImpl*) {});
-  pending_data.addBufferFragment(*long_frag);
-  pending_data.addBufferFragment(*tail_frag);
+      std::string(255, 'b'),
+      [](const Buffer::OwnedBufferFragmentImpl* fragment) { delete fragment; });
+  auto tail_frag = Buffer::OwnedBufferFragmentImpl::create(
+      "ccc", [](const Buffer::OwnedBufferFragmentImpl* fragment) { delete fragment; });
+  pending_data.addBufferFragment(*long_frag.release());
+  pending_data.addBufferFragment(*tail_frag.release());
 
   // Partial write: the first two slices are moved because the second slice move reaches the high
   // watermark.
@@ -406,11 +407,12 @@ TEST_F(BufferedIoSocketHandleTest, PartialWritev) {
   // Writev                           | 1st          | 2nd |
   Buffer::OwnedImpl pending_data("a");
   auto long_frag = Buffer::OwnedBufferFragmentImpl::create(
-      std::string(255, 'b'), [](const Buffer::OwnedBufferFragmentImpl*) {});
-  auto tail_frag =
-      Buffer::OwnedBufferFragmentImpl::create("ccc", [](const Buffer::OwnedBufferFragmentImpl*) {});
-  pending_data.addBufferFragment(*long_frag);
-  pending_data.addBufferFragment(*tail_frag);
+      std::string(255, 'b'),
+      [](const Buffer::OwnedBufferFragmentImpl* fragment) { delete fragment; });
+  auto tail_frag = Buffer::OwnedBufferFragmentImpl::create(
+      "ccc", [](const Buffer::OwnedBufferFragmentImpl* fragment) { delete fragment; });
+  pending_data.addBufferFragment(*long_frag.release());
+  pending_data.addBufferFragment(*tail_frag.release());
 
   // Partial write: the first two slices are moved because the second slice move reaches the high
   // watermark.
