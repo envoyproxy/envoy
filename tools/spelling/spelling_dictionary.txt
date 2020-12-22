@@ -1075,7 +1075,6 @@ str
 streambuf
 strerr
 strerror
-strftime
 stringbuf
 stringified
 stringify

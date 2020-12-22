@@ -2214,9 +2214,8 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 
-  // The %E formatting option in Absl::FormatTime() -- which emulates what strftime() does --
-  // behaves differently for non Linux platforms. See:
-  // https://github.com/abseil/abseil-cpp/issues/869.
+  // The %E formatting option in Absl::FormatTime() behaves differently for non Linux platforms.
+  // See: https://github.com/abseil/abseil-cpp/issues/869.
 #if !defined(WIN32) && !defined(__APPLE__)
   {
     const std::string format = "%START_TIME(%E4n)%";
