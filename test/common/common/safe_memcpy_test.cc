@@ -33,15 +33,16 @@ TEST(SafeMemcpyUnsafeSrcTest, CopyUint8Pointer) {
 }
 
 TEST(SafeMemcpyUnsafeDstTest, PrependGrpcFrameHeader) {
-  Buffer::OwnedImpl buffer;
-  buffer.add("test", 4);
-  std::array<char, 5> expected_header;
-  expected_header[0] = 0; // flags
-  const uint32_t nsize = htonl(4);
-  safeMemcpyUnsafeDst(&expected_header[1], &nsize);
-  std::string header_string(&expected_header[0], 5);
-  Grpc::Common::prependGrpcFrameHeader(buffer);
-  EXPECT_EQ(buffer.toString(), header_string + "test");
+  uint8_t* dst = new uint8_t[8];
+  uint8_t src[8];
+  for (int i = 0; i < 8; ++i) {
+    src[i] = i;
+  }
+  safeMemcpyUnsafeSrc(dst, &src);
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_THAT(dst[i], i);
+  }
+  delete[] dst;
 }
 
 } // namespace Envoy
