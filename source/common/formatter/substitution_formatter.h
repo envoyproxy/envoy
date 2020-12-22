@@ -23,6 +23,8 @@ namespace Formatter {
 class SubstitutionFormatParser {
 public:
   static std::vector<FormatterProviderPtr> parse(const std::string& format);
+  static std::vector<FormatterProviderPtr>
+  parse(const std::string& format, const std::vector<CommandParserPtr>& command_parsers);
 
 private:
   /**
@@ -60,6 +62,12 @@ private:
                            const std::string& separator, std::string& main,
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 
+  /**
+   *  Hadle builtin commands.
+   */
+  static FormatterProviderPtr parseBuiltinCommand(const std::string& token, size_t pos,
+                                                  int command_end_position);
+
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
@@ -94,6 +102,8 @@ private:
 class FormatterImpl : public Formatter {
 public:
   FormatterImpl(const std::string& format, bool omit_empty_values = false);
+  FormatterImpl(const std::string& format, bool omit_empty_values,
+                const std::vector<CommandParserPtr>& command_parsers);
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,

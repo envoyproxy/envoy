@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -77,6 +78,35 @@ public:
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
+
+class CommandParser {
+public:
+  virtual ~CommandParser() = default;
+
+  virtual FormatterProviderPtr parse(absl::string_view token) const PURE;
+};
+
+using CommandParserPtr = std::unique_ptr<CommandParser>;
+
+/**
+ * Implemented by each custom CommandParser and registered via Registry::registerFactory()
+ * or the convenience class RegisterFactory.
+ */
+class CommandParserFactory : public Config::TypedFactory {
+public:
+  ~CommandParserFactory() override = default;
+
+  /**
+   * Creates a particular CommandParser implementation.
+   *
+   * @param config supplies the configuration for the action.
+   * @param context supplies the GuardDog Action's context.
+   * @return FatalActionsPtr the FatalActions object.
+   */
+  virtual CommandParserPtr createCommandParserFromProto(const Protobuf::Message& config) PURE;
+
+  std::string category() const override { return "envoy.formatter"; }
+};
 
 } // namespace Formatter
 } // namespace Envoy

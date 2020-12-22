@@ -97,5 +97,76 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   }
 }
 
+class TestFormatter : public FormatterProvider {
+public:
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override {
+    return "TestFormatter";
+  }
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override {
+    return ValueUtil::stringValue("");
+  }
+};
+
+class TestCommandParser : public CommandParser {
+public:
+  TestCommandParser() {}
+
+  FormatterProviderPtr parse(absl::string_view token) const override {
+    if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
+      return std::make_unique<TestFormatter>();
+    }
+
+    return nullptr;
+  }
+};
+
+class TestCommandFactory : public CommandParserFactory {
+public:
+  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override {
+    return std::make_unique<TestCommandParser>();
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+  std::string name() const override { return "envoy.formatter.TestFormatter"; }
+};
+
+REGISTER_FACTORY(TestCommandFactory, CommandParserFactory);
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "plain text %COMMAND_EXTENSION()%"
+  formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api());
+  EXPECT_EQ("plain text TestFormatter", formatter->format(request_headers_, response_headers_,
+                                                          response_trailers_, stream_info_, body_));
+}
+
+TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionUnknown) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "plain text"
+  formatters:
+    - name: envoy.formatter.TestFormatterUnknown
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()),
+                            EnvoyException,
+                            "Formatter not found: envoy.formatter.TestFormatterUnknown");
+}
+
 } // namespace Formatter
 } // namespace Envoy

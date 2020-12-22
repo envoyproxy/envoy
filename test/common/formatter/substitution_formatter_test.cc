@@ -2354,6 +2354,57 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
   }
 }
 
+class TestFormatter : public FormatterProvider {
+public:
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override {
+    return "TestFormatter";
+  }
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override {
+    return ValueUtil::stringValue("");
+  }
+};
+
+class TestCommandParser : public CommandParser {
+public:
+  TestCommandParser(bool& command_found) : command_found_(command_found) {}
+
+  FormatterProviderPtr parse(absl::string_view token) const override {
+    if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
+      command_found_ = true;
+      return std::make_unique<TestFormatter>();
+    }
+
+    return nullptr;
+  }
+
+private:
+  bool& command_found_;
+};
+
+TEST(SubstitutionFormatterTest, FormatterExtension) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  bool command_found;
+  std::vector<CommandParserPtr> commands;
+  commands.push_back(std::make_unique<TestCommandParser>(command_found));
+
+  auto providers = SubstitutionFormatParser::parse("foo %COMMAND_EXTENSION(x)%", commands);
+
+  EXPECT_TRUE(command_found);
+  EXPECT_EQ(providers.size(), 2);
+  EXPECT_EQ("TestFormatter", providers[1]->format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+}
+
 } // namespace
 } // namespace Formatter
 } // namespace Envoy
