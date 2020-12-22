@@ -250,7 +250,7 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLength) {
 }
 )EOF");
   doRequestNoCompression({{":method", "post"}});
-  Http::TestResponseHeaderMapImpl headers{{":method", "post"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseNoCompression(headers);
 }
 
@@ -278,7 +278,7 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLengthRuntimeDisabled) {
       .Times(1)
       .WillRepeatedly(Return(false));
   doRequestCompression({{":method", "post"}}, false);
-  Http::TestResponseHeaderMapImpl headers{{":method", "post"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseNoCompression(headers);
 }
 
@@ -296,7 +296,7 @@ TEST_F(CompressorFilterTest, CompressResponseNoContentLength) {
 )EOF");
   response_stats_prefix_ = "response.";
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
-  Http::TestResponseHeaderMapImpl headers{{":method", "get"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseNoCompression(headers);
 }
 
@@ -325,7 +325,7 @@ TEST_F(CompressorFilterTest, CompressResponseNoContentLengthRuntimeDisabled) {
       .Times(1)
       .WillRepeatedly(Return(false));
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
-  Http::TestResponseHeaderMapImpl headers{{":method", "get"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseCompression(headers, false);
 }
 
