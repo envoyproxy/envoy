@@ -42,12 +42,15 @@ public:
 
   // Event::Dispatcher
   const std::string& name() override { return name_; }
+  void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                        std::chrono::milliseconds min_touch_interval) override;
   TimeSource& timeSource() override { return api_.timeSource(); }
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;
-  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                Network::TransportSocketPtr&& transport_socket,
-                                                StreamInfo::StreamInfo& stream_info) override;
+  Network::ServerConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo& stream_info) override;
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
@@ -68,7 +71,7 @@ public:
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
-  SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
+  SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
@@ -91,10 +94,40 @@ public:
     }
   }
 
+  void
+  runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
+
 private:
+  // Holds a reference to the watchdog registered with this dispatcher and the timer used to ensure
+  // that the dog is touched periodically.
+  class WatchdogRegistration {
+  public:
+    WatchdogRegistration(const Server::WatchDogSharedPtr& watchdog, Scheduler& scheduler,
+                         std::chrono::milliseconds timer_interval, Dispatcher& dispatcher)
+        : watchdog_(watchdog), timer_interval_(timer_interval) {
+      touch_timer_ = scheduler.createTimer(
+          [this]() -> void {
+            watchdog_->touch();
+            touch_timer_->enableTimer(timer_interval_);
+          },
+          dispatcher);
+      touch_timer_->enableTimer(timer_interval_);
+    }
+
+    void touchWatchdog() { watchdog_->touch(); }
+
+  private:
+    Server::WatchDogSharedPtr watchdog_;
+    const std::chrono::milliseconds timer_interval_;
+    TimerPtr touch_timer_;
+  };
+  using WatchdogRegistrationPtr = std::unique_ptr<WatchdogRegistration>;
+
   TimerPtr createTimerInternal(TimerCb cb);
   void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
+  // Helper used to touch the watchdog after most schedulable, fd, and timer callbacks.
+  void touchWatchdog();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
   // dispatcher run loop is executing on. We allow run_tid_ to be empty for tests where we don't
@@ -121,6 +154,7 @@ private:
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
+  WatchdogRegistrationPtr watchdog_registration_;
 };
 
 } // namespace Event

@@ -3,6 +3,7 @@
 #include "extensions/common/wasm/wasm.h"
 #include "extensions/filters/network/wasm/wasm_filter.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/wasm_base.h"
@@ -38,7 +39,7 @@ public:
   MOCK_CONTEXT_LOG_;
 };
 
-class WasmNetworkFilterTest : public Common::Wasm::WasmNetworkFilterTestBase<
+class WasmNetworkFilterTest : public Extensions::Common::Wasm::WasmNetworkFilterTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmNetworkFilterTest() = default;
@@ -58,7 +59,7 @@ public:
         "" /* root_id */, "" /* vm_configuration */, fail_open);
   }
 
-  void setupFilter() { setupFilterBase<TestFilter>(""); }
+  void setupFilter() { setupFilterBase<TestFilter>(); }
 
   TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
 
@@ -82,17 +83,8 @@ protected:
   std::string code_;
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    std::make_tuple("v8", "cpp"), std::make_tuple("v8", "rust"),
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    std::make_tuple("wavm", "cpp"), std::make_tuple("wavm", "rust"),
-#endif
-    std::make_tuple("null", "cpp"));
-INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmNetworkFilterTest, testing_values);
+INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmNetworkFilterTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_language_values);
 
 // Bad code in initial config.
 TEST_P(WasmNetworkFilterTest, BadCode) {
@@ -172,14 +164,10 @@ TEST_P(WasmNetworkFilterTest, CloseStream) {
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))));
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
   EXPECT_CALL(filter(),
-              log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))));
-  EXPECT_CALL(filter(),
               log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 2"))));
 
   filter().onEvent(static_cast<Network::ConnectionEvent>(9999)); // Does nothing.
   filter().onEvent(Network::ConnectionEvent::RemoteClose);
-  filter().closeStream(proxy_wasm::WasmStreamType::Downstream);
-  filter().closeStream(proxy_wasm::WasmStreamType::Upstream);
 }
 
 TEST_P(WasmNetworkFilterTest, SegvFailOpen) {

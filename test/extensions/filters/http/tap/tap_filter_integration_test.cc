@@ -140,7 +140,7 @@ public:
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     admin_config:
       config_id: test_config_id
@@ -256,6 +256,9 @@ tap_config:
 
   // Second request/response with no tap.
   makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  // The above admin tap close can race with the request that follows and we don't have any way
+  // to synchronize it, so just count the number of taps after the request for use below.
+  const auto current_tapped = test_server_->counter("http.config_test.tap.rq_tapped")->value();
 
   // Setup the tap again and leave it open.
   startAdminRequest(admin_request_yaml);
@@ -328,8 +331,57 @@ tap_config:
   TestUtility::loadFromYaml(admin_response_->body(), trace);
 
   admin_client_->close();
-  EXPECT_EQ(3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+  EXPECT_EQ(current_tapped + 3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
   test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
+}
+
+// Make sure that an admin tap works correctly across an LDS reload.
+TEST_P(TapIntegrationTest, AdminLdsReload) {
+  initializeFilter(admin_filter_config_);
+
+  const std::string admin_request_yaml =
+      R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    and_match:
+      rules:
+        - http_request_trailers_match:
+            headers:
+              - name: foo_trailer
+                exact_match: bar
+        - http_response_trailers_match:
+            headers:
+              - name: bar_trailer
+                exact_match: baz
+  output_config:
+    sinks:
+      - streaming_admin: {}
+)EOF";
+
+  startAdminRequest(admin_request_yaml);
+
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  new_config_helper.addFilter(admin_filter_config_);
+  new_config_helper.renameListener("foo");
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_no_tap_, {}, &request_trailers_, response_headers_no_tap_, {},
+              &response_trailers_);
+
+  envoy::data::tap::v3::TraceWrapper trace;
+  admin_response_->waitForBodyData(1);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
+  EXPECT_EQ("bar",
+            findHeader("foo_trailer", trace.http_buffered_trace().request().trailers())->value());
+  EXPECT_EQ("baz",
+            findHeader("bar_trailer", trace.http_buffered_trace().response().trailers())->value());
+
+  admin_client_->close();
 }
 
 // Verify both request and response trailer matching works.
@@ -476,10 +528,10 @@ TEST_P(TapIntegrationTest, StaticFilePerTapStreaming) {
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
-      match_config:
+      match:
         http_request_headers_match:
           headers:
             - name: foo
@@ -522,10 +574,10 @@ TEST_P(TapIntegrationTest, StaticFilePerTapStreamingWithRequestBuffering) {
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
-      match_config:
+      match:
         http_response_headers_match:
           headers:
             - name: bar

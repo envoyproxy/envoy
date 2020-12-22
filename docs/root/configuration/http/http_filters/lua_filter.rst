@@ -124,8 +124,9 @@ follow:
 
 .. code-block:: yaml
 
-  per_filter_config:
+  typed_per_filter_config:
     envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       disabled: true
 
 We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
@@ -133,8 +134,9 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
 
 .. code-block:: yaml
 
-  per_filter_config:
+  typed_per_filter_config:
     envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       name: hello.lua
 
 .. attention::
@@ -148,8 +150,9 @@ Lua script as follows:
 
 .. code-block:: yaml
 
-  per_filter_config:
+  typed_per_filter_config:
     envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       source_code:
         inline_string: |
           function envoy_on_response(response_handle)

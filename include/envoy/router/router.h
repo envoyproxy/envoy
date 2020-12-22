@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
@@ -36,6 +37,7 @@ namespace Envoy {
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
+class ThreadLocalCluster;
 } // namespace Upstream
 
 namespace Router {
@@ -1182,10 +1184,6 @@ public:
    */
   virtual bool cancelAnyPendingStream() PURE;
   /**
-   * @return optionally returns the protocol for the connection pool.
-   */
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
-  /**
    * @return optionally returns the host for the connection pool.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
@@ -1237,11 +1235,13 @@ public:
    *             connection pools the description may be different each time this is called.
    * @param upstream_local_address supplies the local address of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
+   * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info) PURE;
+                           const StreamInfo::StreamInfo& info,
+                           absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.
   //
@@ -1256,9 +1256,8 @@ public:
  *
  * It is similar logically to RequestEncoder, only without the getStream interface.
  */
-class GenericUpstream {
+class GenericUpstream : public Event::DeferredDeletable {
 public:
-  virtual ~GenericUpstream() = default;
   /**
    * Encode a data frame.
    * @param data supplies the data to encode. The data may be moved by the encoder.
@@ -1274,8 +1273,10 @@ public:
    * Encode headers, optionally indicating end of stream.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request.
+   * @return status indicating success. Encoding will fail if headers do not have required HTTP
+   * headers.
    */
-  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
@@ -1306,7 +1307,7 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

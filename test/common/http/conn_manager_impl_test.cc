@@ -11,6 +11,7 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Mock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -540,7 +541,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> foo_bar_cluster =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-  EXPECT_CALL(cluster_manager_, get(absl::string_view{foo_bar_cluster_name}))
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{foo_bar_cluster_name}))
       .WillOnce(Return(foo_bar_cluster.get()));
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> foo_cluster =
@@ -548,7 +549,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> default_cluster =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-  EXPECT_CALL(cluster_manager_, get(absl::string_view{default_cluster_name}))
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{default_cluster_name}))
       .Times(2)
       .WillRepeatedly(Return(default_cluster.get()));
 
@@ -2643,7 +2644,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
   std::string response_body;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
-    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
     EXPECT_CALL(*request_timer, disableTimer()).Times(AtLeast(1));
 
     EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
@@ -2671,8 +2672,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsNotDisarmedOnIncompleteReq
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
-    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
-    EXPECT_CALL(*request_timer, disableTimer()).Times(1);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
+    EXPECT_CALL(*request_timer, disableTimer());
 
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -2698,7 +2699,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
-    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
 
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -2724,7 +2725,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
-    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
 
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -2751,7 +2752,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
-    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
     decoder_ = &conn_manager_->newStream(response_encoder_);
 
     RequestHeaderMapPtr headers{
@@ -2786,7 +2787,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     Event::MockTimer* request_timer = setUpTimer();
-    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
 
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -2825,14 +2826,76 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
 
   Buffer::OwnedImpl fake_input("1234");
 
-  EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
+  EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
   conn_manager_->onData(fake_input, false); // kick off request
 
-  EXPECT_CALL(*request_timer, disableTimer()).Times(1);
+  EXPECT_CALL(*request_timer, disableTimer());
   EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 
   expectOnDestroy();
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutDisarmedAfterHeaders) {
+  request_headers_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+
+  Event::MockTimer* request_header_timer;
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+        request_header_timer = setUpTimer();
+        EXPECT_CALL(*request_header_timer, enableTimer(request_headers_timeout_, _));
+
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        return Http::okStatus();
+      }))
+      .WillOnce(Return(Http::okStatus()))
+      .WillOnce([&](Buffer::Instance&) {
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "localhost:8080"}, {":path", "/"}, {":method", "GET"}}};
+
+        EXPECT_CALL(*request_header_timer, disableTimer);
+        decoder_->decodeHeaders(std::move(headers), false);
+        return Http::okStatus();
+      });
+
+  Buffer::OwnedImpl first_line("GET /HTTP/1.1\r\n");
+  Buffer::OwnedImpl second_line("Host: localhost:8080\r\n");
+  Buffer::OwnedImpl empty_line("\r\n");
+  conn_manager_->onData(first_line, false);
+  EXPECT_TRUE(request_header_timer->enabled_);
+  conn_manager_->onData(second_line, false);
+  EXPECT_TRUE(request_header_timer->enabled_);
+  conn_manager_->onData(empty_line, false);
+  Mock::VerifyAndClearExpectations(codec_);
+  Mock::VerifyAndClearExpectations(request_header_timer);
+
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutCallbackDisarmsAndReturns408) {
+  request_headers_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+
+  Event::MockTimer* request_header_timer;
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    request_header_timer = setUpTimer();
+    EXPECT_CALL(*request_header_timer, enableTimer(request_headers_timeout_, _));
+
+    conn_manager_->newStream(response_encoder_);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("GET /resource HTTP/1.1\r\n\r\n");
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  // The client took too long to send headers.
+  EXPECT_CALL(*request_header_timer, disableTimer);
+  request_header_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_header_timeout_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationDisabledIfSetToZero) {
@@ -2874,7 +2937,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackResetStream) {
   Event::MockTimer* duration_timer = setUpTimer();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
-    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _));
     conn_manager_->newStream(response_encoder_);
     return Http::okStatus();
   }));
@@ -2990,7 +3053,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackNotCalledIfResetS
   Event::MockTimer* duration_timer = setUpTimer();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
-    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _));
     conn_manager_->newStream(response_encoder_);
     return Http::okStatus();
   }));

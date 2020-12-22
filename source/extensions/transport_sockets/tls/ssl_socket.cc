@@ -42,6 +42,7 @@ public:
   }
   void onConnected() override {}
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  bool startSecureTransport() override { return false; }
 };
 } // namespace
 
@@ -140,10 +141,18 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_WANT_READ:
           break;
         case SSL_ERROR_ZERO_RETURN:
+          // Graceful shutdown using close_notify TLS alert.
           end_stream = true;
           break;
+        case SSL_ERROR_SYSCALL:
+          if (result.error_.value() == 0) {
+            // Non-graceful shutdown by closing the underlying socket.
+            end_stream = true;
+            break;
+          }
+          FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
-        // Renegotiation has started. We don't handle renegotiation so just fall through.
+          // Renegotiation has started. We don't handle renegotiation so just fall through.
         default:
           drainErrorQueue();
           action = PostIoAction::Close;
@@ -157,7 +166,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     if (slices_to_commit > 0) {
       read_buffer.commit(slices, slices_to_commit);
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
         keep_reading = false;
       }
     }
@@ -285,7 +294,27 @@ void SslSocket::shutdownSsl() {
   if (info_->state() != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(rawSsl());
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      // Windows operate under `EmulatedEdge`. These are level events that are artificially
+      // made to behave like edge events. And if the rc is 0 then in that case we want read
+      // activation resumption. This code is protected with an `constexpr` if, to minimize the tax
+      // on POSIX systems that operate in Edge events.
+      if (rc == 0) {
+        // See https://www.openssl.org/docs/manmaster/man3/SSL_shutdown.html
+        // if return value is 0,  Call SSL_read() to do a bidirectional shutdown.
+        callbacks_->setTransportSocketIsReadable();
+      }
+    }
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
+    drainErrorQueue();
+    info_->setState(Ssl::SocketState::ShutdownSent);
+  }
+}
+
+void SslSocket::shutdownBasic() {
+  if (info_->state() != Ssl::SocketState::ShutdownSent &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
+    callbacks_->ioHandle().shutdown(ENVOY_SHUT_WR);
     drainErrorQueue();
     info_->setState(Ssl::SocketState::ShutdownSent);
   }
@@ -303,6 +332,10 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   if (info_->state() == Ssl::SocketState::HandshakeInProgress ||
       info_->state() == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
+  } else {
+    // We're not in a state to do the full SSL shutdown so perform a basic shutdown to flush any
+    // outstanding alerts
+    shutdownBasic();
   }
 }
 
@@ -327,7 +360,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -357,7 +390,7 @@ void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }
@@ -368,7 +401,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
       config_(std::move(config)), server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
@@ -398,7 +431,7 @@ void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
     absl::WriterMutexLock l(&ssl_ctx_mu_);
-    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_, ssl_ctx_);
   }
   stats_.ssl_context_update_by_sds_.inc();
 }

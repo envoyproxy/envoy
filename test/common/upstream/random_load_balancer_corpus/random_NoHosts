@@ -3,7 +3,7 @@ common_lb_config {
 
 }
 actions {
-    prefetch {
+    preconnect {
 
     }
 }
@@ -14,11 +14,17 @@ actions {
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 0
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
 }
 setup_priority_levels {
     num_hosts_in_priority_level: 0
-    random_bytestring: "\x01\x02"
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
 }
 seed_for_prng: 2
 }

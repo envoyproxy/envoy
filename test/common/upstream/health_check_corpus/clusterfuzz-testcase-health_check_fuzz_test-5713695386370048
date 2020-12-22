@@ -1,0 +1,40 @@
+health_check_config {
+  timeout {
+    seconds: 512
+    nanos: 8
+  }
+  interval {
+    nanos: 8
+  }
+  unhealthy_threshold {
+    value: 36
+  }
+  healthy_threshold {
+  }
+  grpc_health_check {
+  }
+  no_traffic_interval {
+    seconds: 512
+    nanos: 8
+  }
+  initial_jitter {
+    seconds: 512
+    nanos: 262152
+  }
+}
+actions {
+  trigger_timeout_timer {
+  }
+}
+actions {
+  raise_go_away: NO_ERROR
+}
+actions {
+  trigger_interval_timer {
+  }
+}
+actions {
+  trigger_timeout_timer {
+  }
+}
+http_verify_cluster: true

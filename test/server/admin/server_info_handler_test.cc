@@ -28,7 +28,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
-      server_.sslContextManager().createSslClientContext(store, cfg));
+      server_.sslContextManager().createSslClientContext(store, cfg, nullptr));
 
   const std::string expected_empty_json = R"EOF({
  "certificates": [

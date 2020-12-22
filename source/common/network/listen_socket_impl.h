@@ -21,6 +21,11 @@ protected:
   ListenSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
       : SocketImpl(std::move(io_handle), local_address) {}
 
+  SocketPtr duplicate() override {
+    // Using `new` to access a non-public constructor.
+    return absl::WrapUnique(new ListenSocketImpl(io_handle_->duplicate(), local_address_));
+  }
+
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;

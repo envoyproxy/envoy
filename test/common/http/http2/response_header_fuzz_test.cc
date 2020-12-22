@@ -14,11 +14,11 @@ namespace Http {
 namespace Http2 {
 namespace {
 
-void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
+void replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Create the client connection containing the nghttp2 session.
-  TestClientConnectionImplNew connection(
+  TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
-      Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+      codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       ProdNghttp2SessionFactory::get());
   // Create a new stream.
   Http::Status status = Http::okStatus();
@@ -27,7 +27,7 @@ void Replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   // Setup a single stream to inject frames as a reply to.
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  codec.request_encoder_->encodeHeaders(request_headers, true);
+  codec.request_encoder_->encodeHeaders(request_headers, true).IgnoreError();
 
   // Send frames.
   status = codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
@@ -40,10 +40,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   Frame frame;
   frame.assign(buf, buf + len);
   // Replay with the fuzzer bytes.
-  Replay(frame, codec);
+  replay(frame, codec);
   // Try again, but fixup the HEADERS frame to make it a valid HEADERS.
   FrameUtils::fixupHeaders(frame);
-  Replay(frame, codec);
+  replay(frame, codec);
 }
 
 } // namespace

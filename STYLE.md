@@ -19,7 +19,7 @@
 # Documentation
 
 * If you are modifying the data plane structually, please keep the [Life of a
-  Request](docs/root/intro/life_of_a_request.md) documentation up-to-date.
+  Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation up-to-date.
 
 # Deviations from Google C++ style guidelines
 

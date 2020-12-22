@@ -36,9 +36,11 @@ using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Optional;
 using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
@@ -117,7 +119,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
 class TestClientConnectionImpl : public Network::ClientConnectionImpl {
 public:
   using ClientConnectionImpl::ClientConnectionImpl;
-  Buffer::WatermarkBuffer& readBuffer() { return read_buffer_; }
+  Buffer::Instance& readBuffer() { return *read_buffer_; }
 };
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -125,7 +127,7 @@ protected:
   ConnectionImplTest() : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
 
   void setUpBasicConnection() {
-    if (dispatcher_.get() == nullptr) {
+    if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
     socket_ = std::make_shared<Network::TcpListenSocket>(
@@ -257,7 +259,7 @@ protected:
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
   StrictMock<MockConnectionCallbacks> client_callbacks_;
-  Network::ConnectionPtr server_connection_;
+  Network::ServerConnectionPtr server_connection_;
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
@@ -285,6 +287,15 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   Buffer::OwnedImpl buffer("hello world");
   client_connection_->write(buffer, false);
   client_connection_->connect();
+  EXPECT_TRUE(client_connection_->connecting());
+
+  StrictMock<MockConnectionCallbacks> added_and_removed_callbacks;
+  // Make sure removed connections don't get events.
+  client_connection_->addConnectionCallbacks(added_and_removed_callbacks);
+  client_connection_->removeConnectionCallbacks(added_and_removed_callbacks);
+
+  std::shared_ptr<MockReadFilter> add_and_remove_filter =
+      std::make_shared<StrictMock<MockReadFilter>>();
 
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
@@ -300,12 +311,60 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
             std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
+        server_connection_->addReadFilter(add_and_remove_filter);
+        server_connection_->removeReadFilter(add_and_remove_filter);
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, UnregisterRegisterDuringConnectCallback) {
+  setUpBasicConnection();
+
+  NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
+  // Verify the code path in the mixed connection pool, where the original
+  // network callback is unregistered when Connected is raised, and a new
+  // callback is registered.
+  // event.
+  int expected_callbacks = 2;
+  client_connection_->connect();
+  read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+
+        expected_callbacks--;
+        if (expected_callbacks == 0) {
+          dispatcher_->exit();
+        }
+      }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        expected_callbacks--;
+        // Register the new callback. It should immediately get the Connected
+        // event without an extra dispatch loop.
+        EXPECT_CALL(upstream_callbacks_, onEvent(ConnectionEvent::Connected));
+        client_connection_->addConnectionCallbacks(upstream_callbacks_);
+        // Remove the old connection callbacks, to regression test removal
+        // under the stack of onEvent.
+        client_connection_->removeConnectionCallbacks(client_callbacks_);
+        if (expected_callbacks == 0) {
+          dispatcher_->exit();
+        }
+      }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Swap the callbacks back as disconnect() expects client_callbacks_ to be
+  // registered.
+  client_connection_->removeConnectionCallbacks(upstream_callbacks_);
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  disconnect(true);
 }
 
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
@@ -330,8 +389,67 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Verify that also the immediate connect errors generate a remote close event.
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  MockTransportSocket* transport_socket = mocks.transport_socket_.get();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
+
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+  EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
+  mock_timer->invokeCallback();
+  EXPECT_THAT(stream_info_.connectionTerminationDetails(),
+              Optional(HasSubstr("transport socket timeout")));
+}
+
+TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  MockTransportSocket* transport_socket = mocks.transport_socket_.get();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+
+  auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
+
+  transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
+  // This should be a no-op. No timer should be created.
+  EXPECT_CALL(*mocks.dispatcher_, createTimer_(_)).Times(0);
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+
+  server_connection->close(ConnectionCloseType::NoFlush);
+}
+
+TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  MockTransportSocket* transport_socket = mocks.transport_socket_.get();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
+
+  bool timer_destroyed = false;
+  mock_timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
+
+  server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3));
+
+  transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
+  EXPECT_TRUE(timer_destroyed);
+
+  server_connection->close(ConnectionCloseType::NoFlush);
 }
 
 TEST_P(ConnectionImplTest, SocketOptions) {
@@ -476,12 +594,21 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   MockConnectionStats client_connection_stats;
   client_connection_->setConnectionStats(client_connection_stats.toBufferStats());
+  EXPECT_TRUE(client_connection_->connecting());
   client_connection_->connect();
+  // The Network::Connection class oddly uses onWrite as its indicator of if
+  // it's done connection, rather than the Connected event.
+  EXPECT_TRUE(client_connection_->connecting());
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
   std::shared_ptr<MockFilter> filter(new MockFilter());
   client_connection_->addFilter(filter);
   client_connection_->addWriteFilter(write_filter);
+
+  // Make sure removed filters don't get callbacks.
+  std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
+  client_connection_->addReadFilter(read_filter);
+  client_connection_->removeReadFilter(read_filter);
 
   Sequence s1;
   EXPECT_CALL(*write_filter, onWrite(_, _))
@@ -793,6 +920,11 @@ TEST_P(ConnectionImplTest, WriteWatermarks) {
   setUpBasicConnection();
   EXPECT_FALSE(client_connection_->aboveHighWatermark());
 
+  StrictMock<MockConnectionCallbacks> added_and_removed_callbacks;
+  // Make sure removed connections don't get events.
+  client_connection_->addConnectionCallbacks(added_and_removed_callbacks);
+  client_connection_->removeConnectionCallbacks(added_and_removed_callbacks);
+
   // Stick 5 bytes in the connection buffer.
   std::unique_ptr<Buffer::OwnedImpl> buffer(new Buffer::OwnedImpl("hello"));
   int buffer_len = buffer->length();
@@ -1012,6 +1144,12 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+        return {-1, SOCKET_ERROR_AGAIN};
+      }));
+
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
@@ -1028,7 +1166,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
 
   // Clean up the connection. The close() (called via disconnect) will attempt to flush. The
   // call to write() will succeed, bringing the connection back under the low watermark.
-  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
 
   disconnect(true);
 }
@@ -1102,6 +1240,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     EXPECT_CALL(os_sys_calls, writev(_, _, _))
         .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
           client_write_buffer_->drain(bytes_to_flush);
+          dispatcher_->exit();
           return {-1, SOCKET_ERROR_AGAIN};
         }))
         .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
@@ -1109,7 +1248,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
         }));
 
     client_connection_->write(buffer_to_write, false);
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
@@ -1262,7 +1401,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
   // reading and the connection should close gracefully via FIN.
 
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(0);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
@@ -1270,7 +1409,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
         dispatcher_->exit();
         return FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose)).Times(1);
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose));
   server_connection_->close(ConnectionCloseType::FlushWrite);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -1313,7 +1452,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 
   // Client closes the connection so delayed close timer on the server conn should not fire.
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(0);
-  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .Times(1)
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -1353,8 +1492,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
         return FilterStatus::StopIteration;
       }));
   server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
-  EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(1);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
+  EXPECT_CALL(stats.delayed_close_timeouts_, inc());
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .Times(1)
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
@@ -1392,7 +1531,7 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithPendingWrite) {
   // The socket close will happen as a result of the write flush and not due to the delayed close
   // timer triggering.
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(0);
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
@@ -1435,7 +1574,7 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithoutPendingWrite)
 
   // The write buffer has been flushed and a delayed close timer has been set. The socket close
   // will happen as part of the close() since the timeout is no longer required.
-  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
   server_connection_->close(ConnectionCloseType::FlushWrite);
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(0);
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -1514,7 +1653,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   Buffer::OwnedImpl data("data");
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _));
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its
@@ -1526,7 +1665,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         buffer.drain(bytes_drained);
         return IoResult{PostIoAction::KeepOpen, bytes_drained, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _));
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("ata"), _))
@@ -1536,7 +1675,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         buffer.drain(buffer.length());
         return IoResult{PostIoAction::KeepOpen, bytes_drained, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _));
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Force the delayed close timeout to trigger so the connection is cleaned up.
@@ -1575,7 +1714,7 @@ TEST_P(ConnectionImplTest, IgnoreSpuriousFdWriteEventsDuringFlushWriteAndDelay) 
   Buffer::OwnedImpl data("data");
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _));
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its
@@ -1587,7 +1726,7 @@ TEST_P(ConnectionImplTest, IgnoreSpuriousFdWriteEventsDuringFlushWriteAndDelay) 
         buffer.drain(bytes_drained);
         return IoResult{PostIoAction::KeepOpen, bytes_drained, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _));
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Handle a write event and drain 0 bytes from the buffer. Verify that the timer is not reset.
@@ -1609,7 +1748,7 @@ TEST_P(ConnectionImplTest, IgnoreSpuriousFdWriteEventsDuringFlushWriteAndDelay) 
         EXPECT_EQ(server_connection->state(), Connection::State::Closing);
         return IoResult{PostIoAction::KeepOpen, bytes_drained, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _));
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Handle a write event after entering the half-closed state. Verify that the timer is not reset
@@ -1629,7 +1768,7 @@ TEST_P(ConnectionImplTest, IgnoreSpuriousFdWriteEventsDuringFlushWriteAndDelay) 
         EXPECT_EQ(server_connection->state(), Connection::State::Closing);
         return IoResult{PostIoAction::KeepOpen, 1, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _));
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Force the delayed close timeout to trigger so the connection is cleaned up.
@@ -1663,10 +1802,10 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
         return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
   server_connection->write(data, false);
-  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _));
   // Enable the delayed close timer.
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
-  EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
+  EXPECT_CALL(*mocks.timer_, disableTimer());
   // This close() will call closeSocket(), which should disable the timer to avoid triggering it
   // after the connection's data structures have been reset.
   server_connection->close(ConnectionCloseType::NoFlush);
@@ -1704,9 +1843,9 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
       }));
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _));
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
-  EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
+  EXPECT_CALL(*mocks.timer_, disableTimer());
   // The following close() will call closeSocket() and reset internal data structures such as
   // stats.
   server_connection->close(ConnectionCloseType::NoFlush);
@@ -1746,7 +1885,7 @@ public:
           return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
 
-    file_event_ = new Event::MockFileEvent;
+    file_event_ = new NiceMock<Event::MockFileEvent>;
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
@@ -1796,6 +1935,197 @@ TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
   file_ready_cb_(Event::FileReadyType::Read);
 }
 
+// Verify that read resumptions requested via setTransportSocketIsReadable() are scheduled once read
+// is re-enabled.
+TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
+  InSequence s;
+
+  std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
+  connection_->readDisable(true);
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  // No calls to activate when re-enabling if there are no pending read requests.
+  EXPECT_CALL(*file_event_, activate(_)).Times(0);
+  connection_->readDisable(false);
+
+  // setTransportSocketIsReadable triggers an immediate call to activate.
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->setTransportSocketIsReadable();
+
+  // When processing a sequence of read disable/read enable, changes to the enabled event mask
+  // happen only when the disable count transitions to/from 0.
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
+  connection_->readDisable(true);
+  connection_->readDisable(true);
+  connection_->readDisable(true);
+  connection_->readDisable(false);
+  connection_->readDisable(false);
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  // Expect a read activation since there have been no transport doRead calls since the call to
+  // setTransportSocketIsReadable.
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->readDisable(false);
+
+  // No calls to doRead when file_ready_cb is invoked while read disabled.
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  connection_->readDisable(true);
+  EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  // Expect a read activate when re-enabling since the file ready cb has not done a read.
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->readDisable(false);
+
+  // Do a read to clear the transport_wants_read_ flag, verify that no read activation is scheduled.
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  connection_->readDisable(true);
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  // No read activate call.
+  EXPECT_CALL(*file_event_, activate(_)).Times(0);
+  connection_->readDisable(false);
+}
+
+// Verify that read resumption is scheduled when read is re-enabled while the read buffer is
+// non-empty.
+TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
+  InSequence s;
+
+  std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
+  connection_->setBufferLimits(5);
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  // Add some data to the read buffer to trigger read activate calls when re-enabling read.
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> IoResult {
+        buffer.add("0123456789");
+        return {PostIoAction::KeepOpen, 10, false};
+      }));
+  // Expect a change to the event mask when hitting the read buffer high-watermark.
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter, onData(_, false)).WillOnce(Return(FilterStatus::Continue));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  // Already read disabled, expect no changes to enabled events mask.
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
+  connection_->readDisable(true);
+  connection_->readDisable(true);
+  connection_->readDisable(false);
+  // Read buffer is at the high watermark so read_disable_count should be == 1. Expect a read
+  // activate but no call to setEnable to change the registration mask.
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->readDisable(false);
+
+  // Invoke the file event cb while read_disable_count_ == 1 to partially drain the read buffer.
+  // Expect no transport reads.
+  EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
+  EXPECT_CALL(*read_filter, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+        EXPECT_EQ(10, data.length());
+        data.drain(data.length() - 1);
+        return FilterStatus::Continue;
+      }));
+  // Partial drain of the read buffer below low watermark triggers an update to the fd enabled mask
+  // and a read activate since the read buffer is not empty.
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  // Drain the rest of the buffer and verify there are no spurious read activate calls.
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  EXPECT_CALL(*read_filter, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+        EXPECT_EQ(1, data.length());
+        data.drain(1);
+        return FilterStatus::Continue;
+      }));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  connection_->readDisable(true);
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  // read buffer is empty, no read activate call.
+  EXPECT_CALL(*file_event_, activate(_)).Times(0);
+  connection_->readDisable(false);
+}
+
+// Verify that transport_wants_read_ read resumption is not lost when processing read buffer
+// high-watermark resumptions.
+TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
+  InSequence s;
+
+  std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
+  connection_->setBufferLimits(5);
+  connection_->enableHalfClose(true);
+  connection_->addReadFilter(read_filter);
+
+  // Add some data to the read buffer and also call setTransportSocketIsReadable to mimic what
+  // transport sockets are expected to do when the read buffer high watermark is hit.
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer) -> IoResult {
+        buffer.add("0123456789");
+        connection_->setTransportSocketIsReadable();
+        return {PostIoAction::KeepOpen, 10, false};
+      }));
+  // Expect a change to the event mask when hitting the read buffer high-watermark.
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write));
+  // The setTransportSocketIsReadable does not call activate because read_disable_count_ > 0 due to
+  // high-watermark.
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read)).Times(0);
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter, onData(_, false)).WillOnce(Return(FilterStatus::Continue));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  // Already read disabled, expect no changes to enabled events mask.
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
+  connection_->readDisable(true);
+  connection_->readDisable(true);
+  connection_->readDisable(false);
+  // Read buffer is at the high watermark so read_disable_count should be == 1. Expect a read
+  // activate but no call to setEnable to change the registration mask.
+  EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  connection_->readDisable(false);
+
+  // Invoke the file event cb while read_disable_count_ == 1 and fully drain the read buffer.
+  // Expect no transport reads. Expect a read resumption due to transport_wants_read_ being true
+  // when read is re-enabled due to going under the low watermark.
+  EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
+  EXPECT_CALL(*read_filter, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+        EXPECT_EQ(10, data.length());
+        data.drain(data.length());
+        return FilterStatus::Continue;
+      }));
+  // The buffer is fully drained. Expect a read activation because setTransportSocketIsReadable set
+  // transport_wants_read_ and no transport doRead calls have happened.
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Read));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  file_ready_cb_(Event::FileReadyType::Read);
+
+  // Verify there are no read activate calls the event callback does a transport read and clears the
+  // transport_wants_read_ state.
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  connection_->readDisable(true);
+  EXPECT_CALL(*file_event_, setEnabled(_));
+  EXPECT_CALL(*file_event_, activate(_)).Times(0);
+  connection_->readDisable(false);
+}
+
 // Test that BytesSentCb is invoked at the correct times
 TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
   uint64_t bytes_sent = 0;
@@ -1803,6 +2133,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
   connection_->addBytesSentCallback([&](uint64_t arg) {
     cb_called++;
     bytes_sent = arg;
+    return true;
   });
 
   // 100 bytes were sent; expect BytesSent event
@@ -1841,11 +2172,13 @@ TEST_F(MockTransportConnectionImplTest, BytesSentMultiple) {
   connection_->addBytesSentCallback([&](uint64_t arg) {
     cb_called1++;
     bytes_sent1 = arg;
+    return true;
   });
 
   connection_->addBytesSentCallback([&](uint64_t arg) {
     cb_called2++;
     bytes_sent2 = arg;
+    return true;
   });
 
   EXPECT_CALL(*transport_socket_, doWrite(_, _))
@@ -1865,6 +2198,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
   Connection::BytesSentCb cb = [&](uint64_t) {
     cb_called++;
     connection_->close(ConnectionCloseType::NoFlush);
+    return true;
   };
   connection_->addBytesSentCallback(cb);
   connection_->addBytesSentCallback(cb);
@@ -1875,6 +2209,71 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
 
   EXPECT_EQ(cb_called, 1);
   EXPECT_EQ(connection_->state(), Connection::State::Closed);
+}
+
+// Test that a callback may unsubscribe from being called in the future.
+// Test defines 3 callbacks. First, the middle one unsubscribes and later
+// on the last added callback unsubscribes.
+TEST_F(MockTransportConnectionImplTest, BytesSentUnsubscribe) {
+  uint32_t cb_called1 = 0;
+  uint32_t cb_called2 = 0;
+  uint32_t cb_called3 = 0;
+  uint32_t bytes_sent2 = 0;
+  uint32_t bytes_sent3 = 0;
+
+  // The first callback should never unsubscribe.
+  connection_->addBytesSentCallback([&](uint64_t) {
+    cb_called1++;
+    return true;
+  });
+
+  // The second callback should unsubscribe after sending 10 bytes.
+  connection_->addBytesSentCallback([&](uint64_t arg) {
+    cb_called2++;
+    bytes_sent2 += arg;
+    return (bytes_sent2 < 10);
+  });
+
+  // The third callback should unsubscribe after sending 20 bytes.
+  connection_->addBytesSentCallback([&](uint64_t arg) {
+    cb_called3++;
+    bytes_sent3 += arg;
+    return (bytes_sent3 < 20);
+  });
+
+  EXPECT_CALL(*transport_socket_, doWrite(_, _))
+      .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 5, false}));
+  // Send 5 bytes. All callbacks should be called.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 1);
+  EXPECT_EQ(cb_called2, 1);
+  EXPECT_EQ(cb_called3, 1);
+
+  // Send next 5 bytes. All callbacks should be called and the second
+  // callback should unsubscribe.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 2);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 2);
+
+  // Send next 5 bytes. Only the first and third callbacks should be called.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 3);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 3);
+
+  // Send next 5 bytes. The first and third callbacks should be called and
+  // the third one should unsubscribe.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 4);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 4);
+
+  // Send next 5 bytes. Only the first callback should be called.
+  file_ready_cb_(Event::FileReadyType::Write);
+  EXPECT_EQ(cb_called1, 5);
+  EXPECT_EQ(cb_called2, 2);
+  EXPECT_EQ(cb_called3, 4);
 }
 
 // Test that onWrite does not have end_stream set, with half-close disabled
@@ -1910,7 +2309,7 @@ TEST_F(MockTransportConnectionImplTest, ReadMultipleEndStream) {
   EXPECT_CALL(*transport_socket_, doRead(_))
       .Times(2)
       .WillRepeatedly(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
-  EXPECT_CALL(*read_filter, onData(_, true)).Times(1);
+  EXPECT_CALL(*read_filter, onData(_, true));
   file_ready_cb_(Event::FileReadyType::Read);
   file_ready_cb_(Event::FileReadyType::Read);
 }

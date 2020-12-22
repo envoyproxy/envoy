@@ -249,6 +249,8 @@ public:
       // create connections with the first 4 bytes of connection id different from each
       // other so they should be evenly distributed.
       designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
+      // TODO(sunjayBhatia,wrowe): deserialize this, establishing all connections in parallel
+      // (Expected to save ~14s each across 6 tests on Windows)
       codec_clients.push_back(makeHttpConnection(lookupPort("http")));
     }
     constexpr auto timeout_first = std::chrono::seconds(15);
@@ -391,9 +393,13 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
-TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsWithBPF) { testMultipleQuicConnections(); }
+// Ensure multiple quic connections work, regardless of platform BPF support
+TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsDefaultMode) {
+  testMultipleQuicConnections();
+}
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
+  // Note: This runtime override is a no-op on platforms without BPF
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing", "false");
 
@@ -523,6 +529,12 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
           : "QUIC_HANDSHAKE_FAILED with details: TLS handshake failure (ENCRYPTION_HANDSHAKE) 46: "
             "certificate unknown";
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
+}
+
+TEST_P(QuicHttpIntegrationTest, RequestResponseWithTrailers) {
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  testTrailers(/*request_size=*/10, /*response_size=*/10, /*request_trailers_present=*/true,
+               /*response_trailers_present=*/true);
 }
 
 } // namespace Quic

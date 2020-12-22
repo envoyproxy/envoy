@@ -4,6 +4,7 @@
 
 set -e
 
+
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
@@ -279,36 +280,34 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     "--define" "boringssl=fips"
     "--define" "log_debug_assert_in_release=enabled"
     "--define" "quiche=enabled"
-    "--define" "wasm=disabled"
     "--define" "path_normalization_by_default=true"
     "--define" "deprecated_features=disabled"
-    "--define" "use_new_codecs_in_integration_tests=false"
     "--define" "tcmalloc=gperftools"
-    "--define" "zlib=ng")
+    "--define" "zlib=ng"
+    "--@envoy//source/extensions/filters/http/kill_request:enabled"
+    "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
 
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
 
-  if [[ "${TEST_TARGETS[*]}" == "//test/..." ]]; then
-    cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    TEST_TARGETS=("@envoy//test/...")
-  fi
-  # Building all the dependencies from scratch to link them against libc++.
-  echo "Building and testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
 
-  # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
-  # integration tests with asan.
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
+  # Building all the dependencies from scratch to link them against libc++.
+  echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+
+  echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
 
-  echo "Building binary..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  echo "Building binary with wasm=wavm..."
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
@@ -373,6 +372,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   setup_clang_toolchain
 
   echo "fix_format..."
+  ./tools/code_format/check_shellcheck_format.sh fix
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh fix --test
@@ -384,7 +384,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format_test..."
   ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
-  ./tools/code_format/check_shellcheck_format.sh
+  ./tools/code_format/check_shellcheck_format.sh check
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/proto_format/proto_format.sh check --test
@@ -446,7 +446,7 @@ elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   done
   docker images
   sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends redis-tools
+  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
   export DOCKER_NO_PULL=1
   umask 027
   chmod -R o-rwx examples/

@@ -68,7 +68,7 @@ public:
   void expectOKWithOnData() {
     EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
     EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(*client_, check(_, _, _, testing::A<Tracing::Span&>(), _))
+    EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
         .WillOnce(
             WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
               request_callbacks_ = &callbacks;
@@ -115,7 +115,6 @@ public:
     EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
     EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
     EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
-    EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
     EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
     EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
     EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
@@ -130,6 +129,7 @@ public:
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
+transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -138,6 +138,7 @@ failure_mode_allow: true
 stat_prefix: name
   )EOF";
   const std::string metadata_yaml_string_ = R"EOF(
+transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -155,6 +156,7 @@ filter_enabled_metadata:
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   std::string yaml_string = R"EOF(
+transport_api_version: V3
 grpc_service: {}
 stat_prefix: name
   )EOF";
@@ -179,7 +181,7 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -208,7 +210,6 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
@@ -221,7 +222,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -241,7 +242,6 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
@@ -256,7 +256,7 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -266,14 +266,13 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
 
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
@@ -288,7 +287,7 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -309,7 +308,6 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
@@ -324,7 +322,7 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -340,7 +338,6 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
@@ -356,7 +353,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
@@ -373,7 +370,6 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
@@ -389,7 +385,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
@@ -402,7 +398,6 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
@@ -418,7 +413,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
@@ -435,41 +430,6 @@ TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
-}
-
-// Test to verify that timeout the proper stat is incremented.
-TEST_F(ExtAuthzFilterTest, TimeoutError) {
-  initialize(default_yaml_string_);
-  InSequence s;
-
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            auto resp = makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error);
-            resp->error_kind = Filters::Common::ExtAuthz::ErrorKind::Timedout;
-            callbacks.onComplete(std::move(resp));
-          })));
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
-  Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
-
-  EXPECT_CALL(*client_, cancel()).Times(0);
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
@@ -495,14 +455,13 @@ TEST_F(ExtAuthzFilterTest, DisabledWithMetadata) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
   EXPECT_CALL(*client_, cancel()).Times(0);
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.disabled").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
-  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.timeout").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());

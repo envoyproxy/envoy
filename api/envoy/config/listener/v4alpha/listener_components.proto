@@ -180,7 +180,7 @@ message FilterChainMatch {
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
 // various other parameters.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message FilterChain {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.FilterChain";
@@ -203,9 +203,9 @@ message FilterChain {
     google.protobuf.Duration rebuild_timeout = 1;
   }
 
-  reserved 2;
+  reserved 2, 4;
 
-  reserved "tls_context";
+  reserved "tls_context", "use_proxy_proto";
 
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;
@@ -216,14 +216,6 @@ message FilterChain {
   // list is empty, the connection will close by default.
   repeated Filter filters = 3;
 
-  // Whether the listener should expect a PROXY protocol V1 header on new
-  // connections. If this option is enabled, the listener will assume that that
-  // remote address of the connection is the one specified in the header. Some
-  // load balancers including the AWS ELB support this option. If the option is
-  // absent or set to false, Envoy will use the physical peer address of the
-  // connection as the remote address.
-  google.protobuf.BoolValue use_proxy_proto = 4;
-
   // [#not-implemented-hide:] filter chain metadata.
   core.v4alpha.Metadata metadata = 5;
 
@@ -233,6 +225,11 @@ message FilterChain {
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
   core.v4alpha.TransportSocket transport_socket = 6;
+
+  // If present and nonzero, the amount of time to allow incoming connections to complete any
+  // transport socket negotiations. If this expires before the transport reports connection
+  // establishment, the connection is summarily closed.
+  google.protobuf.Duration transport_socket_connect_timeout = 9;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter

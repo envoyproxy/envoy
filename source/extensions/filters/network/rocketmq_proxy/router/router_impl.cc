@@ -89,7 +89,7 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
 
   route_entry_ = route->routeEntry();
   const std::string cluster_name = route_entry_->clusterName();
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
     active_message.onError("Cluster does not exist.");
     ENVOY_LOG(warn, "Cluster for {} is not available", cluster_name);
@@ -106,8 +106,8 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
     return;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
+  Tcp::ConnectionPool::Instance* conn_pool =
+      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     ENVOY_LOG(warn, "No host available for cluster {}. Opaque: {}", cluster_name, opaque);
     active_message.onError("No host available");

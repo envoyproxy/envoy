@@ -60,8 +60,6 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_name = "envoy.filters.http.grpc_json_transcoder",
-    # TODO(envoyproxy/windows-dev): diagnose clang-cl build test failure
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/grpc:codec_lib",
         "//source/common/http:header_map_lib",

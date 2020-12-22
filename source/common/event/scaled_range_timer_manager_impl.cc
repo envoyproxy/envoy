@@ -116,7 +116,7 @@ private:
    */
   void onMinTimerComplete() {
     ASSERT(manager_.dispatcher_.isThreadSafe());
-    ENVOY_LOG_MISC(info, "min timer complete for {}", static_cast<void*>(this));
+    ENVOY_LOG_MISC(trace, "min timer complete for {}", static_cast<void*>(this));
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
     const WaitingForMin& waiting = absl::get<WaitingForMin>(state_);
 
@@ -152,7 +152,7 @@ TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerMinimum minimum, Ti
 
 void ScaledRangeTimerManagerImpl::setScaleFactor(double scale_factor) {
   const MonotonicTime now = dispatcher_.approximateMonotonicTime();
-  scale_factor_ = DurationScaleFactor(scale_factor);
+  scale_factor_ = UnitFloat(scale_factor);
   for (auto& queue : queues_) {
     resetQueueTimer(*queue, now);
   }
@@ -171,12 +171,9 @@ ScaledRangeTimerManagerImpl::ScalingTimerHandle::ScalingTimerHandle(Queue& queue
                                                                     Queue::Iterator iterator)
     : queue_(queue), iterator_(iterator) {}
 
-ScaledRangeTimerManagerImpl::DurationScaleFactor::DurationScaleFactor(double value)
-    : value_(std::max(0.0, std::min(value, 1.0))) {}
-
 MonotonicTime ScaledRangeTimerManagerImpl::computeTriggerTime(const Queue::Item& item,
                                                               std::chrono::milliseconds duration,
-                                                              DurationScaleFactor scale_factor) {
+                                                              UnitFloat scale_factor) {
   return item.active_time_ +
          std::chrono::duration_cast<MonotonicTime::duration>(duration * scale_factor.value());
 }

@@ -26,6 +26,7 @@
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/singleton/const_singleton.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
@@ -118,9 +119,12 @@ public:
    * @param cm supplies the cluster manager.
    * @param allow_added_via_api indicates whether a cluster is allowed to be added via api
    *                            rather than be a static resource from the bootstrap config.
+   * @return the main thread cluster if it exists.
    */
-  static void checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm, bool allow_added_via_api = false);
+  static Upstream::ClusterConstOptRef checkCluster(absl::string_view error_prefix,
+                                                   absl::string_view cluster_name,
+                                                   Upstream::ClusterManager& cm,
+                                                   bool allow_added_via_api = false);
 
   /**
    * Check cluster/local info for API config sanity. Throws on error.
@@ -128,10 +132,11 @@ public:
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
    * @param local_info supplies the local info.
+   * @return the main thread cluster if it exists.
    */
-  static void checkClusterAndLocalInfo(absl::string_view error_prefix,
-                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
-                                       const LocalInfo::LocalInfo& local_info);
+  static Upstream::ClusterConstOptRef
+  checkClusterAndLocalInfo(absl::string_view error_prefix, absl::string_view cluster_name,
+                           Upstream::ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
 
   /**
    * Check local info for API config sanity. Throws on error.
@@ -179,6 +184,34 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
+   * Access transport_api_version field in ApiConfigSource, while validating version
+   * compatibility.
+   * @param api_config_source the config source to extract transport API version from.
+   * @return envoy::config::core::v3::ApiVersion transport API version
+   * @throws DeprecatedMajorVersionException when the transport version is disabled.
+   */
+  template <class Proto>
+  static envoy::config::core::v3::ApiVersion
+  getAndCheckTransportVersion(const Proto& api_config_source) {
+    const auto transport_api_version = api_config_source.transport_api_version();
+    if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
+        transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
+      Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
+      const std::string& warning = fmt::format(
+          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
+          "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
+          "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
+          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
+          api_config_source.DebugString());
+      ENVOY_LOG_MISC(warn, warning);
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+        throw DeprecatedMajorVersionException(warning);
+      }
+    }
+    return transport_api_version;
+  }
+
+  /**
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
    * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
@@ -212,8 +245,8 @@ public:
   /**
    * Get a Factory from the registry with a particular name (and templated type) with error checking
    * to ensure the name and factory are valid.
-   * @param name string identifier for the particular implementation. Note: this is a proto string
-   * because it is assumed that this value will be pulled directly from the configuration proto.
+   * @param name string identifier for the particular implementation.
+   * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
@@ -228,6 +261,32 @@ public:
     }
 
     return *factory;
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name or return nullptr.
+   * @param name string identifier for the particular implementation.
+   */
+  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+    if (name.empty()) {
+      return nullptr;
+    }
+
+    return Registry::FactoryRegistry<Factory>::getFactory(name);
+  }
+
+  /**
+   * Get a Factory from the registry or return nullptr.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory* getFactory(const ProtoMessage& message) {
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return factory;
+    }
+
+    return Utility::getFactoryByName<Factory>(message.name());
   }
 
   /**

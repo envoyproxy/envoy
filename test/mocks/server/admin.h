@@ -4,12 +4,17 @@
 
 #include "envoy/server/admin.h"
 
+#include "test/mocks/network/socket.h"
+
 #include "absl/strings/string_view.h"
 #include "config_tracker.h"
 #include "gmock/gmock.h"
 
+using testing::NiceMock;
+
 namespace Envoy {
 namespace Server {
+
 class MockAdmin : public Admin {
 public:
   MockAdmin();
@@ -33,7 +38,9 @@ public:
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
 
-  ::testing::NiceMock<MockConfigTracker> config_tracker_;
+  NiceMock<MockConfigTracker> config_tracker_;
+  NiceMock<Network::MockSocket> socket_;
 };
+
 } // namespace Server
 } // namespace Envoy

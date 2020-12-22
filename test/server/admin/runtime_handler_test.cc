@@ -85,7 +85,7 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   overrides["foo"] = "bar";
   overrides["x"] = "42";
   overrides["nothing"] = "";
-  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+  EXPECT_CALL(loader, mergeValues(overrides));
   EXPECT_EQ(Http::Code::OK,
             postCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
   EXPECT_EQ("OK\n", response.toString());
@@ -98,7 +98,7 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
   const std::string key = "routing.traffic_shift.foo";
   const std::string value = "numerator: 1\ndenominator: TEN_THOUSAND\n";
   const absl::node_hash_map<std::string, std::string> overrides = {{key, value}};
-  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+  EXPECT_CALL(loader, mergeValues(overrides));
 
   const std::string body = fmt::format("{}={}", key, value);
   Http::TestResponseHeaderMapImpl header_map;

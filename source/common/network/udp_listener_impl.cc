@@ -31,11 +31,9 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
-  file_event_ = socket_->ioHandle().createFileEvent(
+  socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
-
-  ASSERT(file_event_);
 
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
@@ -44,18 +42,15 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
   }
 }
 
-UdpListenerImpl::~UdpListenerImpl() {
-  disableEvent();
-  file_event_.reset();
-}
+UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
 
 void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
-  file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+  socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-void UdpListenerImpl::disableEvent() { file_event_->setEnabled(0); }
+void UdpListenerImpl::disableEvent() { socket_->ioHandle().enableFileEvents(0); }
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
@@ -125,7 +120,9 @@ Api::IoCallUint64Result UdpListenerImpl::flush() {
   return cb_.udpPacketWriter().flush();
 }
 
-void UdpListenerImpl::activateRead() { file_event_->activate(Event::FileReadyType::Read); }
+void UdpListenerImpl::activateRead() {
+  socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+}
 
 UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
     : workers_(concurrency) {}

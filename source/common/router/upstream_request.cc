@@ -62,9 +62,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
-  if (conn_pool_->protocol().has_value()) {
-    stream_info_.protocol(conn_pool_->protocol().value());
-  }
 }
 
 UpstreamRequest::~UpstreamRequest() {
@@ -210,7 +207,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!upstream_ || paused_for_connect_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
     if (!buffered_request_body_) {
-      buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
+      buffered_request_body_ = parent_.callbacks()->dispatcher().getWatermarkFactory().create(
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
@@ -351,7 +348,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void UpstreamRequest::onPoolReady(
     std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-    const StreamInfo::StreamInfo& info) {
+    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -367,6 +364,10 @@ void UpstreamRequest::onPoolReady(
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
   onUpstreamHostSelected(host);
+
+  if (protocol) {
+    stream_info_.protocol(protocol.value());
+  }
 
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
@@ -401,7 +402,7 @@ void UpstreamRequest::onPoolReady(
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
-  if (conn_pool_->protocol().has_value() &&
+  if (protocol.has_value() &&
       headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
   }
@@ -416,9 +417,21 @@ void UpstreamRequest::onPoolReady(
     }
   }
 
-  upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
-
+  const Http::Status status =
+      upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
   calling_encode_headers_ = false;
+
+  if (!status.ok()) {
+    // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
+    // erroneously remove required headers.
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    const std::string details =
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
+                     status.message(), "}");
+    parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
+                                        absl::nullopt, details);
+    return;
+  }
 
   if (!paused_for_connect_) {
     encodeBodyAndTrailers();
@@ -468,8 +481,8 @@ void UpstreamRequest::clearRequestEncoder() {
   // Before clearing the encoder, unsubscribe from callbacks.
   if (upstream_) {
     parent_.callbacks()->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+    parent_.callbacks()->dispatcher().deferredDelete(std::move(upstream_));
   }
-  upstream_.reset();
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {

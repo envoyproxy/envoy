@@ -98,7 +98,7 @@ public:
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       xds_cluster->set_name("xds_cluster");
-      xds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*xds_cluster);
     });
   }
 
@@ -115,9 +115,12 @@ public:
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           hcm.mutable_rds()->set_route_config_name(route_config_name);
+          hcm.mutable_rds()->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               hcm.mutable_rds()->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
@@ -215,7 +218,7 @@ TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       local metadata = response_handle:metadata():get("foo.bar")
@@ -240,7 +243,7 @@ TEST_P(LuaIntegrationTest, RequestAndResponse) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:logTrace("log test")
@@ -379,7 +382,7 @@ TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -437,7 +440,7 @@ TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -487,7 +490,7 @@ TEST_P(LuaIntegrationTest, UpstreamAsyncHttpCall) {
       R"EOF(
 name: envoy.filters.http.lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -537,7 +540,7 @@ TEST_P(LuaIntegrationTest, ChangeRoute) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:headers():remove(":path")
@@ -571,7 +574,7 @@ TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_request(request_handle)
       request_handle:streamInfo():dynamicMetadata()
@@ -607,7 +610,7 @@ TEST_P(LuaIntegrationTest, SignatureVerification) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function string.fromhex(str)
       return (str:gsub('..', function (cc)
@@ -891,7 +894,9 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
 // Test whether Rds can correctly deliver LuaPerRoute configuration.
 TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 // When the route configuration is updated dynamically via RDS and the configuration contains an
-// inline Lua code, Envoy may call lua_open in multiple threads to create new lua_State objects.
+// inline Lua code, Envoy may call `luaL_newstate`
+// (https://www.lua.org/manual/5.1/manual.html#luaL_newstate) in multiple threads to create new
+// lua_State objects.
 // During lua_State creation, 'LuaJIT' uses some static local variables shared by multiple threads
 // to aid memory allocation. Although 'LuaJIT' itself guarantees that there is no thread safety
 // issue here, the use of these static local variables by multiple threads will cause a TSAN alarm.
@@ -956,7 +961,7 @@ TEST_P(LuaIntegrationTest, RewriteResponseBuffer) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       local content_length = response_handle:body():setBytes("ok")
@@ -975,7 +980,7 @@ TEST_P(LuaIntegrationTest, RewriteChunkedBody) {
       R"EOF(
 name: lua
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
       response_handle:headers():replace("content-length", 2)

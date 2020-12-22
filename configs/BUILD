@@ -23,14 +23,23 @@ py_binary(
 
 filegroup(
     name = "configs",
-    srcs = [
-        "google-vrp/envoy-edge.yaml",
-        "google-vrp/envoy-origin.yaml",
-        "original-dst-cluster/proxy_config.yaml",
-    ] + select({
-        "//bazel:apple": [],
+    srcs = glob(
+        [
+            "**/*.yaml",
+        ],
+        exclude = [
+            "using_deprecated_config.yaml",
+            "**/*.template.yaml",
+            "freebind/freebind.yaml",
+            "envoy-demo.yaml",
+        ],
+    ) + select({
+        "//bazel:apple": ["envoy-demo.yaml"],
         "//bazel:windows_x86_64": [],
-        "//conditions:default": ["freebind/freebind.yaml"],
+        "//conditions:default": [
+            "envoy-demo.yaml",
+            "freebind/freebind.yaml",
+        ],
     }),
 )
 

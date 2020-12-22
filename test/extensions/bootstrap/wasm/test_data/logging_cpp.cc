@@ -26,10 +26,7 @@ extern "C" PROXY_WASM_KEEPALIVE uint32_t proxy_on_configure(uint32_t, uint32_t c
 
 extern "C" PROXY_WASM_KEEPALIVE void proxy_on_context_create(uint32_t, uint32_t) {}
 
-extern "C" PROXY_WASM_KEEPALIVE uint32_t proxy_on_vm_start(uint32_t, uint32_t) {
-  proxy_set_tick_period_milliseconds(10);
-  return 1;
-}
+extern "C" PROXY_WASM_KEEPALIVE uint32_t proxy_on_vm_start(uint32_t, uint32_t) { return 1; }
 
 extern "C" PROXY_WASM_KEEPALIVE void proxy_on_tick(uint32_t) {
   const char* root_id = nullptr;

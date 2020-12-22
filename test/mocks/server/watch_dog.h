@@ -12,7 +12,6 @@ public:
   ~MockWatchDog() override;
 
   // Server::WatchDog
-  MOCK_METHOD(void, startWatchdog, (Event::Dispatcher & dispatcher));
   MOCK_METHOD(void, touch, ());
   MOCK_METHOD(Thread::ThreadId, threadId, (), (const));
 };

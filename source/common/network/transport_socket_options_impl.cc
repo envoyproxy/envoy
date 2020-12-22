@@ -16,7 +16,8 @@
 namespace Envoy {
 namespace Network {
 namespace {
-void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8_t>& key) {
+void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8_t>& key,
+                   const Network::TransportSocketFactory& factory) {
   const auto& server_name_overide = options.serverNameOverride();
   if (server_name_overide.has_value()) {
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(server_name_overide.value()), key);
@@ -35,19 +36,32 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
       pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
     }
   }
+
   const auto& alpn_fallback = options.applicationProtocolFallback();
-  if (alpn_fallback.has_value()) {
-    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(*alpn_fallback), key);
+  if (!alpn_fallback.empty()) {
+    for (const auto& protocol : alpn_fallback) {
+      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
+    }
+  }
+
+  // Proxy protocol options should only be included in the hash if the upstream
+  // socket intends to use them.
+  const auto& proxy_protocol_options = options.proxyProtocolOptions();
+  if (proxy_protocol_options.has_value() && factory.usesProxyProtocolOptions()) {
+    pushScalarToByteVector(
+        StringUtil::CaseInsensitiveHash()(proxy_protocol_options.value().asStringForHash()), key);
   }
 }
 } // namespace
 
-void AlpnDecoratingTransportSocketOptions::hashKey(std::vector<uint8_t>& key) const {
-  commonHashKey(*this, key);
+void AlpnDecoratingTransportSocketOptions::hashKey(
+    std::vector<uint8_t>& key, const Network::TransportSocketFactory& factory) const {
+  commonHashKey(*this, key, factory);
 }
 
-void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
-  commonHashKey(*this, key);
+void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key,
+                                         const Network::TransportSocketFactory& factory) const {
+  commonHashKey(*this, key, factory);
 }
 
 TransportSocketOptionsSharedPtr
@@ -55,6 +69,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
+  std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
@@ -88,8 +103,8 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
 
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::move(subject_alt_names), std::move(application_protocols), absl::nullopt,
-        proxy_protocol_options);
+        server_name, std::move(subject_alt_names), std::move(application_protocols),
+        std::move(alpn_fallback), proxy_protocol_options);
   } else {
     return nullptr;
   }

@@ -25,6 +25,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -61,7 +62,7 @@ public:
   Http::RequestHeaderMapPtr downstream_headers_;
 };
 
-class OriginalDstClusterTest : public testing::Test {
+class OriginalDstClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   // cleanup timer must be created before the cluster (in setup()), so that we can set expectations
   // on it. Ownership is transferred to the cluster at the cluster constructor, so the cluster will
@@ -91,7 +92,7 @@ public:
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   OriginalDstClusterSharedPtr cluster_;
   ReadyWatcher membership_updated_;
@@ -143,7 +144,8 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
       "ORIGINAL_DST clusters must have no load assignment or hosts configured");
 }
 
-TEST_F(OriginalDstClusterTest, BadConfigWithDeprecatedHosts) {
+TEST_F(OriginalDstClusterTest, DEPRECATED_FEATURE_TEST(BadConfigWithDeprecatedHosts)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
