@@ -1,44 +1,42 @@
 .. _config_access_log:
 
-Access logging
+访问日志
 ==============
 
-Configuration
+配置
 -------------------------
 
-Access logs are configured as part of the :ref:`HTTP connection manager config
-<config_http_conn_man>` or :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
+访问日志是 :ref:`HTTP 连接管理器配置
+<config_http_conn_man>` 或 :ref:`TCP 代理配置 <config_network_filters_tcp_proxy>` 配置的一部分。
 
-* :ref:`v3 API reference <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`
 
 .. _config_access_log_format:
 
-Format Rules
+格式规则
 ------------
 
-Access log formats contain command operators that extract the relevant data and insert it.
-They support two formats: :ref:`"format strings" <config_access_log_format_strings>` and
-:ref:`"format dictionaries" <config_access_log_format_dictionaries>`. In both cases, the command operators
-are used to extract the relevant data, which is then inserted into the specified log format.
-Only one access log format may be specified at a time.
+访问日志格式包含用于提取和插入有关数据的命令操作符。
+他们支持两种格式: :ref:`"格式字符串" <config_access_log_format_strings>` 和
+:ref:`"格式词典" <config_access_log_format_dictionaries>`。两种情况下，命令操作符
+用于提取那些随后将被插入到特定日志格式中的有关数据。
+一次只能指定一种访问日志格式。
 
 .. _config_access_log_format_strings:
 
-Format Strings
+格式字符串
 --------------
 
-Format strings are plain strings, specified using the ``format`` key. They may contain
-either command operators or other characters interpreted as a plain string.
-The access log formatter does not make any assumptions about a new line separator, so one
-has to specified as part of the format string.
-See the :ref:`default format <config_access_log_default_format>` for an example.
+格式字符串是使用关键字 ``format`` 描述的纯字符串。他们可能包含命令操作符或者是其他被解释成纯字符串的字符
+访问日志格式化器不假设新的行分隔符，因此必须将其指定为格式字符串的一部分。
+例如 :ref:`默认格式 <config_access_log_default_format>`。
 
 .. _config_access_log_default_format:
 
-Default Format String
+默认格式
 ---------------------
 
-If custom format string is not specified, Envoy uses the following default format:
+如果自定义格式未指定，Envoy 使用如下的默认格式:
 
 .. code-block:: none
 
@@ -47,7 +45,7 @@ If custom format string is not specified, Envoy uses the following default forma
   %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
   "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
 
-Example of the default Envoy access log format:
+默认 Envoy 访问日志格式举例:
 
 .. code-block:: none
 
@@ -56,15 +54,13 @@ Example of the default Envoy access log format:
 
 .. _config_access_log_format_dictionaries:
 
-Format Dictionaries
+格式词典
 -------------------
 
-Format dictionaries are dictionaries that specify a structured access log output format,
-specified using the ``json_format`` or ``typed_json_format`` keys. This allows logs to be output in
-a structured format such as JSON. Similar to format strings, command operators are evaluated and
-their values inserted into the format dictionary to construct the log output.
+格式词典是指定结构化访问日志输出格式的词典，通过 ``json_format`` 或者 ``typed_json_format`` 关键字指定。 
+允许日志被输出到结构化的格式中（如 JSON）。和格式字符串类似，命令操作符被解析并将其值插入到用于构造日志输出的格式词典中。
 
-For example, with the following format provided in the configuration as ``json_format``:
+如下给出了一个 ``json_format`` 配置的示例:
 
 .. code-block:: json
 
@@ -78,77 +74,68 @@ For example, with the following format provided in the configuration as ``json_f
     }
   }
 
-The following JSON object would be written to the log file:
+与此对应，下面的 JSON 对象会被写入到日志文件中：
 
 .. code-block:: json
 
   {"protocol": "HTTP/1.1", "duration": "123", "my_custom_header": "value_of_MY_CUSTOM_HEADER"}
 
-This allows you to specify a custom key for each command operator.
+每个命令操作符允许指定一个自定义关键字。
 
-The ``typed_json_format`` differs from ``json_format`` in that values are rendered as JSON numbers,
-booleans, and nested objects or lists where applicable. In the example, the request duration
-would be rendered as the number ``123``.
+``typed_json_format`` 不同于 ``json_format`` ，它的值会被渲染成合适的 JSON 数字、布尔和嵌套对象或列表。
+在例子中，请求持续时间会被渲染成一个数字 ``123``。
 
-Format dictionaries have the following restrictions:
+格式词典有如下限制：
 
-* The dictionary must map strings to strings (specifically, strings to command operators). Nesting
-  is supported.
-* When using the ``typed_json_format`` command operators will only produce typed output if the
-  command operator is the only string that appears in the dictionary value. For example,
-  ``"%DURATION%"`` will log a numeric duration value, but ``"%DURATION%.0"`` will log a string
-  value.
+* 词典必须是字符串到字符串的映射（具体来说，是字符串到命令操作符）。支持嵌套。
+* 当使用 ``typed_json_format`` 命令操作符时，如果命令操作符是出现在词典值域中的唯一字符串会产生确定类型输出。例如，
+  ``"%DURATION%"`` 会记录成一个持续值的数值，但是 ``"%DURATION%.0"`` 会记录成一个字符串。
 
 .. note::
 
-  When using the ``typed_json_format``, integer values that exceed :math:`2^{53}` will be
-  represented with reduced precision as they must be converted to floating point numbers.
+  当使用 ``typed_json_format`` 时，超过 :math:`2^{53}` 的整数，由于需要转换成浮点数因此会使精度降低。
 
 .. _config_access_log_command_operators:
 
-Command Operators
+命令运算符
 -----------------
 
-Command operators are used to extract values that will be inserted into the access logs.
-The same operators are used by different types of access logs (such as HTTP and TCP). Some
-fields may have slightly different meanings, depending on what type of log it is. Differences
-are noted.
+命令运算符用于提取那些将被插入到访问日志中值。
+相同的运算符在不同类型的访问日志（例如 HTTP 和 TCP）中用处不同。 不同日志类型中有些字段可能有细微的差别。 注意不同点。
 
-Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
-the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
-strings are rendered as ``""``. :ref:`omit_empty_values
-<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option could be used
-to omit empty values entirely.
+注意如果一个值未设置或为空，日志将会包含一个 ``-`` 或者 JSON 日志中的字符串 ``"-"``。
+对于有类型的 JSON 日志来说，为设置的值会被表示成 ``null`` 值，并且空字符串会被渲染成 ``""`` :ref:`omit_empty_values
+<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` 选项可用于完全忽略空值。
 
-Unless otherwise noted, command operators produce string outputs for typed JSON logs.
+除非另有说明，命令操作符生成针对 JSON 日志的字符串输出。
 
-The following command operators are supported:
+支持如下命令操作符：
 
 .. _config_access_log_format_start_time:
 
 %START_TIME%
   HTTP
-    Request start time including milliseconds.
+    请求开始时间（包括毫秒）。
 
   TCP
-    Downstream connection start time including milliseconds.
+    下游连接开始时间（包括毫秒）。
 
-  START_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
-  In addition to that, START_TIME also accepts following specifiers:
+  START_TIME 可以通过 `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_ 自定义。
+  除此之外, START_TIME 也允许如下格式符：
 
-  +------------------------+-------------------------------------------------------------+
-  | Specifier              | Explanation                                                 |
-  +========================+=============================================================+
-  | ``%s``                 | The number of seconds since the Epoch                       |
-  +------------------------+-------------------------------------------------------------+
-  | ``%f``, ``%[1-9]f``    | Fractional seconds digits, default is 9 digits (nanosecond) |
-  |                        +-------------------------------------------------------------+
-  |                        | - ``%3f`` millisecond (3 digits)                            |
-  |                        | - ``%6f`` microsecond (6 digits)                            |
-  |                        | - ``%9f`` nanosecond (9 digits)                             |
-  +------------------------+-------------------------------------------------------------+
+  +------------------------+---------------------------------------------------------------+
+  | 格式符                 | 说明                                                          |
+  +========================+===============================================================+
+  | ``%s``                 | 从 1970-01-01 00:00:00 UTC 开始的秒数                         |
+  +------------------------+---------------------------------------------------------------+
+  | ``%f``, ``%[1-9]f``    | 小数秒位数，默认 9 位 (纳秒)                                  |
+  |                        +---------------------------------------------------------------+
+  |                        | - ``%3f`` 毫秒 (3 位)                                         |
+  |                        | - ``%6f`` 微秒 (6 位)                                         |
+  |                        | - ``%9f`` 纳秒 (9 位)                                         |
+  +------------------------+---------------------------------------------------------------+
 
-  Examples of formatting START_TIME is as follows:
+  如下是 START_TIME 格式的举例：
 
   .. code-block:: none
 
@@ -161,255 +148,227 @@ The following command operators are supported:
 
     %START_TIME(%s.%9f)%
 
-  In typed JSON logs, START_TIME is always rendered as a string.
+  在确定类型的 JSON 日志中，START_TIME 通常被渲染成字符串。
 
 %BYTES_RECEIVED%
   HTTP
-    Body bytes received.
+    接收到消息体字节数。
 
   TCP
-    Downstream bytes received on connection.
+    在连接上从下游接收的字节数。
 
-  Renders a numeric value in typed JSON logs.
+  在确定类型的 JSON 日志中，渲染成一个数值类型。
 
 %PROTOCOL%
   HTTP
-    Protocol. Currently either *HTTP/1.1* or *HTTP/2*.
+    协议。目前不是 *HTTP/1.1* 就是 *HTTP/2*。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
-  In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
-  available (e.g. in TCP logs).
+  在确定类型的 JSON 日志中，PROTOCOL 会被渲染成字符串。如果协议不可用(如： 在 TCP 日志中) 为 ``"-"`` 。
 
 %RESPONSE_CODE%
   HTTP
-    HTTP response code. Note that a response code of '0' means that the server never sent the
-    beginning of a response. This generally means that the (downstream) client disconnected.
+    HTTP 响应码。注意响应码 '0' 表示服务器从未发送过响应数据。 通常认为是（下游）客户端断开。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
-  Renders a numeric value in typed JSON logs.
+  在确定类型的 JSON 日志中，渲染成一个数值类型。
 
 .. _config_access_log_format_response_code_details:
 
 %RESPONSE_CODE_DETAILS%
   HTTP
-    HTTP response code details provides additional information about the response code, such as
-    who set it (the upstream or envoy) and why.
+    HTTP 响应状态码详情提供关于响应状态码的附加信息， 例如谁设置了它 (上游 或者 envoy) 和原因。
 
   TCP
-    Not implemented ("-")
+    未实现 ("-")
 
 .. _config_access_log_format_connection_termination_details:
 
 %CONNECTION_TERMINATION_DETAILS%
-  HTTP and TCP
-    Connection termination details may provide additional information about why the connection was
-    terminated by Envoy for L4 reasons.
+  HTTP 和 TCP
+    连接中断详情会提供和连接被 Envoy 在 L4 中断原因相关的的附加信息。
 
 %BYTES_SENT%
   HTTP
-    Body bytes sent. For WebSocket connection it will also include response header bytes.
+    发送的包体字节数。 对于 WebSocket 连接将会包含响应头字节数。
 
   TCP
-    Downstream bytes sent on connection.
+    在连接上发送给下游的字节数。
 
-  Renders a numeric value in typed JSON logs.
+  在确定类型的 JSON 日志中，渲染成一个数值类型。
 
 %DURATION%
   HTTP
-    Total duration in milliseconds of the request from the start time to the last byte out.
+    请求从起始时间到最后一个字节发出的持续总时长（以毫秒为单位）。
 
   TCP
-    Total duration in milliseconds of the downstream connection.
+    下游连接的持续总时长（以毫秒为单位）。
 
-  Renders a numeric value in typed JSON logs.
+  在确定类型的 JSON 日志中，渲染成一个数值类型。
 
 %REQUEST_DURATION%
   HTTP
-    Total duration in milliseconds of the request from the start time to the last byte of
-    the request received from the downstream.
+    请求从起始时间到接收完下游的最后一个字节为止的持续总时长（以毫秒为单位）。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
-  Renders a numeric value in typed JSON logs.
+  在确定类型的 JSON 日志中，渲染成一个数值类型。
 
 %RESPONSE_DURATION%
   HTTP
-    Total duration in milliseconds of the request from the start time to the first byte read from the
-    upstream host.
+    请求从起始时间直到上游的第一个字节到达为止的持续总时长（以毫秒为单位）。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
-  Renders a numeric value in typed JSON logs.
+  在确定类型的 JSON 日志中，渲染成一个数值类型。
 
 %RESPONSE_TX_DURATION%
   HTTP
-    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
-    byte sent downstream.
+    请求从读第一个来自于上游主机的字节开始到给下游发完最后一个字节的持续时常（以毫秒为单位）。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
-  Renders a numeric value in typed JSON logs.
+  在确定类型的 JSON 日志中，渲染成一个数值类型。
 
 .. _config_access_log_format_response_flags:
 
 %RESPONSE_FLAGS%
-  Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
-  the descriptions do not apply. Possible values are:
+  如果有的话，表示响应或者连接的附加详情。 对于 TCP 连接，说明中提到的响应码不适用。 可能的值如下：
 
-  HTTP and TCP
-    * **UH**: No healthy upstream hosts in upstream cluster in addition to 503 response code.
-    * **UF**: Upstream connection failure in addition to 503 response code.
-    * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
-    * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
-    * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
-  HTTP only
-    * **DC**: Downstream connection termination.
-    * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
-    * **UT**: Upstream request timeout in addition to 504 response code.
-    * **LR**: Connection local reset in addition to 503 response code.
-    * **UR**: Upstream remote reset in addition to 503 response code.
-    * **UC**: Upstream connection termination in addition to 503 response code.
-    * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-    * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-    * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
-    * **UAEX**: The request was denied by the external authorization service.
-    * **RLSE**: The request was rejected because there was an error in rate limit service.
-    * **IH**: The request was rejected because it set an invalid value for a
-      :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
-    * **SI**: Stream idle timeout in addition to 408 response code.
-    * **DPE**: The downstream request had an HTTP protocol error.
-    * **UMSDR**: The upstream request reached to max stream duration.
+  HTTP 和 TCP
+    * **UH**: 附加在 503 响应状态码，表示上游集群中无健康的上游主机。
+    * **UF**: 附加在 503 响应状态码，表示上游连接失败。
+    * **UO**: 附加在 503 响应状态码，表示上游溢出 (:ref:`熔断 <arch_overview_circuit_break>`) 。
+    * **NR**: 附加在 404 响应状态码，表示无给定请求的 :ref:`路由配置 <arch_overview_http_routing>` ，或者对于一个下游连接没有匹配的过滤器链。
+    * **URX**: 请求因为达到了 :ref:`上游重试限制 (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  或者 :ref:`最大连接尝试 (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` 而被拒绝。
+  HTTP 独有
+    * **DC**: 下游连接中断。
+    * **LH**: 附加在 503 响应状态码，本地服务 :ref:`健康检查请求 <arch_overview_health_checking>` 失败。
+    * **UT**: 附加在 504 响应状态码，上游请求超时。
+    * **LR**: 附加在 503 响应状态码，连接在本地被重置。
+    * **UR**: 附加在 503 响应状态码，连接在远程被重置。
+    * **UC**: 附加在 503 响应状态码，上游连接中断。
+    * **DI**: 通过 :ref:`故障注入 <config_http_filters_fault_injection>` 使请求处理被延迟一个指定的时间。
+    * **FI**: 通过 :ref:`故障注入 <config_http_filters_fault_injection>` 使请求被终止掉并带有一个相应码。 
+    * **RL**: 附加在 429 相应状态码，请求被 :ref:`HTTP 限流过滤器 <config_http_filters_rate_limit>` 本地限流。
+    * **UAEX**: 请求被外部授权服务拒绝。
+    * **RLSE**: 因限流服务出现错误而拒绝请求。
+    * **IH**: 附加在 400 响应状态码，请求被拒绝因为他为
+      :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` 设置了一个无效值。
+    * **SI**: 附加在 408 相应状态码，流闲置超时。
+    * **DPE**: 下游请求存在一个 HTTP 协议错误。
+    * **UMSDR**: 上游请求达到最大流持续时长。
 
 %ROUTE_NAME%
-  Name of the route.
+  路由名。
 
 %UPSTREAM_HOST%
-  Upstream host URL (e.g., tcp://ip:port for TCP connections).
+  上游主机 URL（如，TCP 连接 tcp://ip:port）。
 
 %UPSTREAM_CLUSTER%
-  Upstream cluster to which the upstream host belongs to.
+  上游主机所属的上游集群。
 
 %UPSTREAM_LOCAL_ADDRESS%
-  Local address of the upstream connection. If the address is an IP address it includes both
-  address and port.
+  上游连接的本地地址。如果地址是 IP 地址，则会包含地址和端口。
 
 .. _config_access_log_format_upstream_transport_failure_reason:
 
 %UPSTREAM_TRANSPORT_FAILURE_REASON%
   HTTP
-    If upstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
-    reason from the transport socket. The format of this field depends on the configured upstream
-    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+    如果上游因传输套接字（例如 TLS 握手）而连接失败，从传输套接字中提供失败原因。 这个字段的格式依赖于上游传输套接字的配置。
+    公共的 TLS 失败在 :ref:`TLS 故障排除 <arch_overview_ssl_trouble_shooting>`。
 
   TCP
-    Not implemented ("-")
+    未实现 ("-")。
 
 %DOWNSTREAM_REMOTE_ADDRESS%
-  Remote address of the downstream connection. If the address is an IP address it includes both
-  address and port.
+  下游连接的远程地址。如果地址是 IP 地址，它会包含地址和端口。
 
   .. note::
 
-    This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
-    <config_http_conn_man_headers_x-forwarded-for>`.
+    如果地址是从 :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` 或 :ref:`x-forwarded-for
+    <config_http_conn_man_headers_x-forwarded-for>` 推断而来，则可能不是对端的物理远程地址。
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-  Remote address of the downstream connection. If the address is an IP address the output does
-  *not* include port.
+  下游连接的远程地址。如果地址是 IP 地址，它 *不* 包含端口。
 
   .. note::
 
-    This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
-    <config_http_conn_man_headers_x-forwarded-for>`.
+    如果地址是从 :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` 或 :ref:`x-forwarded-for
+    <config_http_conn_man_headers_x-forwarded-for>` 推断而来，则可能不是对端的物理远程地址。
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
-  Direct remote address of the downstream connection. If the address is an IP address it includes both
-  address and port.
+  下游连接的直达远程地址。如果地址是 IP 地址，它会包含地址和端口。
 
   .. note::
 
-    This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
-    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+    通常是对端的物理远程地址，即使上游远程地址是从 :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    或 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 推断而来。
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
-  The direct remote address of the downstream connection. If the address is an IP address the output does
-  *not* include port.
+  下游连接的直达远程地址。如果地址是 IP 地址，它*不*包含端口。
 
   .. note::
 
-    This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
-    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+    通常是对端的物理远程地址，即使上游远程地址是从 :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    或 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 推断而来。
 
 %DOWNSTREAM_LOCAL_ADDRESS%
-  Local address of the downstream connection. If the address is an IP address it includes both
-  address and port.
-  If the original connection was redirected by iptables REDIRECT, this represents
-  the original destination address restored by the
-  :ref:`Original Destination Filter <config_listener_filters_original_dst>` using SO_ORIGINAL_DST socket option.
-  If the original connection was redirected by iptables TPROXY, and the listener's transparent
-  option was set to true, this represents the original destination address and port.
+  下游连接的本地地址。如果地址是 IP 地址，它会包含地址和端口。
+  如果原始连接被 iptables 的 REDIRECT 重定向，则代表通过 :ref:`原始目的过滤器 <config_listener_filters_original_dst>` 
+  经过 SO_ORIGINAL_DST 套接字选项重存的原始目的地址。
+  如果原始连接被 iptables 的 TPROXY 重定向，并且监听器的 transparent 选项设置为 true，则代表原始的目的地地址和端口。
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
-    Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+    与 **%DOWNSTREAM_LOCAL_ADDRESS%** 相同，如果是IP地址不包含端口。
 
 .. _config_access_log_format_connection_id:
 
 %CONNECTION_ID%
-  An identifier for the downstream connection. It can be used to
-  cross-reference TCP access logs across multiple log sinks, or to
-  cross-reference timer-based reports for the same connection. The identifier
-  is unique with high likelihood within an execution, but can duplicate across
-  multiple instances or between restarts.
+  下游连接的标识。它可以用于交叉引用跨多个日志汇聚的 TCP 访问日志， 或者对同一个连接交叉引用基于时间的报告。
+  标识在一个执行程序中大概率是是唯一的，但是在多个实例或者重启实例间可以重复。
 
 %GRPC_STATUS%
-  gRPC status code which is easy to interpret with text message corresponding with number.
+  gRPC 状态码，易于用数字对应的消息进行翻译
 
 %DOWNSTREAM_LOCAL_PORT%
-    Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+  类似 **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**，但是只提取 **%DOWNSTREAM_LOCAL_ADDRESS%** 的端口部分。
 
 %REQ(X?Y):Z%
   HTTP
-    An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
-    optional parameter denoting string truncation up to Z characters long. The value is taken from
-    the HTTP request header named X first and if it's not set, then request header Y is used. If
-    none of the headers are present '-' symbol will be in the log.
+    HTTP 请求头，其中 X 是首选的 HTTP 头，Y 是一个替代值，Z 是一个可选参数表示字符串截断至 Z 字符长。
+    其值首先从名字为 X 的 HTTP 请求头获取，如果其未设置，那么使用请求头 Y。如果请求头均是 none，则在日志中表示成 '-' 符号。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
 %RESP(X?Y):Z%
   HTTP
-    Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.
+    除了从 HTTP 响应头中获取以外，其他和 **%REQ(X?Y):Z%** 相同。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
 %TRAILER(X?Y):Z%
   HTTP
-    Same as **%REQ(X?Y):Z%** but taken from HTTP response trailers.
+    除了从 HTTP 响应尾中获取以外，其他和 **%REQ(X?Y):Z%** 相同。
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
-    :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
-    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-    lookup up key in the namespace with the option of specifying nested keys separated by ':',
-    and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
-    can be set by filters using the :repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:
-    *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
+    :ref:`动态元数据 <envoy_v3_api_msg_config.core.v3.Metadata>` 信息，
+    当设置元信息时 NAMESPACE 是过滤命名空间的过滤器器，KEY 是命名空间内可选查找关键字，可以被可选嵌套关键字 ':' 切分，
+    Z 是一个可选参数表示字符串截断至 Z 字符长。动态元数据可以被过滤器用:repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:
+    *setDynamicMetadata* 设置。数据会被记录成 JSON 字符串。如下动态参数：
 
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
 
@@ -422,129 +381,125 @@ The following command operators are supported:
     * %DYNAMIC_METADATA(com.test.my_filter):25% will log (truncation at 25 characters): ``{"test_key": "foo", "test``
 
   TCP
-    Not implemented ("-").
+    未实现 ("-")。
 
   .. note::
 
-    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
-    when the referenced key is a simple value. If the referenced key is a struct or list value, a
-    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
-    length is ignored
+    对于确定类型的 JSON 日志，当引用的关键字是单值时，这个运算法渲染成字符串、数值或布尔类型的单值。
+    如果引用的关键字是一个结构或者列表值，会被渲染成 JSON 的结构或者列表。 结构和列表可能是嵌套的，则最大长度的限制会被忽略。
 
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F):Z%
   HTTP
-    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
-    look up the filter state object. The serialized proto will be logged as JSON string if possible.
-    If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
-    Z is an optional parameter denoting string truncation up to Z characters long.
-    F is an optional parameter used to indicate which method FilterState uses for serialization. 
-    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string. 
-    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
+    :ref:`过滤器状态 <arch_overview_data_sharing_between_filters>` 信息，KEY 是查找过滤器状态对象的必选项。
+    被序列化的 proto 会尽可能的被记录成 JSON 字符串。
+    如果对于 Envoy 来说被序列化的 proto 是未知类型，它会被记录成 protobuf 调试字符串。
+    Z 是一个可选参数，表示字符串截断至 Z 字符长。
+    F 是一个可选参数，表明采用哪个 FilterState 方法，完成序列化。
+    如果 'PLAIN' 设置了，过滤器状态对象会被序列化成一个非结构化字符串。
+    如果 'TYPED' 设置了或者没有提供 F，过滤器状态对象会被序列化成一个 JSON 字符串。
 
   TCP
-    Same as HTTP, the filter state is from connection instead of a L7 request.
+    和 HTTP 相同，过滤器状态来自于连接而非一个 L7 层的请求。
 
   .. note::
 
-    For typed JSON logs, this operator renders a single value with string, numeric, or boolean type
-    when the referenced key is a simple value. If the referenced key is a struct or list value, a
-    JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
-    length is ignored
+    对于确定类型的 JSON 日志，当引用的关键字是单值时，这个运算法渲染成字符串、数值或布尔类型的单值。
+    如果引用的关键字是一个结构或者列表值，会被渲染成 JSON 的结构或者列表。 结构和列表可能是嵌套的，则最大长度的限制会被忽略。
 
 %REQUESTED_SERVER_NAME%
   HTTP
-    String value set on ssl connection socket for Server Name Indication (SNI)
+    设置在 ssl 连接套接字上表示服务器名称指示 (SNI) 的字符值
   TCP
-    String value set on ssl connection socket for Server Name Indication (SNI)
+    设置在 ssl 连接套接字上表示服务器名称指示 (SNI) 的字符值
 
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP
-    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的本地 SAN 证书中的 URI。
   TCP
-    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
-
+    用于建立下游 TLS 连接的本地 SAN 证书中的 URI。
+    
 %DOWNSTREAM_PEER_URI_SAN%
   HTTP
-    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的对端 SAN 证书中的 URI。
   TCP
-    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的对端 SAN 证书中的 URI。
 
 %DOWNSTREAM_LOCAL_SUBJECT%
   HTTP
-    The subject present in the local certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的本地证书中的主题。
   TCP
-    The subject present in the local certificate used to establish the downstream TLS connection.
-
+    用于建立下游 TLS 连接的本地证书中的主题。
+  
 %DOWNSTREAM_PEER_SUBJECT%
   HTTP
-    The subject present in the peer certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的对端证书中的主题。
   TCP
-    The subject present in the peer certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的对端证书中的主题。
 
 %DOWNSTREAM_PEER_ISSUER%
   HTTP
-    The issuer present in the peer certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的对端证书的颁发者。
   TCP
-    The issuer present in the peer certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的对端证书的颁发者。
 
 %DOWNSTREAM_TLS_SESSION_ID%
   HTTP
-    The session ID for the established downstream TLS connection.
+    已建立的下游 TLS 连接的会话 ID。
   TCP
-    The session ID for the established downstream TLS connection.
+    已建立的下游 TLS 连接的会话 ID。
 
 %DOWNSTREAM_TLS_CIPHER%
   HTTP
-    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的加密算法集的 OpenSSL 名称。
   TCP
-    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的加密算法集的 OpenSSL 名称。
 
 %DOWNSTREAM_TLS_VERSION%
   HTTP
-    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的 TLS 版本（如，``TLSv1.2``，``TLSv1.3``）。
   TCP
-    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
-
+    用于建立下游 TLS 连接的 TLS 版本（如，``TLSv1.2``，``TLSv1.3``）。
+    
 %DOWNSTREAM_PEER_FINGERPRINT_256%
   HTTP
-    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的客户端证书的十六进制编码 SHA256 指纹。
   TCP
-    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的客户端证书的十六进制编码 SHA256 指纹。
 
 %DOWNSTREAM_PEER_FINGERPRINT_1%
   HTTP
-    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的客户端证书的十六进制编码 SHA1 指纹。
   TCP
-    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的客户端证书的十六进制编码 SHA1 指纹。
 
 %DOWNSTREAM_PEER_SERIAL%
   HTTP
-    The serial number of the client certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的客户端证书的序列号。
   TCP
-    The serial number of the client certificate used to establish the downstream TLS connection.
+    用于建立下游 TLS 连接的客户端证书的序列号。
 
 %DOWNSTREAM_PEER_CERT%
   HTTP
-    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+    基于URL-encoded PEM 格式的客户端证书，该证书用于建立下游 TLS 连接的。
   TCP
-    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+    基于URL-encoded PEM 格式的客户端证书，该证书用于建立下游 TLS 连接的。
 
 %DOWNSTREAM_PEER_CERT_V_START%
   HTTP
-    The validity start date of the client certificate used to establish the downstream TLS connection.
+    客户端证书的有效起始日期，该证书用于建立下游 TLS 连接。
   TCP
-    The validity start date of the client certificate used to establish the downstream TLS connection.
+    客户端证书的有效起始日期，该证书用于建立下游 TLS 连接。
 
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
-    The validity end date of the client certificate used to establish the downstream TLS connection.
+    客户端证书的有效结束日期，该证书用于建立下游 TLS 连接。
   TCP
-    The validity end date of the client certificate used to establish the downstream TLS connection.
+    客户端证书的有效结束日期，该证书用于建立下游 TLS 连接。
 
 %HOSTNAME%
-  The system hostname.
+  系统主机名。
 
 %LOCAL_REPLY_BODY%
-  The body text for the requests rejected by the Envoy.
+  被 Envoy 拒绝的请求体文本。
