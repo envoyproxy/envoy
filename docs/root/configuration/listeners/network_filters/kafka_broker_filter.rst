@@ -1,31 +1,23 @@
 .. _config_network_filters_kafka_broker:
 
-Kafka Broker filter
+Kafka Broker 过滤器
 ===================
 
-The Apache Kafka broker filter decodes the client protocol for
-`Apache Kafka <https://kafka.apache.org/>`_, both the requests and responses in the payload.
-The message versions in `Kafka 2.4.0 <http://kafka.apache.org/24/protocol.html#protocol_api_keys>`_
-are supported.
-The filter attempts not to influence the communication between client and brokers, so the messages
-that could not be decoded (due to Kafka client or broker running a newer version than supported by
-this filter) are forwarded as-is.
+Apache Kafka broker 过滤器用于解码 `Apache Kafka <https://kafka.apache.org/>`_ 的客户端协议，该客户端协议中请求和响应的消息都可以解码。支持 `Kafka 2.4.0 <http://kafka.apache.org/24/protocol.html#protocol_api_keys>`_ 中的消息版本。该过滤器会尝试不影响客户端与 broker 之间的通信，因此无法解码的消息（由于 Kafka 客户端或 broker 运行的版本比该过滤器所支持的版本新）将按原样转发。
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.KafkaBroker>`
-* This filter should be configured with the name *envoy.filters.network.kafka_broker*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.network.kafka_broker.v3.KafkaBroker>`
+* 此过滤器的名称应该被配置为 *envoy.filters.network.kafka_broker*。
 
 .. attention::
 
-   The kafka_broker filter is experimental and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
+   kafka_broker 过滤器是实验性的，目前正在开发中。功能可能会随着时间的推移而扩展，并且配置结构可能会发生变化。
 
 .. _config_network_filters_kafka_broker_config:
 
-Configuration
--------------
+配置
+------
 
-The Kafka Broker filter should be chained with the TCP proxy filter as shown
-in the configuration snippet below:
+Kafka Broker 过滤器应与 TCP 代理过滤器一起使用，如下面的配置片段所示：
 
 .. code-block:: yaml
 
@@ -60,7 +52,7 @@ in the configuration snippet below:
                   address: 127.0.0.1 # Kafka broker's host
                   port_value: 9092 # Kafka broker's port.
 
-The Kafka broker needs to advertise the Envoy listener port instead of its own.
+Kafka broker 需要公布 Envoy 的监听器端口，而不是自己的。
 
 .. code-block:: text
 
@@ -74,20 +66,19 @@ The Kafka broker needs to advertise the Envoy listener port instead of its own.
 
 .. _config_network_filters_kafka_broker_stats:
 
-Statistics
-----------
+统计
+------
 
-Every configured Kafka Broker filter has statistics rooted at *kafka.<stat_prefix>.*, with multiple
-statistics per message type.
+每个配置的 Kafka Broker 过滤器的统计信息都以 *kafka.<stat_prefix>.* 为根，每个消息类型具有多个统计信息。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  request.TYPE, Counter, Number of times a request of particular type was received from Kafka client
-  request.unknown, Counter, Number of times a request with format not recognized by this filter was received
-  request.failure, Counter, Number of times a request with invalid format was received or other processing exception occurred
-  response.TYPE, Counter, Number of times a response of particular type was received from Kafka broker
-  response.TYPE_duration, Histogram, Response generation time in milliseconds
-  response.unknown, Counter, Number of times a response with format not recognized by this filter was received
-  response.failure, Counter, Number of times a response with invalid format was received or other processing exception occurred
+  request.TYPE, Counter, 从 Kafka 客户端收到特定类型的请求的次数
+  request.unknown, Counter, 接收到此过滤器无法识别的格式的请求的次数
+  request.failure, Counter, 接收到格式无效的请求或发生其他处理异常的次数
+  response.TYPE, Counter, 从 Kafka broker 处收到特定类型的响应的次数
+  response.TYPE_duration, Histogram, 响应生成时间（以毫秒为单位）
+  response.unknown, Counter, 接收到此过滤器无法识别的格式的响应的次数
+  response.failure, Counter, 接收到格式无效的响应或发生其他处理异常的次数
