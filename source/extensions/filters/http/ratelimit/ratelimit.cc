@@ -144,7 +144,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
-                      const std::string& response_body) {
+                      const std::string& response_body,
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
@@ -190,6 +191,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     Http::HeaderUtility::addHeaders(*response_headers_to_add_, *rate_limit_headers);
   } else {
     descriptor_statuses = nullptr;
+  }
+
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
+                                                *dynamic_metadata);
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&

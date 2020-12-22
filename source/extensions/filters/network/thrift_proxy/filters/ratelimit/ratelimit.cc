@@ -3,6 +3,7 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"
 #include "extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
 
@@ -62,7 +63,8 @@ void Filter::onDestroy() {
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                      Http::RequestHeaderMapPtr&& request_headers_to_add, const std::string&) {
+                      Http::RequestHeaderMapPtr&& request_headers_to_add, const std::string&,
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
@@ -101,6 +103,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       return;
     }
     break;
+  }
+
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    decoder_callbacks_->streamInfo().setDynamicMetadata(
+        ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT, *dynamic_metadata);
   }
 
   if (!initiating_call_) {
