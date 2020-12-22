@@ -152,6 +152,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   Stats::StatName empty_stat_name;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
+                                                *dynamic_metadata);
+  }
+
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
     cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
@@ -191,11 +196,6 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     Http::HeaderUtility::addHeaders(*response_headers_to_add_, *rate_limit_headers);
   } else {
     descriptor_statuses = nullptr;
-  }
-
-  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
-                                                *dynamic_metadata);
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&

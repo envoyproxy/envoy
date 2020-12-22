@@ -76,6 +76,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&&,
                       Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&, const std::string&,
                       Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    filter_callbacks_->connection().streamInfo().setDynamicMetadata(
+        NetworkFilterNames::get().RateLimit, *dynamic_metadata);
+  }
+
   status_ = Status::Complete;
   config_->stats().active_.dec();
 
@@ -89,11 +94,6 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
     config_->stats().over_limit_.inc();
     break;
-  }
-
-  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    filter_callbacks_->connection().streamInfo().setDynamicMetadata(
-        NetworkFilterNames::get().RateLimit, *dynamic_metadata);
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&

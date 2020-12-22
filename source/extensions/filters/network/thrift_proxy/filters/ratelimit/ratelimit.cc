@@ -72,6 +72,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   UNREFERENCED_PARAMETER(response_headers_to_add);
   UNREFERENCED_PARAMETER(request_headers_to_add);
 
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    decoder_callbacks_->streamInfo().setDynamicMetadata(
+        ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT, *dynamic_metadata);
+  }
+
   state_ = State::Complete;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
@@ -103,11 +108,6 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       return;
     }
     break;
-  }
-
-  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    decoder_callbacks_->streamInfo().setDynamicMetadata(
-        ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT, *dynamic_metadata);
   }
 
   if (!initiating_call_) {
