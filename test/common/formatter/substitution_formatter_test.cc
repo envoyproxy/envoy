@@ -2393,7 +2393,7 @@ TEST(SubstitutionFormatterTest, FormatterExtension) {
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
 
-  bool command_found;
+  bool command_found = false;
   std::vector<CommandParserPtr> commands;
   commands.push_back(std::make_unique<TestCommandParser>(command_found));
 
