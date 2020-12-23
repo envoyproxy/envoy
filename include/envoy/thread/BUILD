@@ -13,6 +13,5 @@ envoy_cc_library(
     hdrs = ["thread.h"],
     deps = [
         "//source/common/common:thread_annotations",
-        "//source/common/singleton:threadsafe_singleton",
     ],
 )
