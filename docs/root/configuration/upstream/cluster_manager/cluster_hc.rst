@@ -1,19 +1,18 @@
 .. _config_cluster_manager_cluster_hc:
 
-Health checking
-===============
+健康检查
+=========
 
-* Health checking :ref:`architecture overview <arch_overview_health_checking>`.
-* If health checking is configured for a cluster, additional statistics are emitted. They are
-  documented :ref:`here <config_cluster_manager_cluster_stats>`.
-* :ref:`v3 API documentation <envoy_v3_api_msg_config.core.v3.HealthCheck>`.
+* 健康检查 :ref:`架构预览 <arch_overview_health_checking>`。
+* 如果一个集群配置了健康检查，会有额外的统计信息发出。这些信息会记录在 :ref:`这儿 <config_cluster_manager_cluster_stats>`。
+* :ref:`v3 API 文档 <envoy_v3_api_msg_config.core.v3.HealthCheck>`。
 
 .. _config_cluster_manager_cluster_hc_tcp_health_checking:
 
-TCP health checking
--------------------
+TCP 健康检查
+-------------
 
-The type of matching performed is the following:
+匹配的执行类型如下：
 
 .. code-block:: yaml
 
@@ -22,17 +21,10 @@ The type of matching performed is the following:
       send: {text: '0101'}
       receive: [{text: '02'}, {text: '03'}]
 
-During each health check cycle, all of the "send" bytes are sent to the target server.
+在每一个健康检查周期内，所有的 “send” 字节都会发送至目标服务器。
 
-When checking the response, "fuzzy" matching is performed such that each block must be found,
-and in the order specified, but not necessarily contiguous. Thus, in the example above,
-"04" could be inserted in the response between "02" and "03" and the check
-would still pass. This is done to support protocols that insert non-deterministic data, such as
-time, into the response.
+当检查响应时，"fuzzy" 匹配会被执行以确保找到每一个块，且按照指定的顺序，但不一定是连续的。因此，在上述的示例中，"04" 可以插在 "02" 和 "03" 的响应之间，且检查也将会通过。这么做是为了支持把不确定性数据，比如时间，插入响应中的协议。
 
-Health checks that require a more complex pattern such as send/receive/send/receive are not
-currently possible.
+较复杂的健康检查模式，诸如 send/receive/send/receive，现在还不支持。
 
-If "receive" is an empty array, Envoy will perform "connect only" TCP health checking. During each
-cycle, Envoy will attempt to connect to the upstream host, and consider it a success if the
-connection succeeds. A new connection is created for each health check cycle.
+如果 "receive" 是一个空数组，Envoy 将执行 "connect only" TCP 健康检查。在每一个检查周期内，Envoy 将尝试去连接上游主机，如果连接成功，则认定健康检查是成功的。每一个健康检查周期都会创建一个新连接。
