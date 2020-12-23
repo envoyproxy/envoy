@@ -63,7 +63,7 @@ private:
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 
   /**
-   *  Hadle builtin commands.
+   *  Handle builtin commands.
    */
   static FormatterProviderPtr parseBuiltinCommand(const std::string& token, size_t pos,
                                                   int command_end_position);
