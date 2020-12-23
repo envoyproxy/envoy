@@ -50,8 +50,8 @@ public:
   void setup(envoy::config::trace::v3::ZipkinConfig& zipkin_config, bool init_timer) {
     cm_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
     cm_.initializeThreadLocalClusters({"fake_cluster"});
-    ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillByDefault(ReturnRef(cm_.async_client_));
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillByDefault(ReturnRef(cm_.thread_local_cluster_.async_client_));
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
@@ -89,11 +89,11 @@ public:
                                                 const std::string& hostname) {
     setupValidDriverWithHostname(version, hostname);
 
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback;
     const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-    EXPECT_CALL(cm_.async_client_,
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
                 send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
         .WillOnce(
             Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -233,11 +233,11 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpProto) {
 TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   setupValidDriver("HTTP_JSON");
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
@@ -292,8 +292,8 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("fake_cluster");
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -316,8 +316,8 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(unrelated_cluster);
 
     // Verify that no report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
 
     // Trigger flush of a span.
     driver_
@@ -338,11 +338,11 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -367,11 +367,11 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     cluster_update_callbacks->onClusterRemoval("unrelated_cluster");
 
     // Verify that report will be sent.
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
-        .WillOnce(ReturnRef(cm_.async_client_));
-    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callback{};
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request)));
 
     // Trigger flush of a span.
@@ -397,13 +397,15 @@ TEST_F(ZipkinDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
 TEST_F(ZipkinDriverTest, CancelInflightRequestsOnDestruction) {
   setupValidDriver("HTTP_JSON");
 
-  StrictMock<Http::MockAsyncClientRequest> request1(&cm_.async_client_),
-      request2(&cm_.async_client_), request3(&cm_.async_client_), request4(&cm_.async_client_);
+  StrictMock<Http::MockAsyncClientRequest> request1(&cm_.thread_local_cluster_.async_client_),
+      request2(&cm_.thread_local_cluster_.async_client_),
+      request3(&cm_.thread_local_cluster_.async_client_),
+      request4(&cm_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback{};
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   // Expect 4 separate report requests to be made.
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callback)), Return(&request1)))
       .WillOnce(Return(&request2))
@@ -458,7 +460,7 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   setupValidDriver("HTTP_JSON");
 
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
-  EXPECT_CALL(cm_.async_client_,
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
@@ -707,6 +709,13 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
                                               start_time_, {Tracing::Reason::Sampling, true});
   span5->setBaggage("baggage_key", "baggage_value");
   EXPECT_EQ("", span5->getBaggage("baggage_key"));
+
+  // ====
+  // Test trace id noop
+  // ====
+  Tracing::SpanPtr span6 = driver_->startSpan(config_, request_headers_, operation_name_,
+                                              start_time_, {Tracing::Reason::Sampling, true});
+  EXPECT_EQ(span6->getTraceIdAsHex(), "");
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {

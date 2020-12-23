@@ -222,9 +222,9 @@ protected:
   absl::Mutex lock_;
   Http::RequestHeaderMapPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
+  FakeHttpConnection& parent_;
 
 private:
-  FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
@@ -545,6 +545,11 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
 public:
   // Creates a fake upstream bound to the specified unix domain socket path.
   FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
+
+  // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+               const Network::Address::InstanceConstSharedPtr& address,
+               const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,

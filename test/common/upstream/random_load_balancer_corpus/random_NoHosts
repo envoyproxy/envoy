@@ -3,7 +3,7 @@ common_lb_config {
 
 }
 actions {
-    prefetch {
+    preconnect {
 
     }
 }

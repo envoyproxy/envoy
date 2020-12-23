@@ -80,7 +80,6 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
-  void setNewCodecs() { config_helper_.setNewCodecs(); }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -140,13 +139,11 @@ public:
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
   // compareDiscoveryRequest() and sendDiscoveryResponse(), but the SotW/delta-specific versions are
   // available if you're writing a SotW/delta-specific test.
-  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
-  // it.
   AssertionResult compareDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names,
       const std::vector<std::string>& expected_resource_names_added,
-      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = true,
+      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
   template <class T>
@@ -179,11 +176,9 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
-  // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
-  // it.
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names, bool expect_node = true,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
@@ -257,16 +252,15 @@ public:
   }
 
 private:
-  std::string intResourceName(const envoy::config::listener::v3::Listener& m) { return m.name(); }
-  std::string intResourceName(const envoy::config::route::v3::RouteConfiguration& m) {
-    return m.name();
+  template <class T> std::string intResourceName(const T& m) {
+    // gcc doesn't allow inline template function to be specialized, using a constexpr if to
+    // workaround.
+    if constexpr (std::is_same_v<T, envoy::config::endpoint::v3::ClusterLoadAssignment>) {
+      return m.cluster_name();
+    } else {
+      return m.name();
+    }
   }
-  std::string intResourceName(const envoy::config::cluster::v3::Cluster& m) { return m.name(); }
-  std::string intResourceName(const envoy::config::endpoint::v3::ClusterLoadAssignment& m) {
-    return m.cluster_name();
-  }
-  std::string intResourceName(const envoy::config::route::v3::VirtualHost& m) { return m.name(); }
-  std::string intResourceName(const envoy::service::runtime::v3::Runtime& m) { return m.name(); }
 
   Event::GlobalTimeSystem time_system_;
 
@@ -369,11 +363,14 @@ public:
 protected:
   void setUdpFakeUpstream(bool value) { upstream_config_.udp_fake_upstream_ = value; }
   bool initialized() const { return initialized_; }
-  const FakeUpstreamConfig& upstreamConfig() {
-    // TODO(alyssawilk) make enable_half_close_ private and remove this.
-    upstream_config_.enable_half_close_ = enable_half_close_;
-    return upstream_config_;
-  }
+
+  // Right now half-close is set globally, not separately for upstream and
+  // downstream.
+  void enableHalfClose(bool value) { upstream_config_.enable_half_close_ = value; }
+
+  bool enableHalfClose() { return upstream_config_.enable_half_close_; }
+
+  const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
 
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
     ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
@@ -418,6 +415,7 @@ protected:
   bool create_xds_upstream_{false};
   bool tls_xds_upstream_{false};
   bool use_lds_{true}; // Use the integration framework's LDS set up.
+  bool upstream_tls_{false};
 
   Network::TransportSocketFactoryPtr createUpstreamTlsContext();
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
@@ -446,8 +444,6 @@ protected:
   // If true, allow incomplete streams in AutonomousUpstream
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
-
-  bool enable_half_close_{false};
 
   // True if test will use a fixed RNG value.
   bool deterministic_{};

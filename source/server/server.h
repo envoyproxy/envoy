@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -176,9 +177,7 @@ public:
   Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return server_.statsFlushInterval();
-  }
+  Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
@@ -261,14 +260,12 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
 
+  Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
 
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
-  }
-
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return config_.statsFlushInterval();
   }
 
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -369,6 +366,7 @@ private:
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
+  ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
 

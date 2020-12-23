@@ -146,6 +146,13 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
+
+  /**
+   * Instructs a transport socket to start using secure transport.
+   * Note: Not all transport sockets support such operation.
+   * @return boolean indicating if the transport socket was able to start secure transport.
+   */
+  virtual bool startSecureTransport() PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
@@ -234,6 +241,12 @@ public:
    * @return bool whether the transport socket will use proxy protocol options.
    */
   virtual bool usesProxyProtocolOptions() const PURE;
+
+  /**
+   * Returns true if the transport socket created by this factory supports some form of ALPN
+   * negotiation.
+   */
+  virtual bool supportsAlpn() const { return false; }
 };
 
 using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;

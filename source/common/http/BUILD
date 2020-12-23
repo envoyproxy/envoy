@@ -58,21 +58,16 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:quic_codec_factory_lib",
         "//source/common/http/http3:well_known_names",
         "//source/common/network:filter_lib",
-        "//source/common/runtime:runtime_features_lib",
-        "//source/common/runtime:runtime_lib",
     ],
 )
 
@@ -142,6 +137,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "mixed_conn_pool",
+    srcs = ["mixed_conn_pool.cc"],
+    hdrs = ["mixed_conn_pool.h"],
+    deps = [
+        ":conn_pool_base_lib",
+        "//source/common/http/http1:conn_pool_lib",
+        "//source/common/http/http2:conn_pool_lib",
+        "//source/common/tcp:conn_pool_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [
@@ -169,11 +176,14 @@ envoy_cc_library(
     deps = [
         ":headers_lib",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/matcher:matcher_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:linked_object",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
         "//source/common/local_reply:local_reply_lib",
+        "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
     ],
 )
 
@@ -233,9 +243,7 @@ envoy_cc_library(
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:quic_codec_factory_lib",
         "//source/common/http/http3:well_known_names",

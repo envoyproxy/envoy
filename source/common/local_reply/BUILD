@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["local_reply.cc"],
     hdrs = ["local_reply.h"],
     deps = [
+        "//include/envoy/api:api_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/server:filter_config_interface",

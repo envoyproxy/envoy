@@ -56,8 +56,6 @@ When decompression is *applied*:
 - *x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes* trailers are added to
   the request/response to relay information about decompression.
 
-.. _decompressor-statistics:
-
 Using different decompressors for requests and responses
 --------------------------------------------------------
 
@@ -97,6 +95,8 @@ multiple decompressor filters enabled only for requests or responses. For instan
           enabled:
             default_value: false
             runtime_key: request_decompressor_enabled
+
+.. _decompressor-statistics:
 
 Statistics
 ----------

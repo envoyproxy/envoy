@@ -39,7 +39,6 @@
 using testing::_;
 using testing::ContainerEq;
 using testing::Eq;
-using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -319,7 +318,7 @@ most_specific_header_mutations_wins: {0}
     return fmt::format(yaml, most_specific_wins);
   }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Event::SimulatedTimeSystem test_time_;
@@ -3036,15 +3035,17 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 41))
       .WillRepeatedly(Return(true));
   EXPECT_EQ(
       "something_else",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("bogus_key",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_), 43))
+  EXPECT_CALL(snapshot,
+              featureEnabled("bogus_key",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), 43))
       .WillRepeatedly(Return(false));
   EXPECT_EQ(
       "www2",
@@ -5616,11 +5617,13 @@ virtual_hosts:
 )EOF";
 
   Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(false));
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.shadow_enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(true));
   EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
@@ -5673,11 +5676,13 @@ virtual_hosts:
 )EOF";
 
   Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(false));
-  EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
-                                       Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot,
+              featureEnabled("cors.www.shadow_enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(true));
   EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
@@ -6518,6 +6523,74 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/a/b/c", redirect->newPath(headers));
+  }
+}
+
+TEST_F(RouteConfigurationV2, RedirectRegexRewrite) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: /foo/([0-9]{4})/(.*)
+        redirect:
+          regex_rewrite:
+            pattern:
+              google_re2: {}
+              regex: /foo/([0-9]{4})/(.*)
+            substitution: /\2/\1/baz
+      - match:
+          safe_regex:
+            google_re2: {}
+            regex: /strip-query/([0-9]{4})/(.*)
+        redirect:
+          strip_query: true
+          regex_rewrite:
+            pattern:
+              google_re2: {}
+              regex: /strip-query/([0-9]{4})/(.*)
+            substitution: /\2/\1/baz
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+
+  // Regex rewrite with a query, no strip_query
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/foo/9000/endpoint?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/endpoint/9000/baz?lang=eng&con=US",
+              redirect->newPath(headers));
+  }
+  // Regex rewrite without a query, no strip_query
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/foo/1984/bar/anything", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newPath(headers));
+  }
+  // Regex rewrite with a query, with strip_query
+  {
+    Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/strip-query/9000/endpoint?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/endpoint/9000/baz", redirect->newPath(headers));
+  }
+  // Regex rewrite without a query, with strip_query
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/strip-query/1984/bar/anything", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newPath(headers));
   }
 }
 

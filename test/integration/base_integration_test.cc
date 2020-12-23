@@ -65,11 +65,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
-  ENVOY_LOG_MISC(debug, "Using new codecs");
-  setNewCodecs();
-#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -92,7 +87,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
-  connection->enableHalfClose(enable_half_close_);
+  connection->enableHalfClose(enableHalfClose());
   return connection;
 }
 
@@ -135,12 +130,15 @@ common_tls_context:
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    Network::TransportSocketFactoryPtr factory =
+        upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(
-          new AutonomousUpstream(endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
+      fake_upstreams_.emplace_back(new AutonomousUpstream(
+          std::move(factory), endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstreamConfig()));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(std::move(factory), endpoint, upstreamConfig()));
     }
   }
 }
@@ -215,6 +213,14 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
         });
   } else {
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
   }
 }
 
@@ -223,7 +229,7 @@ BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                                        Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options, source_address);
+                                                enableHalfClose(), options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
