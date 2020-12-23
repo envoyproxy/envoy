@@ -148,8 +148,7 @@ public:
 
   void expectResponseBodyRewrite(const std::string& code, bool empty_body, bool enable_wrap_body) {
     if (!enable_wrap_body) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.lua_always_wrap_body",
-                                        "false");
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.lua_always_wrap_body", "false");
     }
 
     initializeFilter(code);
@@ -184,9 +183,9 @@ public:
 
     if (enable_wrap_body) {
       EXPECT_EQ("2", response->headers()
-                        .get(Http::LowerCaseString("content-length"))[0]
-                        ->value()
-                        .getStringView());
+                         .get(Http::LowerCaseString("content-length"))[0]
+                         ->value()
+                         .getStringView());
       EXPECT_EQ("ok", response->body());
     } else {
       EXPECT_EQ("", response->body());
