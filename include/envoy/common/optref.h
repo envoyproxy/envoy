@@ -34,6 +34,54 @@ template <class T> struct OptRef : public absl::optional<std::reference_wrapper<
     const T& ref = **this;
     return &ref;
   }
+
+  /**
+   * Helper to convert a OptRef into a pointer. If the optional is not set, returns a nullptr.
+   */
+  T* ptr() {
+    if (this->has_value()) {
+      T& ref = **this;
+      return &ref;
+    }
+
+    return nullptr;
+  }
+
+  /**
+   * Helper to convert a OptRef into a pointer. If the optional is not set, returns a nullptr.
+   */
+  const T* ptr() const {
+    if (this->has_value()) {
+      const T& ref = **this;
+      return &ref;
+    }
+
+    return nullptr;
+  }
+
+  T& ref() { return **this; }
+
+  const T& ref() const { return **this; }
 };
+
+/**
+ * Constructs an OptRef<T> from the provided reference.
+ * @param ref the reference to wrap
+ * @return OptRef<T> the wrapped reference
+ */
+template <class T> OptRef<T> makeOptRef(T& ref) { return {ref}; }
+
+/**
+ * Constructs an OptRef<T> from the provided pointer.
+ * @param ptr the pointer to wrap
+ * @return OptRef<T> the wrapped pointer, or absl::nullopt if the pointer is nullptr
+ */
+template <class T> OptRef<T> makeOptRefFromPtr(T* ptr) {
+  if (ptr == nullptr) {
+    return {};
+  }
+
+  return {*ptr};
+}
 
 } // namespace Envoy
