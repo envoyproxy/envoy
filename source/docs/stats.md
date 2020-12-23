@@ -276,7 +276,7 @@ If you are visiting this section because you saw a message like:
 ```bash
 [...][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure:
 decode_search != decode_map_.end(). Details: Please see 
-https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#debugging-symbol-table-asserts
+https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#debugging-symbol-table-assertions
 ```
 then you have come to the right place.
 
