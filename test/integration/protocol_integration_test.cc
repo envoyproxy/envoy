@@ -318,7 +318,7 @@ TEST_P(ProtocolIntegrationTest, ContinueAfterLocalReply) {
         response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
         response->waitForEndStream();
       },
-      error);
+      HasSubstr(error));
 #endif
 }
 
