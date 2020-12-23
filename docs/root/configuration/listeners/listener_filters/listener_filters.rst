@@ -1,9 +1,9 @@
 .. _config_listener_filters:
 
-Listener filters
+监听器过滤器
 ================
 
-Envoy has the following builtin listener filters.
+Envoy 有如下内置的监听器过滤器。
 
 .. toctree::
   :maxdepth: 2
