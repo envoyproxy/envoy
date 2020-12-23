@@ -22,6 +22,10 @@ namespace ExtAuthz {
 namespace {
 
 void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
+  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
+  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
+    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
+  }
   std::string yaml = R"EOF(
   transport_api_version: V3
   grpc_service:

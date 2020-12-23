@@ -78,7 +78,8 @@ public:
   }
 
   Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, Http::Protocol,
+  allocateConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
+                   std::vector<Http::Protocol>&,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
                    ClusterConnectivityState& state) override {
