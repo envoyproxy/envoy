@@ -2214,9 +2214,10 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 
-  // The %E formatting option in Absl::FormatTime() behaves differently for non Linux platforms.
+  // The %E formatting option in Absl::FormatTime() behaves differently for non Linux platforms,
+  // because abseil depends on cctz which depends on strftime which has different behavior
+  // in some platforms. See:
   //
-  // See:
   // https://github.com/abseil/abseil-cpp/issues/869
   // https://github.com/google/cctz/issues/180
 #if !defined(WIN32) && !defined(__APPLE__)
