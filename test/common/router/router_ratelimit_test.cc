@@ -271,11 +271,15 @@ virtual_hosts:
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml));
+    policy_ = std::make_unique<RateLimitPolicyImpl>(
+        Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>{});
+    rate_limit_entry_ =
+        std::make_unique<RateLimitPolicyEntryImpl>(*policy_.get(), parseRateLimitFromV3Yaml(yaml));
     descriptors_.clear();
     stream_info_.downstream_remote_address_ = default_remote_address_;
   }
 
+  std::unique_ptr<RateLimitPolicyImpl> policy_;
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   NiceMock<MockRouteEntry> route_;
@@ -960,6 +964,127 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, stream_info_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "limited_fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionText) {
+  const std::string yaml = R"EOF(
+actions:
+- expression:
+    descriptor_key: my_descriptor_name
+    text: request.headers["x-header-name"]
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
+                                         stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_descriptor_name", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionTextMalformed) {
+  const std::string yaml = R"EOF(
+actions:
+- expression:
+    descriptor_key: my_descriptor_name
+    text: undefined_ext(false)
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException, "failed to create an expression: .*");
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionUnparsable) {
+  const std::string yaml = R"EOF(
+actions:
+- expression:
+    descriptor_key: my_descriptor_name
+    text: ++
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException,
+                          "Unable to parse descriptor expression: .*");
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionParsed) {
+  const std::string yaml = R"EOF(
+actions:
+- expression:
+    descriptor_key: my_descriptor_name
+    parsed:
+      call_expr:
+        function: _==_
+        args:
+        - select_expr:
+            operand:
+              ident_expr:
+                name: request
+            field: method
+        - const_expr:
+            string_value: GET
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":method", "GET"}};
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
+                                         stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_descriptor_name", "true"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionParsedMalformed) {
+  const std::string yaml = R"EOF(
+actions:
+- expression:
+    descriptor_key: my_descriptor_name
+    parsed:
+      call_expr:
+        function: undefined_extent
+        args:
+        - const_expr:
+            bool_value: false
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException, "failed to create an expression: .*");
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionTextError) {
+  const std::string yaml = R"EOF(
+actions:
+- expression:
+    descriptor_key: test_key
+    text: "'a'"
+- expression:
+    descriptor_key: my_descriptor_name
+    text: request.headers["x-header-name"]
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
+                                         stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionTextErrorSkip) {
+  const std::string yaml = R"EOF(
+actions:
+- expression:
+    descriptor_key: test_key
+    text: "'a'"
+- expression:
+    descriptor_key: my_descriptor_name
+    text: request.headers["x-header-name"]
+    skip_if_error: true
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
+                                         stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"test_key", "a"}}}}),
               testing::ContainerEq(descriptors_));
 }
 

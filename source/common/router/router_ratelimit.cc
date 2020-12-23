@@ -222,16 +222,18 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       switch (action.expression().expr_specifier_case()) {
       case envoy::config::route::v3::RateLimit::Action::Expression::kText: {
         auto parse_status = google::api::expr::parser::Parse(action.expression().text());
-        if (parse_status.ok()) {
+        if (!parse_status.ok()) {
           throw EnvoyException("Unable to parse descriptor expression: " +
                                parse_status.status().ToString());
         }
         actions_.emplace_back(new ExpressionAction(action.expression(), policy.getOrCreateBuilder(),
                                                    parse_status.value().expr()));
+        break;
       }
       case envoy::config::route::v3::RateLimit::Action::Expression::kParsed:
         actions_.emplace_back(new ExpressionAction(action.expression(), policy.getOrCreateBuilder(),
                                                    action.expression().parsed()));
+        break;
       default:
         NOT_REACHED_GCOVR_EXCL_LINE;
       }

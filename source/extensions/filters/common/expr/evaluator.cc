@@ -97,7 +97,7 @@ bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
 std::string print(CelValue value) {
   switch (value.type()) {
   case CelValue::Type::kBool:
-    return absl::StrCat(value.BoolOrDie());
+    return value.BoolOrDie() ? "true" : "false";
   case CelValue::Type::kInt64:
     return absl::StrCat(value.Int64OrDie());
   case CelValue::Type::kUint64:
