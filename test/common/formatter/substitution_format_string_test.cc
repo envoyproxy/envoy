@@ -115,7 +115,7 @@ public:
 
 class TestCommandParser : public CommandParser {
 public:
-  TestCommandParser() {}
+  TestCommandParser() = default;
 
   FormatterProviderPtr parse(absl::string_view token) const override {
     if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
