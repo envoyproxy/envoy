@@ -1734,7 +1734,7 @@ message RateLimit {
         string text = 3 [(validate.rules).string = {min_len: 1}];
 
         // Parsed expression in AST form.
-        google.api.expr.v1alpha1.Expr condition = 4;
+        google.api.expr.v1alpha1.Expr parsed = 4;
       }
     }
 
@@ -1770,7 +1770,7 @@ message RateLimit {
       MetaData metadata = 8;
 
       // Rate limit on a computed expression value.
-      Expression expr = 9;
+      Expression expression = 9;
     }
   }
 

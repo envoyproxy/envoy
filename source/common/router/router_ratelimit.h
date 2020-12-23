@@ -44,7 +44,8 @@ class SourceClusterAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -55,7 +56,8 @@ class DestinationClusterAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -70,7 +72,8 @@ public:
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -86,7 +89,8 @@ class RemoteAddressAction : public RateLimitAction {
 public:
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 };
 
@@ -102,7 +106,8 @@ public:
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -120,7 +125,8 @@ public:
   MetaDataAction(const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action);
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -140,7 +146,8 @@ public:
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -151,35 +158,42 @@ private:
 
 /**
  * Action for a symbolic expression descriptor.
-class ExpressionAction: public RateLimitAction {
+ */
+class ExpressionAction : public RateLimitAction {
 public:
-  ExpressionAction(
-      const envoy::config::route::v3::RateLimit::Action::Expression& action);
+  ExpressionAction(const envoy::config::route::v3::RateLimit::Action::Expression& action,
+                   Extensions::Filters::Common::Expr::Builder& builder,
+                   const google::api::expr::v1alpha1::Expr& input_expr);
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 
 private:
   const google::api::expr::v1alpha1::Expr input_expr_;
-  Expr::ExpressionPtr compiled_expr_;
+  const std::string descriptor_key_;
+  const bool skip_if_error_;
+  Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
 };
- */
+
+class RateLimitPolicyImpl;
 
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
-  RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config);
+  RateLimitPolicyEntryImpl(RateLimitPolicyImpl& policy,
+                           const envoy::config::route::v3::RateLimit& config);
 
   // Router::RateLimitPolicyEntry
   uint64_t stage() const override { return stage_; }
   const std::string& disableKey() const override { return disable_key_; }
   void populateDescriptors(const Router::RouteEntry& route,
                            std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           const std::string& local_service_cluster, const Http::HeaderMap&,
+                           const std::string& local_service_cluster, const Http::RequestHeaderMap&,
                            const StreamInfo::StreamInfo& info) const override;
 
 private:
@@ -197,6 +211,8 @@ public:
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits);
 
+  Extensions::Filters::Common::Expr::Builder& getOrCreateBuilder();
+
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
   getApplicableRateLimit(uint64_t stage = 0) const override;
@@ -210,6 +226,8 @@ private:
   // Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA and
   // Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
   static const uint64_t MAX_STAGE_NUMBER;
+  std::unique_ptr<ProtobufWkt::Arena> builder_arena_;
+  Extensions::Filters::Common::Expr::BuilderPtr expr_builder_;
 };
 
 } // namespace Router

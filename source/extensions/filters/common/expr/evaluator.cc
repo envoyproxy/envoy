@@ -94,6 +94,31 @@ bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
   return result.IsBool() ? result.BoolOrDie() : false;
 }
 
+std::string print(CelValue value) {
+  switch (value.type()) {
+  case CelValue::Type::kBool:
+    return absl::StrCat(value.BoolOrDie());
+  case CelValue::Type::kInt64:
+    return absl::StrCat(value.Int64OrDie());
+  case CelValue::Type::kUint64:
+    return absl::StrCat(value.Uint64OrDie());
+  case CelValue::Type::kDouble:
+    return absl::StrCat(value.DoubleOrDie());
+  case CelValue::Type::kString:
+    return std::string(value.StringOrDie().value());
+  case CelValue::Type::kBytes:
+    return std::string(value.BytesOrDie().value());
+  case CelValue::Type::kMessage:
+    return value.IsNull() ? "NULL" : value.MessageOrDie()->ShortDebugString();
+  case CelValue::Type::kDuration:
+    return absl::FormatDuration(value.DurationOrDie());
+  case CelValue::Type::kTimestamp:
+    return absl::FormatTime(value.TimestampOrDie(), absl::UTCTimeZone());
+  default:
+    return absl::StrCat(CelValue::TypeName(value.type()), " value");
+  }
+}
+
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

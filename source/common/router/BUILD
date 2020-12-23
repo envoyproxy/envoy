@@ -342,6 +342,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "@com_google_cel_cpp//parser",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

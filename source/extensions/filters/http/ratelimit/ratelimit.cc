@@ -224,7 +224,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                           std::vector<RateLimit::Descriptor>& descriptors,
                                           const Router::RouteEntry* route_entry,
-                                          const Http::HeaderMap& headers) const {
+                                          const Http::RequestHeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
     const std::string& disable_key = rate_limit.disableKey();

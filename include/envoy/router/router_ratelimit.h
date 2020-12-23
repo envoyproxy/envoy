@@ -51,7 +51,7 @@ public:
    */
   virtual bool populateDescriptor(const RouteEntry& route, RateLimit::Descriptor& descriptor,
                                   const std::string& local_service_cluster,
-                                  const Http::HeaderMap& headers,
+                                  const Http::RequestHeaderMap& headers,
                                   const StreamInfo::StreamInfo& info) const PURE;
 };
 
@@ -85,7 +85,7 @@ public:
   virtual void populateDescriptors(const RouteEntry& route,
                                    std::vector<RateLimit::Descriptor>& descriptors,
                                    const std::string& local_service_cluster,
-                                   const Http::HeaderMap& headers,
+                                   const Http::RequestHeaderMap& headers,
                                    const StreamInfo::StreamInfo& info) const PURE;
 };
 
