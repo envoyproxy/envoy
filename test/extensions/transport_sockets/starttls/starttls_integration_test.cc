@@ -9,10 +9,10 @@
 #include "extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/config/utility.h"
+#include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
+#include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.validate.h"
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
-#include "test/integration/starttls_integration_test.pb.h"
-#include "test/integration/starttls_integration_test.pb.validate.h"
 #include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
@@ -272,15 +272,13 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   // Send a message to switch to tls on the receiver side.
   // StartTlsSwitchFilter will switch transport socket on the
-  // receiver side upon receiving "switch" message.
+  // receiver side upon receiving "switch" message and send
+  // back the message "usetls".
+  payload_reader_->set_data_to_wait_for("usetls");
   buffer.add("switch");
   conn_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != 11) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
 
   // Wait for confirmation
-  payload_reader_->set_data_to_wait_for("usetls");
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.

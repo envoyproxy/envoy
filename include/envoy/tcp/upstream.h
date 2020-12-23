@@ -10,6 +10,7 @@ namespace Envoy {
 
 namespace Upstream {
 class LoadBalancerContext;
+class ThreadLocalCluster;
 } // namespace Upstream
 
 namespace TcpProxy {
@@ -116,15 +117,14 @@ public:
       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
   /*
-   * @param cluster_name the name of the cluster to use
-   * @param cm the cluster manager to get the connection pool from
+   * @param thread_local_cluster the thread local cluster to use for conn pool creation.
    * @param config the tunneling config, if doing connect tunneling.
    * @param context the load balancing context for this connection.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
    * @return may be null if there is no cluster with the given name.
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(const std::string& cluster_name, Upstream::ClusterManager& cm,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         const absl::optional<TunnelingConfig>& config,
                         Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;

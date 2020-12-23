@@ -119,7 +119,7 @@ public:
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
@@ -201,7 +201,7 @@ TEST_F(LightStepDriverTest, DeferredTlsInitialization) {
 
   auto propagation_mode = Common::Ot::OpenTracingDriver::PropagationMode::TracerNative;
 
-  tls_.defer_data = true;
+  tls_.defer_data_ = true;
   cm_.initializeClusters({"fake_cluster"}, {});
   ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
@@ -721,6 +721,15 @@ TEST_F(LightStepDriverTest, GetAndSetBaggage) {
   std::string value = "value1";
   span->setBaggage(key, value);
   EXPECT_EQ(span->getBaggage(key), value);
+}
+
+TEST_F(LightStepDriverTest, GetTraceId) {
+  setupValidDriver();
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  // This method is unimplemented and a noop.
+  ASSERT_EQ(span->getTraceIdAsHex(), "");
 }
 
 } // namespace

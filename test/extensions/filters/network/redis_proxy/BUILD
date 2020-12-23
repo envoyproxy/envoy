@@ -99,6 +99,7 @@ envoy_cc_mock(
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
         "//source/extensions/filters/network/redis_proxy:router_interface",
+        "//test/test_common:printers_lib",
     ],
 )
 

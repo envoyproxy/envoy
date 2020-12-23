@@ -67,8 +67,11 @@ experience a backward compatible break on a change. Specifically:
     may be granted for scenarios in which these stricter conditions model behavior already implied
     structurally or by documentation.
 
-The exception to the above policy is for API versions tagged `vNalpha`. Within an alpha major
-version, arbitrary breaking changes are allowed.
+An exception to the above policy exists for:
+* Changes made within 14 days of the introduction of a new API field or message.
+* API versions tagged `vNalpha`. Within an alpha major version, arbitrary breaking changes are allowed.
+* Any field, message or enum with a `[#not-implemented-hide:..` comment.
+* Any proto with a `(udpa.annotations.file_status).work_in_progress` option annotation.
 
 Note that changes to default values for wrapped types, e.g. `google.protobuf.UInt32Value` are not
 governed by the above policy. Any management server requiring stability across Envoy API or

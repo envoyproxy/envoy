@@ -14,11 +14,11 @@ load_balancer_test_case {
     }
   }
   actions {
-    prefetch {
+    preconnect {
     }
   }
   actions {
-    prefetch {
+    preconnect {
     }
   }
   actions {
