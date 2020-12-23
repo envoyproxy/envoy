@@ -772,7 +772,7 @@ std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "ConnectionImpl " << this << DUMP_MEMBER(connecting_) << DUMP_MEMBER(bind_error_)
-     << ", state() :" << state() << DUMP_MEMBER(read_buffer_limit_) << "\n";
+     << DUMP_MEMBER(state()) << DUMP_MEMBER(read_buffer_limit_) << "\n";
 
   DUMP_DETAILS(socket_);
 }

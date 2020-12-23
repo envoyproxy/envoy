@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
@@ -1854,6 +1855,8 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 
 // Test DumpState methods.
 TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   Address::InstanceConstSharedPtr server_addr;
   Address::InstanceConstSharedPtr local_addr;
@@ -1875,11 +1878,28 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
 
   // Start measuring memory and dump state.
   Stats::TestUtil::MemoryTest memory_test;
-  connection_socket->dumpState(std::cout, 0);
+  connection_socket->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+  // Check socket dump
+  EXPECT_THAT(ostream.contents(), HasSubstr("ListenSocketImpl"));
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    EXPECT_THAT(
+        ostream.contents(),
+        HasSubstr(
+            "remote_address_: 1.1.1.1:80, direct_remote_address_: 1.1.1.1:80, local_address_: "
+            "1.2.3.4:56789, transport_protocol_: , server_name_: envoyproxy.io"));
+  } else {
+    EXPECT_THAT(
+        ostream.contents(),
+        HasSubstr("remote_address_: [::1]:80, direct_remote_address_: [::1]:80, local_address_: "
+                  "[::1:2:3:4]:56789, transport_protocol_: , server_name_: envoyproxy.io"));
+  }
 }
 
 TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
   ConnectionMocks mocks = createConnectionMocks(false);
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
 
@@ -1890,8 +1910,15 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
 
   // Start measuring memory and dump state.
   Stats::TestUtil::MemoryTest memory_test;
-  server_connection->dumpState(std::cout, 0);
+  server_connection->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+  // Check connection data
+  EXPECT_THAT(ostream.contents(), HasSubstr("ConnectionImpl"));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("connecting_: 0, bind_error_: 0, state(): Open, read_buffer_limit_: 0"));
+  // Check socket starts dumping
+  EXPECT_THAT(ostream.contents(), HasSubstr("ListenSocketImpl"));
 
   server_connection->close(ConnectionCloseType::NoFlush);
 }
