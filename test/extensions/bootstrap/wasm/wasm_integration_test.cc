@@ -66,6 +66,7 @@ typed_config:
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmIntegrationTest,
                          Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmIntegrationTest);
 
 TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
   initialize();
