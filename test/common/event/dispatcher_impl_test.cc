@@ -326,7 +326,7 @@ protected:
 
   void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
     TimerPtr timer;
-    dispatcher_->post([this, &timer]() {
+    dispatcher_->post([this, &timer, enable_timer_delegate]() {
       {
         Thread::LockGuard lock(mu_);
         timer = dispatcher_->createTimer([this]() {
@@ -337,15 +337,13 @@ protected:
           cv_.notifyOne();
         });
         EXPECT_FALSE(timer->enabled());
+        enable_timer_delegate(*timer);
+        EXPECT_TRUE(timer->enabled());
       }
       cv_.notifyOne();
     });
 
     Thread::LockGuard lock(mu_);
-    while (timer == nullptr) {
-      cv_.wait(mu_);
-    }
-    enable_timer_delegate(*timer);
     while (!work_finished_) {
       cv_.wait(mu_);
     }
@@ -496,16 +494,13 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
         cv_.notifyOne();
       });
       EXPECT_FALSE(timer->enabled());
+      timer->enableTimer(std::chrono::milliseconds(50), &scope);
+      EXPECT_TRUE(timer->enabled());
     }
     cv_.notifyOne();
   });
 
   Thread::LockGuard lock(mu_);
-  while (timer == nullptr) {
-    cv_.wait(mu_);
-  }
-  timer->enableTimer(std::chrono::milliseconds(50), &scope);
-
   while (!work_finished_) {
     cv_.wait(mu_);
   }
