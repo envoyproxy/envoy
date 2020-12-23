@@ -1,6 +1,6 @@
-Overview
-========
+概览
+=====
 
-* Access logging :ref:`architecture overview <arch_overview_access_logs>`
-* :ref:`Configuration overview <config_access_log>`
-* :ref:`v2 API reference <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`
+* 访问日志记录 :ref:`架构概览 <arch_overview_access_logs>`
+* :ref:`配置概览 <config_access_log>`
+* :ref:`v2 API 参考 <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`
