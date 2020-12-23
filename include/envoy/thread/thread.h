@@ -97,5 +97,19 @@ public:
   virtual void unlock() ABSL_UNLOCK_FUNCTION() PURE;
 };
 
+struct MainThread {
+  using MainThreadSingleton = InjectableSingleton<MainThread>;
+  bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
+  static void init() { MainThreadSingleton::initialize(new MainThread()); }
+  static void clear() {
+    free(MainThreadSingleton::getExisting());
+    MainThreadSingleton::clear();
+  }
+  static bool isMainThread() { return MainThreadSingleton::get().inMainThread(); }
+
+private:
+  std::thread::id main_thread_id_{std::this_thread::get_id()};
+};
+
 } // namespace Thread
 } // namespace Envoy

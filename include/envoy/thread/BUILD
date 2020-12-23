@@ -11,5 +11,8 @@ envoy_package()
 envoy_cc_library(
     name = "thread_interface",
     hdrs = ["thread.h"],
-    deps = ["//source/common/common:thread_annotations"],
+    deps = [
+        "//source/common/common:thread_annotations",
+        "//source/common/singleton:threadsafe_singleton",
+    ],
 )
