@@ -1273,6 +1273,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "tracked_watermark_buffer_test",
+    srcs = ["tracked_watermark_buffer_test.cc"],
+    deps = [
+        ":tracked_watermark_buffer_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "uds_integration_test",
     srcs = [
         "uds_integration_test.cc",

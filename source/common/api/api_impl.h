@@ -40,7 +40,7 @@ private:
   Filesystem::Instance& file_system_;
   Random::RandomGenerator& random_generator_;
   ProcessContextOptRef process_context_;
-  Buffer::WatermarkFactorySharedPtr watermark_factory_;
+  const Buffer::WatermarkFactorySharedPtr watermark_factory_;
 };
 
 } // namespace Api

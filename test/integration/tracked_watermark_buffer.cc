@@ -28,6 +28,7 @@ TrackedWatermarkBufferFactory::create(std::function<void()> below_low_watermark,
       },
       [this]() {
         absl::MutexLock lock(&mutex_);
+        ASSERT(active_buffer_count_ > 0);
         --active_buffer_count_;
       },
       below_low_watermark, above_high_watermark, above_overflow_watermark);
@@ -74,8 +75,14 @@ std::pair<uint32_t, uint32_t> TrackedWatermarkBufferFactory::highWatermarkRange(
       watermarks_set = true;
     } else {
       if (watermarks_set) {
-        min_watermark = std::min(min_watermark, watermark);
-        max_watermark = std::max(max_watermark, watermark);
+        if (min_watermark != 0) {
+          min_watermark = std::min(min_watermark, watermark);
+        } else {
+          min_watermark = watermark;
+        }
+        if (max_watermark != 0) {
+          max_watermark = std::max(max_watermark, watermark);
+        }
       } else {
         watermarks_set = true;
         min_watermark = watermark;

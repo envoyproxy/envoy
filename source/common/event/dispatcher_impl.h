@@ -30,9 +30,8 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
                        public FatalErrorHandlerInterface {
 public:
-  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system);
-  DispatcherImpl(const std::string& name, const Buffer::WatermarkFactorySharedPtr& factory,
-                 Api::Api& api, Event::TimeSystem& time_system);
+  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
+                 const Buffer::WatermarkFactorySharedPtr& factory = nullptr);
   ~DispatcherImpl() override;
 
   /**

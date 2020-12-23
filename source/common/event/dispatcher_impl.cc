@@ -38,13 +38,11 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
-                               Event::TimeSystem& time_system)
-    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
-
-DispatcherImpl::DispatcherImpl(const std::string& name,
-                               const Buffer::WatermarkFactorySharedPtr& factory, Api::Api& api,
-                               Event::TimeSystem& time_system)
-    : name_(name), api_(api), buffer_factory_(factory),
+                               Event::TimeSystem& time_system,
+                               const Buffer::WatermarkFactorySharedPtr& factory)
+    : name_(name), api_(api),
+      buffer_factory_(factory != nullptr ? factory
+                                         : std::make_shared<Buffer::WatermarkBufferFactory>()),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),

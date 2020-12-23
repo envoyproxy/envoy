@@ -18,16 +18,12 @@ Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store,
       process_context_(process_context), watermark_factory_(std::move(watermark_factory)) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name) {
-  if (watermark_factory_) {
-    return std::make_unique<Event::DispatcherImpl>(name, watermark_factory_, *this, time_system_);
-  } else {
-    return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_);
-  }
+  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, watermark_factory_);
 }
 
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name,
                                               Buffer::WatermarkFactoryPtr&& factory) {
-  return std::make_unique<Event::DispatcherImpl>(name, std::move(factory), *this, time_system_);
+  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, std::move(factory));
 }
 
 } // namespace Api
