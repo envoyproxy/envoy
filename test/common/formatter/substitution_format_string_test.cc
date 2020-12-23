@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -130,13 +131,16 @@ public:
   CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override {
     return std::make_unique<TestCommandParser>();
   }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
   std::string name() const override { return "envoy.formatter.TestFormatter"; }
 };
 
-REGISTER_FACTORY(TestCommandFactory, CommandParserFactory);
-
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension) {
+  TestCommandFactory factory;
+  Registry::InjectFactory<CommandParserFactory> command_register(factory);
+
   const std::string yaml = R"EOF(
   text_format_source:
     inline_string: "plain text %COMMAND_EXTENSION()%"
