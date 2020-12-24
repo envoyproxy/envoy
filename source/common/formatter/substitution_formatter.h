@@ -162,15 +162,26 @@ private:
     StructFormatListPtr value_;
   };
 
+<<<<<<< HEAD
+=======
+  template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
+  template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
+>>>>>>> 57c2668ab (Add support for proto ListVale formatting)
   using StructFormatMapVisitor = StructFormatMapVisitorHelper<
       const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
 
   // Methods for building the format map.
+<<<<<<< HEAD
   std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
   StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
   StructFormatListWrapper toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+=======
+  std::vector<FormatterProviderPtr> toFormatValue(const std::string& string_format) const;
+  StructFormatMapWrapper toFormatValue(const ProtobufWkt::Struct& struct_format) const;
+  StructFormatListWrapper toFormatValue(const ProtobufWkt::ListValue& list_value_format) const;
+>>>>>>> 57c2668ab (Add support for proto ListVale formatting)
 
   // Methods for doing the actual formatting.
   ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,

@@ -149,49 +149,25 @@ StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool
                                  bool omit_empty_values)
     : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
-      struct_output_format_(toFormatMapValue(format_mapping)) {}
+      struct_output_format_(toFormatValue(format_mapping)) {}
 
 StructFormatter::StructFormatMapWrapper
-StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
+StructFormatter::toFormatValue(const ProtobufWkt::Struct& struct_format) const {
   auto output = std::make_unique<StructFormatMap>();
   for (const auto& pair : struct_format.fields()) {
     switch (pair.second.kind_case()) {
     case ProtobufWkt::Value::kStringValue:
-      output->emplace(pair.first, toFormatStringValue(pair.second.string_value()));
+      output->emplace(pair.first, toFormatValue(pair.second.string_value()));
       break;
 
     case ProtobufWkt::Value::kStructValue:
-      output->emplace(pair.first, toFormatMapValue(pair.second.struct_value()));
+      output->emplace(pair.first, toFormatValue(pair.second.struct_value()));
       break;
 
     case ProtobufWkt::Value::kListValue:
-      output->emplace(pair.first, toFormatListValue(pair.second.list_value()));
+      output->emplace(pair.first, toFormatValue(pair.second.list_value()));
       break;
 
-    default:
-      throw EnvoyException("Only string values, nested structs and list values are "
-                           "supported in structured access log format.");
-    }
-  }
-  return {std::move(output)};
-};
-
-StructFormatter::StructFormatListWrapper
-StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const {
-  auto output = std::make_unique<StructFormatList>();
-  for (const auto& value : list_value_format.values()) {
-    switch (value.kind_case()) {
-    case ProtobufWkt::Value::kStringValue:
-      output->emplace_back(toFormatStringValue(value.string_value()));
-      break;
-
-    case ProtobufWkt::Value::kStructValue:
-      output->emplace_back(toFormatMapValue(value.struct_value()));
-      break;
-
-    case ProtobufWkt::Value::kListValue:
-      output->emplace_back(toFormatListValue(value.list_value()));
-      break;
     default:
       throw EnvoyException("Only string values, nested structs and list values are "
                            "supported in structured access log format.");
@@ -202,6 +178,35 @@ StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_form
 
 std::vector<FormatterProviderPtr>
 StructFormatter::toFormatStringValue(const std::string& string_format) const {
+  return SubstitutionFormatParser::parse(string_format);
+};
+
+StructFormatter::StructFormatListWrapper
+StructFormatter::toFormatValue(const ProtobufWkt::ListValue& list_value_format) const {
+  auto output = std::make_unique<StructFormatList>();
+  for (const auto& value : list_value_format.values()) {
+    switch (value.kind_case()) {
+    case ProtobufWkt::Value::kStringValue:
+      output->emplace_back(toFormatValue(value.string_value()));
+      break;
+
+    case ProtobufWkt::Value::kStructValue:
+      output->emplace_back(toFormatValue(value.struct_value()));
+      break;
+
+    case ProtobufWkt::Value::kListValue:
+      output->emplace_back(toFormatValue(value.list_value()));
+      break;
+    default:
+      throw EnvoyException("Only string values, nested structs and list values are "
+                           "supported in structured access log format.");
+    }
+  }
+  return {std::move(output)};
+}
+
+std::vector<FormatterProviderPtr>
+StructFormatter::toFormatValue(const std::string& string_format) const {
   return SubstitutionFormatParser::parse(string_format);
 };
 

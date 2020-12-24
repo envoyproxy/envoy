@@ -1825,6 +1825,38 @@ TEST(SubstitutionFormatterTest, StructFormatterNestedObjectsTest) {
   EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
 }
 
+TEST(SubstitutionFormatterTest, StructFormatterList) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    list:
+      - plain_string: plain_string_value
+      - protocol: '%PROTOCOL%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+
+  const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
+    "list": [
+      { "plain_string": "plain_string_value" },
+      { "protocol": "HTTP/1.1" },
+    ]
+  })EOF");
+  const ProtobufWkt::Struct out_struct =
+      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
+}
+
 TEST(SubstitutionFormatterTest, StructFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
