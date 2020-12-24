@@ -166,9 +166,9 @@ private:
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
 
   // Methods for building the format map.
-  std::vector<FormatterProviderPtr> toFormatValue(const std::string& string_format) const;
-  StructFormatMapWrapper toFormatValue(const ProtobufWkt::Struct& struct_format) const;
-  StructFormatListWrapper toFormatValue(const ProtobufWkt::ListValue& list_value_format) const;
+  std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
+  StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
+  StructFormatListWrapper toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
 
   // Methods for doing the actual formatting.
   ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,
