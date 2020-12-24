@@ -93,7 +93,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
     TestUtility::loadFromYaml(yaml, config_);
     EXPECT_THROW_WITH_MESSAGE(
         SubstitutionFormatStringUtils::fromProtoConfig(config_, context_.api()), EnvoyException,
-        "Only string values or nested structs are supported in structured access log format.");
+        "Only string values, nested structs and list values are supported in structured access log "
+        "format.");
   }
 }
 
