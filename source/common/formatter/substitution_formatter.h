@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <list>
 #include <string>
 #include <vector>
 
@@ -129,9 +130,7 @@ private:
 class StructFormatter {
 public:
   StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                  bool omit_empty_values)
-      : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
-        struct_output_format_(toFormatMap(format_mapping)) {}
+                  bool omit_empty_values);
 
   ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& response_headers,
@@ -141,22 +140,57 @@ public:
 
 private:
   struct StructFormatMapWrapper;
-  using StructFormatMapValue =
-      absl::variant<const std::vector<FormatterProviderPtr>, const StructFormatMapWrapper>;
+  struct StructFormatListWrapper;
+  using StructFormatValue =
+      absl::variant<const std::vector<FormatterProviderPtr>, const StructFormatMapWrapper,
+                    const StructFormatListWrapper>;
   // Although not required for Struct/JSON, it is nice to have the order of
   // properties preserved between the format and the log entry, thus std::map.
-  using StructFormatMap = std::map<std::string, StructFormatMapValue>;
+  using StructFormatMap = std::map<std::string, StructFormatValue>;
   using StructFormatMapPtr = std::unique_ptr<StructFormatMap>;
   struct StructFormatMapWrapper {
     StructFormatMapPtr value_;
   };
 
-  StructFormatMapWrapper toFormatMap(const ProtobufWkt::Struct& struct_format) const;
+  using StructFormatList = std::list<StructFormatValue>;
+  using StructFormatListPtr = std::unique_ptr<StructFormatList>;
+  struct StructFormatListWrapper {
+    StructFormatListPtr value_;
+  };
+
+  template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
+  template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
+  using StructFormatMapVisitor = StructFormatMapVisitorHelper<
+      const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
+      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
+      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
+
+  // Methods for building the format map.
+  std::vector<FormatterProviderPtr> toFormatValue(const std::string& string_format) const;
+  StructFormatMapWrapper toFormatValue(const ProtobufWkt::Struct& struct_format) const;
+  StructFormatListWrapper toFormatValue(const ProtobufWkt::ListValue& list_value_format) const;
+
+  // Methods for doing the actual formatting.
+  ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,
+                                       const Http::RequestHeaderMap& request_headers,
+                                       const Http::ResponseHeaderMap& response_headers,
+                                       const Http::ResponseTrailerMap& response_trailers,
+                                       const StreamInfo::StreamInfo& stream_info,
+                                       absl::string_view local_reply_body) const;
+  ProtobufWkt::Value
+  structFormatMapCallback(const StructFormatter::StructFormatMapWrapper& format_map,
+                          const StructFormatMapVisitor& visitor) const;
+  ProtobufWkt::Value
+  structFormatListCallback(const StructFormatter::StructFormatListWrapper& format_list,
+                           const StructFormatMapVisitor& visitor) const;
 
   const bool omit_empty_values_;
   const bool preserve_types_;
+  const std::string empty_value_;
   const StructFormatMapWrapper struct_output_format_;
-};
+}; // namespace Formatter
+
+using StructFormatterPtr = std::unique_ptr<StructFormatter>;
 
 class JsonFormatterImpl : public Formatter {
 public:
