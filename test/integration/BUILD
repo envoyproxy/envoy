@@ -141,8 +141,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
-    # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -443,11 +441,13 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/common/http/http2:http2_frame",
+        "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -973,9 +973,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_integration_test",
     srcs = ["load_stats_integration_test.cc"],
-    # TODO(envoyproxy/windows-dev): Diagnose timeout observed in opt build test, hangs at
-    # IpVersionsClientType/LoadStatsIntegrationTest.NoLocalLocality/3
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -1298,8 +1295,6 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    # TODO(envoyproxy/windows-dev): Investigate flakes in #14286.
-    tags = ["flaky_on_windows"],
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
