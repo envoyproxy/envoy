@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "common/common/base64.h"
+
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
@@ -9,9 +11,14 @@
 namespace Envoy {
 namespace {
 
+constexpr absl::string_view text{"application/grpc-web-text"};
+constexpr absl::string_view binary{"application/grpc-web"};
+
 using SkipEncodingEmptyTrailers = bool;
-using TestParams =
-    std::tuple<Network::Address::IpVersion, Http::CodecClient::Type, SkipEncodingEmptyTrailers>;
+using ContentType = std::string;
+using Accept = std::string;
+using TestParams = std::tuple<Network::Address::IpVersion, Http::CodecClient::Type,
+                              SkipEncodingEmptyTrailers, ContentType, Accept>;
 
 class GrpcWebFilterIntegrationTest : public testing::TestWithParam<TestParams>,
                                      public HttpIntegrationTest {
@@ -32,11 +39,13 @@ public:
 
   static std::string testParamsToString(const testing::TestParamInfo<TestParams> params) {
     return fmt::format(
-        "{}_{}_{}",
+        "{}_{}_{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
         std::get<1>(params.param) == Http::CodecClient::Type::HTTP2 ? "Http2" : "Http",
-        std::get<2>(params.param) ? "SkipEncodingEmptyTrailers" : "SubmitEncodingEmptyTrailers");
+        std::get<2>(params.param) ? "SkipEncodingEmptyTrailers" : "SubmitEncodingEmptyTrailers",
+        std::get<3>(params.param) == text ? "SendText" : "SendBinary",
+        std::get<4>(params.param) == text ? "AcceptText" : "AcceptBinary");
   }
 };
 
@@ -45,12 +54,16 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(
         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
         testing::Values(Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2),
-        testing::Values(SkipEncodingEmptyTrailers{true}, SkipEncodingEmptyTrailers{false})),
+        testing::Values(SkipEncodingEmptyTrailers{true}, SkipEncodingEmptyTrailers{false}),
+        testing::Values(ContentType{text}, ContentType{binary}),
+        testing::Values(Accept{text}, Accept{binary})),
     GrpcWebFilterIntegrationTest::testParamsToString);
 
 TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   const auto downstream_protocol = std::get<1>(GetParam());
   const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
+  const auto content_type = std::get<3>(GetParam());
+  const auto accept = std::get<4>(GetParam());
 
   if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
@@ -67,30 +80,37 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {"content-type", "application/grpc-web"},
-                                     {":authority", "host"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {"content-type", content_type},
+                                                                 {"accept", accept},
+                                                                 {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(*request_encoder_, 1, false);
+
+  const std::string body = "hello";
+  const std::string encoded_body =
+      content_type == text ? Base64::encode(body.data(), body.length()) : body;
+  codec_client_->sendData(*request_encoder_, encoded_body, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
   waitForNextUpstreamRequest();
+  default_response_headers_.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(1, false);
   upstream_request_->encodeTrailers(response_trailers);
   response->waitForEndStream();
 
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(1, upstream_request_->bodyLength());
+  EXPECT_EQ(body.length(), upstream_request_->bodyLength());
   EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_TRUE(absl::StrContains(response->body(), "response1:trailer1"));
-  EXPECT_TRUE(absl::StrContains(response->body(), "response2:trailer2"));
+  const auto response_body = accept == text ? Base64::decode(response->body()) : response->body();
+  EXPECT_TRUE(absl::StrContains(response_body, "response1:trailer1"));
+  EXPECT_TRUE(absl::StrContains(response_body, "response2:trailer2"));
 
   if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
     // When the downstream protocol is HTTP/1.1 we expect the trailers to be in the response-body.
@@ -113,6 +133,8 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
 TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
   const auto downstream_protocol = std::get<1>(GetParam());
   const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
+  const auto content_type = std::get<3>(GetParam());
+  const auto accept = std::get<4>(GetParam());
 
   if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
@@ -127,12 +149,13 @@ TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {"content-type", "application/grpc-web"},
-                                     {":authority", "host"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {"content-type", content_type},
+                                                                 {"accept", accept},
+                                                                 {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, 1, false);
@@ -141,7 +164,13 @@ TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
 
   ASSERT_TRUE(fake_upstream_connection_->close());
   response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+
+  // TODO(dio): Need to check each response body, should reflect the requirement mandated by the
+  // request "Accept" header.
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_NE(nullptr, response->headers().GrpcMessage());
+  EXPECT_EQ(0U, response->body().length());
 
   codec_client_->close();
 }
