@@ -62,8 +62,8 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   const auto downstream_protocol = std::get<1>(GetParam());
   const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
-  const auto content_type = std::get<3>(GetParam());
-  const auto accept = std::get<4>(GetParam());
+  const ContentType& content_type = std::get<3>(GetParam());
+  const Accept& accept = std::get<4>(GetParam());
 
   if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
@@ -133,8 +133,8 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
 TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
   const auto downstream_protocol = std::get<1>(GetParam());
   const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
-  const auto content_type = std::get<3>(GetParam());
-  const auto accept = std::get<4>(GetParam());
+  const ContentType& content_type = std::get<3>(GetParam());
+  const Accept& accept = std::get<4>(GetParam());
 
   if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
