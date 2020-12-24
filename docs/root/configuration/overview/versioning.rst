@@ -1,25 +1,14 @@
-Versioning
+版本控制
 ----------
 
-The Envoy xDS APIs follow a well defined :repo:`versioning scheme <api/API_VERSIONING.md>`. Envoy
-supports :ref:`multiple major versions <api_supported_versions>` at any point in time. The examples
-in this section are taken from the v2 xDS API.
+Envoy xDS API 遵循明确定义的 :repo:`版本控制方案 <api/API_VERSIONING.md>`。Envoy 在任何时候都支持 :ref:`多个主要版本 <api_supported_versions>` 。本节中的示例摘自 v2 xDS API。
 
-Envoy has API versions for both the xDS transport, i.e. the wire protocol for moving resources
-between a management server and Envoy, and for resources. These are known as the transport and
-resource API version respectively.
+Envoy 具有用于 xDS 传输（即用于在管理服务器和 Envoy 之间移动资源的有线协议）和用于 xDS 资源的 API 版本。这些分别称为传输 API 版本和资源 API 版本。
 
-The transport and resource version may be mixed. For example, v3 resources may be transferred over
-the v2 transport protocol. In addition, an Envoy may consume mixed resource versions for distinct
-resource types. For example, :ref:`v3 Clusters <envoy_v3_api_msg_config.cluster.v3.Cluster>` may be
-used alongside :ref:`v2 Listeners <envoy_api_msg_Listener>`.
+传输版本和资源版本可以混合使用。例如，v3 资源可以通过 v2 传输协议进行传输。此外，Envoy 可以为不同的资源类型使用混合的资源版本。例如，:ref:`v3 集群 <envoy_v3_api_msg_config.cluster.v3.Cluster>` 可以与 :ref:`v2 监听器 <envoy_api_msg_Listener>` 一起使用。
 
-Both the transport and resource API versions follow the API versioning support and deprecation
-:repo:`policy <api/API_VERSIONING.md>`.
+传输版本和资源版本都遵循 API 版本控制的支持和弃用 :repo:`策略 <api/API_VERSIONING.md>`。
 
 .. note::
 
-    Envoy will internally operate at the latest xDS resource version and all supported versioned
-    resources will be transparently upgrading to this latest version on configuration ingestion. For
-    example, v2 and v3 resources, delivered over either a v2 or v3 transport, or any mix thereof,
-    will be internally converted into v3 resources.
+    Envoy 将在内部以最新的 xDS 资源版本运行，并且所有受支持的版本化资源将在提取配置时透明地升级到此最新版本。例如，通过 v2 或 v3 传输或其任何混合传送的 v2 和 v3 资源将在内部转换为 v3 资源。
