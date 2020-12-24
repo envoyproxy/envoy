@@ -413,8 +413,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
   ASSERT_TRUE(tcp_client->write(partial_request));
   tcp_client->close();
 
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(expected_upstream->waitForAndConsumeDisconnectedConnection());
 
   test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
 

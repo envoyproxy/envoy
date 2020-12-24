@@ -257,17 +257,6 @@ public:
     connection_.addConnectionCallbacks(*this);
   }
 
-  Common::CallbackHandle* addDisconnectCallback(DisconnectCallback callback) {
-    absl::MutexLock lock(&lock_);
-    return disconnect_callback_manager_.add(callback);
-  }
-
-  // Avoid directly removing by caller, since CallbackManager is not thread safe.
-  void removeDisconnectCallback(Common::CallbackHandle* handle) {
-    absl::MutexLock lock(&lock_);
-    handle->remove();
-  }
-
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     // Throughout this entire function, we know that the connection_ cannot disappear, since this
@@ -278,7 +267,6 @@ public:
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
       disconnected_ = true;
-      disconnect_callback_manager_.runCallbacks();
     }
   }
 
@@ -315,6 +303,8 @@ public:
     if (disconnected_) {
       return testing::AssertionSuccess();
     }
+    ASSERT(!connection_.dispatcher().isThreadSafe(),
+           "deadlock: executeOnDispatcher called from dispatcher thread.");
     bool callback_ready_event = false;
     bool unexpected_disconnect = false;
     connection_.dispatcher().post(
@@ -345,13 +335,13 @@ public:
 
   void setParented() {
     absl::MutexLock lock(&lock_);
+    ASSERT(!parented_);
     parented_ = true;
   }
 
 private:
   Network::Connection& connection_;
   absl::Mutex lock_;
-  Common::CallbackManager<> disconnect_callback_manager_ ABSL_GUARDED_BY(lock_);
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
 };
@@ -579,6 +569,11 @@ public:
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult waitForAndConsumeDisconnectedConnection(
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Wait for one of the upstreams to receive a connection

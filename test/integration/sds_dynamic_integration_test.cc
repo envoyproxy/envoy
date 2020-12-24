@@ -654,9 +654,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 
   // To flush out the reset connection from the first request in upstream.
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ASSERT_TRUE(fake_upstreams_[0]->waitForAndConsumeDisconnectedConnection());
 
   // Failure
   EXPECT_EQ(0, test_server_->counter("sds.client_cert.update_success")->value());
