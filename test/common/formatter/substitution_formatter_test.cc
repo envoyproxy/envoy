@@ -2373,7 +2373,7 @@ class TestCommandParser : public CommandParser {
 public:
   TestCommandParser(bool& command_found) : command_found_(command_found) {}
 
-  FormatterProviderPtr parse(absl::string_view token) const override {
+  FormatterProviderPtr parse(const std::string& token) const override {
     if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
       command_found_ = true;
       return std::make_unique<TestFormatter>();

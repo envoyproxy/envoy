@@ -83,7 +83,7 @@ class CommandParser {
 public:
   virtual ~CommandParser() = default;
 
-  virtual FormatterProviderPtr parse(absl::string_view token) const PURE;
+  virtual FormatterProviderPtr parse(const std::string& token) const PURE;
 };
 
 using CommandParserPtr = std::unique_ptr<CommandParser>;
