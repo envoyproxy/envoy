@@ -174,7 +174,7 @@ TEST_F(OAuth2Test, RequestSignout) {
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 }
 
@@ -255,7 +255,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 }
 
@@ -281,7 +281,7 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
   EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 1);
@@ -356,6 +356,7 @@ TEST_F(OAuth2Test, CookieValidator) {
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
+  EXPECT_EQ(cookie_validator->token(), "");
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->hmacIsValid());
@@ -421,7 +422,7 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
   EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 }
 
@@ -455,7 +456,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
 
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
   Http::TestRequestHeaderMapImpl final_request_headers{
@@ -564,7 +565,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
 
   // This represents the beginning of the OAuth filter.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(first_request_headers, false));
 
   // This represents the callback request from the authorization server.
@@ -588,6 +589,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
             filter_->decodeHeaders(second_request_headers, false));
 
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
   // Expected response after the callback & validation is complete - verifying we kept the
   // state and method of the original request, including the query string parameters.
