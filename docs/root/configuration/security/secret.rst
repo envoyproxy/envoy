@@ -242,17 +242,17 @@ SSL 套接字工厂输出遵循 SDS 相关统计。它们都是计数器类型�
 对于下游监听器，统计都在 *listener.<LISTENER_IP>.server_ssl_socket_factory.* 命名空间中。
 
 .. csv-table::
-     :header: Name, Description
+     :header: 名称, 描述
      :widths: 1, 2
 
-     ssl_context_update_by_sds, Total number of ssl context has been updated.
-     downstream_context_secrets_not_ready, Total number of downstream connections reset due to empty ssl certificate.
+     ssl_context_update_by_sds, 已更新 ssl 上下文的总数。
+     downstream_context_secrets_not_ready, 由于空 ssl 证书导致的下游连接重置总数。
 
 对于上游集群，统计都在 *cluster.<CLUSTER_NAME>.client_ssl_socket_factory.* 命名空间中。
 
 .. csv-table::
-     :header: Name, Description
+     :header: 名称, 描述
      :widths: 1, 2
 
-     ssl_context_update_by_sds, Total number of ssl context has been updated.
-     upstream_context_secrets_not_ready, Total number of upstream connections reset due to empty ssl certificate.
+     ssl_context_update_by_sds, 已更新 ssl 上下文的总数。
+     upstream_context_secrets_not_ready, 由于空 ssl 证书导致的上游连接重置总数。
