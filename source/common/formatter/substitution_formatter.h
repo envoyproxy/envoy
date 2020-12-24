@@ -26,7 +26,6 @@ public:
   static std::vector<FormatterProviderPtr>
   parse(const std::string& format, const std::vector<CommandParserPtr>& command_parsers);
 
-private:
   /**
    * Parse a header format rule of the form: %REQ(X?Y):Z% .
    * Will populate a main_header and an optional alternative header if specified.
@@ -68,6 +67,7 @@ private:
   static FormatterProviderPtr parseBuiltinCommand(const std::string& token, size_t pos,
                                                   int command_end_position);
 
+private:
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
