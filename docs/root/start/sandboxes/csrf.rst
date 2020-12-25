@@ -15,7 +15,7 @@ is the same as it's destination.
 
 To help demonstrate how front-envoy can enforce CSRF policies, we are releasing
 a `docker compose <https://docs.docker.com/compose/>`_ sandbox that
-deploys a service with both a frontend and backed. This service will be started
+deploys a service with both a frontend and backend. This service will be started
 on two different virtual machines with different origins.
 
 The frontend has a field to input the remote domain of where you would like to
@@ -86,7 +86,7 @@ For example:
   Failed to load resource: the server responded with a status of 403 (Forbidden)
 
 If you change the destination to be the same as one displaying the website and
-set the ``CSRF`` enforcement to enabled the request will go through successfully.
+set the ``CSRF`` enforcement to enabled, the request will successfully go through.
 
 Step 3: Check stats of backend via admin
 ****************************************
