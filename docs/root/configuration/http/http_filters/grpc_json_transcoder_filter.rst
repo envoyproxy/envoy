@@ -1,60 +1,48 @@
 .. _config_http_filters_grpc_json_transcoder:
 
-gRPC-JSON transcoder
+gRPC-JSON 转码器
 ====================
 
-* gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder>`
-* This filter should be configured with the name *envoy.filters.http.grpc_json_transcoder*.
+* gRPC :ref:`架构概览 <arch_overview_grpc>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder>`
+* 此过滤器的名称应该被配置为 *envoy.filters.http.grpc_json_transcoder*。
 
-This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP
-and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to be defined by
-`custom options <https://cloud.google.com/service-management/reference/rpc/google.api#http>`_.
+这是一个过滤器，它允许 RESTful JSON API 客户端通过 HTTP 向 Envoy 发送请求并代理到 gRPC 服务。gRPC 服务的 HTTP 映射必须由 `自定义选项 <https://cloud.google.com/service-management/reference/rpc/google.api#http>`_ 定义。
 
-JSON mapping
+JSON 映射
 ------------
 
-The protobuf to JSON mapping is defined `here <https://developers.google.com/protocol-buffers/docs/proto3#json>`_. For
-gRPC stream request parameters, Envoy expects an array of messages, and it returns an array of messages for stream
-response parameters.
+从 protobuf 到 JSON 的映射在`这里 <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ 定义。对于 gRPC 流请求参数，Envoy 需要一个消息数组，并为流响应参数返回一个消息数组。
 
 .. _config_grpc_json_generate_proto_descriptor_set:
 
-How to generate proto descriptor set
-------------------------------------
+如何生成 proto 描述符集
+------------------------
 
-Envoy has to know the proto descriptor of your gRPC service in order to do the transcoding.
+Envoy 必须知道你的 gRPC 服务的 proto 描述符才能进行转码。
 
-To generate a protobuf descriptor set for the gRPC service, you'll also need to clone the
-googleapis repository from GitHub before running protoc, as you'll need annotations.proto
-in your include path, to define the HTTP mapping.
+要为 gRPC 服务生成 protobuf 描述符集，你还需要在运行 protoc 之前从 GitHub 克隆 googleapis，因为在 include 路径中需要 annotations.proto 来定义 HTTP 映射。
 
 .. code-block:: bash
 
   git clone https://github.com/googleapis/googleapis
   GOOGLEAPIS_DIR=<your-local-googleapis-folder>
 
-Then run protoc to generate the descriptor set from bookstore.proto:
+然后运行 protoc 从 bookstore.proto 生成描述符集：
 
 .. code-block:: bash
 
   protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
     --descriptor_set_out=proto.pb test/proto/bookstore.proto
 
-If you have more than one proto source files, you can pass all of them in one command.
+如果你有多个 proto 源文件，则可以通过一个命令传递所有这些源文件。
 
-Route configs for transcoded requests
--------------------------------------
+转码请求的路由配置
+-------------------
 
-The route configs to be used with the gRPC-JSON transcoder should be identical to the gRPC route.
-The requests processed by the transcoder filter will have `/<package>.<service>/<method>` path and
-`POST` method. The route configs for those requests should match on `/<package>.<service>/<method>`,
-not the incoming request path. This allows the routes to be used for both gRPC requests and
-gRPC-JSON transcoded requests.
+与 gRPC-JSON 转码器一起使用的路由配置应与 gRPC 路由完全相同。由转码过滤器处理的请求将具有 `/<package>.<service>/<method>` 路径和 POST 方法。这些请求的路由配置应与 `/<package>.<service>/<method>` 匹配，而不和传入的请求路径匹配。这样就可以允许路由同时用于 gRPC 请求和 gRPC-JSON 转码请求。
 
-For example, with the following proto example, the router will process `/helloworld.Greeter/SayHello`
-as the path, so the route config prefix `/say` won't match requests to `SayHello`. If you want to
-match the incoming request path, set `match_incoming_request_route` to true.
+例如，在下面的 proto 示例中，路由器将处理 `/helloworld.Greeter/SayHello` 作为路径，因此路由配置前缀 `/say` 将不匹配对 `SayHello` 的请求。如果要匹配传入的请求路径，请将 `match_incoming_request_route` 设置为 true。
 
 .. code-block:: proto
 
@@ -70,38 +58,23 @@ match the incoming request path, set `match_incoming_request_route` to true.
     }
   }
 
-Sending arbitrary content
--------------------------
+发送任意内容
+--------------
 
-By default, when transcoding occurs, gRPC-JSON encodes the message output of a gRPC service method into
-JSON and sets the HTTP response `Content-Type` header to `application/json`. To send arbitrary content,
-a gRPC service method can use
-`google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
-as its output message type. The implementation needs to set
-`content_type <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L68>`_
-(which sets the value of the HTTP response `Content-Type` header) and
-`data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_
-(which sets the HTTP response body) accordingly.
-Multiple `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
-can be send by the gRPC server in the server streaming case.
-In this case, HTTP response header `Content-Type` will use the `content-type` from the first
-`google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+默认情况下，发生转码时，gRPC-JSON 将 gRPC 服务方法的消息输出编码为 JSON，并将 HTTP 响应 `Content-Type` 头部设置为 `application/json`。要发送任意内容，gRPC 服务方法可以使用 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_ 作为其输出消息类型。该实现需要相应地设置 `content_type <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L68>`_ （设置 HTTP 响应 `Content-Type` 头部的值）和 `data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_（设置 HTTP 响应体）。gRPC 服务器可以在流传输的情况下发送多个 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_ 。在这种情况下，HTTP 响应头部 `Content-Type` 将使用第一个 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_ 中的 `content-type`。
 
-Headers
---------
+头部
+-----
 
-gRPC-JSON forwards the following headers to the gRPC server:
+gRPC-JSON 将以下头部转发到 gRPC 服务器：
 
-* `x-envoy-original-path`, containing the value of the original path of HTTP request
-* `x-envoy-original-method`, containing the value of the original method of HTTP request
+* `x-envoy-original-path`, 包含源 HTTP 请求路径的值
+* `x-envoy-original-method`, 包含源 HTTP 请求方法的值
 
+Envoy 配置示例
+-----------------
 
-Sample Envoy configuration
---------------------------
-
-Here's a sample Envoy configuration that proxies to a gRPC server running on localhost:50051. Port 51051 proxies
-gRPC requests and uses the gRPC-JSON transcoder filter to provide the RESTful JSON mapping. I.e., you can make either
-gRPC or RESTful JSON requests to localhost:51051.
+这是一个代理到运行在 localhost:50051 gRPC 服务器的 Envoy 示例配置。端口 51051 代理 gRPC 请求，并使用 gRPC-JSON 转码过滤器提供 RESTful JSON 映射。即你可以向 localhost:50051 发出 gRPC 或 RESTful JSON 请求。
 
 .. literalinclude:: _include/grpc-transcoder-filter.yaml
     :language: yaml
