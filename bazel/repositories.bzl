@@ -788,8 +788,8 @@ def _com_github_google_jwt_verify():
     )
 
     native.bind(
-        name= "simple_lru_cache_lib",
-        actual = "@com_github_google_jwt_verify//:simple_lru_cache_lib"
+        name = "simple_lru_cache_lib",
+        actual = "@com_github_google_jwt_verify//:simple_lru_cache_lib",
     )
 
 def _com_github_luajit_luajit():

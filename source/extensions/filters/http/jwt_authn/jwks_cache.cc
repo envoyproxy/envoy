@@ -1,8 +1,6 @@
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include <chrono>
-#include <memory>
-#include <string>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
@@ -10,8 +8,6 @@
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 #include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/jwt_authn/token_cache.h"
 
 #include "absl/container/node_hash_map.h"
 #include "jwt_verify_lib/check_audience.h"
@@ -29,8 +25,6 @@ namespace {
 
 // Default cache expiration time in 5 minutes.
 constexpr int PubkeyCacheExpirationSec = 600;
-// Default TokenCache expiration time in 5 minutes.
-constexpr int TokenCacheDuration = 600;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
@@ -69,36 +63,6 @@ public:
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
-  void addTokenCache(const std::string& token, Status& status, MonotonicTime& token_exp) override {
-    TokenResult* token_result = new TokenResult();
-    token_result->status_ = status;
-    token_result->expiration_time_ =
-        jwt_provider_.has_token_cache_duration()
-            ? std::min(token_exp,
-                       time_source_.monotonicTime() +
-                           std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-                               (jwt_provider_.token_cache_duration()))))
-            : std::min(token_exp, time_source_.monotonicTime() +
-                                      std::chrono::milliseconds(TokenCacheDuration));
-    token_cache_.insert(token, token_result, 1);
-  }
-
-  bool lookupTokenCache(const std::string& token, Status& status) override {
-    TokenCache& token_cache = token_cache_;
-    TokenCache::ScopedLookup lookup(&token_cache, token);
-    if (lookup.found()) {
-      TokenResult* token_result = lookup.value();
-      if (time_source_.monotonicTime() <= token_result->expiration_time_) {
-        status = token_result->status_;
-        return true;
-      } else {
-        token_cache_.remove(token);
-        return false;
-      }
-    }
-    return false;
-  }
-
 private:
   // Get the expiration time for a remote Jwks
   std::chrono::steady_clock::time_point getRemoteJwksExpirationTime() const {
@@ -128,8 +92,6 @@ private:
   TimeSource& time_source_;
   // The pubkey expiration time.
   MonotonicTime expiration_time_;
-  // Map a token to its result in the cache
-  TokenCache token_cache_;
 };
 
 class JwksCacheImpl : public JwksCache {

@@ -82,6 +82,8 @@ private:
   std::unique_ptr<::google::jwt_verify::Jwt> jwt_;
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
+  // The TokenCache object
+  std::unique_ptr<TokenCache> token_cache_{std::make_unique<TokenCache>()};
   // The HTTP request headers
   Http::HeaderMap* headers_{};
   // The active span for the request
@@ -140,7 +142,21 @@ void AuthenticatorImpl::startVerify() {
 
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
   ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-  Status status = jwt_->parseFromString(curr_token_->token());
+  Status status;
+
+  if (!token_cache_->lookupTokenCacheData(curr_token_->token(), *jwt_, status)) {
+    status = jwt_->parseFromString(curr_token_->token());
+    if (status == Status::Ok) {
+      // Default token cache expiration time is jwt->exp_
+      auto token_exp = absl::ToUnixSeconds(absl::Now());
+      if (jwks_data_->getJwtProvider().has_token_cache_duration()) {
+        token_exp +=
+            DurationUtil::durationToSeconds(jwks_data_->getJwtProvider().token_cache_duration());
+      }
+      token_cache_->addTokenCacheData(curr_token_->token(), *jwt_, token_exp, status);
+    }
+  }
+
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -236,13 +252,8 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  Status status;
-  // check token cache, lookup function should verify expiration time
-  if (!jwks_data_->lookupTokenCache(jwt_->signature_, status)) {
-    status = ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
-    MonotonicTime exp_time(std::chrono::milliseconds(jwt_->exp_));
-    jwks_data_->addTokenCache(jwt_->signature_, status, exp_time);
-  }
+  const Status status =
+      ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;

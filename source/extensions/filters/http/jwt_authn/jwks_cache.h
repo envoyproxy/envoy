@@ -5,17 +5,12 @@
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "extensions/filters/http/jwt_authn/token_cache.h"
-
 #include "jwt_verify_lib/jwks.h"
-#include "jwt_verify_lib/jwt.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-
-using ::google::jwt_verify::Status;
 
 class JwksCache;
 using JwksCachePtr = std::unique_ptr<JwksCache>;
@@ -63,11 +58,6 @@ public:
     // Set a remote Jwks.
     virtual const ::google::jwt_verify::Jwks*
     setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) PURE;
-
-    virtual void addTokenCache(const std::string& token, Status& status,
-                               MonotonicTime& token_exp) PURE;
-
-    virtual bool lookupTokenCache(const std::string& token, Status& status) PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
