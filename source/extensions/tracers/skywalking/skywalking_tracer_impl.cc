@@ -53,10 +53,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // TODO(shikugawa): support extension span header.
   auto propagation_header = request_headers.get(kSkywalkingPropagationHeaderKey);
   if (propagation_header.empty()) {
-    segment_context = segment_context_factory_->create();
-    if (!decision.traced) {
-      segment_context->disableSampling();
-    }
+    segment_context = segment_context_factory_->create(decision.traced);
   } else {
     auto header_value_string = propagation_header[0]->value().getStringView();
     try {
@@ -68,14 +65,14 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     }
   }
 
-  return tracer.startSpan(config, start_time, operation_name, std::move(segment_context), nullptr);
+  return tracer.startSpan(config, start_time, operation_name, segment_context, nullptr);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,
                         Server::Configuration::ServerFactoryContext& server_factory_context) {
   config_.set_service_name(!client_config.service_name().empty()
                                ? client_config.service_name()
-                               : (server_factory_context.localInfo().clusterName().empty()
+                               : (!server_factory_context.localInfo().clusterName().empty()
                                       ? server_factory_context.localInfo().clusterName()
                                       : DEFAULT_SERVICE_AND_INSTANCE.data()));
   config_.set_instance_name(!client_config.instance_name().empty()

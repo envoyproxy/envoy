@@ -22,8 +22,10 @@ static const Http::LowerCaseString kSkywalkingPropagationHeaderKey{"sw8"};
 
 class Span : public Tracing::Span {
 public:
-  Span(CurrentSegmentSpanPtr span_entity, SegmentContextPtr segment_context)
-      : span_entity_(span_entity), segment_context_(segment_context) {}
+  Span(CurrentSegmentSpanPtr span_entity, SegmentContextPtr segment_context,
+       SkywalkingTracer& parent_tracer)
+      : parent_tracer_(parent_tracer), span_entity_(span_entity),
+        segment_context_(segment_context) {}
 
   // Tracing::Span
   void setOperation(absl::string_view operation) override;
@@ -33,14 +35,16 @@ public:
   void injectContext(Http::RequestHeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
-  // info about sampled or not is derived from segment context. So we shouldn't provide the knob to
-  // change this state.
-  void setSampled(bool) override {}
+  void setSampled(bool do_sample) override { span_entity_->setSamplingStatus(do_sample); }
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
 
+  const SegmentContextPtr segmentContext() { return segment_context_; }
+  const CurrentSegmentSpanPtr spanEntity() { return span_entity_; }
+
 private:
+  SkywalkingTracer& parent_tracer_;
   CurrentSegmentSpanPtr span_entity_;
   SegmentContextPtr segment_context_;
 };

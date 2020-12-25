@@ -14,7 +14,9 @@ Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)
 
 void Tracer::sendSegment(SegmentContextPtr segment_context) {
   ASSERT(reporter_);
-  reporter_->report(std::move(segment_context));
+  if (segment_context->readyToSend()) {
+    reporter_->report(std::move(segment_context));
+  }
 }
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, SystemTime, const std::string& operation,
@@ -24,7 +26,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, SystemTime, const std
   auto span_entity = parent != nullptr ? segment_context->createCurrentSegmentSpan(parent)
                                        : segment_context->createCurrentSegmentRootSpan();
   span_entity->startSpan();
-  span = std::make_unique<Span>(span_entity, segment_context);
+  span = std::make_unique<Span>(span_entity, segment_context, *this);
   span->setOperation(operation);
   return span;
 }
@@ -50,7 +52,7 @@ void Span::log(SystemTime, const std::string& event) { span_entity_->addLog(EMPT
 
 void Span::finishSpan() {
   span_entity_->endSpan();
-  // TODO(shikugawa): implement reporting trigger.
+  parent_tracer_.sendSegment(segment_context_);
 }
 
 void Span::injectContext(Http::RequestHeaderMap& request_headers) {
@@ -63,7 +65,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   auto child_span = segment_context_->createCurrentSegmentSpan(span_entity_);
   child_span->startSpan();
   child_span->setOperationName(name);
-  return std::make_unique<Span>(child_span, segment_context_);
+  return std::make_unique<Span>(child_span, segment_context_, parent_tracer_);
 }
 
 } // namespace SkyWalking

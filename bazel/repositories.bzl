@@ -432,10 +432,6 @@ def _com_github_skyapm_cpp2sky():
         name = "cpp2sky",
         actual = "@com_github_skyapm_cpp2sky//:cpp2sky",
     )
-    native.bind(
-        name = "skywalking_data_collect_protocol_language_agent_tracing_protocol",
-        actual = "@skywalking_data_collect_protocol//language-agent:tracing_protocol_cc_proto",
-    )
 
 def _com_github_tencent_rapidjson():
     external_http_archive(

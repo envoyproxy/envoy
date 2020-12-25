@@ -12,7 +12,6 @@
 #include "extensions/tracers/skywalking/skywalking_stats.h"
 
 #include "cpp2sky/segment_context.h"
-#include "language-agent/Tracing.pb.h"
 
 namespace Envoy {
 namespace Extensions {

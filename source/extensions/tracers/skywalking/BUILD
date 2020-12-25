@@ -17,7 +17,6 @@ envoy_cc_library(
     hdrs = ["trace_segment_reporter.h"],
     external_deps = [
         "cpp2sky",
-        "skywalking_data_collect_protocol_language_agent_tracing_protocol",
     ],
     deps = [
         ":skywalking_stats_lib",

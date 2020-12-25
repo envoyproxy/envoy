@@ -40,10 +40,6 @@ def api_dependencies():
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
-    # external_http_archive(
-    #     name = "com_github_apache_skywalking_data_collect_protocol",
-    #     build_file_content = SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT,
-    # )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
