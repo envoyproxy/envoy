@@ -1,46 +1,37 @@
 .. _config_network_filters_local_rate_limit:
 
-Local rate limit
+本地限流
 ================
 
-* Local rate limiting :ref:`architecture overview <arch_overview_local_rate_limit>`
-* :ref:`v3 API reference
-  <envoy_v3_api_msg_extensions.filters.network.local_ratelimit.v3.LocalRateLimit>`
-* This filter should be configured with the name *envoy.filters.network.local_ratelimit*.
+* 本地限流 :ref:`架构概述 <arch_overview_local_rate_limit>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.network.local_ratelimit.v3.LocalRateLimit>`
+* 过滤器应该以 *envoy.filters.network.local_ratelimit* 的名称进行配置。
 
 .. note::
-  Global rate limiting is also supported via the :ref:`global rate limit filter
-  <config_network_filters_rate_limit>`.
+  全局限流是通过 :ref:`全局限流过滤器 <config_network_filters_rate_limit>` 进行支持的。
 
-Overview
---------
+总述
+------
 
-The local rate limit filter applies a :ref:`token bucket
-<envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.token_bucket>` rate
-limit to incoming connections that are processed by the filter's filter chain. Each connection
-processed by the filter utilizes a single token, and if no tokens are available, the connection will
-be immediately closed without further filter iteration.
+本地限流过滤器将 :ref:`令牌桶 <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.token_bucket>` 速率限制应用于由过滤器的过滤器链处理的传入连接。过滤器处理的每个连接都会使用一个令牌，如果连接中没有可用的令牌，那么连接将会被立刻关闭，而不需要进一步的迭代过滤器。
 
 .. note::
-  In the current implementation each filter and filter chain has an independent rate limit.
+  在当前实现中每一个过滤器和过滤器链中都有一个独立的限流。
 
 .. _config_network_filters_local_rate_limit_stats:
 
-Statistics
-----------
+统计
+------
 
-Every configured local rate limit filter has statistics rooted at *local_ratelimit.<stat_prefix>.*
-with the following statistics:
+每个配置的本地限流过滤器统计以 *local_ratelimit.<stat_prefix>.* 为根，统计信息如下：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  rate_limited, Counter, Total connections that have been closed due to rate limit exceeded
+  rate_limited, Counter, 因超出速率限制而被关闭的连接总数
 
-Runtime
+运行时
 -------
 
-The local rate limit filter can be runtime feature flagged via the :ref:`enabled
-<envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.runtime_enabled>`
-configuration field.
+本地限流过滤器可以通过 :ref:`启用 <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.runtime_enabled>` 的配置字段标记运行时功能。
