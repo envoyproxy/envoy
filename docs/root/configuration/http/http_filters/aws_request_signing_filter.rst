@@ -1,24 +1,23 @@
 
 .. _config_http_filters_aws_request_signing:
 
-AWS Request Signing
+AWS 请求签名
 ===================
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning>`
-* This filter should be configured with the name *envoy.filters.http.aws_request_signing*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning>`
+* 此过滤器的名称应该被配置为 *envoy.filters.http.aws_request_signing* 。
+
 
 .. attention::
 
-  The AWS request signing filter is experimental and is currently under active development.
+  AWS 请求签名过滤器是实验性的，目前正在积极开发中。
 
-The HTTP AWS request signing filter is used to access authenticated AWS services. It uses the
-existing AWS Credential Provider to get the secrets used for generating the required
-headers.
+HTTP AWS 请求签名过滤器用于访问经过身份验证的 AWS 服务。它使用现有的 AWS 凭证提供程序获取用于生成所需标头的密文。
 
-Example configuration
----------------------
+示例配置
+---------
 
-Example filter configuration:
+过滤器配置示例：
 
 .. code-block:: yaml
 
@@ -28,17 +27,16 @@ Example filter configuration:
     service_name: s3
     region: us-west-2
 
+统计
+------
 
-Statistics
-----------
-
-The AWS request signing filter outputs statistics in the *http.<stat_prefix>.aws_request_signing.* namespace. The
-:ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
-comes from the owning HTTP connection manager.
+AWS 请求签名过滤器在 *http.<stat_prefix>.aws_request_signing.* 命名空间中输出统计信息。
+:ref:`stat 前缀 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+来自所属的 HTTP 连接管理器。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  signing_added, Counter, Total authentication headers added to requests
-  signing_failed, Counter, Total requests for which a signature was not added
+  signing_added, Counter, 添加到请求的身份验证头部总数
+  signing_failed, Counter, 未添加签名的请求总数
