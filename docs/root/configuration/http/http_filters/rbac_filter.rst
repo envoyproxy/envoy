@@ -1,60 +1,49 @@
 .. _config_http_filters_rbac:
 
-Role Based Access Control (RBAC) Filter
-=======================================
+基于角色的访问控制（RBAC）过滤器
+==================================
 
-The RBAC filter is used to authorize actions (permissions) by identified downstream clients
-(principals). This is useful to explicitly manage callers to an application and protect it from
-unexpected or forbidden agents. The filter supports configuration with either a safe-list (ALLOW) or
-block-list (DENY) set of policies based off properties of the connection (IPs, ports, SSL subject)
-as well as the incoming request's HTTP headers. This filter also supports policy in both enforcement
-and shadow mode, shadow mode won't effect real users, it is used to test that a new set of policies
-work before rolling out to production.
+RBAC 过滤器被用来对可识别的下游客户端（主体）做授权操作。这对于显式管理应用程序的调用者及保护它们免受非期望或禁止客户端的影响来说是非常有用的。过滤器支持基于连接属性（IP、端口、SSL 主题）以及传入请求的 HTTP 头部的 safe-list（允许）或者 block-list（拒绝）策略配置。此过滤器还支持在强制模式和影子模式下的策略，影子模式并不会影响真实的用户，它被用来对上生产之前的一系列新策略进行测试。
 
-When a request is denied, the :ref:`RESPONSE_CODE_DETAILS<config_access_log_format_response_code_details>`
-will include the name of the matched policy that caused the deny in the format of `rbac_access_denied_matched_policy[policy_name]`
-(policy_name will be `none` if no policy matched), this helps to distinguish the deny from Envoy RBAC
-filter and the upstream backend.
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
-* This filter should be configured with the name *envoy.filters.http.rbac*.
+当请求被拒绝时，在 :ref:`RESPONSE_CODE_DETAILS<config_access_log_format_response_code_details>`
+中会包含以 `rbac_access_denied_matched_policy[policy_name]` 为格式的，与引起请求拒绝相匹配的策略的名称（如果没有匹配到任何策略，policy_name 的值将会是 `none`），这有助于区分该拒绝行为是来自于 Envoy RBAC 过滤器还是上游后端。
 
-Per-Route Configuration
------------------------
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
+* 此过滤器的名称应该被配置为 *envoy.filters.http.rbac*。
 
-The RBAC filter configuration can be overridden or disabled on a per-route basis by providing a
-:ref:`RBACPerRoute <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBACPerRoute>` configuration on
-the virtual host, route, or weighted cluster.
+Per-Route 配置
+---------------
 
-Statistics
+通过在虚拟主机、路由或权重集群上提供 :ref:`RBACPerRoute <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBACPerRoute>` 配置，RBAC 过滤器的配置可以在 per-route 的基础上被覆盖或者禁用。
+
+统计
 ----------
 
-The RBAC filter outputs statistics in the *http.<stat_prefix>.rbac.* namespace. The :ref:`stat prefix
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
-owning HTTP connection manager.
+RBAC 过滤器的输出统计位于 *http.<stat_prefix>.rbac.* 命名空间中。:ref:`统计前缀 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` 来自于拥有 HTTP 连接的管理器。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  allowed, Counter, Total requests that were allowed access
-  denied, Counter, Total requests that were denied access
-  shadow_allowed, Counter, Total requests that would be allowed access by the filter's shadow rules
-  shadow_denied, Counter, Total requests that would be denied access by the filter's shadow rules
-  logged, Counter, Total requests that should be logged
-  not_logged, Counter, Total requests that should not be logged
+  allowed, Counter, 允许访问的请求总数
+  denied, Counter, 拒绝访问的请求总数
+  shadow_allowed, Counter, 影子规则允许访问的请求总数
+  shadow_denied, Counter, 影子规则拒绝访问的请求总数
+  logged, Counter, 应该被记录的请求总数
+  not_logged, Counter, 不应该被记录的请求总数
 
 .. _config_http_filters_rbac_dynamic_metadata:
 
-Dynamic Metadata
-----------------
+动态元数据
+------------
 
-The RBAC filter emits the following dynamic metadata.
+RBAC 过滤器会发出以下动态元数据。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
-  shadow_engine_result, string, The engine result for the shadow rules (i.e. either `allowed` or `denied`).
-  access_log_hint, boolean, Whether the request should be logged. This metadata is shared and set under the key namespace 'envoy.common' (See :ref:`Shared Dynamic Metadata<shared_dynamic_metadata>`).
+  shadow_effective_policy_id, string, 与该动作相匹配的有效的影子策略 ID（如果有的话）。
+  shadow_engine_result, string, 影子规则的引擎结果（`允许` 或者 `拒绝`）。
+  access_log_hint, boolean, 请求是否应该被记录。此元数据是共享的，且设置在关键的命名空间‘envoy.common’下。(查看 :ref:`共享的动态元数据 <shared_dynamic_metadata>`）。
