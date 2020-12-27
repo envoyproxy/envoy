@@ -609,6 +609,36 @@ private:
 };
 
 /**
+ * Implementation of SubsetSelector
+ */
+class ShuffleSubsetSelectorImpl : public ShuffleSubsetSelector {
+public:
+  ShuffleSubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
+                     envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
+                         LbShuffleSubsetSelectorFallbackPolicy fallback_policy,
+                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
+                     bool single_host_per_subset);
+
+  // SubsetSelector
+  const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
+  envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
+      LbShuffleSubsetSelectorFallbackPolicy
+      fallbackPolicy() const override {
+    return fallback_policy_;
+  }
+  const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+  bool singleHostPerSubset() const override { return single_host_per_subset_; }
+
+private:
+  const std::set<std::string> selector_keys_;
+  const envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
+      LbShuffleSubsetSelectorFallbackPolicy fallback_policy_;
+  const std::set<std::string> fallback_keys_subset_;
+  const bool single_host_per_subset_;
+};
+
+
+/**
  * Implementation of LoadBalancerSubsetInfo.
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
@@ -651,6 +681,52 @@ private:
       fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
   std::vector<SubsetSelectorPtr> subset_selectors_;
+  const bool locality_weight_aware_;
+  const bool scale_locality_weight_;
+  const bool panic_mode_any_;
+  const bool list_as_any_;
+};
+
+class LoadBalancerShuffleSubsetInfoImpl : public LoadBalancerShuffleSubsetInfo {
+public:
+  LoadBalancerShuffleSubsetInfoImpl(
+      const envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig& subset_config)
+      : enabled_(!subset_config.subset_selectors().empty()),
+        fallback_policy_(subset_config.fallback_policy()),
+        default_subset_(subset_config.default_subset()),
+        locality_weight_aware_(subset_config.locality_weight_aware()),
+        scale_locality_weight_(subset_config.scale_locality_weight()),
+        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
+    for (const auto& subset : subset_config.subset_selectors()) {
+      if (!subset.keys().empty()) {
+        subset_selectors_.emplace_back(std::make_shared<ShuffleSubsetSelectorImpl>(
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset(),
+            subset.single_host_per_subset()));
+      }
+    }
+  }
+
+  // Upstream::LoadBalancerShuffleSubsetInfo
+  bool isEnabled() const override { return enabled_; }
+  envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetFallbackPolicy
+  fallbackPolicy() const override {
+    return fallback_policy_;
+  }
+  const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
+  const std::vector<ShuffleSubsetSelectorPtr>& subsetSelectors() const override {
+    return subset_selectors_;
+  }
+  bool localityWeightAware() const override { return locality_weight_aware_; }
+  bool scaleLocalityWeight() const override { return scale_locality_weight_; }
+  bool panicModeAny() const override { return panic_mode_any_; }
+  bool listAsAny() const override { return list_as_any_; }
+
+private:
+  const bool enabled_;
+  const envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetFallbackPolicy
+      fallback_policy_;
+  const ProtobufWkt::Struct default_subset_;
+  std::vector<ShuffleSubsetSelectorPtr> subset_selectors_;
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool panic_mode_any_;

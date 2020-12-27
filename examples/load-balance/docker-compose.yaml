@@ -1,0 +1,39 @@
+version: '3.7'
+services:
+
+  # proxy:
+  #   image: envoyproxy/envoy:v1.15.1
+  #   depends_on:
+  #     - service-http
+  #     - service-http-2
+  #   networks:
+  #     - envoymesh
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - "./envoy.yaml:/etc/envoy.yaml"
+  #   command: "/usr/local/bin/envoy -c /etc/envoy.yaml --concurrency 1"
+
+
+  service-http:
+    image: mendhak/http-https-echo
+    hostname: service-http
+    ports:
+      - "8001:80"
+    environment:
+      - HTTPS_PORT=0
+    networks:
+      - envoymesh
+
+  service-http-2:
+    image: mendhak/http-https-echo
+    hostname: service-http-2
+    ports:
+      - "8002:80"
+    environment:
+      - HTTPS_PORT=0
+    networks:
+      - envoymesh
+
+networks:
+  envoymesh: {}

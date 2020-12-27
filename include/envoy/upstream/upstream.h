@@ -924,6 +924,11 @@ public:
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 
   /**
+   * @return the configuration for load balancer shuffle subsets.
+   */
+  virtual const LoadBalancerShuffleSubsetInfo& lbShuffleSubsetInfo() const PURE;
+
+  /**
    * @return const envoy::config::core::v3::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;

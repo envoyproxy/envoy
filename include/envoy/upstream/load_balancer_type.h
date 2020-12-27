@@ -52,7 +52,32 @@ public:
   virtual bool singleHostPerSubset() const PURE;
 };
 
+class ShuffleSubsetSelector {
+public:
+  virtual ~ShuffleSubsetSelector() = default;
+
+  /**
+   * @return keys defined for this selector
+   */
+  virtual const std::set<std::string>& selectorKeys() const PURE;
+
+  /**
+   * @return fallback policy defined for this selector, or NOT_DEFINED
+   */
+  virtual envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
+      LbShuffleSubsetSelectorFallbackPolicy
+      fallbackPolicy() const PURE;
+
+  /**
+   * @return fallback keys subset defined for this selector, or empty set
+   */
+  virtual const std::set<std::string>& fallbackKeysSubset() const PURE;
+
+  virtual bool singleHostPerSubset() const PURE;
+};
+
 using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;
+using ShuffleSubsetSelectorPtr = std::shared_ptr<ShuffleSubsetSelector>;
 
 /**
  * Load Balancer subset configuration.
@@ -84,6 +109,58 @@ public:
    * sorted keys used to define load balancer subsets.
    */
   virtual const std::vector<SubsetSelectorPtr>& subsetSelectors() const PURE;
+
+  /*
+   * @return bool whether routing to subsets should take locality weights into account.
+   */
+  virtual bool localityWeightAware() const PURE;
+
+  /*
+   * @return bool whether the locality weights should be scaled to compensate for the
+   * fraction of hosts removed from the original host set.
+   */
+  virtual bool scaleLocalityWeight() const PURE;
+
+  /*
+   * @return bool whether to attempt to select a host from the entire cluster if host
+   * selection from the fallback subset fails.
+   */
+  virtual bool panicModeAny() const PURE;
+
+  /*
+   * @return bool whether matching metadata should attempt to match against any of the
+   * elements in a list value defined in endpoint metadata.
+   */
+  virtual bool listAsAny() const PURE;
+};
+
+class LoadBalancerShuffleSubsetInfo {
+public:
+  virtual ~LoadBalancerShuffleSubsetInfo() = default;
+
+  /**
+   * @return bool true if load balancer subsets are configured.
+   */
+  virtual bool isEnabled() const PURE;
+
+  /**
+   * @return LbSubsetFallbackPolicy the fallback policy used when
+   * route metadata does not match any subset.
+   */
+  virtual envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetFallbackPolicy
+  fallbackPolicy() const PURE;
+
+  /**
+   * @return ProtobufWkt::Struct the struct describing the metadata for a
+   *         host to be included in the default subset.
+   */
+  virtual const ProtobufWkt::Struct& defaultSubset() const PURE;
+
+  /*
+   * @return const std:vector<std:set<std::string>>& a vector of
+   * sorted keys used to define load balancer subsets.
+   */
+  virtual const std::vector<ShuffleSubsetSelectorPtr>& subsetSelectors() const PURE;
 
   /*
    * @return bool whether routing to subsets should take locality weights into account.

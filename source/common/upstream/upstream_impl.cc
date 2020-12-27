@@ -773,6 +773,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                            : absl::nullopt),
       added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
+      lb_shuffle_subset_(LoadBalancerShuffleSubsetInfoImpl(config.lb_shuffle_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),

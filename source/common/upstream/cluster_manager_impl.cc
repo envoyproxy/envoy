@@ -1299,10 +1299,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_ = std::make_unique<SubsetLoadBalancer>(
+  lb_ = std::make_unique<SubsetLoadBalancer>(
+      cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
+      cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
+      cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
+      cluster->lbLeastRequestConfig(), cluster->lbConfig());
+  } else if (cluster->lbShuffleSubsetInfo().isEnabled()) {
+    lb_ = std::make_unique<ShuffleSubsetLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
-        cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
+        cluster->lbShuffleSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
         cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {
