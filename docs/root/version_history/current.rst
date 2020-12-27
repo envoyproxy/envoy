@@ -31,6 +31,7 @@ Minor Behavior Changes
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
 * xds: to support TTLs, heartbeating has been added to xDS. As a result, responses that contain empty resources without updating the version will no longer be propagated to the
   subscribers. To undo this for VHDS (which is the only subscriber that wants empty resources), the `envoy.reloadable_features.vhds_heartbeats` can be set to "false".
+* lua: always return a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>` even the body is empty. This feature is controlled by the runtime guard `envoy.reloadable_features.lua_always_wrap_body`.
 
 Bug Fixes
 ---------
