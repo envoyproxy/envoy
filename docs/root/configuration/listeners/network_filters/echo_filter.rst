@@ -3,8 +3,7 @@
 Echo
 ====
 
-The echo is a trivial network filter mainly meant to demonstrate the network filter API. If
-installed it will echo (write) all received data back to the connected downstream client. 
-This filter should be configured with the name *envoy.filters.network.echo*.
+echo 是一个简单的网络过滤器，主要用于演示网络过滤器 API。如果安装了，那么它会将接收到的数据回送（写入）到连接的下游客户端。
+过滤器的名称应该配置为 *envoy.filters.network.echo* 。
 
-* :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.Filter.name>`
+* :ref:`v3 API 参考 <envoy_v3_api_field_config.listener.v3.Filter.name>`
