@@ -35,5 +35,14 @@ services:
     networks:
       - envoymesh
 
+  service-http-3:
+    image: mendhak/http-https-echo
+    hostname: service-http-3
+    ports:
+      - "8003:80"
+    environment:
+      - HTTPS_PORT=0
+    networks:
+      - envoymesh
 networks:
   envoymesh: {}

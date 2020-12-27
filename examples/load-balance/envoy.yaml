@@ -48,7 +48,7 @@ static_resources:
     lb_policy: round_robin # ring_hash # maglev
     # ring_hash_lb_config:
     #   hash_function: MURMUR_HASH_2
-    lb_subset_config:
+    lb_shuffle_subset_config:
       fallback_policy: DEFAULT_SUBSET
       default_subset:
         charlie: a
@@ -57,9 +57,9 @@ static_resources:
         #     - default
         - keys:
             - charlie
-    lb_shuffle_subset_config:
-      shards:
-      - a
+              #lb_shuffle_subset_config:
+      #shards:
+        #  - a
     load_assignment:
       cluster_name: service-http
       endpoints:
@@ -83,6 +83,17 @@ static_resources:
           metadata:
             filter_metadata:
               envoy.lb:
-                charlie: b
+                charlie: a
                 region: us-east-1
                 az: b
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8003
+          metadata:
+            filter_metadata:
+              envoy.lb:
+                charlie: c
+                region: us-east-2
+                az: c

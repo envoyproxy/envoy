@@ -301,6 +301,20 @@ public:
         hosts_(new HostVector()), healthy_hosts_(new HealthyHostVector()),
         degraded_hosts_(new DegradedHostVector()), excluded_hosts_(new ExcludedHostVector()) {}
 
+  HostSetImpl(uint32_t priority, uint32_t overprovisioning_factor,
+        HostVectorConstSharedPtr hosts, HealthyHostVectorConstSharedPtr healthy_hosts,
+        DegradedHostVectorConstSharedPtr degraded_hosts, ExcludedHostVectorConstSharedPtr excluded_hosts)
+      : priority_(priority), overprovisioning_factor_(overprovisioning_factor),
+        hosts_(hosts), healthy_hosts_(healthy_hosts),
+        degraded_hosts_(degraded_hosts), excluded_hosts_(excluded_hosts) {}
+
+  HostSetImpl(const HostSetImpl& old_obj)
+      : priority_(old_obj.priority_), overprovisioning_factor_(old_obj.overprovisioning_factor_),
+        hosts_(old_obj.hosts_), healthy_hosts_(old_obj.healthy_hosts_),
+        degraded_hosts_(old_obj.degraded_hosts_), excluded_hosts_(old_obj.excluded_hosts_),
+        member_update_cb_helper_(old_obj.member_update_cb_helper_) {}
+
+
   /**
    * Install a callback that will be invoked when the host set membership changes.
    * @param callback supplies the callback to invoke.
