@@ -1,11 +1,11 @@
 #pragma once
 
-#include <functional>
-#include <string>
-
 #include <processenv.h>
 #include <shellapi.h>
 #include <winsvc.h>
+
+#include <functional>
+#include <string>
 
 #include "envoy/event/signal.h"
 
