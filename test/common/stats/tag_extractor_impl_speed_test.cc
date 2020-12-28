@@ -1,3 +1,5 @@
+// Note: this should be run with --compilation_mode=opt
+
 #include "envoy/config/metrics/v3/stats.pb.h"
 
 #include "common/common/assert.h"
@@ -54,6 +56,7 @@ static void bmExtractTags(benchmark::State& state) {
   const uint32_t tags_size = std::get<1>(p);
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     TagVector tags;
     tag_extractors.produceTags(str, tags);
     RELEASE_ASSERT(tags.size() == tags_size, "");
