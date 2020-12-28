@@ -43,6 +43,7 @@ else
   START_COMMAND=("/bin/bash" "-lc" "groupadd --gid $(id -g) -f envoygroup \
     && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
+    && chown envoybuild:envoygroup /build \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
