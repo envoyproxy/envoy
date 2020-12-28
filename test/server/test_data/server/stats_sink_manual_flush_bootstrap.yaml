@@ -13,3 +13,4 @@ admin:
 stats_sinks:
 - name: envoy.custom_stats_sink
 stats_flush_on_admin: true
+enable_dispatcher_stats: true
