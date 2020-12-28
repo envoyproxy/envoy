@@ -85,9 +85,10 @@ private:
  * All stats for the OAuth filter. @see stats_macros.h
  */
 #define ALL_OAUTH_FILTER_STATS(COUNTER)                                                            \
-  COUNTER(oauth_unauthorized_rq)                                                                   \
+  COUNTER(oauth_new)                                                                               \
   COUNTER(oauth_failure)                                                                           \
-  COUNTER(oauth_success)
+  COUNTER(oauth_success)                                                                           \
+  COUNTER(oauth_unauthorized)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -108,6 +109,7 @@ public:
                const std::string& stats_prefix);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
+  const std::vector<std::string>& authorizedGroups() const { return authorized_groups_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
@@ -130,6 +132,7 @@ private:
   const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
   const std::string authorization_endpoint_;
   const std::string client_id_;
+  std::vector<std::string> authorized_groups_;
   const std::string redirect_uri_;
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
@@ -193,11 +196,12 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
 
   // FilterCallbacks
-  void onGetAccessTokenSuccess(const std::string& access_code,
-                               std::chrono::seconds expires_in) override;
+  void onGetAccessTokenSuccess(const std::string& access_code, std::chrono::seconds expires_in,
+                               const std::string& subject,
+                               const std::vector<std::string>& groups) override;
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
-  void sendUnauthorizedResponse() override;
+  void sendUnauthorizedResponse(const absl::string_view& message) override;
 
   void finishFlow();
 
@@ -210,6 +214,7 @@ private:
   std::string auth_code_;
   std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string new_expires_;
+  std::string subject_;
   absl::string_view host_;
   std::string state_;
   bool found_bearer_token_{false};

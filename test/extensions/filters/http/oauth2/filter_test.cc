@@ -102,6 +102,7 @@ public:
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
     credentials->mutable_hmac_secret()->set_name("hmac");
+    credentials->add_authorized_groups("admin_group");
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -271,7 +272,7 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
 
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "401"},
-      {Http::Headers::get().ContentLength.get(), "18"}, // unauthorizedBodyMessage()
+      {Http::Headers::get().ContentLength.get(), "18"}, // OauthFlowFailed
       {Http::Headers::get().ContentType.get(), "text/plain"},
   };
 
@@ -588,7 +589,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, config_->stats().oauth_new_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
   // Expected response after the callback & validation is complete - verifying we kept the
@@ -665,6 +666,39 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
 
   // Expected decoded headers after the callback & validation of the bearer token is complete.
   EXPECT_EQ(request_headers_before, request_headers_after);
+}
+
+TEST_F(OAuth2Test, OAuthAllowAuthorizedGroups) {
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  const std::chrono::seconds expires_in{1000};
+  const std::vector<std::string> groups = {"admin_group", "global_group"};
+  filter_->onGetAccessTokenSuccess("golden ticket", expires_in, "user123", groups);
+
+  EXPECT_EQ(scope_.counterFromString("test.oauth_unauthorized").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+}
+
+TEST_F(OAuth2Test, OAuthRejectUnauthorizedGroups) {
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "401"},
+      {Http::Headers::get().ContentLength.get(), "20"}, // OauthFlowUnauthorized
+      {Http::Headers::get().ContentType.get(), "text/plain"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+
+  const std::chrono::seconds expires_in{1000};
+  const std::vector<std::string> groups = {"global_group"};
+  filter_->onGetAccessTokenSuccess("golden ticket", expires_in, "user123", groups);
+
+  // Unauthorized requests also count as failures.
+  EXPECT_EQ(scope_.counterFromString("test.oauth_unauthorized").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
 }
 
 } // namespace Oauth2

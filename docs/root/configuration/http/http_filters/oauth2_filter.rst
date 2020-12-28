@@ -27,6 +27,11 @@ The OAuth filter's flow involves:
   flow. These cookies are calculated using the
   :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Credentials.hmac_secret>`
   to assist in encoding.
+* If :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Credentials.authorized_groups>` are defined, then token
+  JSONs fetched from the :ref:`token_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.token_endpoint>` will have
+  their "groups" list inspected to ensure it contains a configured authorized_group. If no authorized_groups are found, the client will receive a
+  401 Unauthorized response.
+* Response Set-Cookie headers are sent to persist the current session and authenticate future requests without needing to perform async calls.
 * The filter calls continueDecoding() to unblock the filter chain.
 
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
@@ -71,6 +76,8 @@ The following is an example configuring the filter.
         name: hmac
         sds_config:
           path: "/etc/envoy/hmac.yaml"
+      authorized_groups:
+      - "admin_group"
 
 Below is a complete code example of how we employ the filter as one of
 :ref:`HttpConnectionManager HTTP filters
@@ -114,6 +121,8 @@ Below is a complete code example of how we employ the filter as one of
                     name: hmac
                     sds_config:
                       path: "/etc/envoy/hmac.yaml"
+                  authorized_groups:
+                  - "admin_group"
           - name: envoy.router
           tracing: {}
           codec_type: "AUTO"

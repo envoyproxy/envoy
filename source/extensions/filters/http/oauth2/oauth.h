@@ -6,6 +6,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -20,9 +22,10 @@ public:
   virtual ~FilterCallbacks() = default;
 
   virtual void onGetAccessTokenSuccess(const std::string& access_token,
-                                       std::chrono::seconds expires_in) PURE;
+                                       std::chrono::seconds expires_in, const std::string& subject,
+                                       const std::vector<std::string>& groups) PURE;
 
-  virtual void sendUnauthorizedResponse() PURE;
+  virtual void sendUnauthorizedResponse(const absl::string_view& message) PURE;
 };
 
 } // namespace Oauth2

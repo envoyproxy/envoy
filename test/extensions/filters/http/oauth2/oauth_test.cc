@@ -28,8 +28,10 @@ using testing::Return;
 
 class MockCallbacks : public FilterCallbacks {
 public:
-  MOCK_METHOD(void, sendUnauthorizedResponse, ());
-  MOCK_METHOD(void, onGetAccessTokenSuccess, (const std::string&, std::chrono::seconds));
+  MOCK_METHOD(void, sendUnauthorizedResponse, (const absl::string_view&));
+  MOCK_METHOD(void, onGetAccessTokenSuccess,
+              (const std::string&, std::chrono::seconds, const std::string&,
+               const std::vector<std::string>&));
 };
 
 class OAuth2ClientTest : public testing::Test {
@@ -89,7 +91,46 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _));
+  const std::chrono::seconds expires_in{1000};
+  const std::vector<std::string> groups;
+  EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess("golden ticket", expires_in, "", groups));
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
+TEST_F(OAuth2ClientTest, RequestAccessTokenSuccessWithSubjectAndGroups) {
+  std::string json = R"EOF(
+    {
+      "access_token": "golden ticket",
+      "expires_in": 1000,
+      "sub": "user123",
+      "groups": ["admin_group", "global_group"]
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "200"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+  EXPECT_EQ(1, callbacks_.size());
+  const std::chrono::seconds expires_in{1000};
+  const std::vector<std::string> groups = {"admin_group", "global_group"};
+  EXPECT_CALL(*mock_callbacks_,
+              onGetAccessTokenSuccess("golden ticket", expires_in, "user123", groups));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -120,7 +161,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse(_));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -145,13 +186,13 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse(_));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
+TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidExpires) {
   std::string json = R"EOF(
     {
       "expires_in": "some_string"
@@ -176,7 +217,39 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse(_));
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback(
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+}
+
+TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidGroups) {
+  std::string json = R"EOF(
+    {
+      "expires_in": "some_string",
+      "groups": ["group1", 2]
+    }
+    )EOF";
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "200"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+  mock_response->body().add(json);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("a", "b", "c", "d");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse(_));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -195,7 +268,7 @@ TEST_F(OAuth2ClientTest, NetworkError) {
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
 
-  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse(_));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
@@ -205,7 +278,7 @@ TEST_F(OAuth2ClientTest, NetworkError) {
 TEST_F(OAuth2ClientTest, NoCluster) {
   ON_CALL(cm_, getThreadLocalCluster("auth")).WillByDefault(Return(nullptr));
   client_->setCallbacks(*mock_callbacks_);
-  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
+  EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse(_));
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(0, callbacks_.size());
 }

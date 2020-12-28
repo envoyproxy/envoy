@@ -6,5 +6,11 @@ import "google/protobuf/wrappers.proto";
 
 message OAuthResponse {
   google.protobuf.StringValue access_token = 1;
+
   google.protobuf.UInt64Value expires_in = 2;
+
+  // Subject of the token (user)
+  google.protobuf.StringValue sub = 3;
+
+  repeated google.protobuf.StringValue groups = 4;
 }

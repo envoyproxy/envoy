@@ -6,6 +6,7 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
@@ -26,6 +27,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* GetAccessTokenBodyFormatString =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
+
+constexpr absl::string_view OauthEndpointError = "Error retrieving token from token endpoint.";
 
 } // namespace
 
@@ -55,7 +58,7 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
         Http::AsyncClient::RequestOptions().setTimeout(
             std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
   } else {
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse(OauthEndpointError);
   }
 }
 
@@ -70,7 +73,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const auto response_code = message->headers().Status()->value().getStringView();
   if (response_code != "200") {
     ENVOY_LOG(debug, "Oauth response code: {}", response_code);
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse(OauthEndpointError);
     return;
   }
 
@@ -82,7 +85,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   } catch (EnvoyException& e) {
     ENVOY_LOG(debug, "Error parsing response body, received exception: {}", e.what());
     ENVOY_LOG(debug, "Response body: {}", response_body);
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse(OauthEndpointError);
     return;
   }
 
@@ -90,20 +93,24 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   // message might be good enough reason to do this manually?
   if (!response.has_access_token() || !response.has_expires_in()) {
     ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken");
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse(OauthEndpointError);
     return;
   }
 
   const std::string access_token{PROTOBUF_GET_WRAPPED_REQUIRED(response, access_token)};
   const std::chrono::seconds expires_in{PROTOBUF_GET_WRAPPED_REQUIRED(response, expires_in)};
-  parent_->onGetAccessTokenSuccess(access_token, expires_in);
+  std::vector<std::string> groups;
+  for (const auto& group : response.groups()) {
+    groups.push_back(group.value());
+  }
+  parent_->onGetAccessTokenSuccess(access_token, expires_in, response.sub().value(), groups);
 }
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
   ENVOY_LOG(debug, "OAuth request failed.");
   in_flight_request_ = nullptr;
-  parent_->sendUnauthorizedResponse();
+  parent_->sendUnauthorizedResponse(OauthEndpointError);
 }
 
 } // namespace Oauth2

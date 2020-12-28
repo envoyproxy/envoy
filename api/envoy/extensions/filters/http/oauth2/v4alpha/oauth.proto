@@ -43,6 +43,10 @@ message OAuth2Credentials {
     transport_sockets.tls.v4alpha.SdsSecretConfig hmac_secret = 3
         [(validate.rules).message = {required: true}];
   }
+
+  // If authorized_groups are specified, only token claims that include at least one group in authorized_groups will
+  // be permitted to continue. Other requests receive a 401.
+  repeated string authorized_groups = 4;
 }
 
 // OAuth config

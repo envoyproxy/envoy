@@ -50,7 +50,8 @@ constexpr const char* CookieTailHttpOnlyFormatString =
 const char* AuthorizationEndpointFormat =
     "{}?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}";
 
-constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
+constexpr absl::string_view OauthFlowFailed = "OAuth flow failed.";
+constexpr absl::string_view OauthFlowUnauthorized = "Unauthorized claims.";
 
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
@@ -96,6 +97,10 @@ FilterConfig::FilterConfig(
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
                                      oauth_token_endpoint_.cluster()));
+  }
+
+  for (const auto& entry : proto_config.credentials().authorized_groups()) {
+    authorized_groups_.push_back(entry);
   }
 }
 
@@ -211,12 +216,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
           Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
-        sendUnauthorizedResponse();
+        sendUnauthorizedResponse(OauthFlowFailed);
         return Http::FilterHeadersStatus::StopIteration;
       }
       // Avoid infinite redirect storm
       if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
-        sendUnauthorizedResponse();
+        sendUnauthorizedResponse(OauthFlowFailed);
         return Http::FilterHeadersStatus::StopIteration;
       }
       Http::ResponseHeaderMapPtr response_headers{
@@ -281,7 +286,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
-    config_->stats().oauth_unauthorized_rq_.inc();
+    config_->stats().oauth_new_.inc();
 
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -291,14 +296,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // token
   const auto query_parameters = Http::Utility::parseQueryString(path_str);
   if (query_parameters.find(queryParamsError()) != query_parameters.end()) {
-    sendUnauthorizedResponse();
+    sendUnauthorizedResponse(OauthFlowFailed);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   // if the data we need is not present on the URL, stop execution
   if (query_parameters.find(queryParamsCode()) == query_parameters.end() ||
       query_parameters.find(queryParamsState()) == query_parameters.end()) {
-    sendUnauthorizedResponse();
+    sendUnauthorizedResponse(OauthFlowFailed);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -307,7 +312,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   Http::Utility::Url state_url;
   if (!state_url.initialize(state_, false)) {
-    sendUnauthorizedResponse();
+    sendUnauthorizedResponse(OauthFlowFailed);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -363,13 +368,30 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 }
 
 void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
-                                           std::chrono::seconds expires_in) {
+                                           std::chrono::seconds expires_in,
+                                           const std::string& subject,
+                                           const std::vector<std::string>& groups) {
   access_token_ = access_code;
-
   const auto new_epoch = time_source_.systemTime() + expires_in;
   new_expires_ = std::to_string(
       std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
+  subject_ = subject;
 
+  if (!config_->authorizedGroups().empty()) {
+    bool found = false;
+    for (const auto& group : config_->authorizedGroups()) {
+      const auto it = std::find(groups.begin(), groups.end(), group);
+      if (it != groups.end()) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      config_->stats().oauth_unauthorized_.inc();
+      sendUnauthorizedResponse(OauthFlowUnauthorized);
+      return;
+    }
+  }
   finishFlow();
 }
 
@@ -435,10 +457,10 @@ void OAuth2Filter::finishFlow() {
   decoder_callbacks_->continueDecoding();
 }
 
-void OAuth2Filter::sendUnauthorizedResponse() {
+void OAuth2Filter::sendUnauthorizedResponse(const absl::string_view& message) {
   config_->stats().oauth_failure_.inc();
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
-                                     absl::nullopt, EMPTY_STRING);
+  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, message, nullptr, absl::nullopt,
+                                     EMPTY_STRING);
 }
 
 } // namespace Oauth2
