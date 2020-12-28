@@ -1307,8 +1307,9 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   StreamInfo::MockStreamInfo log_stream_info;
   filter().log(&request_headers, nullptr, nullptr, log_stream_info);
 
-  const auto& result = request_stream_info_.filterState()->getDataReadOnly<Common::Wasm::WasmState>(
-      "wasm.wasm_request_set_key");
+  const auto& result =
+      request_stream_info_.filterState()->getDataReadOnly<Filters::Common::Expr::CelState>(
+          "wasm.wasm_request_set_key");
   EXPECT_EQ("wasm_request_set_value", result.value());
 
   filter().onDestroy();

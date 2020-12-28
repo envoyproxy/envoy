@@ -20,6 +20,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:context_lib",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
