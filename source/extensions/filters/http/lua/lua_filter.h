@@ -290,6 +290,8 @@ private:
   int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
   int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
 
+  int timestamp(int timestamp, absl::uint128 resolution);
+
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
     // Headers/body/trailers wrappers do not survive any yields. The user can request them

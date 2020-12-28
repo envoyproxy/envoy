@@ -25,6 +25,7 @@
 using testing::_;
 using testing::AtLeast;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -2325,8 +2326,8 @@ TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1.583879145572e+18")));
   // Invalid format
   EXPECT_CALL(*filter_,
-              scriptLog(spdlog::level::err, StrEq("[string \"...\"]:5: timestamp format must be "
-                                                  "MILLISECOND or NANOSECOND.")));
+              scriptLog(spdlog::level::err,
+                        HasSubstr("timestamp format must be MILLISECOND or NANOSECOND.")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
