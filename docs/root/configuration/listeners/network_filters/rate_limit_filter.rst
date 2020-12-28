@@ -1,45 +1,41 @@
 .. _config_network_filters_rate_limit:
 
-Rate limit
+限流
 ==========
 
-* Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.ratelimit.v3.RateLimit>`
-* This filter should be configured with the name *envoy.filters.network.ratelimit*.
+* 全局限流 :ref:`架构概览 <arch_overview_global_rate_limit>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.network.ratelimit.v3.RateLimit>`
+* 过滤器的名称应该配置为 *envoy.filters.network.ratelimit* 。
 
 .. note::
-  Local rate limiting is also supported via the :ref:`local rate limit filter
-  <config_network_filters_local_rate_limit>`.
+  本地限流是通过 :ref:`本地限流过滤器 <config_network_filters_local_rate_limit>` 来支持的。
 
 .. _config_network_filters_rate_limit_stats:
 
-Statistics
+统计
 ----------
 
-Every configured rate limit filter has statistics rooted at *ratelimit.<stat_prefix>.* with the
-following statistics:
+每个限流过滤器的配置都有以 *ratelimit.<stat_prefix>.* 为根的统计信息，如下所示：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  total, Counter, Total requests to the rate limit service
-  error, Counter, Total errors contacting the rate limit service
-  over_limit, Counter, Total over limit responses from the rate limit service
-  ok, Counter, Total under limit responses from the rate limit service
-  cx_closed, Counter, Total connections closed due to an over limit response from the rate limit service
-  active, Gauge, Total active requests to the rate limit service
-  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.failure_mode_deny>` set to false."
+  total, Counter, 限流服务的请求总数
+  error, Counter, 连接限流服务的总异常数
+  over_limit, Counter, 限流服务的超限响应总数
+  ok, Counter, 限流服务的非超限服务总数
+  cx_closed, Counter, 由于限流服务而超限的关闭连接总数
+  active, Gauge, 限流服务的活跃请求总数
+  failure_mode_allowed, Counter, 由于 :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.network.ratelimit.v3.RateLimit.failure_mode_deny>` 设置为 false 而允许通过的异常请求总数
 
-Runtime
+运行时
 -------
 
-The network rate limit filter supports the following runtime settings:
+网络限流过滤器支持以下的运行时设置：
 
 ratelimit.tcp_filter_enabled
-  % of connections that will call the rate limit service. Defaults to 100.
+  调用限流服务的连接百分比。默认为 100。
 
 ratelimit.tcp_filter_enforcing
-  % of connections that will call the rate limit service and enforce the decision. Defaults to 100.
-  This can be used to test what would happen before fully enforcing the outcome.
+  调用限流服务并强制执行的连接百分比，默认为 100。这个可以被用于测试在强制执行之前会发生什么。
