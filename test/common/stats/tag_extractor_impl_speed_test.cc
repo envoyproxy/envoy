@@ -88,6 +88,7 @@ const std::vector<Params> params = {
      1},
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void BM_ExtractTags(benchmark::State& state) {
   TagProducerImpl tag_extractors{envoy::config::metrics::v3::StatsConfig()};
   const auto idx = state.range(0);
