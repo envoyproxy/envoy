@@ -1,4 +1,44 @@
 // Note: this should be run with --compilation_mode=opt
+// Running ./bazel-out/k8-opt/bin/test/common/stats/tag_extractor_impl_benchmark
+// Run on (24 X 4300 MHz CPU s)
+// CPU Caches:
+//   L1 Data 32 KiB (x12)
+//   L1 Instruction 32 KiB (x12)
+//   L2 Unified 1024 KiB (x12)
+//   L3 Unified 16896 KiB (x1)
+// Load Average: 0.94, 0.75, 0.88
+// ***WARNING*** CPU scaling is enabled, the benchmark real time
+// measurements may be noisy and will incur extra overhead.
+// -----------------------------------------------------------
+// Benchmark                 Time             CPU   Iterations
+// -----------------------------------------------------------
+// bmExtractTags/0        1825 ns         1822 ns       387111
+// bmExtractTags/1         508 ns          507 ns      1000000
+// bmExtractTags/2         790 ns          789 ns       848523
+// bmExtractTags/3         644 ns          643 ns      1094132
+// bmExtractTags/4        1341 ns         1340 ns       531746
+// bmExtractTags/5         862 ns          861 ns       826768
+// bmExtractTags/6         338 ns          337 ns      2113684
+// bmExtractTags/7         588 ns          587 ns      1201340
+// bmExtractTags/8        1427 ns         1424 ns       491857
+// bmExtractTags/9        1859 ns         1856 ns       376606
+// bmExtractTags/10        316 ns          316 ns      2218446
+// bmExtractTags/11        510 ns          509 ns      1387294
+// bmExtractTags/12       1136 ns         1134 ns       603194
+// bmExtractTags/13       1353 ns         1351 ns       526904
+// bmExtractTags/14       1592 ns         1590 ns       437307
+// bmExtractTags/15        958 ns          956 ns       716738
+// bmExtractTags/16        809 ns          808 ns       834782
+// bmExtractTags/17        806 ns          804 ns       892949
+// bmExtractTags/18        829 ns          828 ns       867147
+// bmExtractTags/19        333 ns          333 ns      2070021
+// bmExtractTags/20        347 ns          347 ns      2071800
+// bmExtractTags/21        399 ns          398 ns      1769854
+// bmExtractTags/22        873 ns          872 ns       784136
+// bmExtractTags/23       2092 ns         2089 ns       336846
+// bmExtractTags/24        314 ns          314 ns      2221138
+// bmExtractTags/25        306 ns          306 ns      2317142
+// bmExtractTags/26        497 ns          497 ns      1417577
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
