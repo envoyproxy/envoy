@@ -1,92 +1,69 @@
 .. _arch_overview_http_conn_man:
 
-HTTP connection management
+HTTP 连接管理
 ==========================
 
-HTTP is such a critical component of modern service oriented architectures that Envoy implements a
-large amount of HTTP specific functionality. Envoy has a built in network level filter called the
-:ref:`HTTP connection manager <config_http_conn_man>`. This filter translates raw bytes into HTTP
-level messages and events (e.g., headers received, body data received, trailers received, etc.). It
-also handles functionality common to all HTTP connections and requests such as :ref:`access logging
-<arch_overview_access_logs>`, :ref:`request ID generation and tracing <arch_overview_tracing>`,
-:ref:`request/response header manipulation <config_http_conn_man_headers>`, :ref:`route table
-<arch_overview_http_routing>` management, and :ref:`statistics <config_http_conn_man_stats>`.
+HTTP 是现代面向服务体系架构的重要组成部分，Envoy 实现了大量的 HTTP 特定功能。Envoy内置了一个叫 :ref:`HTTP 连接管理器 <config_http_conn_man>` 的网络层过滤器。
+此过滤器将原始字节转换为 HTTP 协议的消息和事件（例如，请求头接收、请求体数据接收、请求标尾（trailers）接收等）。 过滤器同时处理所有 HTTP 连接和请求
+的通用功能，例如 :ref:`访问日志 <arch_overview_access_logs>`、 :ref:`请求 ID 生成与追踪 <arch_overview_tracing>`、 :ref:`请求头/响应头的操作 
+<config_http_conn_man_headers>`、 :ref:`路由表 <arch_overview_http_routing>` 管理和 :ref:`统计 <config_http_conn_man_stats>`。
 
-HTTP connection manager :ref:`configuration <config_http_conn_man>`.
+HTTP 连接管理器 :ref:`配置 <config_http_conn_man>`。
 
 .. _arch_overview_http_protocols:
 
-HTTP protocols
+HTTP 协议
 --------------
 
-Envoy’s HTTP connection manager has native support for HTTP/1.1, WebSockets, and HTTP/2. It does not support
-SPDY. Envoy’s HTTP support was designed to first and foremost be an HTTP/2 multiplexing proxy.
-Internally, HTTP/2 terminology is used to describe system components. For example, an HTTP request
-and response take place on a *stream*. A codec API is used to translate from different wire
-protocols into a protocol agnostic form for streams, requests, responses, etc. In the case of
-HTTP/1.1, the codec translates the serial/pipelining capabilities of the protocol into something
-that looks like HTTP/2 to higher layers. This means that the majority of the code does not need to
-understand whether a stream originated on an HTTP/1.1 or HTTP/2 connection.
+Envoy 的 HTTP 连接管理器原生支持 HTTP/1.1、WebSockets 和 HTTP/2。现在还不支持 SPDY。Envoy HTTP 设计的首要目标是成为一个 HTTP/2 多路复用代理。在内部，
+HTTP/2 术语用于描述系统组件。例如，一个 HTTP 请求和响应发生在 *流* 上。一个编解码 API 被用来将不同的电报协议转换为流、请求、响应等协议无关的格式。
+对于 HTTP/1.1 来说，编解码器将协议的串行/流功能转换成像 HTTP/2 的某些东西提供给更高层级。这意味着大部分代码不需要理解一个流是来自 HTTP/1.1 还是 HTTP/2 连接。
 
-HTTP header sanitizing
+HTTP 头清理
 ----------------------
 
-The HTTP connection manager performs various :ref:`header sanitizing
-<config_http_conn_man_header_sanitizing>` actions for security reasons.
+HTTP 连接管理器执行各种 :ref:`头清理 <config_http_conn_man_header_sanitizing>` 操作为了安全因素。
 
-Route table configuration
+路由表配置
 -------------------------
 
-Each :ref:`HTTP connection manager filter <config_http_conn_man>` has an associated :ref:`route
-table <arch_overview_http_routing>`. The route table can be specified in one of two ways:
+每一个 :ref:`HTTP 连接管理过滤器 <config_http_conn_man>` 有一个相关的 :ref:`路由表 <arch_overview_http_routing>`。路由表可以使用下面两种之一来配置：
 
-* Statically.
-* Dynamically via the :ref:`RDS API <config_http_conn_man_rds>`.
+* 静态配置。
+* 基于 :ref:`RDS API <config_http_conn_man_rds>` 的动态配置。
 
 .. _arch_overview_http_retry_plugins:
 
-Retry plugin configuration
+重试插件配置
 --------------------------
 
-Normally during retries, host selection follows the same process as the original request. Retry plugins
-can be used to modify this behavior, and they fall into two categories:
+通常在重试期间，主机选择遵循与原始请求相同的过程。重试插件可以用来修改这种行为，它们分为两类：
 
-* :ref:`Host Predicates <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`:
-  These predicates can be used to "reject" a host, which will cause host selection to be reattempted.
-  Any number of these predicates can be specified, and the host will be rejected if any of the predicates reject the host.
+* :ref:`主机谓词 <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_host_predicate>`：这些谓词可以用来“拒绝”一个主机，将导致重新尝试主机选择。
+  可以指定任意数量的谓词，如果任何谓词拒绝主机，则主机将被拒绝。
 
-  Envoy supports the following built-in host predicates
+  Envoy 支持以下内置的主机谓词
 
-  * *envoy.retry_host_predicates.previous_hosts*: This will keep track of previously attempted hosts, and rejects
-    hosts that have already been attempted.
+  * *envoy.retry_host_predicates.previous_hosts*：这将跟踪以前尝试过的主机并且拒绝已经尝试过的主机。
 
-  * *envoy.retry_host_predicates.omit_canary_hosts*: This will reject any host that is a marked as canary host.
-    Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
-    See :ref:`LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>` for more details.
+  * *envoy.retry_host_predicates.omit_canary_hosts*：这将拒绝任何被标记为金丝雀主机的主机。通过在过滤器元数据中为 ``envoy.lb`` 过滤器设置 ``canary: true`` 来标记主机。查看 :ref:`LbEndpoint <envoy_v3_api_msg_config.endpoint.v3.LbEndpoint>` 获得更多信息。
 
-  * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria. 
-    See the configuration example below for more details.
+  * *envoy.retry_host_predicates.omit_host_metadata*：这将拒绝任何符合预定义条件的主机。查看下面的配置示例获得更多信息。
 
-* :ref:`Priority Predicates<envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`: These predicates can
-  be used to adjust the priority load used when selecting a priority for a retry attempt. Only one such
-  predicate may be specified.
+* :ref:`优先级谓词<envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>`：这类谓词可以用来在为一个重试尝试选择优先级时调整负载的优先级。只可以定义
+  一个这样的谓词。
 
-  Envoy supports the following built-in priority predicates
+  Envoy 内置支持下面的优先级谓词
 
-  * *envoy.retry_priorities.previous_priorities*: This will keep track of previously attempted priorities,
-    and adjust the priority load such that other priorities will be targeted in subsequent retry attempts.
+  * *envoy.retry_priorities.previous_priorities*：这将跟踪以前尝试过的优先级，并调整优先级负载，以便在后续重试中将其他优先级作为目标。
 
-Host selection will continue until either the configured predicates accept the host or a configurable
-:ref:`max attempts <envoy_v3_api_field_config.route.v3.RetryPolicy.host_selection_retry_max_attempts>` has been reached.
+主机选择将会继续直到配置的谓词接受主机或者达到了配置的 :ref:`最大尝试次数 <envoy_v3_api_field_config.route.v3.RetryPolicy.host_selection_retry_max_attempts>`。
 
-These plugins can be combined to affect both host selection and priority load. Envoy can also be extended
-with custom retry plugins similar to how custom filters can be added.
+可以组合使用这些插件来影响主机选择和优先级。Envoy 也可以像添加过滤器一样通过自定义的重试插件进行扩展。
 
+**配置示例**
 
-**Configuration Example**
-
-For example, to configure retries to prefer hosts that haven't been attempted already, the built-in
-``envoy.retry_host_predicates.previous_hosts`` predicate can be used:
+例如，想要配置优先重试没有尝试过的主机，可以使用内置的 ``envoy.retry_host_predicates.previous_hosts``：
 
 .. code-block:: yaml
 
@@ -95,12 +72,10 @@ For example, to configure retries to prefer hosts that haven't been attempted al
     - name: envoy.retry_host_predicates.previous_hosts
     host_selection_retry_max_attempts: 3
 
-This will reject hosts previously attempted, retrying host selection a maximum of 3 times. The bound
-on attempts is necessary in order to deal with scenarios in which finding an acceptable host is either
-impossible (no hosts satisfy the predicate) or very unlikely (the only suitable host has a very low
-relative weight).
+这将拒绝已经尝试过的主机，并且最多尝试 3 次主机选择。为了处理寻找一个可用主机过程中不可能发生（没有主机满足谓词）或者不太可能发生（唯一
+合适的主机相对权重非常低）的情况，尝试次数的上限是有必要的。
 
-To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_metadata`` can be used:
+根据主机的元数据拒绝主机，可以使用 ``envoy.retry_host_predicates.omit_host_metadata``：
 
 .. code-block:: yaml
 
@@ -114,10 +89,9 @@ To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_
             envoy.lb:
               key: value
 
-This will reject any host with matching (key, value) in its metadata.
+这将拒绝任何匹配元数据中存在（key，value）的主机。
 
-To configure retries to attempt other priorities during retries, the built-in
-``envoy.retry_priorities.previous_priorities`` can be used.
+配置在重试期间重试其他优先级，可以使用内置的 ``envoy.retry_priorities.previous_priorities``。
 
 .. code-block:: yaml
 
@@ -128,11 +102,9 @@ To configure retries to attempt other priorities during retries, the built-in
         "@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
         update_frequency: 2
 
-This will target priorities in subsequent retry attempts that haven't been already used. The ``update_frequency`` parameter decides how
-often the priority load should be recalculated.
+这将针对后续重试中尚未使用过的优先级。``update_frequency`` 参数决定优先级负载应多长时间重新计算一次。
 
-These plugins can be combined, which will exclude both previously attempted hosts as well as
-previously attempted priorities.
+这些插件可以被组合使用，这将排除以前尝试过的主机和以前尝试过的优先级。
 
 .. code-block:: yaml
 
@@ -148,92 +120,60 @@ previously attempted priorities.
 
 .. _arch_overview_internal_redirects:
 
-Internal redirects
+内部重定向
 --------------------------
 
-Envoy supports handling 3xx redirects internally, that is capturing a configurable 3xx redirect
-response, synthesizing a new request, sending it to the upstream specified by the new route match,
-and returning the redirected response as the response to the original request.
+Envoy 支持处理 3xx 内部重定向，捕获可配置的 3xx 重定向响应，合成一个新的请求，将他发送给新路由匹配指定的上游，将重定向的响应作为对原始请求的响应返回。
 
-Internal redirects are configured via the :ref:`internal redirect policy
-<envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field in route configuration.
-When redirect handling is on, any 3xx response from upstream, that matches
-:ref:`redirect_response_codes
-<envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`
-is subject to the redirect being handled by Envoy.
+内部重定向可以使用路由配置中的 :ref:`内部重定向策略 <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` 字段来配置。
+当重定向处理开启，任何来自上游的 3xx 响应，只要匹配到配置的 :ref:`redirect_response_codes <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>` 
+的响应都将由 Envoy 来处理。
 
-For a redirect to be handled successfully it must pass the following checks:
+要成功地处理重定向，必须通过以下检查：
 
-1. Have a response code matching one of :ref:`redirect_response_codes
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`, which is
-   either 302 (by default), or a set of 3xx codes (301, 302, 303, 307, 308).
-2. Have a *location* header with a valid, fully qualified URL.
-3. The request must have been fully processed by Envoy.
-4. The request must not have a body.
-5. :ref:`allow_cross_scheme_redirect
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` is true (default to false),
-   or the scheme of the downstream request and the *location* header are the same.
-6. The number of previously handled internal redirect within a given downstream request does not
-   exceed :ref:`max internal redirects
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
-   of the route that the request or redirected request is hitting.
-7. All :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>` accept
-   the target route.
+1. 响应码匹配到配置的 :ref:`redirect_response_codes <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.redirect_response_codes>`，默认是 302，
+   或者其他的 3xx 状态码（301, 302, 303, 307, 308）。
+2. 拥有一个有效的、完全限定的URL的 *location* 头。
+3. 该请求必须已被 Envoy 完全处理。
+4. 请求不能包含请求体。
+5. :ref:`allow_cross_scheme_redirect <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.allow_cross_scheme_redirect>` 是 true（默认是 false），
+   或者下游请求的 scheme 和 *location* 头一致。
+6. 给定的下游请求之前处理的内部重定向次数不超过请求或重定向请求命中的路由配置的 :ref:`最大重定向数 <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`。
+7. 全部 :ref:`谓词 <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>` 接受目标路由。
 
-Any failure will result in redirect being passed downstream instead.
+任何失败都将导致重定向传递给下游。
 
-Since a redirected request may be bounced between different routes, any route in the chain of redirects that
+由于重定向请求可能会在不同的路由之间传递，重定向链中的任何满足以下条件的路由都将导致重定向被传递给下游。
 
-1. does not have internal redirect enabled
-2. or has a :ref:`max internal redirects
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>`
-   smaller or equal to the redirect chain length when the redirect chain hits it
-3. or is disallowed by any of the :ref:`predicates
-   <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
+1. 没有启用内部重定向
+2. 或者当重定向链命中的路由的 :ref:`最大重定向次数 <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.max_internal_redirects>` 小于等于重定向链的长度。
+3. 或者路由被 :ref:`谓词 <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>` 拒绝。
 
-will cause the redirect to be passed downstream.
+有两个谓词可以创建一个有向无环图（DAG）来定义一个过滤器链，他们是 :ref:`先前的路由 <envoy_v3_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig>` 谓词
+和 :ref:`allow_listed_routes <envoy_v3_api_msg_extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig>`。
+具体来说，*allow listed routes* 谓词定义的有向无环图（DAG）中各个节点的边，而 *先前的路由* 谓词定义了边的“访问”状态，如果是这样就可以避免循环。
 
-Two predicates can be used to create a DAG that defines the redirect chain, the :ref:`previous routes
-<envoy_v3_api_msg_extensions.internal_redirect.previous_routes.v3.PreviousRoutesConfig>` predicate, and
-the :ref:`allow_listed_routes
-<envoy_v3_api_msg_extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig>`.
-Specifically, the *allow listed routes* predicate defines edges of individual node in the DAG
-and the *previous routes* predicate defines "visited" state of the edges, so that loop can be avoided
-if so desired.
+第三个谓词 :ref:`safe_cross_scheme <envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>` 被用来防止 HTTP -> HTTPS 的重定向。
 
-A third predicate :ref:`safe_cross_scheme                                      
-<envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`
-can be used to prevent HTTP -> HTTPS redirect.
+一旦重定向通过这些检查，发送到原始上游的请求头将被修改为：
 
-Once the redirect has passed these checks, the request headers which were shipped to the original
-upstream will be modified by:
+1. 将完全限定的原始请求 URL 放到 x-envoy-original-url 头中。
+2. 使用 Location 头中的值替换 Authority/Host、Scheme、Path 头。
 
-1. Putting the fully qualified original request URL in the x-envoy-original-url header.
-2. Replacing the Authority/Host, Scheme, and Path headers with the values from the Location header.
+修改后的请求头将选择一个新的路由，通过一个新的过滤器链发送，然后把所有正常的 Envoy 请求都发送到上游进行清理。
 
-The altered request headers will then have a new route selected, be sent through a new filter chain,
-and then shipped upstream with all of the normal Envoy request sanitization taking place.
+.. Warning::
+  请注意，HTTP连接管理器头清理（例如清除不受信任的标头）仅应用一次。即使原始路由和第二个路由相同，每个路由的头修改也将同时应用于原始路由和第二路由，因此请谨慎配置头修改规则，
+  以避免重复不必要的请求头值。
 
-.. warning::
-  Note that HTTP connection manager sanitization such as clearing untrusted headers will only be
-  applied once. Per-route header modifications will be applied on both the original route and the
-  second route, even if they are the same, so be careful configuring header modification rules to
-  avoid duplicating undesired header values.
+一个简单的重定向流如下所示：
 
-A sample redirect flow might look like this:
+1. 客户端发送GET请求以获取 *\http://foo.com/bar*
+2. 上游 1 发送 302 响应码并携带 *"location: \http://baz.com/eep"*
+3. Envoy 被配置为允许原始路由上重定向，并发送新的 GET 请求到上游 2，携带请求头 *"x-envoy-original-url: \http://foo.com/bar"* 获取 *\http://baz.com/eep*
+4. Envoy 将 *\http://baz.com/eep* 的响应数据代理到客户端，作为对原始请求的响应。
 
-1. Client sends a GET request for *\http://foo.com/bar*
-2. Upstream 1 sends a 302 with  *"location: \http://baz.com/eep"*
-3. Envoy is configured to allow redirects on the original route, and sends a new GET request to
-   Upstream 2, to fetch *\http://baz.com/eep* with the additional request header
-   *"x-envoy-original-url: \http://foo.com/bar"*
-4. Envoy proxies the response data for *\http://baz.com/eep* to the client as the response to the original
-   request.
-
-
-Timeouts
+超时
 --------
 
-Various configurable timeouts apply to an HTTP connection and its constituent streams. Please see
-:ref:`this FAQ entry <faq_configuration_timeouts>` for an overview of important timeout
-configuration.
+各种可配置的超时适用于 HTTP 连接及其组成的流。有关重要超时配置的概述，请参考 :ref:`此 FQA 条目 <faq_configuration_timeouts>`。
