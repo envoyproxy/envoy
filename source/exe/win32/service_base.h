@@ -3,6 +3,10 @@
 #include <functional>
 #include <string>
 
+#include <processenv.h>
+#include <shellapi.h>
+#include <winsvc.h>
+
 #include "envoy/event/signal.h"
 
 #include "exe/service_status.h"
