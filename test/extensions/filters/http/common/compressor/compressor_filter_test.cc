@@ -11,6 +11,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -249,7 +250,7 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLength) {
   }
 }
 )EOF");
-  doRequestNoCompression({{":method", "post"}});
+  doRequestCompression({{":method", "post"}}, false);
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseNoCompression(headers);
 }
@@ -257,14 +258,7 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLength) {
 TEST_F(CompressorFilterTest, CompressRequestNoContentLengthRuntimeDisabled) {
   setUpFilter(R"EOF(
 {
-  "request_direction_config": {
-    "common_config": {
-      "do_not_compress_if_no_required_headers": {
-        "default_value": true,
-        "runtime_key": "foo_key"
-      }
-    }
-  },
+  "request_direction_config": {},
   "compressor_library": {
     "name": "test",
     "typed_config": {
@@ -273,11 +267,10 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLengthRuntimeDisabled) {
   }
 }
 )EOF");
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("", true)).Times(4);
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
-      .Times(1)
-      .WillRepeatedly(Return(false));
-  doRequestCompression({{":method", "post"}}, false);
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_compression_without_chunked_header", "false"}});
+  doRequestNoCompression({{":method", "post"}});
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseNoCompression(headers);
 }
@@ -297,20 +290,13 @@ TEST_F(CompressorFilterTest, CompressResponseNoContentLength) {
   response_stats_prefix_ = "response.";
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  doResponseNoCompression(headers);
+  doResponseCompression(headers, false);
 }
 
 TEST_F(CompressorFilterTest, CompressResponseNoContentLengthRuntimeDisabled) {
   setUpFilter(R"EOF(
 {
-  "response_direction_config": {
-    "common_config": {
-      "do_not_compress_if_no_required_headers": {
-        "default_value": true,
-        "runtime_key": "foo_key"
-      }
-    }
-  },
+  "response_direction_config": {},
   "compressor_library": {
     "name": "test",
     "typed_config": {
@@ -319,14 +305,13 @@ TEST_F(CompressorFilterTest, CompressResponseNoContentLengthRuntimeDisabled) {
   }
 }
 )EOF");
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_compression_without_chunked_header", "false"}});
   response_stats_prefix_ = "response.";
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("", true)).Times(2);
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
-      .Times(1)
-      .WillRepeatedly(Return(false));
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  doResponseCompression(headers, false);
+  doResponseNoCompression(headers);
 }
 
 TEST_F(CompressorFilterTest, CompressRequestWithTrailers) {
@@ -652,7 +637,7 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("transfer-encoding", "Chunked", "", true),
                     std::make_tuple("transfer-encoding", "chunked", "\"content_length\": 500,",
                                     true),
-                    std::make_tuple("", "", "\"content_length\": 500,", false),
+                    std::make_tuple("", "", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "501", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "499", "\"content_length\": 500,", false)));
 

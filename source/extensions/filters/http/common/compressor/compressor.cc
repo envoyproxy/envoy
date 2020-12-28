@@ -62,8 +62,6 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
-      do_not_compress_if_no_required_headers_(proto_config.do_not_compress_if_no_required_headers(),
-                                              runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
       content_type_values_(contentTypeSet(proto_config.content_type())), stats_{generateStats(
                                                                              stats_prefix, scope)} {
@@ -497,6 +495,10 @@ bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
 
 bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     const Http::RequestOrResponseHeaderMap& headers) const {
+  if (StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                Http::Headers::get().TransferEncodingValues.Chunked)) {
+    return true;
+  }
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length != nullptr) {
     uint64_t length;
@@ -508,11 +510,11 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     }
     return is_minimum_content_length;
   }
-  if (do_not_compress_if_no_required_headers_.enabled()) {
-    return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
-                                     Http::Headers::get().TransferEncodingValues.Chunked);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_compression_without_chunked_header")) {
+    return true;
   }
-  return true;
+  return false;
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const {

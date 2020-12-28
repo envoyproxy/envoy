@@ -45,11 +45,6 @@ message Compressor {
     // "application/xhtml+xml", "image/svg+xml", "text/css", "text/html", "text/plain", "text/xml"
     // and their synonyms.
     repeated string content_type = 3;
-
-    // Runtime flag that controls whether we compress or not body if no content-length and/or transfer-encoding
-    // headers exist. If set to true (default value) we compress body only if either content-length header exists
-    // (and the value is bigger than the minimum one allowed) or transfer-encoding set to chunked.
-    config.core.v4alpha.RuntimeFeatureFlag do_not_compress_if_no_required_headers = 4;
   }
 
   // Configuration for filter behavior on the request direction.
