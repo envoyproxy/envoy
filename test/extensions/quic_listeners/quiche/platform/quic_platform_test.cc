@@ -30,7 +30,6 @@
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
-#include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -42,7 +41,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_macros.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
@@ -50,7 +48,6 @@
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_pcc_sender.h"
-#include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
@@ -91,8 +88,6 @@ protected:
   const QuicLogLevel log_level_;
   const int verbosity_log_threshold_;
 };
-
-TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
@@ -468,9 +463,9 @@ TEST_F(QuicPlatformTest, QuicCertUtils) {
   unsigned char* der = nullptr;
   int len = i2d_X509(x509_cert.get(), &der);
   ASSERT_GT(len, 0);
-  quiche::QuicheStringPiece out;
+  absl::string_view out;
   QuicCertUtils::ExtractSubjectNameFromDERCert(
-      quiche::QuicheStringPiece(reinterpret_cast<const char*>(der), len), &out);
+      absl::string_view(reinterpret_cast<const char*>(der), len), &out);
   EXPECT_EQ("0z1\v0\t\x6\x3U\x4\x6\x13\x2US1\x13"
             "0\x11\x6\x3U\x4\b\f\nCalifornia1\x16"
             "0\x14\x6\x3U\x4\a\f\rSan Francisco1\r"
@@ -566,8 +561,8 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, QuicFlags) {
-  auto& flag_registry = quiche::FlagRegistry::GetInstance();
-  flag_registry.ResetFlags();
+  auto& flag_registry = quiche::FlagRegistry::getInstance();
+  flag_registry.resetFlags();
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
@@ -583,14 +578,15 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 
-  flag_registry.ResetFlags();
+  flag_registry.resetFlags();
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  flag_registry.FindFlag("quic_reloadable_flag_quic_testonly_default_false")
-      ->SetValueFromString("true");
-  flag_registry.FindFlag("quic_restart_flag_quic_testonly_default_true")->SetValueFromString("0");
-  flag_registry.FindFlag("quic_time_wait_list_seconds")->SetValueFromString("100");
+  flag_registry.findFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
+      ->setValueFromString("true");
+  flag_registry.findFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
+      ->setValueFromString("0");
+  flag_registry.findFlag("FLAGS_quic_time_wait_list_seconds")->setValueFromString("100");
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
@@ -661,35 +657,6 @@ TEST_F(FileUtilsTest, ReadFileContents) {
   EXPECT_EQ(data, output);
 }
 
-TEST_F(QuicPlatformTest, PickUnsedPort) {
-  int port = QuicPickServerPortForTestsOrDie();
-  std::vector<Envoy::Network::Address::IpVersion> supported_versions =
-      Envoy::TestEnvironment::getIpVersionsForTest();
-  for (auto ip_version : supported_versions) {
-    Envoy::Network::Address::InstanceConstSharedPtr addr =
-        Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
-    Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
-        Envoy::Network::Utility::getAddressWithPort(*addr, port);
-    Envoy::Network::SocketImpl sock(Envoy::Network::Socket::Type::Datagram, addr_with_port);
-    // binding of given port should success.
-    EXPECT_EQ(0, sock.bind(addr_with_port).rc_);
-  }
-}
-
-TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
-  Envoy::Api::MockOsSysCalls os_sys_calls;
-  Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  // Actually create sockets.
-  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillRepeatedly([](int domain, int type, int protocol) {
-    os_fd_t fd = ::socket(domain, type, protocol);
-    return Envoy::Api::SysCallSocketResult{fd, errno};
-  });
-  // Fail bind call's to mimic port exhaustion.
-  EXPECT_CALL(os_sys_calls, bind(_, _, _))
-      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
-  EXPECT_DEATH(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
-}
-
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
   QuicStreamBufferAllocator allocator;
   Envoy::Stats::TestUtil::MemoryTest memory_test;
@@ -709,14 +676,6 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // build.
   QuicRunSystemEventLoopIteration();
   QuicSystemEventLoop("dummy");
-}
-
-QUIC_MUST_USE_RESULT bool dummyTestFunction() { return false; }
-
-TEST_F(QuicPlatformTest, TestQuicMacros) {
-  // Just make sure it compiles.
-  EXPECT_FALSE(dummyTestFunction());
-  int a QUIC_UNUSED;
 }
 
 TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {

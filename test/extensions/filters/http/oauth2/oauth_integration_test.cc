@@ -16,7 +16,7 @@ class OauthIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   OauthIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   envoy::service::discovery::v3::DiscoveryResponse genericSecretResponse(absl::string_view name,
@@ -91,8 +91,6 @@ TEST_F(OauthIntegrationTest, UnauthenticatedFlow) {
                                          {":authority", "authority"}};
   auto encoder_decoder = codec_client_->startRequest(headers);
 
-  Buffer::OwnedImpl buffer;
-  encoder_decoder.first.encodeData(buffer, true);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 

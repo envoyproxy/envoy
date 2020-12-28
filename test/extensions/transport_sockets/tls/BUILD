@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -24,8 +26,6 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     shard_count = 4,
-    # TODO(wrowe): Diagnose timeout error on Windows (skipped for the moment)
-    tags = ["fails_on_windows"],
     deps = [
         ":test_private_key_method_provider_test_lib",
         "//include/envoy/network:transport_socket_interface",
@@ -180,4 +180,28 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "tls_throughput_benchmark",
+    srcs = ["tls_throughput_benchmark.cc"],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    external_deps = [
+        "benchmark",
+        "ssl",
+    ],
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "tls_throughput_benchmark_test",
+    benchmark_binary = "tls_throughput_benchmark",
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
 )

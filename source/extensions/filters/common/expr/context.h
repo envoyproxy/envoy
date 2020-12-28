@@ -9,6 +9,7 @@
 
 #include "eval/public/cel_value.h"
 #include "eval/public/cel_value_producer.h"
+#include "eval/public/structs/cel_proto_wrapper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,6 +18,7 @@ namespace Common {
 namespace Expr {
 
 using CelValue = google::api::expr::runtime::CelValue;
+using CelProtoWrapper = google::api::expr::runtime::CelProtoWrapper;
 
 // Symbols for traversing the request properties
 constexpr absl::string_view Request = "request";
@@ -54,6 +56,7 @@ constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view MTLS = "mtls";
 constexpr absl::string_view RequestedServerName = "requested_server_name";
 constexpr absl::string_view TLSVersion = "tls_version";
+constexpr absl::string_view ConnectionTerminationDetails = "termination_details";
 constexpr absl::string_view SubjectLocalCertificate = "subject_local_certificate";
 constexpr absl::string_view SubjectPeerCertificate = "subject_peer_certificate";
 constexpr absl::string_view URISanLocalCertificate = "uri_san_local_certificate";
@@ -187,7 +190,7 @@ class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
 public:
   MetadataProducer(const envoy::config::core::v3::Metadata& metadata) : metadata_(metadata) {}
   CelValue Produce(ProtobufWkt::Arena* arena) override {
-    return CelValue::CreateMessage(&metadata_, arena);
+    return CelProtoWrapper::CreateMessage(&metadata_, arena);
   }
 
 private:

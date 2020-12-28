@@ -308,6 +308,16 @@ message HeaderMap {
   repeated HeaderValue headers = 1;
 }
 
+// A directory that is watched for changes, e.g. by inotify on Linux. Move/rename
+// events inside this directory trigger the watch.
+message WatchedDirectory {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.WatchedDirectory";
+
+  // Directory path to watch.
+  string path = 1 [(validate.rules).string = {min_len: 1}];
+}
+
 // Data source consisting of either a file or an inline value.
 message DataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.DataSource";
@@ -319,10 +329,10 @@ message DataSource {
     string filename = 1 [(validate.rules).string = {min_len: 1}];
 
     // Bytes inlined in the configuration.
-    bytes inline_bytes = 2 [(validate.rules).bytes = {min_len: 1}];
+    bytes inline_bytes = 2;
 
     // String inlined in the configuration.
-    string inline_string = 3 [(validate.rules).string = {min_len: 1}];
+    string inline_string = 3;
   }
 }
 

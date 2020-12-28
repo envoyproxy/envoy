@@ -212,6 +212,7 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
   Stats::Store& store_;
+  Stats::ScopePtr stats_scope_;
   Config::SubscriptionPtr subscription_;
   std::string resource_name_;
   Init::TargetImpl init_target_;

@@ -1,0 +1,31 @@
+zone_aware_load_balancer_test_case {
+  load_balancer_test_case {
+    common_lb_config {
+      healthy_panic_threshold {
+        value: nan
+      }
+      locality_weighted_lb_config {
+      }
+      update_merge_window {
+        seconds: -1
+        nanos: 292
+      }
+      ignore_new_hosts_until_first_hc: true
+      close_connections_on_host_set_change: true
+    }
+    actions {
+      update_health_flags {
+        random_bytestring: 67108864
+      }
+    }
+    setup_priority_levels {
+      num_hosts_in_priority_level: 46080
+      num_hosts_locality_a: 46080
+      random_bytestring: 46080
+      random_bytestring: 46080
+    }
+    seed_for_prng: 2816
+  }
+  need_local_priority_set: true
+  random_bytestring_for_weights: "qk\274\337\204\263!\246"
+}

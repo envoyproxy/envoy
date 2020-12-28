@@ -31,6 +31,10 @@ AdminHandler::AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_
   const bool rc =
       admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
+  if (admin_.socket().addressType() == Network::Address::Type::Pipe) {
+    ENVOY_LOG(warn, "Admin tapping (via /tap) is unreliable when the admin endpoint is a pipe and "
+                    "the connection is HTTP/1. Either use an IP address or connect using HTTP/2.");
+  }
 }
 
 AdminHandler::~AdminHandler() {

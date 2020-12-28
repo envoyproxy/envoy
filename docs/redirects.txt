@@ -17,3 +17,5 @@ start/install/tools/tools.rst	operations/tools/tools.rst
 start/install/tools/route_table_check_tool.rst	operations/tools/route_table_check_tool.rst
 start/install/tools/schema_validator_check_tool.rst	operations/tools/schema_validator_check_tool.rst
 start/install/tools/config_load_check_tool.rst	operations/tools/config_load_check_tool.rst
+
+start/quick-start.rst	start/quick-start/index.rst

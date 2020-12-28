@@ -55,7 +55,6 @@ private:
 
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
-  Event::FileEventPtr file_event_;
 };
 
 } // namespace Quic

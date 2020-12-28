@@ -15,7 +15,6 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/grpc/async_client_manager.h"
-#include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -24,6 +23,7 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/store.h"
+#include "envoy/stats/symbol_table.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/health_checker.h"
@@ -72,6 +72,47 @@ public:
 using ClusterUpdateCallbacksHandlePtr = std::unique_ptr<ClusterUpdateCallbacksHandle>;
 
 class ClusterManagerFactory;
+
+// These are per-cluster per-thread, so not "global" stats.
+struct ClusterConnectivityState {
+  ~ClusterConnectivityState() {
+    ASSERT(pending_streams_ == 0);
+    ASSERT(active_streams_ == 0);
+    ASSERT(connecting_stream_capacity_ == 0);
+  }
+
+  template <class T> void checkAndDecrement(T& value, uint32_t delta) {
+    ASSERT(delta <= value);
+    value -= delta;
+  }
+
+  template <class T> void checkAndIncrement(T& value, uint32_t delta) {
+    ASSERT(std::numeric_limits<T>::max() - value > delta);
+    value += delta;
+  }
+
+  void incrPendingStreams(uint32_t delta) { checkAndIncrement<uint32_t>(pending_streams_, delta); }
+  void decrPendingStreams(uint32_t delta) { checkAndDecrement<uint32_t>(pending_streams_, delta); }
+  void incrConnectingStreamCapacity(uint32_t delta) {
+    checkAndIncrement<uint64_t>(connecting_stream_capacity_, delta);
+  }
+  void decrConnectingStreamCapacity(uint32_t delta) {
+    checkAndDecrement<uint64_t>(connecting_stream_capacity_, delta);
+  }
+  void incrActiveStreams(uint32_t delta) { checkAndIncrement<uint32_t>(active_streams_, delta); }
+  void decrActiveStreams(uint32_t delta) { checkAndDecrement<uint32_t>(active_streams_, delta); }
+
+  // Tracks the number of pending streams for this ClusterManager.
+  uint32_t pending_streams_{};
+  // Tracks the number of active streams for this ClusterManager.
+  uint32_t active_streams_{};
+  // Tracks the available stream capacity if all connecting connections were connected.
+  //
+  // For example, if an H2 connection is started with concurrent stream limit of 100, this
+  // goes up by 100. If the connection is established and 2 streams are in use, it
+  // would be reduced to 98 (as 2 of the 100 are not available).
+  uint64_t connecting_stream_capacity_{};
+};
 
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
@@ -125,13 +166,35 @@ public:
   virtual void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
-  using ClusterInfoMap = absl::node_hash_map<std::string, std::reference_wrapper<const Cluster>>;
+  using ClusterInfoMap = absl::flat_hash_map<std::string, std::reference_wrapper<const Cluster>>;
+  struct ClusterInfoMaps {
+    bool hasCluster(absl::string_view cluster) const {
+      return active_clusters_.find(cluster) != active_clusters_.end() ||
+             warming_clusters_.find(cluster) != warming_clusters_.end();
+    }
+
+    ClusterConstOptRef getCluster(absl::string_view cluster) {
+      auto active_cluster = active_clusters_.find(cluster);
+      if (active_cluster != active_clusters_.end()) {
+        return active_cluster->second;
+      }
+      auto warming_cluster = warming_clusters_.find(cluster);
+      if (warming_cluster != warming_clusters_.end()) {
+        return warming_cluster->second;
+      }
+      return absl::nullopt;
+    }
+
+    ClusterInfoMap active_clusters_;
+    ClusterInfoMap warming_clusters_;
+  };
 
   /**
-   * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
-   * clusters which should only be used for stats/admin.
+   * @return ClusterInfoMap all current clusters including active and warming.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual ClusterInfoMap clusters() PURE;
+  virtual ClusterInfoMaps clusters() PURE;
 
   using ClusterSet = absl::flat_hash_set<std::string>;
 
@@ -151,53 +214,12 @@ public:
    * the case of dynamic clusters, subsequent event loop iterations may invalidate this pointer.
    * If information about the cluster needs to be kept, use the ThreadLocalCluster::info() method to
    * obtain cluster information that is safe to store.
-   */
-  virtual ThreadLocalCluster* get(absl::string_view cluster) PURE;
-
-  /**
-   * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
-   * callers do not need to worry about per thread synchronization. The load balancing policy that
-   * is used is the one defined on the cluster when it was created.
    *
-   * Can return nullptr if there is no host available in the cluster or if the cluster does not
-   * exist.
-   *
-   * To resolve the protocol to use, we provide the downstream protocol (if one exists).
+   * NOTE: This method may return nullptr even if the cluster exists (if it hasn't been warmed yet,
+   * propagated to workers, etc.). Use clusters() for general configuration checking on the main
+   * thread.
    */
-  virtual Http::ConnectionPool::Instance*
-  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                         absl::optional<Http::Protocol> downstream_protocol,
-                         LoadBalancerContext* context) PURE;
-
-  /**
-   * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that
-   * callers do not need to worry about per thread synchronization. The load balancing policy that
-   * is used is the one defined on the cluster when it was created.
-   *
-   * Can return nullptr if there is no host available in the cluster or if the cluster does not
-   * exist.
-   */
-  virtual Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
-                                                               ResourcePriority priority,
-                                                               LoadBalancerContext* context) PURE;
-
-  /**
-   * Allocate a load balanced TCP connection for a cluster. The created connection is already
-   * bound to the correct *per-thread* dispatcher, so no further synchronization is needed. The
-   * load balancing policy that is used is the one defined on the cluster when it was created.
-   *
-   * Returns both a connection and the host that backs the connection. Both can be nullptr if there
-   * is no host available in the cluster.
-   */
-  virtual Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
-                                                       LoadBalancerContext* context) PURE;
-
-  /**
-   * Returns a client that can be used to make async HTTP calls against the given cluster. The
-   * client may be backed by a connection pool or by a multiplexed connection. The cluster manager
-   * owns the client.
-   */
-  virtual Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) PURE;
+  virtual ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) PURE;
 
   /**
    * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
@@ -267,6 +289,21 @@ public:
    * @return Config::SubscriptionFactory& the subscription factory.
    */
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
+
+  /**
+   * Returns a struct with all the Stats::StatName objects needed by
+   * Clusters. This helps factor out some relatively heavy name
+   * construction which occur when there is a large CDS update during operation,
+   * relative to recreating all stats from strings on-the-fly.
+   *
+   * @return the stat names.
+   */
+  virtual const ClusterStatNames& clusterStatNames() const PURE;
+  virtual const ClusterLoadReportStatNames& clusterLoadReportStatNames() const PURE;
+  virtual const ClusterCircuitBreakersStatNames& clusterCircuitBreakersStatNames() const PURE;
+  virtual const ClusterRequestResponseSizeStatNames&
+  clusterRequestResponseSizeStatNames() const PURE;
+  virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -316,9 +353,10 @@ public:
    */
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                   ResourcePriority priority, Http::Protocol protocol,
+                   ResourcePriority priority, std::vector<Http::Protocol>& protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options) PURE;
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   ClusterConnectivityState& state) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
@@ -328,7 +366,8 @@ public:
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options) PURE;
+                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      ClusterConnectivityState& state) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

@@ -94,7 +94,7 @@ TEST_F(OptionsImplTest, All) {
       "--log-path "
       "/foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
-      "--reject-unknown-dynamic-fields --use-fake-symbol-table 0 --base-id 5 "
+      "--reject-unknown-dynamic-fields --base-id 5 "
       "--use-dynamic-base-id --base-id-path /foo/baz "
       "--socket-path /foo/envoy_domain_socket --socket-mode 644");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
@@ -118,7 +118,6 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
-  EXPECT_FALSE(options->fakeSymbolTableEnabled());
   EXPECT_EQ(5U, options->baseId());
   EXPECT_TRUE(options->useDynamicBaseId());
   EXPECT_EQ("/foo/baz", options->baseIdPath());
@@ -127,13 +126,6 @@ TEST_F(OptionsImplTest, All) {
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
-}
-
-// TODO(#13399): remove this test once we remove the option.
-TEST_F(OptionsImplTest, FakeSymtabWarning) {
-  EXPECT_LOG_CONTAINS("warning", "Fake symbol tables have been removed",
-                      createOptionsImpl("envoy --use-fake-symbol-table 1"));
-  EXPECT_NO_LOGS(createOptionsImpl("envoy --use-fake-symbol-table 0"));
 }
 
 // Either variants of allow-unknown-[static-]-fields works.
@@ -161,9 +153,10 @@ TEST_F(OptionsImplTest, SetAll) {
   bool hot_restart_disabled = options->hotRestartDisabled();
   bool signal_handling_enabled = options->signalHandlingEnabled();
   bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
-  bool fake_symbol_table_enabled = options->fakeSymbolTableEnabled();
 
   options->setBaseId(109876);
+  options->setUseDynamicBaseId(true);
+  options->setBaseIdPath("foo");
   options->setConcurrency(42);
   options->setConfigPath("foo");
   envoy::config::bootstrap::v3::Bootstrap bootstrap_foo{};
@@ -189,11 +182,12 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setCpusetThreads(!options->cpusetThreadsEnabled());
   options->setAllowUnkownFields(true);
   options->setRejectUnknownFieldsDynamic(true);
-  options->setFakeSymbolTableEnabled(!options->fakeSymbolTableEnabled());
   options->setSocketPath("/foo/envoy_domain_socket");
   options->setSocketMode(0644);
 
   EXPECT_EQ(109876, options->baseId());
+  EXPECT_EQ(true, options->useDynamicBaseId());
+  EXPECT_EQ("foo", options->baseIdPath());
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
   envoy::config::bootstrap::v3::Bootstrap bootstrap_bar{};
@@ -219,7 +213,6 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(!cpuset_threads_enabled, options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
-  EXPECT_EQ(!fake_symbol_table_enabled, options->fakeSymbolTableEnabled());
   EXPECT_EQ("/foo/envoy_domain_socket", options->socketPath());
   EXPECT_EQ(0644, options->socketMode());
 
@@ -293,15 +286,13 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
 
-  // Currently the following 7 options are not defined in proto, hence the count differs by 7.
+  // Currently the following 6 options are not defined in proto, hence the count differs by 6.
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
   // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
-  // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
-  // 6. hot restart version - print the hot restart version and exit.
-  // 7. log-format-prefix-with-location - short-term override for rollout of dynamic log format.
-  const uint32_t options_not_in_proto = 7;
+  // 5. hot restart version - print the hot restart version and exit.
+  const uint32_t options_not_in_proto = 5;
 
   // There are two deprecated options: "max_stats" and "max_obj_name_len".
   const uint32_t deprecated_options = 2;
@@ -457,17 +448,10 @@ TEST_F(OptionsImplTest, LogFormatDefault) {
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
 }
 
-TEST_F(OptionsImplTest, LogFormatDefaultNoPrefix) {
-  std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format-prefix-with-location", "0"});
-  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
-}
-
 TEST_F(OptionsImplTest, LogFormatOverride) {
   std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
-                         "--log-format-prefix-with-location 1"});
-  EXPECT_EQ(options->logFormat(), "%%v [%g:%#] %v %t [%g:%#] %v");
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
+  EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {

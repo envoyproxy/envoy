@@ -31,7 +31,8 @@ void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
   }
 
   const ThriftProxy::Router::RouteEntry* route_entry = route->routeEntry();
-  Upstream::ThreadLocalCluster* cluster = config_->cm().get(route_entry->clusterName());
+  Upstream::ThreadLocalCluster* cluster =
+      config_->cm().getThreadLocalCluster(route_entry->clusterName());
   if (!cluster) {
     return;
   }
@@ -61,7 +62,7 @@ void Filter::onDestroy() {
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                      Http::RequestHeaderMapPtr&& request_headers_to_add) {
+                      Http::RequestHeaderMapPtr&& request_headers_to_add, const std::string&) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.

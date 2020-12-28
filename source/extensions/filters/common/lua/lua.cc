@@ -49,10 +49,10 @@ void Coroutine::resume(int num_args, const std::function<void()>& yield_callback
 }
 
 ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls)
-    : tls_slot_(tls.allocateSlot()) {
+    : tls_slot_(ThreadLocal::TypedSlot<LuaThreadLocal>::makeUnique(tls)) {
 
   // First verify that the supplied code can be parsed.
-  CSmartPtr<lua_State, lua_close> state(lua_open());
+  CSmartPtr<lua_State, lua_close> state(luaL_newstate());
   RELEASE_ASSERT(state.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state.get());
 
@@ -61,40 +61,38 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
   }
 
   // Now initialize on all threads.
-  tls_slot_->set([code](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new LuaThreadLocal(code)};
-  });
+  tls_slot_->set([code](Event::Dispatcher&) { return std::make_shared<LuaThreadLocal>(code); });
 }
 
 int ThreadLocalState::getGlobalRef(uint64_t slot) {
-  LuaThreadLocal& tls = tls_slot_->getTyped<LuaThreadLocal>();
+  LuaThreadLocal& tls = **tls_slot_;
   ASSERT(tls.global_slots_.size() > slot);
   return tls.global_slots_[slot];
 }
 
 uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
-  tls_slot_->runOnAllThreads([global](ThreadLocal::ThreadLocalObjectSharedPtr previous) {
-    LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(previous);
-    lua_getglobal(tls.state_.get(), global.c_str());
-    if (lua_isfunction(tls.state_.get(), -1)) {
-      tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
+  tls_slot_->runOnAllThreads([global](OptRef<LuaThreadLocal> tls) {
+    lua_getglobal(tls->state_.get(), global.c_str());
+    if (lua_isfunction(tls->state_.get(), -1)) {
+      tls->global_slots_.push_back(luaL_ref(tls->state_.get(), LUA_REGISTRYINDEX));
     } else {
       ENVOY_LOG(debug, "definition for '{}' not found in script", global);
-      lua_pop(tls.state_.get(), 1);
-      tls.global_slots_.push_back(LUA_REFNIL);
+      lua_pop(tls->state_.get(), 1);
+      tls->global_slots_.push_back(LUA_REFNIL);
     }
-    return previous;
   });
 
   return current_global_slot_++;
 }
 
 CoroutinePtr ThreadLocalState::createCoroutine() {
-  lua_State* state = tls_slot_->getTyped<LuaThreadLocal>().state_.get();
+  lua_State* state = tlsState().get();
   return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
 }
 
-ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : state_(lua_open()) {
+ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code)
+    : state_(luaL_newstate()) {
+
   RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());

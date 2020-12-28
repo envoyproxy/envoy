@@ -117,6 +117,7 @@ static_resources:
               socket_address:
                 address: service
                 port_value: 8000
+
 admin:
   access_log_path: "/dev/null"
   address:

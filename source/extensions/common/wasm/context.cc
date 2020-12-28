@@ -34,10 +34,11 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
-#include "eval/eval/field_access.h"
-#include "eval/eval/field_backed_list_impl.h"
-#include "eval/eval/field_backed_map_impl.h"
 #include "eval/public/cel_value.h"
+#include "eval/public/containers/field_access.h"
+#include "eval/public/containers/field_backed_list_impl.h"
+#include "eval/public/containers/field_backed_map_impl.h"
+#include "eval/public/structs/cel_proto_wrapper.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
@@ -421,6 +422,7 @@ static absl::flat_hash_map<std::string, PropertyToken> property_tokens = {PROPER
 
 absl::optional<google::api::expr::runtime::CelValue>
 Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const {
+  using google::api::expr::runtime::CelProtoWrapper;
   using google::api::expr::runtime::CelValue;
 
   const StreamInfo::StreamInfo* info = getConstRequestStreamInfo();
@@ -448,7 +450,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   switch (part_token->second) {
   case PropertyToken::METADATA:
     if (info) {
-      return CelValue::CreateMessage(&info->dynamicMetadata(), arena);
+      return CelProtoWrapper::CreateMessage(&info->dynamicMetadata(), arena);
     }
     break;
   case PropertyToken::REQUEST:
@@ -485,9 +487,9 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::NODE:
     if (root_local_info_) {
-      return CelValue::CreateMessage(&root_local_info_->node(), arena);
+      return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
     } else if (plugin_) {
-      return CelValue::CreateMessage(&plugin()->local_info_.node(), arena);
+      return CelProtoWrapper::CreateMessage(&plugin()->local_info_.node(), arena);
     }
     break;
   case PropertyToken::SOURCE:
@@ -509,7 +511,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::LISTENER_METADATA:
     if (plugin_) {
-      return CelValue::CreateMessage(plugin()->listener_metadata_, arena);
+      return CelProtoWrapper::CreateMessage(plugin()->listener_metadata_, arena);
     }
     break;
   case PropertyToken::CLUSTER_NAME:
@@ -524,15 +526,16 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::CLUSTER_METADATA:
     if (info && info->upstreamHost()) {
-      return CelValue::CreateMessage(&info->upstreamHost()->cluster().metadata(), arena);
+      return CelProtoWrapper::CreateMessage(&info->upstreamHost()->cluster().metadata(), arena);
     } else if (info && info->upstreamClusterInfo().has_value() &&
                info->upstreamClusterInfo().value()) {
-      return CelValue::CreateMessage(&info->upstreamClusterInfo().value()->metadata(), arena);
+      return CelProtoWrapper::CreateMessage(&info->upstreamClusterInfo().value()->metadata(),
+                                            arena);
     }
     break;
   case PropertyToken::UPSTREAM_HOST_METADATA:
     if (info && info->upstreamHost() && info->upstreamHost()->metadata()) {
-      return CelValue::CreateMessage(info->upstreamHost()->metadata().get(), arena);
+      return CelProtoWrapper::CreateMessage(info->upstreamHost()->metadata().get(), arena);
     }
     break;
   case PropertyToken::ROUTE_NAME:
@@ -542,7 +545,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     break;
   case PropertyToken::ROUTE_METADATA:
     if (info && info->routeEntry()) {
-      return CelValue::CreateMessage(&info->routeEntry()->metadata(), arena);
+      return CelProtoWrapper::CreateMessage(&info->routeEntry()->metadata(), arena);
     }
     break;
   case PropertyToken::PLUGIN_NAME:
@@ -705,6 +708,9 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, absl::string_view 
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -766,6 +772,9 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -776,6 +785,9 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, absl::string_vi
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -787,6 +799,9 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, absl::string_v
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, value);
+  if (type == WasmHeaderMapType::RequestHeaders) {
+    decoder_callbacks_->clearRouteCache();
+  }
   return WasmResult::Ok;
 }
 
@@ -810,8 +825,8 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
   case WasmBufferType::VmConfiguration:
     return buffer_.set(wasm()->vm_configuration());
   case WasmBufferType::PluginConfiguration:
-    if (plugin_) {
-      return buffer_.set(plugin_->plugin_configuration_);
+    if (temp_plugin_) {
+      return buffer_.set(temp_plugin_->plugin_configuration_);
     }
     return nullptr;
   case WasmBufferType::HttpRequestBody:
@@ -855,11 +870,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
 void Context::onDownstreamConnectionClose(CloseType close_type) {
   ContextBase::onDownstreamConnectionClose(close_type);
   downstream_closed_ = true;
-  // Call close on TCP connection, if upstream connection closed or there was a failure seen in
-  // this connection.
-  if (upstream_closed_ || getRequestStreamInfo()->hasAnyResponseFlag()) {
-    onCloseTCP();
-  }
+  onCloseTCP();
 }
 
 void Context::onUpstreamConnectionClose(CloseType close_type) {
@@ -893,7 +904,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
     return WasmResult::BadArgument;
   }
   auto cluster_string = std::string(cluster);
-  if (clusterManager().get(cluster_string) == nullptr) {
+  const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_string);
+  if (thread_local_cluster == nullptr) {
     return WasmResult::BadArgument;
   }
 
@@ -929,9 +941,8 @@ WasmResult Context::httpCall(absl::string_view cluster, const Pairs& request_hea
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
-  auto http_request = clusterManager()
-                          .httpAsyncClientForCluster(cluster_string)
-                          .send(std::move(message), handler, options);
+  auto http_request =
+      thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
     http_request_.erase(token);
     return WasmResult::InternalFailure;
@@ -1182,18 +1193,18 @@ bool Context::validateConfiguration(absl::string_view configuration,
   if (!wasm()->validate_configuration_) {
     return true;
   }
-  plugin_ = plugin_base;
+  temp_plugin_ = plugin_base;
   auto result =
       wasm()
           ->validate_configuration_(this, id_, static_cast<uint32_t>(configuration.size()))
           .u64_ != 0;
-  plugin_.reset();
+  temp_plugin_.reset();
   return result;
 }
 
 absl::string_view Context::getConfiguration() {
-  if (plugin_) {
-    return plugin_->plugin_configuration_;
+  if (temp_plugin_) {
+    return temp_plugin_->plugin_configuration_;
   } else {
     return wasm()->vm_configuration();
   }
@@ -1490,12 +1501,14 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
     if (decoder_callbacks_) {
-      decoder_callbacks_->continueDecoding();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { decoder_callbacks_->continueDecoding(); });
     }
     break;
   case WasmStreamType::Response:
     if (encoder_callbacks_) {
-      encoder_callbacks_->continueEncoding();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
     }
     break;
   default:

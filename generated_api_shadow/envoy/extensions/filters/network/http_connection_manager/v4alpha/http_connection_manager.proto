@@ -19,8 +19,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/resource_locator.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -36,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 41]
+// [#next-free-field: 42]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -341,6 +339,10 @@ message HttpConnectionManager {
   // <envoy_api_field_config.core.v4alpha.HttpProtocolOptions.max_stream_duration>` does not apply to
   // this corner case.
   //
+  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
+  // is configured, this timeout is scaled according to the value for
+  // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
+  //
   // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
   // to the granularity of events presented to the connection manager. For example, while receiving
   // very large request headers, it may be the case that there is traffic regularly arriving on the
@@ -358,6 +360,14 @@ message HttpConnectionManager {
   // response is initiated. If not specified or set to 0, this timeout is disabled.
   google.protobuf.Duration request_timeout = 28
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
+
+  // The amount of time that Envoy will wait for the request headers to be received. The timer is
+  // activated when the first byte of the headers is received, and is disarmed when the last byte of
+  // the headers has been received. If not specified or set to 0, this timeout is disabled.
+  google.protobuf.Duration request_headers_timeout = 41 [
+    (validate.rules).duration = {gte {}},
+    (udpa.annotations.security).configure_for_untrusted_downstream = true
+  ];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.
@@ -644,17 +654,11 @@ message Rds {
   // Configuration source specifier for RDS.
   config.core.v4alpha.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  oneof name_specifier {
-    // The name of the route configuration. This name will be passed to the RDS
-    // API. This allows an Envoy configuration with multiple HTTP listeners (and
-    // associated HTTP connection manager filters) to use different route
-    // configurations.
-    string route_config_name = 2;
-
-    // Resource locator for RDS. This is mutually exclusive to *route_config_name*.
-    // [#not-implemented-hide:]
-    udpa.core.v1.ResourceLocator rds_resource_locator = 3;
-  }
+  // The name of the route configuration. This name will be passed to the RDS
+  // API. This allows an Envoy configuration with multiple HTTP listeners (and
+  // associated HTTP connection manager filters) to use different route
+  // configurations.
+  string route_config_name = 2;
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.

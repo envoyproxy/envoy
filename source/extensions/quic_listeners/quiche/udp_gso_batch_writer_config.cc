@@ -4,9 +4,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 
-#if defined(__linux__)
 #include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
-#endif
 
 namespace Envoy {
 namespace Quic {
@@ -22,7 +20,7 @@ UdpGsoBatchWriterConfigFactory::createUdpPacketWriterFactory(const Protobuf::Mes
                          "for UDP GSO. Reset udp_writer_config to default writer");
   }
 
-#if defined(__linux__)
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
   return std::make_unique<UdpGsoBatchWriterFactory>();
 #else
   // On non-linux, `supportsUdpGso()` always returns false.

@@ -92,6 +92,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "context_lib",
+    srcs = ["context_impl.cc"],
+    hdrs = ["context_impl.h"],
+    deps = [
+        "//include/envoy/router:context_interface",
+        "//include/envoy/stats:stats_macros",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_config_lib",
     srcs = ["debug_config.cc"],
     hdrs = ["debug_config.h"],
@@ -270,6 +280,7 @@ envoy_cc_library(
     ],
     deps = [
         ":config_lib",
+        ":context_lib",
         ":debug_config_lib",
         ":header_parser_lib",
         ":retry_state_lib",

@@ -77,8 +77,8 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      is_response_to_head_request_(false), is_response_to_connect_request_(false),
-      header_key_formatter_(header_key_formatter) {
+      connect_request_(false), is_response_to_head_request_(false),
+      is_response_to_connect_request_(false), header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -261,9 +261,13 @@ void StreamEncoderImpl::endEncode() {
 
   connection_.flushOutput(true);
   connection_.onEncodeComplete();
+  // With CONNECT, half-closing the connection is used to signal end stream.
+  if (connect_request_) {
+    connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+  }
 }
 
-void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
+void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) {
   // It's messy and complicated to try to tag the final write of an HTTP response for response
   // tracking for flood protection. Instead, write an empty buffer fragment after the response,
   // to allow for tracking.
@@ -293,20 +297,20 @@ void ConnectionImpl::flushOutput(bool end_encode) {
   if (end_encode) {
     // If this is an HTTP response in ServerConnectionImpl, track outbound responses for flood
     // protection
-    maybeAddSentinelBufferFragment(output_buffer_);
+    maybeAddSentinelBufferFragment(*output_buffer_);
   }
-  connection().write(output_buffer_, false);
-  ASSERT(0UL == output_buffer_.length());
+  connection().write(*output_buffer_, false);
+  ASSERT(0UL == output_buffer_->length());
 }
 
-void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_.add(data); }
+void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_->add(data); }
 
-void ConnectionImpl::addCharToBuffer(char c) { output_buffer_.add(&c, 1); }
+void ConnectionImpl::addCharToBuffer(char c) { output_buffer_->add(&c, 1); }
 
-void ConnectionImpl::addIntToBuffer(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
+void ConnectionImpl::addIntToBuffer(uint64_t i) { output_buffer_->add(absl::StrCat(i)); }
 
 void ConnectionImpl::copyToBuffer(const char* data, uint64_t length) {
-  output_buffer_.add(data, length);
+  output_buffer_->add(data, length);
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
@@ -366,24 +370,21 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
+  // Required headers must be present. This can only happen by some erroneous processing after the
+  // downstream codecs decode.
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
 
-  // TODO(#10878): Include missing host header for CONNECT.
-  // The RELEASE_ASSERT below does not change the existing behavior of `encodeHeaders`.
-  // The `encodeHeaders` used to throw on errors. Callers of `encodeHeaders()` do not catch
-  // exceptions and this would cause abnormal process termination in error cases. This change
-  // replaces abnormal process termination from unhandled exception with the RELEASE_ASSERT. Further
-  // work will replace this RELEASE_ASSERT with proper error handling.
-  RELEASE_ASSERT(method && (path || is_connect), ":method and :path must be specified");
-
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
   } else if (method->value() == Headers::get().MethodValues.Connect) {
     disableChunkEncoding();
+    connection_.connection().enableHalfClose(true);
     connect_request_ = true;
   }
   if (Utility::isUpgrade(headers)) {
@@ -400,6 +401,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream);
+  return okStatus();
 }
 
 int ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
@@ -475,12 +477,12 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
-      dispatching_(false),
-      output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                     [&]() -> void { this->onAboveHighWatermark(); },
-                     []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
+      dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
+                               [&]() -> void { this->onBelowLowWatermark(); },
+                               [&]() -> void { this->onAboveHighWatermark(); },
+                               []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
-  output_buffer_.setWatermarks(connection.bufferLimit());
+  output_buffer_->setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.allow_chunked_length = 1;
   parser_.data = this;
@@ -555,6 +557,16 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
       [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
 }
 
+Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
+  Http::Status status = ConnectionImpl::dispatch(data);
+  if (status.ok() && data.length() > 0) {
+    // The HTTP/1.1 codec pauses dispatch after a single response is complete. Extraneous data
+    // after a response is complete indicates an error.
+    return codecProtocolError("http/1.1 protocol error: extraneous data after response complete");
+  }
+  return status;
+}
+
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
@@ -574,11 +586,19 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    current_dispatching_buffer_ = &data;
+    while (data.length() > 0) {
+      auto slice = data.frontSlice();
+      dispatching_slice_already_drained_ = false;
       auto statusor_parsed = dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
       if (!statusor_parsed.ok()) {
         return statusor_parsed.status();
       }
+      if (!dispatching_slice_already_drained_) {
+        ASSERT(statusor_parsed.value() <= slice.len_);
+        data.drain(statusor_parsed.value());
+      }
+
       total_parsed += statusor_parsed.value();
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK) {
         // Parse errors trigger an exception in dispatchSlice so we are guaranteed to be paused at
@@ -587,6 +607,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
         break;
       }
     }
+    current_dispatching_buffer_ = nullptr;
     dispatchBufferedBody();
   } else {
     auto result = dispatchSlice(nullptr, 0);
@@ -597,7 +618,6 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ASSERT(buffered_body_.length() == 0);
 
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
-  data.drain(total_parsed);
 
   // If an upgrade has been handled and there is body data or early upgrade
   // payload to send on, send it on.
@@ -773,7 +793,13 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
-  buffered_body_.add(data, length);
+  auto slice = current_dispatching_buffer_->frontSlice();
+  if (data == slice.mem_ && length == slice.len_) {
+    buffered_body_.move(*current_dispatching_buffer_, length);
+    dispatching_slice_already_drained_ = true;
+  } else {
+    buffered_body_.add(data, length);
+  }
 }
 
 void ConnectionImpl::dispatchBufferedBody() {
@@ -1288,6 +1314,9 @@ void ClientConnectionImpl::onMessageComplete() {
     pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
+
+  // Pause the parser after a response is complete. Any remaining data indicates an error.
+  http_parser_pause(&parser_, 1);
 }
 
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {

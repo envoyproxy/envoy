@@ -1,20 +1,32 @@
 .. _install_sandboxes_cache_filter:
 
-Cache Filter
+Cache filter
 ============
 .. TODO(yosrym93): When a documentation is written for a production-ready Cache Filter, link to it through this doc.
+
+.. sidebar:: Requirements
+
+   .. include:: _include/docker-env-setup-link.rst
+
+   :ref:`curl <start_sandboxes_setup_curl>`
+	Used to make ``HTTP`` requests.
 
 In this example, we demonstrate how HTTP caching can be utilized in Envoy by using the Cache Filter.
 The setup of this sandbox is based on the setup of the :ref:`Front Proxy sandbox <install_sandboxes_front_proxy>`.
 
 All incoming requests are routed via the front Envoy, which acts as a reverse proxy sitting on
-the edge of the ``envoymesh`` network. Ports ``8000`` and ``8001`` are exposed by docker
-compose (see :repo:`/examples/cache/docker-compose.yaml`) to handle ``HTTP`` calls
-to the services, and requests to ``/admin`` respectively. Two backend services are deployed behind the front Envoy, each with a sidecar Envoy.
+the edge of the ``envoymesh`` network.
+
+Port ``8000`` is exposed by :download:`docker-compose.yaml <_include/cache/docker-compose.yaml>` to handle ``HTTP`` calls
+to the services. Two backend services are deployed behind the front Envoy, each with a sidecar Envoy.
 
 The front Envoy is configured to run the Cache Filter, which stores cacheable responses in an in-memory cache,
-and serves it to subsequent requests. In this demo, the responses that are served by the deployed services are stored in :repo:`/examples/cache/responses.yaml`.
-This file is mounted to both services' containers, so any changes made to the stored responses while the services are running should be instantly effective (no need to rebuild or rerun).
+and serves it to subsequent requests.
+
+In this demo, the responses that are served by the deployed services are stored in :download:`responses.yaml <_include/cache/responses.yaml>`.
+
+This file is mounted to both services' containers, so any changes made to the stored responses while the services are
+running should be instantly effective (no need to rebuild or rerun).
 
 For the purposes of the demo, a response's date of creation is appended to its body before being served.
 An Etag is computed for every response for validation purposes, which only depends on the response body in the yaml file (i.e. the appended date is not taken into account).
@@ -22,10 +34,10 @@ Cached responses can be identified by having an ``age`` header. Validated respon
 as when a response is validated the ``date`` header is updated, while the body stays the same. Validated responses do not have an ``age`` header.
 Responses served from the backend service have no ``age`` header, and their ``date`` header is the same as their generation date.
 
-.. include:: _include/docker-env-setup.rst
-
-Step 3: Start all of our containers
+Step 1: Start all of our containers
 ***********************************
+
+Change to the ``examples/cache`` directory.
 
 .. code-block:: console
 
@@ -35,13 +47,13 @@ Step 3: Start all of our containers
     $ docker-compose up -d
     $ docker-compose ps
 
-           Name                      Command            State                             Ports
-    ------------------------------------------------------------------------------------------------------------------------
-    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+           Name                      Command            State           Ports
+    ----------------------------------------------------------------------------------------------
+    cache_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp
     cache_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     cache_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
 
-Step 4: Test Envoy's HTTP caching capabilities
+Step 2: Test Envoy's HTTP caching capabilities
 **********************************************
 
 You can now send a request to both services via the ``front-envoy``. Note that since the two services have different routes,
@@ -54,7 +66,8 @@ To send a request:
 
 ``service_no``: The service to send the request to, 1 or 2.
 
-``response``: The response that is being requested. The responses are found in :repo:`/examples/cache/responses.yaml`.
+``response``: The response that is being requested. The responses are found in
+:download:`responses.yaml <_include/cache/responses.yaml>`.
 
 
 The provided example responses are:
@@ -222,5 +235,8 @@ You will receive a new response that's served from the backend service.
 The new response will be cached for subsequent requests.
 
 You can also add new responses to the yaml file with different ``cache-control`` headers and start experimenting!
-To learn more about caching and ``cache-control`` headers visit
-the `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
+
+.. seealso::
+
+   `MDN Web Docs <https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching>`_.
+      Learn more about caching and ``cache-control`` on the web.

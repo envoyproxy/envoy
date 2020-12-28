@@ -1135,7 +1135,7 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
       foo: bar
       baz: meh
   )EOF");
-  EXPECT_CALL(rtds_init_callback_, Call()).Times(1);
+  EXPECT_CALL(rtds_init_callback_, Call());
   doOnConfigUpdateVerifyNoThrow(runtime, 0);
 
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
@@ -1181,7 +1181,7 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   rtds_layer->set_name("some_resource");
   rtds_layer->mutable_rtds_config();
 
-  EXPECT_CALL(cm_, subscriptionFactory()).Times(1);
+  EXPECT_CALL(cm_, subscriptionFactory());
   LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
                     *api_);
 

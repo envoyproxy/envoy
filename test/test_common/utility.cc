@@ -249,55 +249,6 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
   return file_names;
 }
 
-std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
-  if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
-        .cluster_name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().Runtime) {
-    return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
-  }
-  if (resource.type_url() == Config::getTypeUrl<envoy::config::listener::v3::Listener>(
-                                 envoy::config::core::v3::ApiVersion::V3)) {
-    return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
-  }
-  if (resource.type_url() == Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-                                 envoy::config::core::v3::ApiVersion::V3)) {
-    return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
-  }
-  if (resource.type_url() == Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-                                 envoy::config::core::v3::ApiVersion::V3)) {
-    return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
-  }
-  if (resource.type_url() == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-                                 envoy::config::core::v3::ApiVersion::V3)) {
-    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
-        .cluster_name();
-  }
-  if (resource.type_url() == Config::getTypeUrl<envoy::config::route::v3::VirtualHost>(
-                                 envoy::config::core::v3::ApiVersion::V3)) {
-    return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
-  }
-  if (resource.type_url() == Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(
-                                 envoy::config::core::v3::ApiVersion::V3)) {
-    return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
-  }
-  throw EnvoyException(
-      absl::StrCat("xdsResourceName does not know about type URL ", resource.type_url()));
-}
-
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
   int line_fill_len = desired_length - to_pad.length();
   int first_half_len = line_fill_len / 2;
@@ -426,6 +377,10 @@ public:
 ApiPtr createApiForTest() {
   return std::make_unique<TestImpl>(Thread::threadFactoryForTest(),
                                     Filesystem::fileSystemForTest());
+}
+
+ApiPtr createApiForTest(Filesystem::Instance& filesystem) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), filesystem);
 }
 
 ApiPtr createApiForTest(Random::RandomGenerator& random) {

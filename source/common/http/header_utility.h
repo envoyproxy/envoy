@@ -8,6 +8,7 @@
 #include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "common/http/status.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -46,6 +47,8 @@ public:
 
     friend class HeaderUtility;
   };
+  static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap::GetResult& header,
+                                                             absl::string_view separator = ",");
   static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap& headers,
                                                              const Http::LowerCaseString& key,
                                                              absl::string_view separator = ",");
@@ -174,6 +177,14 @@ public:
    * @brief Remove the port part from host/authority header if it is equal to provided port
    */
   static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
+
+  /* Does a common header check ensuring required headers are present.
+   * Required request headers include :method header, :path for non-CONNECT requests, and
+   * host/authority for HTTP/1.1 or CONNECT requests.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
+   */
+  static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

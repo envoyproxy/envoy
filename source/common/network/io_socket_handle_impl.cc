@@ -48,6 +48,16 @@ in_addr addressFromMessage(const cmsghdr& cmsg) {
 #endif
 }
 
+constexpr int messageTruncatedOption() {
+#if defined(__APPLE__)
+  // OSX does not support passing `MSG_TRUNC` to recvmsg and recvmmsg. This does not effect
+  // functionality and it primarily used for logging.
+  return 0;
+#else
+  return MSG_TRUNC;
+#endif
+}
+
 } // namespace
 
 namespace Network {
@@ -59,6 +69,10 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
+  if (file_event_) {
+    file_event_.reset();
+  }
+
   ASSERT(SOCKET_VALID(fd_));
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).rc_;
   SET_SOCKET_INVALID(fd_);
@@ -80,8 +94,18 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
     num_bytes_to_read += slice_length;
   }
   ASSERT(num_bytes_to_read <= max_length);
-  return sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
+  auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
+
+  // Emulated edge events need to registered if the socket operation did not complete
+  // because the socket would block.
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    // Some tests try to read without initializing the file_event.
+    if (result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+    }
+  }
+  return result;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint64_t max_length) {
@@ -99,6 +123,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint6
     bytes_to_commit -= slices[i].len_;
   }
   buffer.commit(slices, num_slices);
+
+  // Emulated edge events need to registered if the socket operation did not complete
+  // because the socket would block.
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    // Some tests try to read without initializing the file_event.
+    if (result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+    }
+  }
   return result;
 }
 
@@ -116,8 +149,18 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   if (num_slices_to_write == 0) {
     return Api::ioCallUint64ResultNoError();
   }
-  return sysCallResultToIoCallResult(
+  auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
+
+  // Emulated edge events need to registered if the socket operation did not complete
+  // because the socket would block.
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    // Some tests try to write without initializing the file_event.
+    if (result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    }
+  }
+  return result;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
@@ -126,6 +169,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
   Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
   if (result.ok() && result.rc_ > 0) {
     buffer.drain(static_cast<uint64_t>(result.rc_));
+  }
+
+  // Emulated edge events need to registered if the socket operation did not complete
+  // because the socket would block.
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    // Some tests try to read without initializing the file_event.
+    if (result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+    }
   }
   return result;
 }
@@ -164,7 +216,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     message.msg_control = nullptr;
     message.msg_controllen = 0;
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    return sysCallResultToIoCallResult(result);
+    auto io_result = sysCallResultToIoCallResult(result);
+    // Emulated edge events need to registered if the socket operation did not complete
+    // because the socket would block.
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      if (io_result.wouldBlock() && file_event_) {
+        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+      }
+    }
+    return io_result;
   } else {
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
@@ -206,7 +266,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    return sysCallResultToIoCallResult(result);
+    auto io_result = sysCallResultToIoCallResult(result);
+    // Emulated edge events need to registered if the socket operation did not complete
+    // because the socket would block.
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      if (io_result.wouldBlock() && file_event_) {
+        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
+      }
+    }
+    return io_result;
   }
 }
 
@@ -292,8 +360,24 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_flags = 0;
   hdr.msg_control = cbuf.begin();
   hdr.msg_controllen = cmsg_space_;
-  const Api::SysCallSizeResult result = Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, 0);
+  Api::SysCallSizeResult result =
+      Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
   if (result.rc_ < 0) {
+    auto io_result = sysCallResultToIoCallResult(result);
+    // Emulated edge events need to registered if the socket operation did not complete
+    // because the socket would block.
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      if (io_result.wouldBlock() && file_event_) {
+        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+      }
+    }
+    return io_result;
+  }
+  if ((hdr.msg_flags & MSG_TRUNC) != 0) {
+    ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.rc_);
+    result.rc_ = 0;
+    (*output.dropped_packets_)++;
+    output.msg_[0].truncated_and_dropped_ = true;
     return sysCallResultToIoCallResult(result);
   }
 
@@ -320,7 +404,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       if (output.dropped_packets_ != nullptr) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ = *maybe_dropped;
+          *output.dropped_packets_ += *maybe_dropped;
           continue;
         }
       }
@@ -373,28 +457,37 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   // Set MSG_WAITFORONE so that recvmmsg will not waiting for
   // |num_packets_per_mmsg_call| packets to arrive before returning when the
   // socket is a blocking socket.
-  const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().recvmmsg(
-      fd_, mmsg_hdr.data(), num_packets_per_mmsg_call, MSG_TRUNC | MSG_WAITFORONE, nullptr);
+  const Api::SysCallIntResult result =
+      Api::OsSysCallsSingleton::get().recvmmsg(fd_, mmsg_hdr.data(), num_packets_per_mmsg_call,
+                                               messageTruncatedOption() | MSG_WAITFORONE, nullptr);
 
   if (result.rc_ <= 0) {
-    return sysCallResultToIoCallResult(result);
+    auto io_result = sysCallResultToIoCallResult(result);
+    // Emulated edge events need to registered if the socket operation did not complete
+    // because the socket would block.
+    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+      if (io_result.wouldBlock() && file_event_) {
+        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+      }
+    }
+    return io_result;
   }
 
   int num_packets_read = result.rc_;
 
   for (int i = 0; i < num_packets_read; ++i) {
-    if (mmsg_hdr[i].msg_len == 0) {
+    msghdr& hdr = mmsg_hdr[i].msg_hdr;
+    if ((hdr.msg_flags & MSG_TRUNC) != 0) {
+      ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", mmsg_hdr[i].msg_len);
+      (*output.dropped_packets_)++;
+      output.msg_[i].truncated_and_dropped_ = true;
       continue;
     }
-    msghdr& hdr = mmsg_hdr[i].msg_hdr;
+
     RELEASE_ASSERT((hdr.msg_flags & MSG_CTRUNC) == 0,
                    fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
     RELEASE_ASSERT(hdr.msg_namelen > 0,
                    fmt::format("Unable to get remote address from recvmmsg() for fd: {}", fd_));
-    if ((hdr.msg_flags & MSG_TRUNC) != 0) {
-      ENVOY_LOG_MISC(warn, "Dropping truncated UDP packet with size: {}.", mmsg_hdr[i].msg_len);
-      continue;
-    }
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
@@ -420,7 +513,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ = *maybe_dropped;
+          *output.dropped_packets_ += *maybe_dropped;
         }
       }
     }
@@ -431,7 +524,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   const Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
-  return sysCallResultToIoCallResult(result);
+  auto io_result = sysCallResultToIoCallResult(result);
+  // Emulated edge events need to registered if the socket operation did not complete
+  // because the socket would block.
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    if (io_result.wouldBlock() && file_event_) {
+      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+    }
+  }
+  return io_result;
 }
 
 bool IoSocketHandleImpl::supportsMmsg() const {
@@ -477,6 +578,13 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }
 
+IoHandlePtr IoSocketHandleImpl::duplicate() {
+  auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
+  RELEASE_ASSERT(result.rc_ != -1, fmt::format("duplicate failed for '{}': ({}) {}", fd_,
+                                               result.errno_, errorDetails(result.errno_)));
+  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
+}
+
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
@@ -517,11 +625,27 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   return Address::addressFromSockAddr(ss, ss_len);
 }
 
-Event::FileEventPtr IoSocketHandleImpl::createFileEvent(Event::Dispatcher& dispatcher,
-                                                        Event::FileReadyCb cb,
-                                                        Event::FileTriggerType trigger,
-                                                        uint32_t events) {
-  return dispatcher.createFileEvent(fd_, cb, trigger, events);
+void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                             Event::FileTriggerType trigger, uint32_t events) {
+  ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
+                                 "file descriptor. This is not allowed.");
+  file_event_ = dispatcher.createFileEvent(fd_, cb, trigger, events);
+}
+
+void IoSocketHandleImpl::activateFileEvents(uint32_t events) {
+  if (file_event_) {
+    file_event_->activate(events);
+  } else {
+    ENVOY_BUG(false, "Null file_event_");
+  }
+}
+
+void IoSocketHandleImpl::enableFileEvents(uint32_t events) {
+  if (file_event_) {
+    file_event_->setEnabled(events);
+  } else {
+    ENVOY_BUG(false, "Null file_event_");
+  }
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {

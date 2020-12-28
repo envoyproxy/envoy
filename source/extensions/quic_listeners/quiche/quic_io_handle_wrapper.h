@@ -115,10 +115,18 @@ public:
   Network::Address::InstanceConstSharedPtr peerAddress() override {
     return io_handle_.peerAddress();
   }
-  Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                      Event::FileTriggerType trigger, uint32_t events) override {
-    return io_handle_.createFileEvent(dispatcher, cb, trigger, events);
+
+  void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                           Event::FileTriggerType trigger, uint32_t events) override {
+    io_handle_.initializeFileEvent(dispatcher, cb, trigger, events);
   }
+
+  Network::IoHandlePtr duplicate() override { return io_handle_.duplicate(); }
+
+  void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }
+  void enableFileEvents(uint32_t events) override { io_handle_.enableFileEvents(events); }
+  void resetFileEvents() override { return io_handle_.resetFileEvents(); };
+
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
 

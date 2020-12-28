@@ -16,6 +16,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/visitor.h"
 #include "common/protobuf/well_known.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
@@ -164,7 +165,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
     try {
       f(message, MessageVersion::LatestVersionValidate);
     } catch (EnvoyException& e) {
-      MessageUtil::onVersionUpgradeWarn(e.what());
+      MessageUtil::onVersionUpgradeDeprecation(e.what());
     }
     // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
@@ -275,8 +276,7 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
   throw ProtoValidationException(validation_error, message);
 }
 
-// TODO(htuch): this is where we will also reject v2 configs by default.
-void MessageUtil::onVersionUpgradeWarn(absl::string_view desc) {
+void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool reject) {
   const std::string& warning_str =
       fmt::format("Configuration does not parse cleanly as v3. v2 configuration is "
                   "deprecated and will be removed from Envoy at the start of Q1 2021: {}",
@@ -299,6 +299,15 @@ void MessageUtil::onVersionUpgradeWarn(absl::string_view desc) {
   // bootstrap).
   if (loader != nullptr) {
     loader->countDeprecatedFeatureUse();
+  }
+  if (reject &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_deprecated_v2_api")) {
+    throw DeprecatedMajorVersionException(fmt::format(
+        "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
+        "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
+        "following "
+        "the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition. ({})",
+        desc));
   }
 }
 
@@ -647,7 +656,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      MessageUtil::onVersionUpgradeWarn(any_full_name);
+      MessageUtil::onVersionUpgradeDeprecation(any_full_name);
       return;
     }
   }

@@ -41,7 +41,7 @@ public:
                Event::TimeSystem&));
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
-  MOCK_METHOD(const Stats::Scope&, rootScope, ());
+  MOCK_METHOD(Stats::Scope&, rootScope, ());
   MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
 
@@ -92,6 +92,7 @@ public:
   MOCK_METHOD(SysCallIntResult, shutdown, (os_fd_t sockfd, int how));
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));
+  MOCK_METHOD(SysCallSocketResult, duplicate, (os_fd_t sockfd));
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
   MOCK_METHOD(SysCallBoolResult, socketTcpInfo, (os_fd_t sockfd, EnvoyTcpInfo* tcp_info));
   MOCK_METHOD(bool, supportsMmsg, (), (const));

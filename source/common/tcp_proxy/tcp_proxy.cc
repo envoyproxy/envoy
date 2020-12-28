@@ -20,6 +20,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
 #include "common/network/proxy_protocol_filter_state.h"
@@ -382,12 +383,14 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
 
-  Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
+  Upstream::ThreadLocalCluster* thread_local_cluster =
+      cluster_manager_.getThreadLocalCluster(cluster_name);
 
   if (thread_local_cluster) {
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
   } else {
+    ENVOY_CONN_LOG(debug, "Cluster not found {}", read_callbacks_->connection(), cluster_name);
     config_->stats().downstream_cx_no_route_.inc();
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NoRoute);
@@ -431,8 +434,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
         downstreamConnection()->streamInfo().filterState());
   }
 
-  if (!maybeTunnel(cluster_name)) {
-    // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
+  if (!maybeTunnel(*thread_local_cluster)) {
+    // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
@@ -440,47 +443,32 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-bool Filter::maybeTunnel(const std::string& cluster_name) {
-  if (!config_->tunnelingConfig()) {
-    generic_conn_pool_ =
-        std::make_unique<TcpConnPool>(cluster_name, cluster_manager_, this, *upstream_callbacks_);
-    if (generic_conn_pool_->valid()) {
-      connecting_ = true;
-      connect_attempts_++;
-      generic_conn_pool_->newStream(this);
-      // Because we never return open connections to the pool, this either has a handle waiting on
-      // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
-      return true;
-    } else {
-      generic_conn_pool_.reset();
-    }
+bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
+  GenericConnPoolFactory* factory = nullptr;
+  if (cluster.info()->upstreamConfig().has_value()) {
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
+        cluster.info()->upstreamConfig().value());
   } else {
-    auto* cluster = cluster_manager_.get(cluster_name);
-    if (!cluster) {
-      return false;
-    }
-    // TODO(snowp): Ideally we should prevent this from being configured, but that's tricky to get
-    // right since whether a cluster is invalid depends on both the tcp_proxy config + cluster
-    // config.
-    if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) == 0) {
-      ENVOY_LOG(error, "Attempted to tunnel over HTTP/1.1, this is not supported. Set "
-                       "http2_protocol_options on the cluster.");
-      return false;
-    }
-
-    generic_conn_pool_ = std::make_unique<HttpConnPool>(cluster_name, cluster_manager_, this,
-                                                        config_->tunnelingConfig()->hostname(),
-                                                        *upstream_callbacks_);
-    if (generic_conn_pool_->valid()) {
-      generic_conn_pool_->newStream(this);
-      return true;
-    } else {
-      generic_conn_pool_.reset();
-    }
+    factory = Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
+        "envoy.filters.connection_pools.tcp.generic");
+  }
+  if (!factory) {
+    return false;
   }
 
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfig(), this,
+                                                      *upstream_callbacks_);
+  if (generic_conn_pool_) {
+    connecting_ = true;
+    connect_attempts_++;
+    generic_conn_pool_->newStream(*this);
+    // Because we never return open connections to the pool, this either has a handle waiting on
+    // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
+    return true;
+  }
   return false;
 }
+
 void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   generic_conn_pool_.reset();
@@ -644,8 +632,8 @@ void Filter::onUpstreamConnection() {
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
   getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
-  ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-            getStreamInfo().requestedServerName());
+  ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
+                 read_callbacks_->connection(), getStreamInfo().requestedServerName());
 
   if (config_->idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into
@@ -654,10 +642,14 @@ void Filter::onUpstreamConnection() {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
     resetIdleTimer();
-    read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
+    read_callbacks_->connection().addBytesSentCallback([this](uint64_t) {
+      resetIdleTimer();
+      return true;
+    });
     if (upstream_) {
-      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) {
+      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) -> bool {
         upstream_callbacks->onBytesSent();
+        return true;
       });
     }
   }

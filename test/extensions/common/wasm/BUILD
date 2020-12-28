@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_binary",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -21,6 +22,7 @@ envoy_cc_test(
     ]),
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
@@ -44,6 +46,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/common/wasm:wasm_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
         "//test/extensions/common/wasm/test_data:test_context_cpp_plugin",
         "//test/extensions/common/wasm/test_data:test_cpp_plugin",
         "//test/mocks/server:server_mocks",
@@ -63,8 +66,21 @@ envoy_cc_test_binary(
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/extensions/common/wasm:wasm_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "wasm_runtime",
+    srcs = ["wasm_runtime.cc"],
+    hdrs = ["wasm_runtime.h"],
+    deps = [
+        "//source/extensions/wasm_runtime/null:config",
+        "//source/extensions/wasm_runtime/v8:config",
+        "//source/extensions/wasm_runtime/wasmtime:config",
+        "//source/extensions/wasm_runtime/wavm:config",
     ],
 )

@@ -210,6 +210,9 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
   case 0xe8:
   case 0xe9:
   case 0xea:
+  case 0xeb:
+  case 0xec:
+  case 0xed:
   case 0xee:
   case 0xef:
 
@@ -229,6 +232,8 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
   case 0xf9:
   case 0xfa:
   case 0xfb:
+  case 0xfc:
+  case 0xfd:
   case 0xfe:
   case 0xff:
 
@@ -340,6 +345,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
   case 0xc9:
   case 0xca:
   case 0xcb:
+  case 0xcc:
   case 0xcd:
   case 0xce:
   case 0xcf:

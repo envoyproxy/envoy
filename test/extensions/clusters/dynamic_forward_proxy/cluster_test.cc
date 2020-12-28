@@ -16,6 +16,7 @@
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
 using testing::DoAll;
@@ -43,7 +44,7 @@ public:
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
     if (uses_tls) {
-      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
+      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _, _));
     }
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     // Below we return a nullptr handle which has no effect on the code under test but isn't
@@ -69,7 +70,11 @@ public:
     for (const auto& host : host_map_) {
       existing_hosts.emplace(host.first, host.second);
     }
-    EXPECT_CALL(*dns_cache_manager_->dns_cache_, hosts()).WillOnce(Return(existing_hosts));
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, iterateHostMap(_)).WillOnce(Invoke([&](auto cb) {
+      for (const auto& host : host_map_) {
+        cb(host.first, host.second);
+      }
+    }));
     if (!existing_hosts.empty()) {
       EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
     }
@@ -107,7 +112,7 @@ public:
   MOCK_METHOD(void, onMemberUpdateCb,
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -137,7 +142,7 @@ connect_timeout: 0.25s
 cluster_type:
   name: dynamic_forward_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
     dns_cache_config:
       name: foo
       dns_lookup_family: AUTO
@@ -153,14 +158,12 @@ TEST_F(ClusterTest, BasicFlow) {
   // Verify no host LB cases.
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
 
-  // LB will not resolve host1 until it has been updated.
+  // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
-  refreshLb();
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 
@@ -173,13 +176,10 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 
-  // Remove the host, LB will still resolve until it is refreshed.
+  // Remove the host, LB will immediately fail to find the host in the map.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
   update_callbacks_->onDnsHostRemove("host1");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
-  refreshLb();
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
 }
 
@@ -214,7 +214,7 @@ protected:
   }
 
 private:
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -232,6 +232,7 @@ private:
 
 // Verify that using 'sni' causes a failure.
 TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -256,6 +257,7 @@ tls_context:
 
 // Verify that using 'verify_subject_alt_name' causes a failure.
 TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -285,7 +287,7 @@ connect_timeout: 0.25s
 cluster_type:
   name: dynamic_forward_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
     dns_cache_config:
       name: foo
 upstream_http_protocol_options: {}
