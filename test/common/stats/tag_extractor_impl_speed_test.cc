@@ -23,9 +23,6 @@ const std::vector<Params> params = {
     {"mongo.mongo_filter.cmd.foo_cmd.reply_size", 2},
     {"mongo.mongo_filter.collection.bar_collection.query.multi_get", 2},
     {"mongo.mongo_filter.collection.bar_collection.callsite.baz_callsite.query.scatter_get", 3},
-    {"mongo.mongo_filter.with.dot.in.prefix.collection.bar_collection.callsite.baz_callsite.query."
-     "scatter_get",
-     3},
     {"ratelimit.foo_ratelimiter.over_limit", 1},
     {"http.egress_dynamodb_iad.downstream_cx_total", 1},
     {"http.egress_dynamodb_iad.dynamodb.operation.Query.upstream_rq_time", 2},
@@ -62,7 +59,7 @@ static void bmExtractTags(benchmark::State& state) {
     RELEASE_ASSERT(tags.size() == tags_size, "");
   }
 }
-BENCHMARK(bmExtractTags)->DenseRange(0, 27, 1);
+BENCHMARK(bmExtractTags)->DenseRange(0, 26, 1);
 
 } // namespace
 } // namespace Stats
