@@ -4266,6 +4266,92 @@ TEST_F(PreconnectTest, PreconnectOn) {
       ->tcpConnPool(ResourcePriority::Default, nullptr);
 }
 
+class DynamicRemovalClusterUpdateCallbacks : public ClusterUpdateCallbacks {
+public:
+  DynamicRemovalClusterUpdateCallbacks(ClusterManager* cluster_manager)
+      : cb_handler_(cluster_manager->addThreadLocalClusterUpdateCallbacks(*this)) {}
+
+  void onClusterAddOrUpdate(ThreadLocalCluster&) override {
+    cb_handler_.reset();
+    add_or_updated_counter_++;
+  }
+
+  void onClusterRemoval(const std::string&) override {
+    cb_handler_.reset();
+    removal_counter_++;
+  }
+
+  ClusterUpdateCallbacksHandlePtr cb_handler_;
+  uint32_t add_or_updated_counter_{0};
+  uint32_t removal_counter_{0};
+};
+
+// Test removing a callback while iterating over the cluster manager callbacks.
+TEST_F(ClusterManagerImplTest, DynamicClusterUpdateCallbacksRemoval) {
+  create(defaultConfig());
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  // Create dynamic removal callbacks to test onClusterAddOrUpdate.
+  DynamicRemovalClusterUpdateCallbacks dynamic_removal_update_cbs(cluster_manager_.get());
+  // Create mock callbacks.
+  std::unique_ptr<MockClusterUpdateCallbacks> mock_callbacks(
+      new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr mock_cbs =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*mock_callbacks);
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_CALL(*mock_callbacks, onClusterAddOrUpdate(_));
+  cluster1->initialize_callback_();
+  EXPECT_EQ(1, dynamic_removal_update_cbs.add_or_updated_counter_);
+  EXPECT_EQ(0, dynamic_removal_update_cbs.removal_counter_);
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+
+  // Add another cluster (dynamically), and verify that the removed callbacks weren't called.
+  std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
+  cluster2->info_->name_ = "fake_cluster2";
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster2, nullptr)));
+  ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster2"), "");
+  EXPECT_CALL(*mock_callbacks, onClusterAddOrUpdate(_));
+  cluster2->initialize_callback_();
+  // No change to the removed update callbacks.
+  EXPECT_EQ(1, dynamic_removal_update_cbs.add_or_updated_counter_);
+  EXPECT_EQ(0, dynamic_removal_update_cbs.removal_counter_);
+  checkStats(2 /*added*/, 0 /*modified*/, 0 /*removed*/, 2 /*active*/, 0 /*warming*/);
+
+  // Create dynamic removal callbacks to test onClusterRemoval.
+  DynamicRemovalClusterUpdateCallbacks dynamic_removal_remove_cbs(cluster_manager_.get());
+
+  // Now remove one of the clusters.
+  EXPECT_CALL(*mock_callbacks, onClusterRemoval(_));
+  EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
+  EXPECT_EQ(0, dynamic_removal_remove_cbs.add_or_updated_counter_);
+  EXPECT_EQ(1, dynamic_removal_remove_cbs.removal_counter_);
+  EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
+  checkStats(2 /*added*/, 0 /*modified*/, 1 /*removed*/, 1 /*active*/, 0 /*warming*/);
+
+  // Remove the other cluster, and verify that the removed callbacks weren't called.
+  EXPECT_CALL(*mock_callbacks, onClusterRemoval(_));
+  EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster2"));
+  EXPECT_EQ(0, dynamic_removal_remove_cbs.add_or_updated_counter_);
+  EXPECT_EQ(1, dynamic_removal_remove_cbs.removal_counter_);
+  EXPECT_EQ(0UL, cluster_manager_->clusters().active_clusters_.size());
+  checkStats(2 /*added*/, 0 /*modified*/, 2 /*removed*/, 0 /*active*/, 0 /*warming*/);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(mock_callbacks.get()));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
