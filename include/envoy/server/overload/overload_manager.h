@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_timer_minimum.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "common/singleton/const_singleton.h"
@@ -37,6 +38,17 @@ public:
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
 
+enum class OverloadTimerType {
+  // Timers created with this type will never be scaled. This should only be used for testing.
+  UnscaledRealTimerForTest,
+  // The amount of time an HTTP connection to a downstream client can remain idle (no streams). This
+  // corresponds to the HTTP_DOWNSTREAM_CONNECTION_IDLE TimerType in overload.proto.
+  HttpDownstreamIdleConnectionTimeout,
+  // The amount of time an HTTP stream from a downstream client can remain idle. This corresponds to
+  // the HTTP_DOWNSTREAM_STREAM_IDLE TimerType in overload.proto.
+  HttpDownstreamIdleStreamTimeout,
+};
+
 /**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client
  * requests. It monitors a set of resources and notifies registered listeners if
@@ -69,6 +81,12 @@ public:
    * an alternative to registering a callback for overload action state changes.
    */
   virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
+
+  /**
+   * Get the configured minimum rule for the given timer type.
+   */
+  virtual Event::ScaledTimerMinimum
+  getConfiguredTimerMinimum(OverloadTimerType timer_type) const PURE;
 };
 
 } // namespace Server

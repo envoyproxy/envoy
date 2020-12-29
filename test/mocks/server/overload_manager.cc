@@ -11,19 +11,14 @@ namespace Envoy {
 namespace Server {
 
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::ReturnNew;
 using ::testing::ReturnRef;
 
 MockThreadLocalOverloadState::MockThreadLocalOverloadState()
     : disabled_state_(OverloadActionState::inactive()) {
   ON_CALL(*this, getState).WillByDefault(ReturnRef(disabled_state_));
-  ON_CALL(*this, createScaledTypedTimer_).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledMinimumTimer_).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
-}
-
-Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(OverloadTimerType timer_type,
-                                                                Event::TimerCb callback) {
-  return Event::TimerPtr{createScaledTypedTimer_(timer_type, std::move(callback))};
 }
 
 Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(Event::ScaledTimerMinimum minimum,
@@ -33,6 +28,8 @@ Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(Event::ScaledTim
 
 MockOverloadManager::MockOverloadManager() {
   ON_CALL(*this, getThreadLocalOverloadState()).WillByDefault(ReturnRef(overload_state_));
+  ON_CALL(*this, getConfiguredTimerMinimum)
+      .WillByDefault(Return(Event::ScaledMinimum(UnitFloat::max())));
 }
 
 MockOverloadManager::~MockOverloadManager() = default;

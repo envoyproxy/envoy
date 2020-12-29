@@ -40,17 +40,6 @@ private:
  */
 using OverloadActionCb = std::function<void(OverloadActionState)>;
 
-enum class OverloadTimerType {
-  // Timers created with this type will never be scaled. This should only be used for testing.
-  UnscaledRealTimerForTest,
-  // The amount of time an HTTP connection to a downstream client can remain idle (no streams). This
-  // corresponds to the HTTP_DOWNSTREAM_CONNECTION_IDLE TimerType in overload.proto.
-  HttpDownstreamIdleConnectionTimeout,
-  // The amount of time an HTTP stream from a downstream client can remain idle. This corresponds to
-  // the HTTP_DOWNSTREAM_STREAM_IDLE TimerType in overload.proto.
-  HttpDownstreamIdleStreamTimeout,
-};
-
 /**
  * Thread-local copy of the state of each configured overload action.
  */
@@ -58,10 +47,6 @@ class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
-
-  // Get a scaled timer whose minimum corresponds to the configured value for the given timer type.
-  virtual Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
-                                            Event::TimerCb callback) PURE;
 
   // Get a scaled timer whose minimum is determined by the given scaling rule.
   virtual Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,

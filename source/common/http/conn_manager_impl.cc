@@ -101,6 +101,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_state_.getState(Server::OverloadActionNames::get().StopAcceptingRequests)),
       overload_disable_keepalive_ref_(
           overload_state_.getState(Server::OverloadActionNames::get().DisableHttpKeepAlive)),
+      downstream_idle_connection_scaled_timeout_(overload_manager.getConfiguredTimerMinimum(
+          Server::OverloadTimerType::HttpDownstreamIdleConnectionTimeout)),
+      downstream_idle_stream_scaled_timeout_(overload_manager.getConfiguredTimerMinimum(
+          Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout)),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -122,8 +126,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   if (config_.idleTimeout()) {
     connection_idle_timer_ = overload_state_.createScaledTimer(
-        Server::OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
-        [this]() -> void { onIdleTimeout(); });
+        downstream_idle_connection_scaled_timeout_, [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
@@ -638,7 +641,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
-        Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
+        connection_manager_.downstream_idle_stream_scaled_timeout_,
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
@@ -1063,7 +1066,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
-              Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
+              connection_manager_.downstream_idle_stream_scaled_timeout_,
               [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {

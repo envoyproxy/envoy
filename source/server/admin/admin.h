@@ -255,9 +255,6 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
-      Event::TimerPtr createScaledTimer(OverloadTimerType, Event::TimerCb callback) override {
-        return dispatcher_.createTimer(callback);
-      }
       Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum,
                                         Event::TimerCb callback) override {
         return dispatcher_.createTimer(callback);
@@ -284,6 +281,10 @@ private:
       // This method shouldn't be called by the admin listener
       NOT_REACHED_GCOVR_EXCL_LINE;
       return false;
+    }
+
+    Event::ScaledTimerMinimum getConfiguredTimerMinimum(OverloadTimerType) const override {
+      return Event::ScaledMinimum(UnitFloat::max());
     }
 
     ThreadLocal::SlotPtr tls_;

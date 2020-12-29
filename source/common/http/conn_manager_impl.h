@@ -440,6 +440,9 @@ private:
   // map lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
+  // Timer scaling factors.
+  const Event::ScaledTimerMinimum downstream_idle_connection_scaled_timeout_;
+  const Event::ScaledTimerMinimum downstream_idle_stream_scaled_timeout_;
   TimeSource& time_source_;
   bool remote_close_{};
 };
