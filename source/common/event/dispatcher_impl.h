@@ -29,7 +29,7 @@ namespace Event {
  */
 class DispatcherImplBase final : public DispatcherBase {
 public:
-  DispatcherImplBase(Api::Api& api, TimeSystem& time_system);
+  DispatcherImplBase(Api::Api& api, TimeSystem& time_system, std::function<void()> before_post_cb);
 
   // DispatcherBase impl
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
@@ -51,14 +51,6 @@ public:
    */
   Api::Api& api() { return api_; }
   /**
-   * @return Thread::ThreadId the thread ID last set by saveTid().
-   */
-  Thread::ThreadId runTid() const { return run_tid_; }
-  /**
-   * Saves the ID of the calling thread for later retrieval with runTid().
-   */
-  void saveTid() { run_tid_ = api_.threadFactory().currentThreadId(); }
-  /**
    * Creates a schedulable callback that doesn't touch the watchdog before running.
    */
   SchedulableCallbackPtr createRawSchedulableCallback(std::function<void()> cb);
@@ -74,19 +66,27 @@ public:
    */
   void touchWatchdog();
 
+  /**
+   * Post a callback to be executed during the current or next call to run().
+   */
+  void post(std::function<void()> callback);
+
+  /**
+   * Run the dispatcher with the given exit condition.
+   */
+  void run(Dispatcher::RunType type);
+
   // Utility functions used to implement the full Dispatcher interface.
   void registerOnPrepareCallback(LibeventScheduler::OnPrepareCallback&& callback) {
     base_scheduler_.registerOnPrepareCallback(std::move(callback));
   }
   void initializeStats(DispatcherStats* stats) { base_scheduler_.initializeStats(stats); }
-  void run(Dispatcher::RunType type) { base_scheduler_.run(type); }
   void loopExit() { base_scheduler_.loopExit(); }
   void runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const;
   void onFatalError(std::ostream& os) const;
   void updateApproximateMonotonicTime() {
     approximate_monotonic_time_ = api_.timeSource().monotonicTime();
   }
-
 private:
   // Holds a reference to the watchdog registered with this dispatcher and the timer used to ensure
   // that the dog is touched periodically.
@@ -103,6 +103,8 @@ private:
     TimerPtr touch_timer_;
   };
 
+  void runPostCallbacks();
+
   LibeventScheduler base_scheduler_;
   absl::optional<WatchdogRegistration> watchdog_registration_;
   const ScopeTrackedObject* current_object_{};
@@ -110,6 +112,10 @@ private:
   SchedulerPtr scheduler_;
   Thread::ThreadId run_tid_;
   MonotonicTime approximate_monotonic_time_;
+  Thread::MutexBasicLockable post_lock_;
+  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
+  SchedulableCallbackPtr post_cb_;
+  std::function<void()> before_post_cb_;
 };
 
 /**
@@ -168,7 +174,10 @@ public:
   void exit() override { base_.loopExit(); }
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
-  void run(RunType type) override;
+  void run(RunType type) override {
+    clearDeferredDeleteList();
+    base_.run(type);
+    }
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   void updateApproximateMonotonicTime() override { base_.updateApproximateMonotonicTime(); }
 
@@ -190,12 +199,9 @@ private:
   DispatcherStatsPtr stats_;
   Buffer::WatermarkFactorySharedPtr buffer_factory_;
   SchedulableCallbackPtr deferred_delete_cb_;
-  SchedulableCallbackPtr post_cb_;
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
-  Thread::MutexBasicLockable post_lock_;
-  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   bool deferred_deleting_{};
 };
 

@@ -37,8 +37,11 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImplBase::DispatcherImplBase(Api::Api& api, TimeSystem& time_system)
-    : api_(api), scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)) {
+DispatcherImplBase::DispatcherImplBase(Api::Api& api, TimeSystem& time_system,
+                                       std::function<void()> before_post_cb)
+    : api_(api), scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
+      post_cb_(createRawSchedulableCallback([this]() -> void { runPostCallbacks(); })),
+      before_post_cb_(std::move(before_post_cb)) {
   updateApproximateMonotonicTime();
   registerOnPrepareCallback(std::bind(&DispatcherImplBase::updateApproximateMonotonicTime, this));
 }
@@ -96,6 +99,31 @@ void DispatcherImplBase::touchWatchdog() {
   }
 }
 
+void DispatcherImplBase::post(std::function<void()> callback) {
+  bool do_post;
+  {
+    Thread::LockGuard lock(post_lock_);
+    do_post = post_callbacks_.empty();
+    post_callbacks_.push_back(callback);
+  }
+
+  if (do_post) {
+    post_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
+void DispatcherImplBase::run(Dispatcher::RunType type) {
+  run_tid_ = api_.threadFactory().currentThreadId();
+
+  // Flush all post callbacks before we run the event loop. We do this because there are post
+  // callbacks that have to get run before the initial event loop starts running. libevent does
+  // not guarantee that events are run in any particular order. So even if we post() and call
+  // event_base_once() before some other event, the other event might get called first.
+  runPostCallbacks();
+
+  base_scheduler_.run(type);
+}
+
 void DispatcherImplBase::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
   // Only run if this is the dispatcher of the current thread and
@@ -132,15 +160,47 @@ DispatcherImplBase::WatchdogRegistration::WatchdogRegistration(
   touch_timer_->enableTimer(timer_interval_);
 }
 
+void DispatcherImplBase::runPostCallbacks() {
+  before_post_cb_();
+  std::list<std::function<void()>> callbacks;
+  {
+    // Take ownership of the callbacks under the post_lock_. The lock must be released before
+    // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute
+    // later in the event loop.
+    Thread::LockGuard lock(post_lock_);
+    callbacks = std::move(post_callbacks_);
+    // post_callbacks_ should be empty after the move.
+    ASSERT(post_callbacks_.empty());
+  }
+  // It is important that the execution and deletion of the callback happen while post_lock_ is not
+  // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
+  while (!callbacks.empty()) {
+    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
+    // executing a long list of callbacks.
+    touchWatchdog();
+    // Run the callback.
+    callbacks.front()();
+    // Pop the front so that the destructor of the callback that just executed runs before the next
+    // callback executes.
+    callbacks.pop_front();
+  }
+}
+
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
                                const Buffer::WatermarkFactorySharedPtr& factory)
-    : base_(api, time_system), name_(name),
+    : base_(api, time_system,
+            [this] {
+              // Clear the deferred delete list before running post callbacks to reduce
+              // non-determinism in callback processing, and more easily detect if a scheduled post
+              // callback refers to one of the objects that is being deferred deleted.
+              clearDeferredDeleteList();
+            }),
+      name_(name),
       buffer_factory_(factory != nullptr ? factory
                                          : std::make_shared<Buffer::WatermarkBufferFactory>()),
       deferred_delete_cb_(
           base_.createRawSchedulableCallback([this]() -> void { clearDeferredDeleteList(); })),
-      post_cb_(base_.createRawSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
@@ -162,7 +222,8 @@ void DispatcherImpl::initializeStats(Stats::Scope& scope,
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
     base_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, base_.runTid().debugString());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_,
+              base_.api().threadFactory().currentThreadId().debugString());
   });
 }
 
@@ -276,59 +337,7 @@ SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb)
   return SignalEventPtr{new SignalEventImpl(base_, signal_num, cb)};
 }
 
-void DispatcherImpl::post(std::function<void()> callback) {
-  bool do_post;
-  {
-    Thread::LockGuard lock(post_lock_);
-    do_post = post_callbacks_.empty();
-    post_callbacks_.push_back(callback);
-  }
-
-  if (do_post) {
-    post_cb_->scheduleCallbackCurrentIteration();
-  }
-}
-
-void DispatcherImpl::run(RunType type) {
-  base_.saveTid();
-
-  // Flush all post callbacks before we run the event loop. We do this because there are post
-  // callbacks that have to get run before the initial event loop starts running. libevent does
-  // not guarantee that events are run in any particular order. So even if we post() and call
-  // event_base_once() before some other event, the other event might get called first.
-  runPostCallbacks();
-  base_.run(type);
-}
-
-void DispatcherImpl::runPostCallbacks() {
-  // Clear the deferred delete list before running post callbacks to reduce non-determinism in
-  // callback processing, and more easily detect if a scheduled post callback refers to one of the
-  // objects that is being deferred deleted.
-  clearDeferredDeleteList();
-
-  std::list<std::function<void()>> callbacks;
-  {
-    // Take ownership of the callbacks under the post_lock_. The lock must be released before
-    // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute
-    // later in the event loop.
-    Thread::LockGuard lock(post_lock_);
-    callbacks = std::move(post_callbacks_);
-    // post_callbacks_ should be empty after the move.
-    ASSERT(post_callbacks_.empty());
-  }
-  // It is important that the execution and deletion of the callback happen while post_lock_ is not
-  // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
-  while (!callbacks.empty()) {
-    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
-    // executing a long list of callbacks.
-    base_.touchWatchdog();
-    // Run the callback.
-    callbacks.front()();
-    // Pop the front so that the destructor of the callback that just executed runs before the next
-    // callback executes.
-    callbacks.pop_front();
-  }
-}
+void DispatcherImpl::post(std::function<void()> callback) { base_.post(std::move(callback)); }
 
 void DispatcherImpl::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
