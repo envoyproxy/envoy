@@ -9,36 +9,36 @@
 // Load Average: 0.94, 0.75, 0.88
 // ***WARNING*** CPU scaling is enabled, the benchmark real time
 // measurements may be noisy and will incur extra overhead.
-// -----------------------------------------------------------
-// Benchmark                 Time             CPU   Iterations
-// -----------------------------------------------------------
-// BM_ExtractTags/0        1825 ns         1822 ns       387111
-// BM_ExtractTags/1         508 ns          507 ns      1000000
-// BM_ExtractTags/2         790 ns          789 ns       848523
-// BM_ExtractTags/3         644 ns          643 ns      1094132
-// BM_ExtractTags/4        1341 ns         1340 ns       531746
-// BM_ExtractTags/5         862 ns          861 ns       826768
-// BM_ExtractTags/6         338 ns          337 ns      2113684
-// BM_ExtractTags/7         588 ns          587 ns      1201340
-// BM_ExtractTags/8        1427 ns         1424 ns       491857
-// BM_ExtractTags/9        1859 ns         1856 ns       376606
-// BM_ExtractTags/10        316 ns          316 ns      2218446
-// BM_ExtractTags/11        510 ns          509 ns      1387294
-// BM_ExtractTags/12       1136 ns         1134 ns       603194
-// BM_ExtractTags/13       1353 ns         1351 ns       526904
-// BM_ExtractTags/14       1592 ns         1590 ns       437307
-// BM_ExtractTags/15        958 ns          956 ns       716738
-// BM_ExtractTags/16        809 ns          808 ns       834782
-// BM_ExtractTags/17        806 ns          804 ns       892949
-// BM_ExtractTags/18        829 ns          828 ns       867147
-// BM_ExtractTags/19        333 ns          333 ns      2070021
-// BM_ExtractTags/20        347 ns          347 ns      2071800
-// BM_ExtractTags/21        399 ns          398 ns      1769854
-// BM_ExtractTags/22        873 ns          872 ns       784136
-// BM_ExtractTags/23       2092 ns         2089 ns       336846
-// BM_ExtractTags/24        314 ns          314 ns      2221138
-// BM_ExtractTags/25        306 ns          306 ns      2317142
-// BM_ExtractTags/26        497 ns          497 ns      1417577
+// ------------------------------------------------------------
+// Benchmark                  Time             CPU   Iterations
+// ------------------------------------------------------------
+// BM_ExtractTags/0        1796 ns         1793 ns       401011
+// BM_ExtractTags/1         513 ns          512 ns      1364401
+// BM_ExtractTags/2         794 ns          793 ns       899533
+// BM_ExtractTags/3         646 ns          645 ns      1091666
+// BM_ExtractTags/4        1315 ns         1314 ns       523727
+// BM_ExtractTags/5         854 ns          853 ns       830341
+// BM_ExtractTags/6         336 ns          336 ns      2085144
+// BM_ExtractTags/7         574 ns          573 ns      1205468
+// BM_ExtractTags/8        1264 ns         1262 ns       542151
+// BM_ExtractTags/9        1724 ns         1721 ns       408224
+// BM_ExtractTags/10        316 ns          316 ns      2203384
+// BM_ExtractTags/11        522 ns          521 ns      1383972
+// BM_ExtractTags/12       1159 ns         1157 ns       591665
+// BM_ExtractTags/13       1348 ns         1346 ns       518341
+// BM_ExtractTags/14       1605 ns         1603 ns       445517
+// BM_ExtractTags/15        959 ns          958 ns       720045
+// BM_ExtractTags/16        820 ns          818 ns       857287
+// BM_ExtractTags/17        806 ns          805 ns       833224
+// BM_ExtractTags/18        843 ns          842 ns       830836
+// BM_ExtractTags/19        343 ns          343 ns      2088403
+// BM_ExtractTags/20        351 ns          350 ns      1988046
+// BM_ExtractTags/21        404 ns          404 ns      1711767
+// BM_ExtractTags/22        874 ns          873 ns       802379
+// BM_ExtractTags/23       2041 ns         2038 ns       334105
+// BM_ExtractTags/24        316 ns          316 ns      2216693
+// BM_ExtractTags/25        298 ns          298 ns      2302454
+// BM_ExtractTags/26        506 ns          506 ns      1384901
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 

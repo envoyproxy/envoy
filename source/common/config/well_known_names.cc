@@ -31,71 +31,71 @@ TagNameValues::TagNameValues() {
 
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.[<operation_name>.](__partition_id=<last_seven_characters_from_partition_id>)
   addRe2(DYNAMO_PARTITION_ID,
-         R"(^http\.[\w-]+\.dynamodb\.table\.[\w-]+\.capacity\.[\w-]+(\.__partition_id=(\w{7}))$)",
+         R"(^http\.[^\.]+\.dynamodb\.table\.[^\.]+\.capacity\.[^\.]+(\.__partition_id=(\w{7}))$)",
          ".dynamodb.table.");
 
   // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)<base_stat> or
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.(<operation_name>.)[<partition_id>]
   addRe2(DYNAMO_OPERATION,
-         R"(^http\.[\w-]+\.dynamodb.(?:operation|table\.[\w-]+\.capacity)(\.([\w-]+))(?:\.|$))",
+         R"(^http\.[^\.]+\.dynamodb.(?:operation|table\.[^\.]+\.capacity)(\.([^\.]+))(?:\.|$))",
          ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.<base_stat>
-  addRe2(MONGO_CALLSITE, R"(^mongo\.[\w-]+\.collection\.[\w-]+\.callsite\.(([\w-]+)\.)query\.)",
+  addRe2(MONGO_CALLSITE, R"(^mongo\.[^\.]+\.collection\.[^\.]+\.callsite\.(([^\.]+)\.)query\.)",
          ".collection.");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.) or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
-  addRe2(DYNAMO_TABLE, R"(^http\.[\w-]+\.dynamodb.(?:table|error)\.(([\w-]+)\.))", ".dynamodb.");
+  addRe2(DYNAMO_TABLE, R"(^http\.[^\.]+\.dynamodb.(?:table|error)\.(([^\.]+)\.))", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.<base_stat>
-  addRe2(MONGO_COLLECTION, R"(^mongo\.[\w-]+\.collection\.(([\w-]+)\.).*?query\.)", ".collection.");
+  addRe2(MONGO_COLLECTION, R"(^mongo\.[^\.]+\.collection\.(([^\.]+)\.).*?query\.)", ".collection.");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)<base_stat>
-  addRe2(MONGO_CMD, R"(^mongo\.[\w-]+\.cmd\.(([\w-]+)\.))", ".cmd.");
+  addRe2(MONGO_CMD, R"(^mongo\.[^\.]+\.cmd\.(([^\.]+)\.))", ".cmd.");
 
   // cluster.[<route_target_cluster>.]grpc.<grpc_service>.(<grpc_method>.)*
-  addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.[\w-]+\.grpc\.[\w-]+\.(([\w-]+)\.))", ".grpc.");
+  addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.[^\.]+\.grpc\.[^\.]+\.(([^\.]+)\.))", ".grpc.");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
-  addRe2(HTTP_USER_AGENT, R"(^http\.[\w-]+\.user_agent\.(([\w-]+)\.))", ".user_agent.");
+  addRe2(HTTP_USER_AGENT, R"(^http\.[^\.]+\.user_agent\.(([^\.]+)\.))", ".user_agent.");
 
   // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)*
-  addRe2(VIRTUAL_CLUSTER, R"(^vhost\.[\w-]+\.vcluster\.(([\w-]+)\.))", ".vcluster.");
+  addRe2(VIRTUAL_CLUSTER, R"(^vhost\.[^\.]+\.vcluster\.(([^\.]+)\.))", ".vcluster.");
 
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
-  addRe2(FAULT_DOWNSTREAM_CLUSTER, R"(^http\.[\w-]+\.fault\.(([\w-]+)\.))", ".fault.");
+  addRe2(FAULT_DOWNSTREAM_CLUSTER, R"(^http\.[^\.]+\.fault\.(([^\.]+)\.))", ".fault.");
 
   // listener.[<address>.]ssl.cipher.(<cipher>)
   addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.([0-9A-Za-z_-]+))$)");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
-  addRe2(SSL_CIPHER_SUITE, R"(^cluster\.[\w-]+\.ssl\.ciphers(\.([0-9A-Za-z_-]+))$)",
+  addRe2(SSL_CIPHER_SUITE, R"(^cluster\.[^\.]+\.ssl\.ciphers(\.([0-9A-Za-z_-]+))$)",
          ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRe2(GRPC_BRIDGE_SERVICE, R"(^cluster\.[\w-]+\.grpc\.(([\w-]+)\.))", ".grpc.");
+  addRe2(GRPC_BRIDGE_SERVICE, R"(^cluster\.[^\.]+\.grpc\.(([^\.]+)\.))", ".grpc.");
 
   // tcp.(<stat_prefix>.)<base_stat>
-  addRe2(TCP_PREFIX, R"(^tcp\.(([\w-]+)\.))");
+  addRe2(TCP_PREFIX, R"(^tcp\.(([^\.]+)\.))");
 
   // udp.(<stat_prefix>.)<base_stat>
-  addRe2(UDP_PREFIX, R"(^udp\.(([\w-]+)\.))");
+  addRe2(UDP_PREFIX, R"(^udp\.(([^\.]+)\.))");
 
   // auth.clientssl.(<stat_prefix>.)*
-  addRe2(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.(([\w-]+)\.))");
+  addRe2(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.(([^\.]+)\.))");
 
   // ratelimit.(<stat_prefix>.)*
-  addRe2(RATELIMIT_PREFIX, R"(^ratelimit\.(([\w-]+)\.))");
+  addRe2(RATELIMIT_PREFIX, R"(^ratelimit\.(([^\.]+)\.))");
 
   // cluster.(<cluster_name>.)*
-  addRe2(CLUSTER_NAME, R"(^cluster\.(([\w-]+)\.))");
+  addRe2(CLUSTER_NAME, R"(^cluster\.(([^\.]+)\.))");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
-  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.(([\w-]+)\.))", ".http.");
+  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.(([^\.]+)\.))", ".http.");
 
   // http.(<stat_prefix>.)*
-  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^http\.(([\w-]+)\.))");
+  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^http\.(([^\.]+)\.))");
 
   // listener.(<address>.)*
   addRe2(
@@ -103,13 +103,13 @@ TagNameValues::TagNameValues() {
       R"(^listener\.(((?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}_\d+|\[[_aAbBcCdDeEfF[:digit:]]+\]_\d+))\.))");
 
   // vhost.(<virtual host name>.)*
-  addRe2(VIRTUAL_HOST, R"(^vhost\.(([\w-]+)\.))");
+  addRe2(VIRTUAL_HOST, R"(^vhost\.(([^\.]+)\.))");
 
   // mongo.(<stat_prefix>.)*
-  addRe2(MONGO_PREFIX, R"(^mongo\.(([\w-]+)\.))");
+  addRe2(MONGO_PREFIX, R"(^mongo\.(([^\.]+)\.))");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
-  addRe2(RDS_ROUTE_CONFIG, R"(^http\.[\w-]+\.rds\.(([\w-\.]+)\.)\w+?$)", ".rds.");
+  addRe2(RDS_ROUTE_CONFIG, R"(^http\.[^\.]+\.rds\.(([\w-\.]+)\.)\w+?$)", ".rds.");
 
   // listener_manager.(worker_<id>.)*
   addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
