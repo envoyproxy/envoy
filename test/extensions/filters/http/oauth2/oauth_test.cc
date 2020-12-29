@@ -79,12 +79,16 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   mock_response->body().add(json);
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_.push_back(&cb);
-            return &request_;
-          }));
+      .WillRepeatedly(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                                 const Http::AsyncClient::RequestOptions&)
+                                 -> Http::AsyncClient::Request* {
+        EXPECT_FALSE(message->headers().get(Http::CustomHeaders::get().Accept).empty());
+        EXPECT_EQ(
+            message->headers().get(Http::CustomHeaders::get().Accept)[0]->value().getStringView(),
+            Http::Headers::get().ContentTypeValues.Json);
+        callbacks_.push_back(&cb);
+        return &request_;
+      }));
 
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
