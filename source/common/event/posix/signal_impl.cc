@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Event {
 
-SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num, SignalCb cb)
+SignalEventImpl::SignalEventImpl(DispatcherImplBase& dispatcher, signal_t signal_num, SignalCb cb)
     : cb_(cb) {
   evsignal_assign(
       &raw_event_, &dispatcher.base(), signal_num,

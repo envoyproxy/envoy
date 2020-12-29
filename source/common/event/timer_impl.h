@@ -52,7 +52,7 @@ public:
  */
 class TimerImpl : public Timer, ImplBase {
 public:
-  TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Event::Dispatcher& dispatcher);
+  TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Event::DispatcherBase& dispatcher);
 
   // Timer
   void disableTimer() override;
@@ -65,7 +65,7 @@ public:
 private:
   void internalEnableTimer(const timeval& tv, const ScopeTrackedObject* scope);
   TimerCb cb_;
-  Dispatcher& dispatcher_;
+  DispatcherBase& dispatcher_;
   // This has to be atomic for alarms which are handled out of thread, for
   // example if the DispatcherImpl::post is called by two threads, they race to
   // both set this to null.

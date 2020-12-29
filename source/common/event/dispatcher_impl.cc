@@ -37,31 +37,120 @@
 namespace Envoy {
 namespace Event {
 
+DispatcherImplBase::DispatcherImplBase(Api::Api& api, TimeSystem& time_system)
+    : api_(api), scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)) {}
+
+FileEventPtr DispatcherImplBase::createFileEvent(os_fd_t fd, FileReadyCb cb,
+                                                 FileTriggerType trigger, uint32_t events) {
+  ASSERT(isThreadSafe());
+  return FileEventPtr{new FileEventImpl(
+      *this, fd,
+      [this, cb](uint32_t events) {
+        touchWatchdog();
+        cb(events);
+      },
+      trigger, events)};
+}
+
+TimerPtr DispatcherImplBase::createTimer(TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return scheduler_->createTimer(
+      [this, cb]() {
+        touchWatchdog();
+        cb();
+      },
+      *this);
+}
+
+Event::SchedulableCallbackPtr
+DispatcherImplBase::createSchedulableCallback(std::function<void()> cb) {
+  return createRawSchedulableCallback([this, cb = std::move(cb)] {
+    touchWatchdog();
+    cb();
+  });
+}
+
+const ScopeTrackedObject* DispatcherImplBase::setTrackedObject(const ScopeTrackedObject* object) {
+  const ScopeTrackedObject* return_object = current_object_;
+  current_object_ = object;
+  return return_object;
+}
+
+Event::SchedulableCallbackPtr
+DispatcherImplBase::createRawSchedulableCallback(std::function<void()> cb) {
+  return base_scheduler_.createSchedulableCallback(std::move(cb));
+}
+
+void DispatcherImplBase::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                          std::chrono::milliseconds min_touch_interval) {
+  ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
+  watchdog_registration_ =
+      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
+}
+
+void DispatcherImplBase::touchWatchdog() {
+  if (watchdog_registration_) {
+    watchdog_registration_->touchWatchdog();
+  }
+}
+
+void DispatcherImplBase::runFatalActionsOnTrackedObject(
+    const FatalAction::FatalActionPtrList& actions) const {
+  // Only run if this is the dispatcher of the current thread and
+  // DispatcherImpl::Run has been called.
+  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
+    return;
+  }
+
+  for (const auto& action : actions) {
+    action->run(current_object_);
+  }
+}
+
+void DispatcherImplBase::onFatalError(std::ostream& os) const {
+  // Dump the state of the tracked object if it is in the current thread. This generally results
+  // in dumping the active state only for the thread which caused the fatal error.
+  if (isThreadSafe()) {
+    if (current_object_) {
+      current_object_->dumpState(os);
+    }
+  }
+}
+
+DispatcherImplBase::WatchdogRegistration::WatchdogRegistration(
+    const Server::WatchDogSharedPtr& watchdog, Scheduler& scheduler,
+    std::chrono::milliseconds timer_interval, DispatcherBase& dispatcher)
+    : watchdog_(watchdog), timer_interval_(timer_interval) {
+  touch_timer_ = scheduler.createTimer(
+      [this]() -> void {
+        watchdog_->touch();
+        touch_timer_->enableTimer(timer_interval_);
+      },
+      dispatcher);
+  touch_timer_->enableTimer(timer_interval_);
+}
+
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
                                const Buffer::WatermarkFactorySharedPtr& factory)
-    : name_(name), api_(api),
+    : base_(api, time_system), name_(name),
       buffer_factory_(factory != nullptr ? factory
                                          : std::make_shared<Buffer::WatermarkBufferFactory>()),
-      scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
-      deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
-          [this]() -> void { clearDeferredDeleteList(); })),
-      post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
+      deferred_delete_cb_(
+          base_.createRawSchedulableCallback([this]() -> void { clearDeferredDeleteList(); })),
+      post_cb_(base_.createRawSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
-  updateApproximateMonotonicTimeInternal();
-  base_scheduler_.registerOnPrepareCallback(
-      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
+  base_.updateApproximateMonotonicTime();
+  base_.registerOnPrepareCallback(std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
 DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                       std::chrono::milliseconds min_touch_interval) {
-  ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
-  watchdog_registration_ =
-      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
+  base_.registerWatchdog(watchdog, min_touch_interval);
 }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
@@ -72,8 +161,8 @@ void DispatcherImpl::initializeStats(Stats::Scope& scope,
     stats_prefix_ = effective_prefix + "dispatcher";
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
-    base_scheduler_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_.debugString());
+    base_.initializeStats(stats_.get());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, base_.run_tid().debugString());
   });
 }
 
@@ -96,7 +185,7 @@ void DispatcherImpl::clearDeferredDeleteList() {
     current_to_delete_ = &to_delete_1_;
   }
 
-  touchWatchdog();
+  base_.touchWatchdog();
   deferred_deleting_ = true;
 
   // Calling clear() on the vector does not specify which order destructors run in. We want to
@@ -147,28 +236,16 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
                    "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
                    "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
                    "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.randomGenerator(),
-                                                           api_.rootScope());
+    return std::make_shared<Network::AppleDnsResolverImpl>(*this, base_.api().randomGenerator(),
+                                                           base_.api().rootScope());
   }
 #endif
   return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, use_tcp_for_dns_lookups);
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
-                                             uint32_t events) {
-  ASSERT(isThreadSafe());
-  return FileEventPtr{new FileEventImpl(
-      *this, fd,
-      [this, cb](uint32_t events) {
-        touchWatchdog();
-        cb(events);
-      },
-      trigger, events)};
-}
-
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   ASSERT(isThreadSafe());
-  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, api_)};
+  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, base_.api())};
 }
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
@@ -176,35 +253,13 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
                                                     bool bind_to_port, uint32_t backlog_size) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::TcpListenerImpl>(
-      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
+      *this, base_.api().randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr socket,
                                                           Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
-}
-
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
-  ASSERT(isThreadSafe());
-  return createTimerInternal(cb);
-}
-
-Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
-  ASSERT(isThreadSafe());
-  return base_scheduler_.createSchedulableCallback([this, cb]() {
-    touchWatchdog();
-    cb();
-  });
-}
-
-TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  return scheduler_->createTimer(
-      [this, cb]() {
-        touchWatchdog();
-        cb();
-      },
-      *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -216,11 +271,9 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
-
 SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
-  return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
+  return SignalEventPtr{new SignalEventImpl(base_, signal_num, cb)};
 }
 
 void DispatcherImpl::post(std::function<void()> callback) {
@@ -237,24 +290,14 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
-  run_tid_ = api_.threadFactory().currentThreadId();
+  base_.saveTid();
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
-  base_scheduler_.run(type);
-}
-
-MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
-  return approximate_monotonic_time_;
-}
-
-void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
-
-void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
-  approximate_monotonic_time_ = api_.timeSource().monotonicTime();
+  base_.run(type);
 }
 
 void DispatcherImpl::runPostCallbacks() {
@@ -278,7 +321,7 @@ void DispatcherImpl::runPostCallbacks() {
   while (!callbacks.empty()) {
     // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
     // executing a long list of callbacks.
-    touchWatchdog();
+    base_.touchWatchdog();
     // Run the callback.
     callbacks.front()();
     // Pop the front so that the destructor of the callback that just executed runs before the next
@@ -289,21 +332,7 @@ void DispatcherImpl::runPostCallbacks() {
 
 void DispatcherImpl::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
-  // Only run if this is the dispatcher of the current thread and
-  // DispatcherImpl::Run has been called.
-  if (run_tid_.isEmpty() || (run_tid_ != api_.threadFactory().currentThreadId())) {
-    return;
-  }
-
-  for (const auto& action : actions) {
-    action->run(current_object_);
-  }
-}
-
-void DispatcherImpl::touchWatchdog() {
-  if (watchdog_registration_) {
-    watchdog_registration_->touchWatchdog();
-  }
+  base_.runFatalActionsOnTrackedObject(actions);
 }
 
 } // namespace Event

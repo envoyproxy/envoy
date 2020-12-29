@@ -35,7 +35,7 @@ LibeventScheduler::LibeventScheduler() {
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
-TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher) {
+TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, DispatcherBase& dispatcher) {
   return std::make_unique<TimerImpl>(libevent_, cb, dispatcher);
 };
 

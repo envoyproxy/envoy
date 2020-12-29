@@ -16,7 +16,7 @@ namespace Event {
  */
 class FileEventImpl : public FileEvent, ImplBase {
 public:
-  FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
+  FileEventImpl(DispatcherImplBase& dispatcher, os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                 uint32_t events);
 
   // Event::FileEvent

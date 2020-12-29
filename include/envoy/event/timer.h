@@ -14,7 +14,7 @@ class ScopeTrackedObject;
 
 namespace Event {
 
-class Dispatcher;
+class DispatcherBase;
 
 /**
  * Callback invoked when a timer event fires.
@@ -67,7 +67,7 @@ public:
   /**
    * Creates a timer.
    */
-  virtual TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) PURE;
+  virtual TimerPtr createTimer(const TimerCb& cb, DispatcherBase& dispatcher) PURE;
 };
 
 using SchedulerPtr = std::unique_ptr<Scheduler>;

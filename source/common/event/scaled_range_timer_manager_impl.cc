@@ -137,7 +137,7 @@ private:
   const ScopeTrackedObject* scope_;
 };
 
-ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(Dispatcher& dispatcher)
+ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(DispatcherBase& dispatcher)
     : dispatcher_(dispatcher), scale_factor_(1.0) {}
 
 ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
@@ -163,7 +163,7 @@ ScaledRangeTimerManagerImpl::Queue::Item::Item(RangeTimerImpl& timer, MonotonicT
 
 ScaledRangeTimerManagerImpl::Queue::Queue(std::chrono::milliseconds duration,
                                           ScaledRangeTimerManagerImpl& manager,
-                                          Dispatcher& dispatcher)
+                                          DispatcherBase& dispatcher)
     : duration_(duration),
       timer_(dispatcher.createTimer([this, &manager] { manager.onQueueTimerFired(*this); })) {}
 

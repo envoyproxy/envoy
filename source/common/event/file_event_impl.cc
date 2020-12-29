@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Event {
 
-FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb,
+FileEventImpl::FileEventImpl(DispatcherImplBase& dispatcher, os_fd_t fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
     : cb_(cb), fd_(fd), trigger_(trigger), enabled_events_(events),
       activation_cb_(dispatcher.createSchedulableCallback([this]() {

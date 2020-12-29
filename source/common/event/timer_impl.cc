@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Event {
 
-TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispatcher)
+TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, DispatcherBase& dispatcher)
     : cb_(cb), dispatcher_(dispatcher),
       activate_timers_next_event_loop_(
           // Only read the runtime feature if the runtime loader singleton has already been created.

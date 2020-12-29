@@ -21,7 +21,7 @@ namespace Event {
  */
 class ScaledRangeTimerManagerImpl : public ScaledRangeTimerManager {
 public:
-  explicit ScaledRangeTimerManagerImpl(Dispatcher& dispatcher);
+  explicit ScaledRangeTimerManagerImpl(DispatcherBase& dispatcher);
   ~ScaledRangeTimerManagerImpl() override;
 
   // ScaledRangeTimerManager impl
@@ -45,7 +45,7 @@ private:
     using Iterator = std::list<Item>::iterator;
 
     Queue(std::chrono::milliseconds duration, ScaledRangeTimerManagerImpl& manager,
-          Dispatcher& dispatcher);
+          DispatcherBase& dispatcher);
 
     // The (max - min) value for all timers in range_timers_.
     const std::chrono::milliseconds duration_;
@@ -113,7 +113,7 @@ private:
 
   void onQueueTimerFired(Queue& queue);
 
-  Dispatcher& dispatcher_;
+  DispatcherBase& dispatcher_;
   UnitFloat scale_factor_;
   absl::flat_hash_set<std::unique_ptr<Queue>, Hash, Eq> queues_;
 };

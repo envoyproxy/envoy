@@ -62,7 +62,7 @@ public:
   LibeventScheduler();
 
   // Scheduler
-  TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override;
+  TimerPtr createTimer(const TimerCb& cb, DispatcherBase& dispatcher) override;
   SchedulableCallbackPtr createSchedulableCallback(const std::function<void()>& cb) override;
 
   /**

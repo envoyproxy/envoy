@@ -13,7 +13,7 @@ namespace Event {
  */
 class SignalEventImpl : public SignalEvent, ImplBase {
 public:
-  SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num, SignalCb cb);
+  SignalEventImpl(DispatcherImplBase& dispatcher, signal_t signal_num, SignalCb cb);
 
 private:
   SignalCb cb_;

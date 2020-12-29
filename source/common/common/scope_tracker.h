@@ -12,7 +12,7 @@ namespace Envoy {
 // dispatcher at the previously tracked object.
 class ScopeTrackerScopeState {
 public:
-  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::Dispatcher& dispatcher)
+  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::DispatcherBase& dispatcher)
       : dispatcher_(dispatcher) {
     latched_object_ = dispatcher_.setTrackedObject(object);
   }
@@ -21,7 +21,7 @@ public:
 
 private:
   const ScopeTrackedObject* latched_object_;
-  Event::Dispatcher& dispatcher_;
+  Event::DispatcherBase& dispatcher_;
 };
 
 } // namespace Envoy
