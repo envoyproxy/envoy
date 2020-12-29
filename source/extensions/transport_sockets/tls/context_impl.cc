@@ -467,20 +467,27 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   // groups given as "[alt1|alt2]", and exclusions preceded by "!". For the
   // purposes of collecting stats -- we want to track all these names. We don't
   // need to fully parse out the structure of the cipher suites -- just extract
-  // out the names.
+  // out the names. We skip exclusions as those do not show up as entire
+  // stat-name segments, so they would not match.
   for (absl::string_view cipher_suite :
-       absl::StrSplit(config.cipherSuites(), absl::ByAnyChar(":|[]!"))) {
-    stat_name_set_->rememberBuiltin(cipher_suite);
+       absl::StrSplit(config.cipherSuites(), absl::ByAnyChar(":|[]"))) {
+    if (!cipher_suite.empty() && cipher_suite[0] != '!') { // skip exclusions.
+      stat_name_set_->rememberBuiltin(cipher_suite);
+    }
   }
 
-  // This cipher is referenced in a test, though it's not super-obvious how.
+  // This cipher is referenced in a test, though it's not obvious how or why.
   stat_name_set_->rememberBuiltin("TLS_AES_128_GCM_SHA256");
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
+  //
+  // TODO(jmarantz): consider whether we need this hard-coded list in addition
+  // to the ones from ecdhCurves below. Note there is no harm in remembering a
+  // curve more than once.
   stat_name_set_->rememberBuiltins(
       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
-  for (absl::string_view curve : absl::StrSplit(config.ecdhCurves(), ":")) {
+  for (absl::string_view curve : absl::StrSplit(config.ecdhCurves(), ':')) {
     stat_name_set_->rememberBuiltin(curve);
   }
 
