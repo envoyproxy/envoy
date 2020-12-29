@@ -65,7 +65,8 @@ InstanceImpl::InstanceImpl(
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
     ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
+    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+    Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
@@ -75,7 +76,8 @@ InstanceImpl::InstanceImpl(
       random_generator_(std::move(random_generator)),
       api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
-                                         : absl::nullopt)),
+                                         : absl::nullopt,
+                         watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
@@ -87,7 +89,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      main_thread_id_(std::this_thread::get_id()), server_contexts_(*this) {
+      main_thread_id_(std::this_thread::get_id()), hooks_(hooks), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -592,10 +594,10 @@ void InstanceImpl::onRuntimeReady() {
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                        stats_store_, false)
             ->create(),
-        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, info_factory_, access_log_manager_,
-        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
-        messageValidationContext().dynamicValidationVisitor(), *api_);
+        Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
+        Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
+        access_log_manager_, *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_,
+        thread_local_, messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 
   // If there is no global limit to the number of active connections, warn on startup.
@@ -609,15 +611,22 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*worker_guard_dog_);
-  initialization_timer_->complete();
-  // Update server stats as soon as initialization is done.
-  updateServerStats();
-  workers_started_ = true;
-  // At this point we are ready to take traffic and all listening ports are up. Notify our parent
-  // if applicable that they can stop listening and drain.
-  restarter_.drainParentListeners();
-  drain_manager_->startParentShutdownSequence();
+  // The callback will be called after workers are started.
+  listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
+    if (isShutdown()) {
+      return;
+    }
+
+    initialization_timer_->complete();
+    // Update server stats as soon as initialization is done.
+    updateServerStats();
+    workers_started_ = true;
+    hooks_.onWorkersStarted();
+    // At this point we are ready to take traffic and all listening ports are up. Notify our
+    // parent if applicable that they can stop listening and drain.
+    restarter_.drainParentListeners();
+    drain_manager_->startParentShutdownSequence();
+  });
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,

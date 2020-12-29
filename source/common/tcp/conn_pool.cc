@@ -24,13 +24,14 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   connection_ = std::move(data.connection_);
   connection_->addConnectionCallbacks(*this);
   connection_->detectEarlyCloseWhenReadDisabled(false);
-  connection_->addReadFilter(std::make_shared<ConnReadFilter>(*this));
+  read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
+  connection_->addReadFilter(read_filter_handle_);
   connection_->setConnectionStats({host->cluster().stats().upstream_cx_rx_bytes_total_,
                                    host->cluster().stats().upstream_cx_rx_bytes_buffered_,
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
                                    host->cluster().stats().upstream_cx_tx_bytes_buffered_,
                                    &host->cluster().stats().bind_errors_, nullptr});
-
+  connection_->noDelay(true);
   connection_->connect();
 }
 
@@ -66,6 +67,9 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
     if (event == Network::ConnectionEvent::Connected) {
       connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
     } else {
+      if (tcp_connection_data_) {
+        Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
+      }
       callbacks_->onEvent(event);
       // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
       // Clear the pointer to avoid using it again.

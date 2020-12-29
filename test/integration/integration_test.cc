@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/filter/http/grpc_http1_bridge/v2/config.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -469,6 +470,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
+
+const ::envoy::config::filter::http::grpc_http1_bridge::v2::Config _grpc_http1_bridge_dummy;
 
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
