@@ -410,9 +410,9 @@ class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
   // Constructor that enables internal redirect with policy_config controlling the configurable
   // behaviors.
-  InternalRedirectPolicyImpl(
-      const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
-      ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
+  InternalRedirectPolicyImpl(const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+                             ProtobufMessage::ValidationVisitor& validator,
+                             absl::string_view current_route_name);
   // Default constructor that disables internal redirect.
   InternalRedirectPolicyImpl() = default;
 
