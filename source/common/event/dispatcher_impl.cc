@@ -84,8 +84,7 @@ DispatcherImplBase::createRawSchedulableCallback(std::function<void()> cb) {
 void DispatcherImplBase::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                           std::chrono::milliseconds min_touch_interval) {
   ASSERT(!watchdog_registration_, "Each dispatcher can have at most one registered watchdog.");
-  watchdog_registration_ =
-      std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
+  watchdog_registration_.emplace(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
 void DispatcherImplBase::touchWatchdog() {

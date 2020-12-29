@@ -102,10 +102,9 @@ private:
     const std::chrono::milliseconds timer_interval_;
     TimerPtr touch_timer_;
   };
-  using WatchdogRegistrationPtr = std::unique_ptr<WatchdogRegistration>;
 
   LibeventScheduler base_scheduler_;
-  WatchdogRegistrationPtr watchdog_registration_;
+  absl::optional<WatchdogRegistration> watchdog_registration_;
   const ScopeTrackedObject* current_object_{};
   Api::Api& api_;
   SchedulerPtr scheduler_;
