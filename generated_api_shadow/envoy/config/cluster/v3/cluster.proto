@@ -338,19 +338,19 @@ message Cluster {
   // endpoint metadata and selected by route and weighted cluster metadata.
   // [#next-free-field: 8]
   message LbShuffleSubsetConfig {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.Cluster.LbShuffleSubsetConfig";
+    // option (udpa.annotations.versioning).previous_message_type =
+    //     "envoy.api.v2.Cluster.LbShuffleSubsetConfig";
 
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
     // any cluster endpoint may be returned (subject to policy, health checks,
     // etc). If DEFAULT_SUBSET is selected, load balancing is performed over the
     // endpoints matching the values from the default_subset field.
-    enum LbSubsetFallbackPolicy {
-      NO_FALLBACK = 0;
-      ANY_ENDPOINT = 1;
-      DEFAULT_SUBSET = 2;
-    }
+    // enum LbSubsetFallbackPolicy {
+    //   NO_FALLBACK = 0;
+    //   ANY_ENDPOINT = 1;
+    //   DEFAULT_SUBSET = 2;
+    // }
 
     // Specifications for subsets.
     message LbSubsetSelector {
@@ -418,7 +418,7 @@ message Cluster {
     // The behavior used when no endpoint subset matches the selected route's
     // metadata. The value defaults to
     // :ref:`NO_FALLBACK<envoy_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
-    LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
+    // LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Specifies the default subset of endpoints used during fallback if
     // fallback_policy is
@@ -428,7 +428,7 @@ message Cluster {
     // namespace. It is valid for no hosts to match, in which case the behavior
     // is the same as a fallback_policy of
     // :ref:`NO_FALLBACK<envoy_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
-    google.protobuf.Struct default_subset = 2;
+    // google.protobuf.Struct default_subset = 2;
 
     // For each entry, LbEndpoint.Metadata's
     // *envoy.lb* namespace is traversed and a subset is created for each unique
@@ -444,7 +444,7 @@ message Cluster {
     // A subset is matched when the metadata from the selected route and
     // weighted cluster contains the same keys and values as the subset's
     // metadata. The same host may appear in multiple subsets.
-    repeated LbSubsetSelector subset_selectors = 3;
+    // repeated LbSubsetSelector subset_selectors = 3;
 
     // If true, routing to subsets will take into account the localities and locality weights of the
     // endpoints when making the routing decision.
@@ -456,13 +456,13 @@ message Cluster {
     // which have 100 hosts each without subsetting. If the subset LB results in X having only 1
     // host selected but Y having 100, then a lot more load is being dumped on the single host in X
     // than originally anticipated in the load balancing assignment delivered via EDS.
-    bool locality_weight_aware = 4;
+    // bool locality_weight_aware = 4;
 
     // When used with locality_weight_aware, scales the weight of each locality by the ratio
     // of hosts in the subset vs hosts in the original subset. This aims to even out the load
     // going to an individual locality if said locality is disproportionately affected by the
     // subset predicate.
-    bool scale_locality_weight = 5;
+    // bool scale_locality_weight = 5;
 
     // If true, when a fallback policy is configured and its corresponding subset fails to find
     // a host this will cause any host to be selected instead.
@@ -470,12 +470,14 @@ message Cluster {
     // This is useful when using the default subset as the fallback policy, given the default
     // subset might become empty. With this option enabled, if that happens the LB will attempt
     // to select a host from the entire cluster.
-    bool panic_mode_any = 6;
+    // bool panic_mode_any = 6;
 
     // If true, metadata specified for a metadata key will be matched against the corresponding
     // endpoint metadata if the endpoint metadata matches the value exactly OR it is a list value
     // and any of the elements in the list matches the criteria.
-    bool list_as_any = 7;
+    // bool list_as_any = 7;
+
+    google.protobuf.UInt32Value shard_size = 8;
   }
 
   // Specific configuration for the LeastRequest load balancing policy.

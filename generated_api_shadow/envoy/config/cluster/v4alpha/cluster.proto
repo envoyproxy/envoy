@@ -340,19 +340,19 @@ message Cluster {
   // endpoint metadata and selected by route and weighted cluster metadata.
   // [#next-free-field: 8]
   message LbShuffleSubsetConfig {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.cluster.v3.Cluster.LbShuffleSubsetConfig";
+    // option (udpa.annotations.versioning).previous_message_type =
+    //     "envoy.config.cluster.v3.Cluster.LbShuffleSubsetConfig";
 
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
     // any cluster endpoint may be returned (subject to policy, health checks,
     // etc). If DEFAULT_SUBSET is selected, load balancing is performed over the
     // endpoints matching the values from the default_subset field.
-    enum LbSubsetFallbackPolicy {
-      NO_FALLBACK = 0;
-      ANY_ENDPOINT = 1;
-      DEFAULT_SUBSET = 2;
-    }
+    // enum LbSubsetFallbackPolicy {
+    //   NO_FALLBACK = 0;
+    //   ANY_ENDPOINT = 1;
+    //   DEFAULT_SUBSET = 2;
+    // }
 
     // Specifications for subsets.
     message LbSubsetSelector {

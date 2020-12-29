@@ -347,11 +347,11 @@ message Cluster {
     // any cluster endpoint may be returned (subject to policy, health checks,
     // etc). If DEFAULT_SUBSET is selected, load balancing is performed over the
     // endpoints matching the values from the default_subset field.
-    enum LbSubsetFallbackPolicy {
-      NO_FALLBACK = 0;
-      ANY_ENDPOINT = 1;
-      DEFAULT_SUBSET = 2;
-    }
+    // enum LbSubsetFallbackPolicy {
+    //   NO_FALLBACK = 0;
+    //   ANY_ENDPOINT = 1;
+    //   DEFAULT_SUBSET = 2;
+    // }
 
     // Specifications for subsets.
     message LbSubsetSelector {
@@ -401,8 +401,8 @@ message Cluster {
 
       // The behavior used when no endpoint subset matches the selected route's
       // metadata.
-      LbSubsetSelectorFallbackPolicy fallback_policy = 2
-          [(validate.rules).enum = {defined_only: true}];
+      // LbSubsetSelectorFallbackPolicy fallback_policy = 2
+      //     [(validate.rules).enum = {defined_only: true}];
 
       // Subset of
       // :ref:`keys<envoy_api_field_config.cluster.v4alpha.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` used by
@@ -419,7 +419,7 @@ message Cluster {
     // The behavior used when no endpoint subset matches the selected route's
     // metadata. The value defaults to
     // :ref:`NO_FALLBACK<envoy_api_enum_value_config.cluster.v4alpha.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
-    LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
+    // LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Specifies the default subset of endpoints used during fallback if
     // fallback_policy is

@@ -147,43 +147,45 @@ public:
    * @return LbSubsetFallbackPolicy the fallback policy used when
    * route metadata does not match any subset.
    */
-  virtual envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetFallbackPolicy
-  fallbackPolicy() const PURE;
+  // virtual envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetFallbackPolicy
+  // fallbackPolicy() const PURE;
+  virtual uint32_t shard_size() const PURE;
+
 
   /**
    * @return ProtobufWkt::Struct the struct describing the metadata for a
    *         host to be included in the default subset.
    */
-  virtual const ProtobufWkt::Struct& defaultSubset() const PURE;
+  // virtual const ProtobufWkt::Struct& defaultSubset() const PURE;
 
   /*
    * @return const std:vector<std:set<std::string>>& a vector of
    * sorted keys used to define load balancer subsets.
    */
-  virtual const std::vector<ShuffleSubsetSelectorPtr>& subsetSelectors() const PURE;
+  // virtual const std::vector<ShuffleSubsetSelectorPtr>& subsetSelectors() const PURE;
 
   /*
    * @return bool whether routing to subsets should take locality weights into account.
    */
-  virtual bool localityWeightAware() const PURE;
+  // virtual bool localityWeightAware() const PURE;
 
   /*
    * @return bool whether the locality weights should be scaled to compensate for the
    * fraction of hosts removed from the original host set.
    */
-  virtual bool scaleLocalityWeight() const PURE;
+  // virtual bool scaleLocalityWeight() const PURE;
 
   /*
    * @return bool whether to attempt to select a host from the entire cluster if host
    * selection from the fallback subset fails.
    */
-  virtual bool panicModeAny() const PURE;
+  // virtual bool panicModeAny() const PURE;
 
   /*
    * @return bool whether matching metadata should attempt to match against any of the
    * elements in a list value defined in endpoint metadata.
    */
-  virtual bool listAsAny() const PURE;
+  // virtual bool listAsAny() const PURE;
 };
 
 } // namespace Upstream

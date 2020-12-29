@@ -44,5 +44,15 @@ services:
       - HTTPS_PORT=0
     networks:
       - envoymesh
+
+  service-http-4:
+    image: mendhak/http-https-echo
+    hostname: service-http-4
+    ports:
+      - "8004:80"
+    environment:
+      - HTTPS_PORT=0
+    networks:
+      - envoymesh
 networks:
   envoymesh: {}
