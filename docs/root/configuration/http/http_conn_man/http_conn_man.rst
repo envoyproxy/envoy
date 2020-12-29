@@ -1,7 +1,7 @@
 .. _config_http_conn_man:
 
-HTTP connection manager
-=======================
+HTTP 连接管理器
+=================
 
 .. toctree::
   :maxdepth: 2
