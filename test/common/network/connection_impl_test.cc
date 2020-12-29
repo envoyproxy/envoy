@@ -986,7 +986,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   // Add 3 bytes to the buffer so that it sits at exactly the read limit. Verify that
   // shouldDrainReadBuffer is true, but the connection remains read enabled.
   {
-    Buffer::OwnedImpl buffer("123");
+    Buffer::OwnedImpl buffer("12");
     server_connection_->write(buffer, false);
     EXPECT_CALL(*client_read_filter, onData(_, false)).WillOnce(Invoke(on_filter_data_exit));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -998,7 +998,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   // Add 1 bytes to the buffer to go over the high watermark. Verify the connection becomes read
   // disabled.
   {
-    Buffer::OwnedImpl buffer("4");
+    Buffer::OwnedImpl buffer("3");
     server_connection_->write(buffer, false);
     EXPECT_CALL(*client_read_filter, onData(_, false)).WillOnce(Invoke(on_filter_data_exit));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1008,10 +1008,10 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
     EXPECT_FALSE(client_connection_->readEnabled());
   }
 
-  // Drain 3 bytes from the buffer. This bring sit below the low watermark, and
+  // Drain 2 bytes from the buffer. This bring sit below the low watermark, and
   // read enables, as well as triggering a kick for the remaining byte.
   {
-    testClientConnection()->readBuffer().drain(3);
+    testClientConnection()->readBuffer().drain(2);
     EXPECT_FALSE(testClientConnection()->readBuffer().highWatermarkTriggered());
     EXPECT_FALSE(testClientConnection()->shouldDrainReadBuffer());
     EXPECT_TRUE(client_connection_->readEnabled());
@@ -1020,10 +1020,10 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  // Add 3 bytes to the buffer and verify the connection becomes read disabled
+  // Add 2 bytes to the buffer and verify the connection becomes read disabled
   // again.
   {
-    Buffer::OwnedImpl buffer("bye");
+    Buffer::OwnedImpl buffer("45");
     server_connection_->write(buffer, false);
     EXPECT_CALL(*client_read_filter, onData(_, false)).WillOnce(Invoke(on_filter_data_exit));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1038,7 +1038,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   // does not want to read.
   {
     client_connection_->readDisable(true);
-    testClientConnection()->readBuffer().drain(3);
+    testClientConnection()->readBuffer().drain(2);
     EXPECT_FALSE(testClientConnection()->readBuffer().highWatermarkTriggered());
     EXPECT_FALSE(testClientConnection()->shouldDrainReadBuffer());
     EXPECT_FALSE(client_connection_->readEnabled());
@@ -2045,22 +2045,10 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
   file_ready_cb_(Event::FileReadyType::Read);
   EXPECT_TRUE(connection_->shouldDrainReadBuffer());
 
-  // Do a third read, but that's not enough to trigger the high watermark.
+  // Do a third read to trigger the high watermark.
   EXPECT_CALL(*transport_socket_, doRead(_))
       .WillOnce(Invoke([](Buffer::Instance& buffer) -> IoResult {
         buffer.add("5");
-        return {PostIoAction::KeepOpen, 1, false};
-      }));
-  // Buffer is exactly at the read limit, expect no changes to the file event registration.
-  EXPECT_CALL(*file_event_, setEnabled(_)).Times(0);
-  EXPECT_CALL(*read_filter, onData(_, false)).WillOnce(Return(FilterStatus::Continue));
-  file_ready_cb_(Event::FileReadyType::Read);
-  EXPECT_TRUE(connection_->shouldDrainReadBuffer());
-
-  // Do a fourth read to trigger the high watermark.
-  EXPECT_CALL(*transport_socket_, doRead(_))
-      .WillOnce(Invoke([](Buffer::Instance& buffer) -> IoResult {
-        buffer.add("6");
         return {PostIoAction::KeepOpen, 1, false};
       }));
   // Expect a change to the event mask when going over the read limit.
@@ -2085,7 +2073,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
   EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
   EXPECT_CALL(*read_filter, onData(_, _))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
-        EXPECT_EQ(7, data.length());
+        EXPECT_EQ(6, data.length());
         data.drain(data.length() - 1);
         return FilterStatus::Continue;
       }));
