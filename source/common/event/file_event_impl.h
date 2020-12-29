@@ -30,6 +30,7 @@ private:
   void mergeInjectedEventsAndRunCb(uint32_t events);
   void updateEvents(uint32_t events);
 
+  Dispatcher& dispatcher_;
   FileReadyCb cb_;
   os_fd_t fd_;
   FileTriggerType trigger_;

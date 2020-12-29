@@ -83,6 +83,7 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
   EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
@@ -90,7 +91,6 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
   EXPECT_EQ(0UL, store_.counter("filesystem.write_buffered").value());
 
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(
@@ -152,11 +152,10 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
   EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
-
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
 
   // The first write to a given file will start the flush thread. Because AccessManagerImpl::write
   // holds the write_lock_ when the thread is started, the thread will flush on its first loop, once
@@ -224,11 +223,11 @@ TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
   EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
 
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(0, data.compare("test"));

@@ -325,27 +325,29 @@ protected:
   }
 
   void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
+    {
+      Thread::LockGuard lock(mu_);
+      work_finished_ = false;
+    }
     TimerPtr timer;
-    dispatcher_->post([this, &timer]() {
+    dispatcher_->post([this, &timer, enable_timer_delegate]() {
       {
         Thread::LockGuard lock(mu_);
         timer = dispatcher_->createTimer([this]() {
           {
             Thread::LockGuard lock(mu_);
+            ASSERT(!work_finished_);
             work_finished_ = true;
           }
           cv_.notifyOne();
         });
         EXPECT_FALSE(timer->enabled());
+        enable_timer_delegate(*timer);
+        EXPECT_TRUE(timer->enabled());
       }
-      cv_.notifyOne();
     });
 
     Thread::LockGuard lock(mu_);
-    while (timer == nullptr) {
-      cv_.wait(mu_);
-    }
-    enable_timer_delegate(*timer);
     while (!work_finished_) {
       cv_.wait(mu_);
     }
@@ -376,6 +378,7 @@ TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
     {
       Thread::LockGuard lock(mu_);
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
@@ -418,6 +421,7 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
     dispatcher_->post([this]() {
       {
         Thread::LockGuard lock(mu_);
+        ASSERT(!work_finished_);
         work_finished_ = true;
       }
       cv_.notifyOne();
@@ -459,6 +463,7 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
     dispatcher_->post([this]() {
       {
         Thread::LockGuard lock(mu_);
+        ASSERT(!work_finished_);
         work_finished_ = true;
       }
       cv_.notifyOne();
@@ -491,21 +496,18 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
         {
           Thread::LockGuard lock(mu_);
           static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(std::cerr);
+          ASSERT(!work_finished_);
           work_finished_ = true;
         }
         cv_.notifyOne();
       });
       EXPECT_FALSE(timer->enabled());
+      timer->enableTimer(std::chrono::milliseconds(50), &scope);
+      EXPECT_TRUE(timer->enabled());
     }
-    cv_.notifyOne();
   });
 
   Thread::LockGuard lock(mu_);
-  while (timer == nullptr) {
-    cv_.wait(mu_);
-  }
-  timer->enableTimer(std::chrono::milliseconds(50), &scope);
-
   while (!work_finished_) {
     cv_.wait(mu_);
   }
@@ -517,6 +519,7 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
       Thread::LockGuard lock(mu_);
       // Thread safe because it is called within the dispatcher thread's context.
       EXPECT_TRUE(dispatcher_->isThreadSafe());
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
@@ -562,6 +565,7 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
     {
       Thread::LockGuard lock(mu_);
       static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
