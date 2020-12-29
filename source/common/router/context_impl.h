@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/context.h"
+#include "envoy/router/router.h"
 #include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
@@ -34,9 +35,13 @@ public:
   ~ContextImpl() override = default;
 
   const StatNames& statNames() const override { return stat_names_; }
+  const VirtualClusterStatNames& virtualClusterStatNames() const override {
+    return virtual_cluster_stat_names_;
+  }
 
 private:
   const StatNames stat_names_;
+  const VirtualClusterStatNames virtual_cluster_stat_names_;
 };
 
 } // namespace Router
