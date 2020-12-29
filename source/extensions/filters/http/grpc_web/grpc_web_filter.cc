@@ -48,6 +48,13 @@ bool isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
   return hasGrpcWebContentType(headers);
 }
 
+// Valid response headers contain gRPC or gRPC-Web response headers.
+bool isValidResponseHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
+  return Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
+         (Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
+          hasGrpcWebContentType(headers));
+}
+
 } // namespace
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -62,20 +69,6 @@ struct RcDetailsValues {
   const std::string GrpcDecodeFailedDueToData = "grpc_base_64_decode_failed";
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
-
-bool GrpcWebFilter::checkGrpcResponseHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
-  const bool ok = Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK);
-  if (ok && (Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
-             hasGrpcWebContentType(headers))) {
-    return true;
-  }
-
-  ENVOY_LOG(info, "upstream response is not gRPC response");
-  headers.setGrpcStatus(
-      Grpc::Utility::httpToGrpcStatus(enumToInt(Http::Utility::getResponseStatus(headers))));
-  response_headers_ = &headers;
-  return false;
-}
 
 // Implements StreamDecoderFilter.
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
@@ -181,8 +174,8 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
 
-  if (!checkGrpcResponseHeaders(headers, end_stream)) {
-    ENVOY_LOG(info, "stop iteration");
+  if (!end_stream && !isValidResponseHeaders(headers, end_stream)) {
+    response_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -198,6 +191,9 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
   // upstream body content.
   if (response_headers_ != nullptr) {
     data.drain(data.length());
+
+    response_headers_->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(
+        enumToInt(Http::Utility::getResponseStatus(*response_headers_))));
     response_headers_->setGrpcMessage(Http::Utility::PercentEncoding::encode(data.toString()));
     response_headers_->setContentLength(0);
     return Http::FilterDataStatus::Continue;

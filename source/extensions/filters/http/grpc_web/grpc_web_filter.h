@@ -16,9 +16,7 @@ namespace GrpcWeb {
 /**
  * See docs/configuration/http_filters/grpc_web_filter.rst
  */
-class GrpcWebFilter : public Http::StreamFilter,
-                      NonCopyable,
-                      public Logger::Loggable<Logger::Id::filter> {
+class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
   explicit GrpcWebFilter(Grpc::Context& context) : context_(context) {}
   ~GrpcWebFilter() override = default;
@@ -57,7 +55,6 @@ private:
 
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
-  bool checkGrpcResponseHeaders(Http::ResponseHeaderMap& headers, bool end_stream);
 
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
