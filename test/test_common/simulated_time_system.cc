@@ -253,8 +253,9 @@ private:
   SimulatedTimeSystemHelper& time_system_;
 };
 
-TimerPtr SimulatedTimeSystemHelper::SimulatedScheduler::createTimer(const TimerCb& cb,
-                                                                    DispatcherBase& /*dispatcher*/) {
+TimerPtr
+SimulatedTimeSystemHelper::SimulatedScheduler::createTimer(const TimerCb& cb,
+                                                           DispatcherBase& /*dispatcher*/) {
   return std::make_unique<SimulatedTimeSystemHelper::Alarm>(*this, time_system_, cb_scheduler_, cb);
 }
 
