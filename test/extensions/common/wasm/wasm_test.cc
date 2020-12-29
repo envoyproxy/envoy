@@ -147,9 +147,10 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
 
   delete root_context;
 
-  WasmStatePrototype wasm_state_prototype(true, WasmType::Bytes, "",
-                                          StreamInfo::FilterState::LifeSpan::FilterChain);
-  auto wasm_state = std::make_unique<WasmState>(wasm_state_prototype);
+  Filters::Common::Expr::CelStatePrototype wasm_state_prototype(
+      true, Filters::Common::Expr::CelStateType::Bytes, "",
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto wasm_state = std::make_unique<Filters::Common::Expr::CelState>(wasm_state_prototype);
   Protobuf::Arena arena;
   EXPECT_EQ(wasm_state->exprValue(&arena, true).MessageOrDie(), nullptr);
   wasm_state->setValue("foo");
