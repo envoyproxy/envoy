@@ -14,6 +14,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * lua: fixed crash when Lua script contains streamInfo():downstreamSslConnection().
+* tls: fix detection of the upstream connection close event.
 
 Removed Config or Runtime
 -------------------------
