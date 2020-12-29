@@ -53,9 +53,9 @@ public:
   /**
    * @return Thread::ThreadId the thread ID last set by saveTid().
    */
-  Thread::ThreadId run_tid() const { return run_tid_; }
+  Thread::ThreadId runTid() const { return run_tid_; }
   /**
-   * Saves the ID of the calling thread for later retrieval with run_tid().
+   * Saves the ID of the calling thread for later retrieval with runTid().
    */
   void saveTid() { run_tid_ = api_.threadFactory().currentThreadId(); }
   /**

@@ -161,7 +161,7 @@ void DispatcherImpl::initializeStats(Stats::Scope& scope,
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
     base_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, base_.run_tid().debugString());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, base_.runTid().debugString());
   });
 }
 
