@@ -225,7 +225,7 @@ private:
   };
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
-    explicit CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
+    CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
         : VirtualClusterBase(stat_names.other_, scope.scopeFromStatName(stat_names.other_),
                              stat_names) {}
   };
@@ -410,7 +410,7 @@ class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
   // Constructor that enables internal redirect with policy_config controlling the configurable
   // behaviors.
-  explicit InternalRedirectPolicyImpl(
+  InternalRedirectPolicyImpl(
       const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
       ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
   // Default constructor that disables internal redirect.

@@ -31,7 +31,7 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
                                    host->cluster().stats().upstream_cx_tx_bytes_buffered_,
                                    &host->cluster().stats().bind_errors_, nullptr});
-
+  connection_->noDelay(true);
   connection_->connect();
 }
 
@@ -67,6 +67,9 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
     if (event == Network::ConnectionEvent::Connected) {
       connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
     } else {
+      if (tcp_connection_data_) {
+        Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
+      }
       callbacks_->onEvent(event);
       // After receiving a disconnect event, the owner of callbacks_ will likely self-destruct.
       // Clear the pointer to avoid using it again.

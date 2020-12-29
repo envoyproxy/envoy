@@ -1155,7 +1155,7 @@ class MockDestructSchedulableCallback : public Event::MockSchedulableCallback {
 public:
   MockDestructSchedulableCallback(Event::MockDispatcher* dispatcher)
       : Event::MockSchedulableCallback(dispatcher) {}
-  MOCK_METHOD0(Die, void());
+  MOCK_METHOD(void, Die, ());
 
   ~MockDestructSchedulableCallback() override { Die(); }
 };

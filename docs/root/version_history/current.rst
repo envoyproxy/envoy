@@ -14,6 +14,7 @@ Minor Behavior Changes
 
 * build: the Alpine based debug images are no longer built in CI, use Ubuntu based images instead.
 * cluster manager: the cluster which can't extract secret entity by SDS to be warming and never activate. This feature is disabled by default and is controlled by runtime guard `envoy.reloadable_features.cluster_keep_warming_no_secret_entity`.
+* decompressor: set the default value of window_bits of the decompressor to 15 to be able to decompress responses compressed by a compressor with any window size.
 * expr filter: added `connection.termination_details` property support.
 * ext_authz filter: disable `envoy.reloadable_features.ext_authz_measure_timeout_on_check_created` by default.
 * ext_authz filter: the deprecated field :ref:`use_alpha <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.use_alpha>` is no longer supported and cannot be set anymore.
@@ -25,6 +26,7 @@ Minor Behavior Changes
 * listener: injection of the :ref:`TLS inspector <config_listener_filters_tls_inspector>` has been disabled by default. This feature is controlled by the runtime guard `envoy.reloadable_features.disable_tls_inspector_injection`.
 * memory: enable new tcmalloc with restartable sequences for aarch64 builds.
 * mongo proxy metrics: swapped network connection remote and local closed counters previously set reversed (`cx_destroy_local_with_active_rq` and `cx_destroy_remote_with_active_rq`).
+* outlier detection: added :ref:`max_ejection_time <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` to limit ejection time growth when a node stays unhealthy for extended period of time. By default :ref:`max_ejection_time <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` limits ejection time to 5 minutes. Additionally, when the node stays healthy, ejection time decreases. See :ref:`ejection algorithm<arch_overview_outlier_detection_algorithm>` for more info. Previously, ejection time could grow without limit and never decreased.
 * performance: improve performance when handling large HTTP/1 bodies.
 * tls: removed RSA key transport and SHA-1 cipher suites from the client-side defaults.
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
@@ -38,6 +40,7 @@ Bug Fixes
 * config: validate that upgrade configs have a non-empty :ref:`upgrade_type <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.upgrade_type>`, fixing a bug where an errant "-" could result in unexpected behavior.
 * dns: fix a bug where custom resolvers provided in configuration were not preserved after network issues.
 * dns_filter: correctly associate DNS response IDs when multiple queries are received.
+* grpc mux: fix sending node again after stream is reset when ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` is set.
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
 * http: reject requests with missing required headers after filter chain processing.
 * http: sending CONNECT_ERROR for HTTP/2 where appropriate during CONNECT requests.
@@ -104,6 +107,7 @@ Deprecated
 * compression: the fields :ref:`content_length <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.content_length>`, :ref:`content_type <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.content_type>`, :ref:`disable_on_etag_header <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.disable_on_etag_header>`, :ref:`remove_accept_encoding_header <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.remove_accept_encoding_header>` and :ref:`runtime_enabled <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.runtime_enabled>` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>` message have been deprecated in favor of :ref:`response_direction_config <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.response_direction_config>`.
 * formatter: :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` is now deprecated in favor of :ref:`text_format_source <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format_source>`. To migrate existing text format strings, use the :ref:`inline_string <envoy_v3_api_field_config.core.v3.DataSource.inline_string>` field.
 * gzip: :ref:`HTTP Gzip filter <config_http_filters_gzip>` is rejected now unless explicitly allowed with :ref:`runtime override <config_runtime_deprecation>` `envoy.deprecated_features.allow_deprecated_gzip_http_filter` set to `true`.
+* listener: :ref:`use_proxy_proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` has been deprecated in favor of adding a :ref:`PROXY protocol listener filter <config_listener_filters_proxy_protocol>` explicitly.
 * logging: the `--log-format-prefix-with-location` option is removed.
 * ratelimit: the :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` action is deprecated in favor of the more generic :ref:`metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>` action.
 * stats: the `--use-fake-symbol-table` option is removed.

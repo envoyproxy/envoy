@@ -506,7 +506,7 @@ Supported variable names are:
     .. note::
 
       This may not be the physical remote address of the peer if the address has been inferred from
-      :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+      :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%

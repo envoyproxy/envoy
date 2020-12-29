@@ -1192,7 +1192,7 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
-    virtual_clusters_.emplace_back(
+    virtual_clusters_.push_back(
         VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
                             factory_context.routerContext().virtualClusterStatNames()));
   }
