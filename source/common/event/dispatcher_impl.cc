@@ -38,7 +38,10 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImplBase::DispatcherImplBase(Api::Api& api, TimeSystem& time_system)
-    : api_(api), scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)) {}
+    : api_(api), scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)) {
+  updateApproximateMonotonicTime();
+  registerOnPrepareCallback(std::bind(&DispatcherImplBase::updateApproximateMonotonicTime, this));
+}
 
 FileEventPtr DispatcherImplBase::createFileEvent(os_fd_t fd, FileReadyCb cb,
                                                  FileTriggerType trigger, uint32_t events) {
@@ -141,8 +144,6 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
-  base_.updateApproximateMonotonicTime();
-  base_.registerOnPrepareCallback(std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
 DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
