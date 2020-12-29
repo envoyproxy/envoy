@@ -1934,6 +1934,50 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
       "Certificate configuration can't have both private_key and private_key_provider");
 }
 
+class SslContextStatsTest : public SslContextImplTest {
+protected:
+  SslContextStatsTest() {
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context_);
+    client_context_config_ =
+        std::make_unique<ClientContextConfigImpl>(tls_context_, factory_context_);
+    context_.reset(new ContextImpl(store_, *client_context_config_, time_system_));
+  }
+
+  void incCounter(absl::string_view name1, absl::string_view name2) {
+    Stats::StatNamePool pool(store_.symbolTable());
+    context_->incCounter(pool.add(name1), name2, pool.add("fallback"));
+  }
+
+  Stats::TestUtil::TestStore store_;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
+  std::unique_ptr<ClientContextConfigImpl> client_context_config_;
+  std::unique_ptr<ContextImpl> context_;
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+  )EOF";
+};
+
+TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
+  // Incrementing a value for a cipher that is part of the configuration works, and
+  // we'll be able to find the value in the stats store.
+  incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
+  Stats::CounterOptConstRef cipher =
+      store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
+  EXPECT_TRUE(cipher);
+  EXPECT_EQ(1, cipher->get().value());
+
+  // Incrementing a stat for a random unknown cipher does not work. A
+  // rate-limited error log message will also be generated but that is hard to
+  // test as it is dependent on timing and test-ordering.
+  incCounter("ssl.ciphers", "unexpected");
+  EXPECT_FALSE(store_.findCounterByString("ssl.ciphers.unexpected"));
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

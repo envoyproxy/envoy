@@ -110,6 +110,8 @@ public:
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
 
 protected:
+  friend class SslContextStatsTest;
+
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
 

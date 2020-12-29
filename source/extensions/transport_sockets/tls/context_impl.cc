@@ -463,27 +463,26 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
-  // To enumerate the required builtin ciphers, curves, algorithms, and
-  // versions, uncomment '#define LOG_BUILTIN_STAT_NAMES' below, and run
-  //  bazel test //test/extensions/transport_sockets/tls/... --test_output=streamed
-  //      | grep " Builtin ssl." | sort | uniq
-  // #define LOG_BUILTIN_STAT_NAMES
-  //
-  // TODO(#8035): improve tooling to find any other built-ins needed to avoid
-  // contention.
+  // Ciphers are configured as a string delimited by ":", with equivalence
+  // groups given as "[alt1|alt2]", and exclusions preceded by "!". For the
+  // purposes of collecting stats -- we want to track all these names. We don't
+  // need to fully parse out the structure of the cipher suites -- just extract
+  // out the names.
+  for (absl::string_view cipher_suite :
+       absl::StrSplit(config.cipherSuites(), absl::ByAnyChar(":|[]!"))) {
+    stat_name_set_->rememberBuiltin(cipher_suite);
+  }
 
-  // Ciphers
-  stat_name_set_->rememberBuiltin("AEAD-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-SHA");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
+  // This cipher is referenced in a test, though it's not super-obvious how.
   stat_name_set_->rememberBuiltin("TLS_AES_128_GCM_SHA256");
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
   stat_name_set_->rememberBuiltins(
       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
+  for (absl::string_view curve : absl::StrSplit(config.ecdhCurves(), ":")) {
+    stat_name_set_->rememberBuiltin(curve);
+  }
 
   // Algorithms
   stat_name_set_->rememberBuiltins({"ecdsa_secp256r1_sha256", "rsa_pss_rsae_sha256"});
@@ -640,12 +639,15 @@ Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
                              const Stats::StatName fallback) const {
-  Stats::Counter& counter = Stats::Utility::counterFromElements(
-      scope_, {name, stat_name_set_->getBuiltin(value, fallback)});
-  counter.inc();
+  const Stats::StatName value_stat_name = stat_name_set_->getBuiltin(value, fallback);
+  if (value_stat_name == fallback) {
+    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::minutes(1), "Unexpected {} value: {}",
+                            scope_.symbolTable().toString(name), value);
+  }
+  Stats::Utility::counterFromElements(scope_, {name, value_stat_name}).inc();
 
 #ifdef LOG_BUILTIN_STAT_NAMES
-  std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")
+  std::cerr << absl::StrCat("Builtin ", scope_.symbolTable().toString(name), ": ", value, "\n")
             << std::flush;
 #endif
 }
