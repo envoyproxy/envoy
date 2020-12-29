@@ -300,7 +300,6 @@ envoy_cc_test_library(
     hdrs = ["wasm_base.h"],
     deps = [
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/common/wasm:wasm_interoperation_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
