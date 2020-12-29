@@ -355,6 +355,8 @@ AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
 }
 
 AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milliseconds timeout) {
+  // Do the work inline if called from the dispatcher thread, executeOnDispatcher can only be called
+  // from outside the dispatcher thread.
   if (shared_connection_.connection().dispatcher().isThreadSafe()) {
     shared_connection_.connection().readDisable(disable);
     return AssertionSuccess();
@@ -366,6 +368,8 @@ AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milli
 
 AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
                                                     std::chrono::milliseconds timeout) {
+  // Do the work inline if called from the dispatcher thread, executeOnDispatcher can only be called
+  // from outside the dispatcher thread.
   if (shared_connection_.connection().dispatcher().isThreadSafe()) {
     shared_connection_.connection().enableHalfClose(enable);
     return AssertionSuccess();
@@ -565,26 +569,17 @@ AssertionResult FakeUpstream::waitForHttpConnection(
     }
   }
 
-  AssertionResult result = AssertionSuccess();
-  absl::Notification done;
-  ASSERT(!dispatcher_->isThreadSafe());
-  dispatcher_->post([&]() {
-    {
-      absl::MutexLock lock(&lock_);
-      connection = std::make_unique<FakeHttpConnection>(
-          *this, consumeConnection(), http_type_, time_system_, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-      result = connection->initialize();
-      if (result == AssertionSuccess()) {
-        if (read_disable_on_new_connection_) {
-          result = connection->readDisable(false);
-        }
-      }
+  return runOnDispatcherThreadAndWait([&]() {
+    absl::MutexLock lock(&lock_);
+    connection = std::make_unique<FakeHttpConnection>(
+        *this, consumeConnection(), http_type_, time_system_, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
+    VERIFY_ASSERTION(connection->initialize());
+    if (read_disable_on_new_connection_) {
+      VERIFY_ASSERTION(connection->readDisable(false));
     }
-    done.Notify();
+    return AssertionSuccess();
   });
-  done.WaitForNotification();
-  return result;
 }
 
 AssertionResult
@@ -610,25 +605,16 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         }
       }
 
-      AssertionResult result = AssertionSuccess();
-      absl::Notification done;
-      ASSERT(!upstream.dispatcher_->isThreadSafe());
-      upstream.dispatcher_->post([&]() {
-        {
-          absl::MutexLock lock(&upstream.lock_);
-          connection = std::make_unique<FakeHttpConnection>(
-              upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
-              Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-              envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-          result = connection->initialize();
-          if (result == AssertionSuccess()) {
-            result = connection->readDisable(false);
-          }
-        }
-        done.Notify();
+      return upstream.runOnDispatcherThreadAndWait([&]() {
+        absl::MutexLock lock(&upstream.lock_);
+        connection = std::make_unique<FakeHttpConnection>(
+            upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
+            Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+            envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+        VERIFY_ASSERTION(connection->initialize());
+        VERIFY_ASSERTION(connection->readDisable(false));
+        return AssertionSuccess();
       });
-      done.WaitForNotification();
-      return result;
     }
   }
   return AssertionFailure() << "Timed out waiting for HTTP connection.";
@@ -648,27 +634,14 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     }
   }
 
-  AssertionResult result = AssertionSuccess();
-  absl::Notification done;
-  ASSERT(!dispatcher_->isThreadSafe());
-  dispatcher_->post([&]() {
-    {
-      absl::MutexLock lock(&lock_);
-      auto local_connection =
-          std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
-      result = local_connection->initialize();
-      if (result == AssertionSuccess()) {
-        result = local_connection->readDisable(false);
-        if (result == AssertionSuccess()) {
-          result = local_connection->enableHalfClose(enable_half_close_);
-        }
-      }
-      connection = std::move(local_connection);
-    }
-    done.Notify();
+  return runOnDispatcherThreadAndWait([&]() {
+    absl::MutexLock lock(&lock_);
+    connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
+    VERIFY_ASSERTION(connection->initialize());
+    VERIFY_ASSERTION(connection->readDisable(false));
+    VERIFY_ASSERTION(connection->enableHalfClose(enable_half_close_));
+    return AssertionSuccess();
   });
-  done.WaitForNotification();
-  return result;
 }
 
 testing::AssertionResult
@@ -712,6 +685,18 @@ testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& 
 void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
   absl::MutexLock lock(&lock_);
   received_datagrams_.emplace_back(std::move(data));
+}
+
+AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb) {
+  AssertionResult result = AssertionSuccess();
+  absl::Notification done;
+  ASSERT(!dispatcher_->isThreadSafe());
+  dispatcher_->post([&]() {
+    result = cb();
+    done.Notify();
+  });
+  done.WaitForNotification();
+  return result;
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,

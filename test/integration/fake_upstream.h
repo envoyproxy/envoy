@@ -729,6 +729,7 @@ private:
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void onRecvDatagram(Network::UdpRecvData& data);
+  AssertionResult runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb);
 
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;
