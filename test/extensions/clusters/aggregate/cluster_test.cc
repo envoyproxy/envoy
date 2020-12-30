@@ -14,6 +14,7 @@
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 
 using testing::Eq;
 using testing::Return;
@@ -29,9 +30,11 @@ const std::string primary_name("primary");
 const std::string secondary_name("secondary");
 } // namespace
 
-class AggregateClusterTest : public testing::Test {
+class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AggregateClusterTest() : stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_)) {
+  AggregateClusterTest()
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
   }
@@ -40,19 +43,20 @@ public:
                                     int degraded_hosts, int unhealthy_hosts, uint32_t priority) {
     Upstream::HostVector hosts;
     for (int i = 0; i < healthy_hosts; ++i) {
-      hosts.emplace_back(Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80", 1, priority));
+      hosts.emplace_back(
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80", simTime(), 1, priority));
     }
 
     for (int i = 0; i < degraded_hosts; ++i) {
       Upstream::HostSharedPtr host =
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.2:80", 1, priority);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.2:80", simTime(), 1, priority);
       host->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
       hosts.emplace_back(host);
     }
 
     for (int i = 0; i < unhealthy_hosts; ++i) {
       Upstream::HostSharedPtr host =
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.3:80", 1, priority);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.3:80", simTime(), 1, priority);
       host->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
       hosts.emplace_back(host);
     }
@@ -68,7 +72,6 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
-    cluster_->refresh();
   }
 
   void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
@@ -79,7 +82,6 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
-    cluster_->refresh();
   }
 
   void setupPrioritySet() {
@@ -103,27 +105,25 @@ public:
 
     cluster_ =
         std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
-                                  factory_context, std::move(scope), tls_, false);
+                                  factory_context, std::move(scope), false);
 
-    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
-    lb_factory_ = thread_aware_lb_->factory();
-    lb_ = lb_factory_->create();
-
-    EXPECT_CALL(cm_, get(Eq("aggregate_cluster"))).WillRepeatedly(Return(&aggregate_cluster_));
-    EXPECT_CALL(cm_, get(Eq("primary"))).WillRepeatedly(Return(&primary_));
-    EXPECT_CALL(cm_, get(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
-    EXPECT_CALL(cm_, get(Eq("tertiary"))).WillRepeatedly(Return(nullptr));
+    cm_.initializeThreadLocalClusters({"primary", "secondary"});
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("primary"))).WillRepeatedly(Return(&primary_));
+    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
-    ON_CALL(aggregate_cluster_, loadBalancer()).WillByDefault(ReturnRef(*lb_));
 
     setupPrioritySet();
 
     ON_CALL(primary_, loadBalancer()).WillByDefault(ReturnRef(primary_load_balancer_));
     ON_CALL(secondary_, loadBalancer()).WillByDefault(ReturnRef(secondary_load_balancer_));
+
+    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
+    lb_factory_ = thread_aware_lb_->factory();
+    lb_ = lb_factory_->create();
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -139,12 +139,13 @@ public:
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
+  Upstream::ClusterStatNames stat_names_;
   Upstream::ClusterStats stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Upstream::MockThreadLocalCluster> aggregate_cluster_, primary_, secondary_;
+  NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
 
@@ -171,7 +172,8 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   // Cluster 2:
   //     Priority 0: 33.3%
   //     Priority 1: 33.3%
-  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
+  Upstream::HostSharedPtr host =
+      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
@@ -220,7 +222,8 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
 
 TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   initialize(default_yaml_config_);
-  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
+  Upstream::HostSharedPtr host =
+      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
   // Set up the HostSet with 0 healthy, 0 degraded and 2 unhealthy.
   setupPrimary(0, 0, 0, 2);
   setupPrimary(1, 0, 0, 2);
@@ -258,7 +261,8 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
 
 TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   initialize(default_yaml_config_);
-  Upstream::HostSharedPtr host = Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80");
+  Upstream::HostSharedPtr host =
+      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
   setupPrimary(0, 1, 0, 4);
   setupPrimary(1, 1, 0, 4);
   setupSecondary(0, 1, 0, 4);
@@ -341,7 +345,7 @@ TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
 
   const uint32_t invalid_priority = 42;
   Upstream::HostSharedPtr host =
-      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", 1, invalid_priority);
+      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime(), 1, invalid_priority);
 
   // The linearized priorities are [P0, P1, S0, S1].
   Upstream::HealthyAndDegradedLoad secondary_priority_1{Upstream::HealthyLoad({0, 0, 0, 100}),

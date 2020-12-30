@@ -38,12 +38,11 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
-                               Event::TimeSystem& time_system)
-    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
-
-DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
-                               Api::Api& api, Event::TimeSystem& time_system)
-    : name_(name), api_(api), buffer_factory_(std::move(factory)),
+                               Event::TimeSystem& time_system,
+                               const Buffer::WatermarkFactorySharedPtr& factory)
+    : name_(name), api_(api),
+      buffer_factory_(factory != nullptr ? factory
+                                         : std::make_shared<Buffer::WatermarkBufferFactory>()),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
@@ -97,6 +96,7 @@ void DispatcherImpl::clearDeferredDeleteList() {
     current_to_delete_ = &to_delete_1_;
   }
 
+  touchWatchdog();
   deferred_deleting_ = true;
 
   // Calling clear() on the vector does not specify which order destructors run in. We want to
@@ -218,7 +218,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
 
 void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
-SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
+SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
   return SignalEventPtr{new SignalEventImpl(*this, signal_num, cb)};
 }
@@ -258,23 +258,32 @@ void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
 }
 
 void DispatcherImpl::runPostCallbacks() {
-  while (true) {
-    // It is important that this declaration is inside the body of the loop so that the callback is
-    // destructed while post_lock_ is not held. If callback is declared outside the loop and reused
-    // for each iteration, the previous iteration's callback is destructed when callback is
-    // re-assigned, which happens while holding the lock. This can lead to a deadlock (via
-    // recursive mutex acquisition) if destroying the callback runs a destructor, which through some
-    // callstack calls post() on this dispatcher.
-    std::function<void()> callback;
-    {
-      Thread::LockGuard lock(post_lock_);
-      if (post_callbacks_.empty()) {
-        return;
-      }
-      callback = post_callbacks_.front();
-      post_callbacks_.pop_front();
-    }
-    callback();
+  // Clear the deferred delete list before running post callbacks to reduce non-determinism in
+  // callback processing, and more easily detect if a scheduled post callback refers to one of the
+  // objects that is being deferred deleted.
+  clearDeferredDeleteList();
+
+  std::list<std::function<void()>> callbacks;
+  {
+    // Take ownership of the callbacks under the post_lock_. The lock must be released before
+    // callbacks execute. Callbacks added after this transfer will re-arm post_cb_ and will execute
+    // later in the event loop.
+    Thread::LockGuard lock(post_lock_);
+    callbacks = std::move(post_callbacks_);
+    // post_callbacks_ should be empty after the move.
+    ASSERT(post_callbacks_.empty());
+  }
+  // It is important that the execution and deletion of the callback happen while post_lock_ is not
+  // held. Either the invocation or destructor of the callback can call post() on this dispatcher.
+  while (!callbacks.empty()) {
+    // Touch the watchdog before executing the callback to avoid spurious watchdog miss events when
+    // executing a long list of callbacks.
+    touchWatchdog();
+    // Run the callback.
+    callbacks.front()();
+    // Pop the front so that the destructor of the callback that just executed runs before the next
+    // callback executes.
+    callbacks.pop_front();
   }
 }
 

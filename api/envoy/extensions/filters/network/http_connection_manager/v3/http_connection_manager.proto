@@ -19,8 +19,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/resource_locator.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
@@ -342,6 +340,10 @@ message HttpConnectionManager {
   // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` does not apply to
   // this corner case.
   //
+  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
+  // is configured, this timeout is scaled according to the value for
+  // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
+  //
   // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
   // to the granularity of events presented to the connection manager. For example, while receiving
   // very large request headers, it may be the case that there is traffic regularly arriving on the
@@ -651,13 +653,7 @@ message Rds {
   // API. This allows an Envoy configuration with multiple HTTP listeners (and
   // associated HTTP connection manager filters) to use different route
   // configurations.
-  string route_config_name = 2
-      [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
-
-  // Resource locator for RDS. This is mutually exclusive to *route_config_name*.
-  // [#not-implemented-hide:]
-  udpa.core.v1.ResourceLocator rds_resource_locator = 3
-      [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
+  string route_config_name = 2;
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.

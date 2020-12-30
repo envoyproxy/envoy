@@ -1460,8 +1460,8 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   Server::Configuration::MockListenerFactoryContext context;
-  EXPECT_CALL(context, scope()).Times(1);
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
+  EXPECT_CALL(context, scope());
+  EXPECT_CALL(context, messageValidationVisitor());
   Network::ListenerFilterFactoryCb cb =
       factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
 

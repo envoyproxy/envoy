@@ -383,12 +383,14 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
 
-  Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
+  Upstream::ThreadLocalCluster* thread_local_cluster =
+      cluster_manager_.getThreadLocalCluster(cluster_name);
 
   if (thread_local_cluster) {
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
   } else {
+    ENVOY_CONN_LOG(debug, "Cluster not found {}", read_callbacks_->connection(), cluster_name);
     config_->stats().downstream_cx_no_route_.inc();
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NoRoute);
@@ -432,8 +434,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
         downstreamConnection()->streamInfo().filterState());
   }
 
-  if (!maybeTunnel(*thread_local_cluster, cluster_name)) {
-    // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
+  if (!maybeTunnel(*thread_local_cluster)) {
+    // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
@@ -441,7 +443,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name) {
+bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
@@ -454,8 +456,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::strin
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(
-      cluster_name, cluster_manager_, config_->tunnelingConfig(), this, *upstream_callbacks_);
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfig(), this,
+                                                      *upstream_callbacks_);
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -630,8 +632,8 @@ void Filter::onUpstreamConnection() {
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
   getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
-  ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-            getStreamInfo().requestedServerName());
+  ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
+                 read_callbacks_->connection(), getStreamInfo().requestedServerName());
 
   if (config_->idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into
@@ -640,10 +642,14 @@ void Filter::onUpstreamConnection() {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
     resetIdleTimer();
-    read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
+    read_callbacks_->connection().addBytesSentCallback([this](uint64_t) {
+      resetIdleTimer();
+      return true;
+    });
     if (upstream_) {
-      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) {
+      upstream_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](uint64_t) -> bool {
         upstream_callbacks->onBytesSent();
+        return true;
       });
     }
   }

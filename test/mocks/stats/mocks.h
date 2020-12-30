@@ -21,30 +21,11 @@
 #include "common/stats/timespan_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Stats {
-
-class TestSymbolTableHelper {
-public:
-  SymbolTable& symbolTable() { return symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return symbol_table_; }
-
-private:
-  SymbolTableImpl symbol_table_;
-};
-
-class TestSymbolTable {
-public:
-  SymbolTable& operator*() { return global_.get().symbolTable(); }
-  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
-  SymbolTable* operator->() { return &global_.get().symbolTable(); }
-  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
-  Envoy::Test::Global<TestSymbolTableHelper> global_;
-};
 
 template <class BaseClass> class MockMetric : public BaseClass {
 public:
@@ -103,7 +84,7 @@ public:
     }
   }
 
-  TestSymbolTable symbol_table_; // Must outlive name_.
+  TestUtil::TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
 
   void setTags(const TagVector& tags) {
@@ -298,12 +279,7 @@ public:
   MOCK_METHOD(void, onHistogramComplete, (const Histogram& histogram, uint64_t value));
 };
 
-class SymbolTableProvider {
-public:
-  TestSymbolTable global_symbol_table_;
-};
-
-class MockStore : public SymbolTableProvider, public TestUtil::TestStore {
+class MockStore : public TestUtil::TestStore {
 public:
   MockStore();
   ~MockStore() override;
@@ -348,7 +324,7 @@ public:
     return textReadout(symbol_table_->toString(name));
   }
 
-  TestSymbolTable symbol_table_;
+  TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };
@@ -357,7 +333,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : public SymbolTableProvider, public TestUtil::TestStore {
+class MockIsolatedStatsStore : public TestUtil::TestStore {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;

@@ -15,7 +15,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/collection_entry.proto";
+import "xds/core/v3/collection_entry.proto";
 
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Listener list collections. Entries are *Listener* resources or references.
 // [#not-implemented-hide:]
 message ListenerCollection {
-  repeated udpa.core.v1.CollectionEntry entries = 1;
+  repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
 // [#next-free-field: 26]
@@ -93,9 +93,7 @@ message Listener {
     }
   }
 
-  reserved 14, 4;
-
-  reserved "use_original_dst";
+  reserved 14;
 
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -115,6 +113,13 @@ message Listener {
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
+
+  // If a connection is redirected using *iptables*, the port on which the proxy
+  // receives it might be different from the original destination address. When this flag is set to
+  // true, the listener hands off redirected connections to the listener associated with the
+  // original destination address. If there is no listener associated with the original destination
+  // address, the connection is handled by the listener that receives it. Defaults to false.
+  google.protobuf.BoolValue use_original_dst = 4;
 
   // The default filter chain if none of the filter chain matches. If no default filter chain is supplied,
   // the connection will be closed. The filter chain match is ignored in this field.

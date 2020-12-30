@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <ios>
 #include <set>
 #include <sstream>
 #include <string>
@@ -108,6 +109,32 @@ public:
   // TimeSource
   SystemTime systemTime() override { return std::chrono::system_clock::now(); }
   MonotonicTime monotonicTime() override { return std::chrono::steady_clock::now(); }
+};
+
+/**
+ * Class used for creating non-memory allocating std::ostream.
+ */
+class MutableMemoryStreamBuffer : public std::streambuf {
+public:
+  MutableMemoryStreamBuffer(char* base, size_t size);
+};
+
+/**
+ * std::ostream class that serializes writes into the provided buffer.
+ */
+class OutputBufferStream : private MutableMemoryStreamBuffer, public std::ostream {
+public:
+  OutputBufferStream(char* data, size_t size);
+
+  /**
+   * @return the number of bytes written prior to the "put" pointer into the buffer.
+   */
+  int bytesWritten() const;
+
+  /**
+   * @return a string view of the written bytes.
+   */
+  absl::string_view contents() const;
 };
 
 /**

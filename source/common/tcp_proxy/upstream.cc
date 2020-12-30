@@ -2,6 +2,8 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/codec_client.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -54,16 +56,9 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const std::string& hostname)
-    : upstream_callbacks_(callbacks), response_decoder_(*this), hostname_(hostname) {}
+    : hostname_(hostname), response_decoder_(*this), upstream_callbacks_(callbacks) {}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
-
-bool HttpUpstream::isValidBytestreamResponse(const Http::ResponseHeaderMap& headers) {
-  if (Http::Utility::getResponseStatus(headers) != 200) {
-    return false;
-  }
-  return true;
-}
 
 bool HttpUpstream::readDisable(bool disable) {
   if (!request_encoder_) {
@@ -112,22 +107,6 @@ void HttpUpstream::onBelowWriteBufferLowWatermark() {
   upstream_callbacks_.onBelowWriteBufferLowWatermark();
 }
 
-void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
-  request_encoder_ = &request_encoder;
-  request_encoder_->getStream().addCallbacks(*this);
-  const std::string& scheme =
-      is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
-      {{Http::Headers::get().Method, "CONNECT"},
-       {Http::Headers::get().Protocol, Http::Headers::get().ProtocolValues.Bytestream},
-       {Http::Headers::get().Scheme, scheme},
-       {Http::Headers::get().Path, "/"},
-       {Http::Headers::get().Host, hostname_}});
-  const auto status = request_encoder_->encodeHeaders(*headers, false);
-  // Encoding can only fail on missing required request headers.
-  ASSERT(status.ok());
-}
-
 void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   if (!request_encoder_) {
     return;
@@ -156,12 +135,11 @@ void HttpUpstream::doneWriting() {
   }
 }
 
-TcpConnPool::TcpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
     : upstream_callbacks_(upstream_callbacks) {
-  conn_pool_ = cluster_manager.tcpConnPoolForCluster(cluster_name,
-                                                     Upstream::ResourcePriority::Default, context);
+  conn_pool_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
 }
 
 TcpConnPool::~TcpConnPool() {
@@ -201,13 +179,13 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
                                  latched_data->connection().streamInfo().downstreamSslConnection());
 }
 
-HttpConnPool::HttpConnPool(const std::string& cluster_name,
-                           Upstream::ClusterManager& cluster_manager,
+HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
-                           Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
-    : hostname_(config.hostname()), upstream_callbacks_(upstream_callbacks) {
-  conn_pool_ = cluster_manager.httpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, absl::nullopt, context);
+                           Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                           Http::CodecClient::Type type)
+    : hostname_(config.hostname()), type_(type), upstream_callbacks_(upstream_callbacks) {
+  conn_pool_ = thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, absl::nullopt,
+                                                 context);
 }
 
 HttpConnPool::~HttpConnPool() {
@@ -220,7 +198,11 @@ HttpConnPool::~HttpConnPool() {
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  upstream_ = std::make_unique<HttpUpstream>(upstream_callbacks_, hostname_);
+  if (type_ == Http::CodecClient::Type::HTTP1) {
+    upstream_ = std::make_unique<Http1Upstream>(upstream_callbacks_, hostname_);
+  } else {
+    upstream_ = std::make_unique<Http2Upstream>(upstream_callbacks_, hostname_);
+  }
   Tcp::ConnectionPool::Cancellable* handle =
       conn_pool_->newStream(upstream_->responseDecoder(), *this);
   if (handle != nullptr) {
@@ -236,7 +218,7 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl:
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
-                               const StreamInfo::StreamInfo& info) {
+                               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
   upstream_handle_ = nullptr;
   Http::RequestEncoder* latched_encoder = &request_encoder;
   upstream_->setRequestEncoder(request_encoder,
@@ -244,6 +226,67 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
                                  latched_encoder->getStream().connectionLocalAddress(),
                                  info.downstreamSslConnection());
+}
+
+Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+                             const std::string& hostname)
+    : HttpUpstream(callbacks, hostname) {}
+
+bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
+  if (Http::Utility::getResponseStatus(headers) != 200) {
+    return false;
+  }
+  return true;
+}
+
+void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
+  request_encoder_ = &request_encoder;
+  request_encoder_->getStream().addCallbacks(*this);
+  const std::string& scheme =
+      is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
+      {{Http::Headers::get().Method, "CONNECT"},
+       {Http::Headers::get().Protocol, Http::Headers::get().ProtocolValues.Bytestream},
+       {Http::Headers::get().Scheme, scheme},
+       {Http::Headers::get().Path, "/"},
+       {Http::Headers::get().Host, hostname_}});
+  const auto status = request_encoder_->encodeHeaders(*headers, false);
+  // Encoding can only fail on missing required request headers.
+  ASSERT(status.ok());
+}
+
+Http1Upstream::Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+                             const std::string& hostname)
+    : HttpUpstream(callbacks, hostname) {}
+
+void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
+  request_encoder_ = &request_encoder;
+  request_encoder_->getStream().addCallbacks(*this);
+
+  ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, "CONNECT"},
+      {Http::Headers::get().Host, hostname_},
+  });
+
+  const auto status = request_encoder_->encodeHeaders(*headers, false);
+  // Encoding can only fail on missing required request headers.
+  ASSERT(status.ok());
+}
+
+bool Http1Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
+  // According to RFC7231 any 2xx response indicates that the connection is
+  // established.
+  // Any 'Content-Length' or 'Transfer-Encoding' header fields MUST be ignored.
+  // https://tools.ietf.org/html/rfc7231#section-4.3.6
+  return Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(headers));
+}
+
+void Http1Upstream::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (!request_encoder_) {
+    return;
+  }
+  request_encoder_->encodeData(data, end_stream);
 }
 
 } // namespace TcpProxy

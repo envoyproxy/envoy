@@ -67,7 +67,7 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
   FatalAction::FatalActionManager* action_manager = fatal_action_manager.load();
 
   if (action_manager == nullptr) {
-    return FatalAction::Status::ActionManangerUnset;
+    return FatalAction::Status::ActionManagerUnset;
   }
 
   int64_t my_tid = action_manager->getThreadFactory().currentThreadId().getId();

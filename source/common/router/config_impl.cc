@@ -463,6 +463,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
+  if (route.redirect().has_regex_rewrite()) {
+    ASSERT(prefix_rewrite_redirect_.empty());
+    auto rewrite_spec = route.redirect().regex_rewrite();
+    regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
+  }
+
   if (enable_preserve_query_in_path_redirects_ && path_redirect_has_query_ && strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
@@ -567,7 +574,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Handle path rewrite
-  if (!getPathRewrite().empty() || regex_rewrite_ != nullptr) {
+  absl::optional<std::string> container;
+  if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -602,6 +610,30 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
   return runtime;
 }
 
+const std::string&
+RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
+                                   absl::optional<std::string>& container) const {
+  // Just use the prefix rewrite if this isn't a redirect.
+  if (!isRedirect()) {
+    return prefix_rewrite_;
+  }
+
+  // Return the regex rewrite substitution for redirects, if set.
+  if (regex_rewrite_redirect_ != nullptr) {
+    // Copy just the path and rewrite it using the regex.
+    //
+    // Store the result in the output container, and return a reference to the underlying string.
+    auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
+    container =
+        regex_rewrite_redirect_->replaceAll(just_path, regex_rewrite_redirect_substitution_);
+
+    return container.value();
+  }
+
+  // Otherwise, return the prefix rewrite used for redirects.
+  return prefix_rewrite_redirect_;
+}
+
 // finalizePathHeaders does the "standard" path rewriting, meaning that it
 // handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
 // which can be specified. The "matched_path" argument applies only to the
@@ -612,7 +644,8 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
 void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
-  const auto& rewrite = getPathRewrite();
+  absl::optional<std::string> container;
+  const auto& rewrite = getPathRewrite(headers, container);
   if (rewrite.empty() && regex_rewrite_ == nullptr) {
     // There are no rewrites configured. Just return.
     return;
@@ -902,7 +935,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
                                           true);
 }
 
-void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
+void RouteEntryImplBase::validateClusters(
+    const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const {
   if (isDirectResponse()) {
     return;
   }
@@ -914,12 +948,12 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   // In the future we might decide to also have a config option that turns off checks for static
   // route tables. This would enable the all CDS with static route table case.
   if (!cluster_name_.empty()) {
-    if (!cm.get(cluster_name_)) {
+    if (!cluster_info_maps.hasCluster(cluster_name_)) {
       throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (!weighted_clusters_.empty()) {
     for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-      if (!cm.get(cluster->clusterName())) {
+      if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
         throw EnvoyException(
             fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
       }
@@ -1075,11 +1109,12 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
   return nullptr;
 }
 
-VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
-                                 const ConfigImpl& global_route_config,
-                                 Server::Configuration::ServerFactoryContext& factory_context,
-                                 Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
-                                 bool validate_clusters)
+VirtualHostImpl::VirtualHostImpl(
+    const envoy::config::route::v3::VirtualHost& virtual_host,
+    const ConfigImpl& global_route_config,
+    Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+    ProtobufMessage::ValidationVisitor& validator,
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
     : stat_name_pool_(factory_context.scope().symbolTable()),
       stat_name_(stat_name_pool_.add(virtual_host.name())),
       vcluster_scope_(scope.createScope(virtual_host.name() + ".vcluster")),
@@ -1095,7 +1130,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
-      virtual_cluster_catch_all_(stat_name_pool_, *vcluster_scope_) {
+      virtual_cluster_catch_all_(*vcluster_scope_,
+                                 factory_context.routerContext().virtualClusterStatNames()) {
 
   switch (virtual_host.require_tls()) {
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -1142,11 +1178,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
-    if (validate_clusters) {
-      routes_.back()->validateClusters(factory_context.clusterManager());
+    if (validation_clusters.has_value()) {
+      routes_.back()->validateClusters(*validation_clusters);
       for (const auto& shadow_policy : routes_.back()->shadowPolicies()) {
         ASSERT(!shadow_policy->cluster().empty());
-        if (!factory_context.clusterManager().get(shadow_policy->cluster())) {
+        if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
           throw EnvoyException(
               fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
         }
@@ -1156,7 +1192,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, stat_name_pool_, *vcluster_scope_));
+        VirtualClusterEntry(virtual_cluster, stat_name_pool_, *vcluster_scope_,
+                            factory_context.routerContext().virtualClusterStatNames()));
   }
 
   if (virtual_host.has_cors()) {
@@ -1166,9 +1203,9 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool,
-    Stats::Scope& scope)
+    Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
     : VirtualClusterBase(pool.add(virtual_cluster.name()),
-                         scope.createScope(virtual_cluster.name())) {
+                         scope.createScope(virtual_cluster.name()), stat_names) {
   if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
       virtual_cluster.headers().empty()) {
     throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
@@ -1228,10 +1265,14 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
     : vhost_scope_(factory_context.scope().createScope("vhost")) {
+  absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
+  if (validate_clusters) {
+    validation_clusters = factory_context.clusterManager().clusters();
+  }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
                                                           factory_context, *vhost_scope_, validator,
-                                                          validate_clusters));
+                                                          validation_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       bool duplicate_found = false;
