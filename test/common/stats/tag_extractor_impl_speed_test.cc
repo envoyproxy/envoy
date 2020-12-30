@@ -12,33 +12,33 @@
 // ------------------------------------------------------------
 // Benchmark                  Time             CPU   Iterations
 // ------------------------------------------------------------
-// BM_ExtractTags/0        1796 ns         1793 ns       401011
-// BM_ExtractTags/1         513 ns          512 ns      1364401
-// BM_ExtractTags/2         794 ns          793 ns       899533
-// BM_ExtractTags/3         646 ns          645 ns      1091666
-// BM_ExtractTags/4        1315 ns         1314 ns       523727
-// BM_ExtractTags/5         854 ns          853 ns       830341
-// BM_ExtractTags/6         336 ns          336 ns      2085144
-// BM_ExtractTags/7         574 ns          573 ns      1205468
-// BM_ExtractTags/8        1264 ns         1262 ns       542151
-// BM_ExtractTags/9        1724 ns         1721 ns       408224
-// BM_ExtractTags/10        316 ns          316 ns      2203384
-// BM_ExtractTags/11        522 ns          521 ns      1383972
-// BM_ExtractTags/12       1159 ns         1157 ns       591665
-// BM_ExtractTags/13       1348 ns         1346 ns       518341
-// BM_ExtractTags/14       1605 ns         1603 ns       445517
-// BM_ExtractTags/15        959 ns          958 ns       720045
-// BM_ExtractTags/16        820 ns          818 ns       857287
-// BM_ExtractTags/17        806 ns          805 ns       833224
-// BM_ExtractTags/18        843 ns          842 ns       830836
-// BM_ExtractTags/19        343 ns          343 ns      2088403
-// BM_ExtractTags/20        351 ns          350 ns      1988046
-// BM_ExtractTags/21        404 ns          404 ns      1711767
-// BM_ExtractTags/22        874 ns          873 ns       802379
-// BM_ExtractTags/23       2041 ns         2038 ns       334105
-// BM_ExtractTags/24        316 ns          316 ns      2216693
-// BM_ExtractTags/25        298 ns          298 ns      2302454
-// BM_ExtractTags/26        506 ns          506 ns      1384901
+// BM_ExtractTags/0        1759 ns         1757 ns       397721
+// BM_ExtractTags/1         498 ns          497 ns      1386765
+// BM_ExtractTags/2         814 ns          813 ns       789388
+// BM_ExtractTags/3         621 ns          620 ns      1109055
+// BM_ExtractTags/4        1320 ns         1318 ns       536701
+// BM_ExtractTags/5         882 ns          880 ns       817115
+// BM_ExtractTags/6         327 ns          327 ns      2171259
+// BM_ExtractTags/7         572 ns          571 ns      1205250
+// BM_ExtractTags/8        1238 ns         1236 ns       558481
+// BM_ExtractTags/9        1669 ns         1667 ns       414483
+// BM_ExtractTags/10        310 ns          310 ns      2237065
+// BM_ExtractTags/11        476 ns          476 ns      1465925
+// BM_ExtractTags/12       1102 ns         1100 ns       631707
+// BM_ExtractTags/13       1307 ns         1305 ns       513760
+// BM_ExtractTags/14       1583 ns         1581 ns       447159
+// BM_ExtractTags/15        957 ns          956 ns       729726
+// BM_ExtractTags/16        822 ns          821 ns       869110
+// BM_ExtractTags/17        821 ns          820 ns       839293
+// BM_ExtractTags/18        783 ns          782 ns       898442
+// BM_ExtractTags/19        330 ns          329 ns      2098821
+// BM_ExtractTags/20        342 ns          342 ns      2044062
+// BM_ExtractTags/21        389 ns          389 ns      1785110
+// BM_ExtractTags/22        847 ns          846 ns       831652
+// BM_ExtractTags/23       2022 ns         2019 ns       353368
+// BM_ExtractTags/24        306 ns          305 ns      2226702
+// BM_ExtractTags/25        277 ns          277 ns      2516796
+// BM_ExtractTags/26        494 ns          494 ns      1363306
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
