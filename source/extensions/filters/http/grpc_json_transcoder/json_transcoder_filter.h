@@ -113,11 +113,6 @@ private:
   ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                            google::grpc::transcoding::RequestInfo* info) const;
 
-  JsonTranscoderConfig(
-      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
-          proto_config,
-      Api::Api& api, bool disabled);
-
 private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);

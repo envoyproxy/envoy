@@ -643,7 +643,7 @@ JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
-  if (error_ || !transcoder_ || per_route_config_->disabled()) {
+  if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled()) {
     return;
   }
 
@@ -799,7 +799,7 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
 
 bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
                                                   Http::ResponseHeaderOrTrailerMap& trailers) {
-  ASSERT(!per_route_config_->disabled());
+  ASSERT(per_route_config_ && !per_route_config_->disabled());
   if (!per_route_config_->convertGrpcStatus()) {
     return false;
   }
