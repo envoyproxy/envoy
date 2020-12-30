@@ -175,12 +175,14 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
 
-  if (!end_stream && !isValidResponseHeaders(headers, end_stream)) {
-    response_headers_ = &headers;
-    return Http::FilterHeadersStatus::StopIteration;
+  if (end_stream || isValidResponseHeaders(headers, end_stream)) {
+    return Http::FilterHeadersStatus::Continue;
   }
 
-  return Http::FilterHeadersStatus::Continue;
+  ENVOY_LOG(debug, "received invalid response headers since the upstream response or local reply "
+                   "is not a gRPC or gRPC-Web response");
+  response_headers_ = &headers;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool end_stream) {
