@@ -43,6 +43,7 @@
 #include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
+#include "common/upstream/shuffle_subset_lb.h"
 
 namespace Envoy {
 namespace Upstream {
