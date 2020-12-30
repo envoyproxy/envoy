@@ -195,6 +195,25 @@ TEST_F(GrpcWebFilterTest, Base64NoPadding) {
   EXPECT_EQ(decoder_callbacks_.details(), "grpc_base_64_decode_failed_bad_size");
 }
 
+TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText}, {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data1("start");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data1, false));
+  Buffer::OwnedImpl data2("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data2, false));
+  Buffer::OwnedImpl data3("end");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data3, true));
+
+  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+}
+
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", request_content_type()},

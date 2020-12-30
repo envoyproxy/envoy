@@ -23,6 +23,7 @@ namespace {
 
 // Bit mask denotes a trailers frame of gRPC-Web.
 constexpr const uint8_t GRPC_WEB_TRAILER = 0b10000000;
+constexpr const uint64_t MAX_GRPC_MESSAGE_LENGTH = 1024;
 
 const absl::flat_hash_set<std::string>& gRpcWebContentTypes() {
   // Supported gRPC-Web content-types.
@@ -182,19 +183,28 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
+Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!is_grpc_web_request_) {
     return Http::FilterDataStatus::Continue;
   }
 
-  // When the upstream response is not a gRPC response, we set the "grpc-message" header with the
-  // upstream body content.
+  // When the upstream response (this is also relevant for local reply, since gRPC-Web request is
+  // not a gRPC request which makes the local reply's is_grpc_request set to false) is not a gRPC
+  // response, we set the "grpc-message" header with the upstream body content.
   if (response_headers_ != nullptr) {
+    if (!end_stream) {
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    // Take the last frame as the grpc-message value, but the size of it is limited by
+    // MAX_GRPC_MESSAGE_LENGTH.
+    const auto message =
+        Http::Utility::PercentEncoding::encode(data.toString().substr(0, MAX_GRPC_MESSAGE_LENGTH));
     data.drain(data.length());
 
     response_headers_->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(
         enumToInt(Http::Utility::getResponseStatus(*response_headers_))));
-    response_headers_->setGrpcMessage(Http::Utility::PercentEncoding::encode(data.toString()));
+    response_headers_->setGrpcMessage(message);
     response_headers_->setContentLength(0);
     return Http::FilterDataStatus::Continue;
   }
