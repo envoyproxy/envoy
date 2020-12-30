@@ -30,9 +30,8 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
                        public FatalErrorHandlerInterface {
 public:
-  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system);
-  DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
-                 Event::TimeSystem& time_system);
+  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
+                 const Buffer::WatermarkFactorySharedPtr& factory = nullptr);
   ~DispatcherImpl() override;
 
   /**
@@ -141,7 +140,7 @@ private:
   std::string stats_prefix_;
   DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;
-  Buffer::WatermarkFactoryPtr buffer_factory_;
+  Buffer::WatermarkFactorySharedPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
   SchedulableCallbackPtr deferred_delete_cb_;
