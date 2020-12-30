@@ -15,8 +15,10 @@
 #include "envoy/init/manager.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload/overload_manager.h"
@@ -116,6 +118,11 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
+   * @return Router::Context& a reference to the router context.
+   */
+  virtual Router::Context& routerContext() PURE;
+
+  /**
    * @return DrainManager& the server-wide drain manager.
    */
   virtual Envoy::Server::DrainManager& drainManager() PURE;
@@ -136,9 +143,9 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
-   * @return std::chrono::milliseconds the flush interval of stats sinks.
+   * @return StatsConfig& the servers stats configuration.
    */
-  virtual std::chrono::milliseconds statsFlushInterval() const PURE;
+  virtual StatsConfig& statsConfig() PURE;
 };
 
 /**
@@ -222,6 +229,11 @@ public:
    * @return Grpc::Context& a reference to the grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;
+
+  /**
+   * @return Router::Context& a reference to the router context.
+   */
+  virtual Router::Context& routerContext() PURE;
 
   /**
    * @return ProcessContextOptRef an optional reference to the

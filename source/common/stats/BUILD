@@ -182,8 +182,8 @@ envoy_cc_library(
         ":recent_lookups_lib",
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
         "//source/common/common:mem_block_builder_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
@@ -263,5 +263,8 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = [":symbol_table_lib"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+    ],
 )

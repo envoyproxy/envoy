@@ -100,15 +100,16 @@ public:
   void startRequest() { router_->sendRequestToUpstream(*active_message_); }
 
   void connectUpstream() {
-    context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+    context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
   }
 
   void startRequestWithExistingConnection() {
-    EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
+    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
         .WillOnce(
             Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              context_.cluster_manager_.tcp_conn_pool_.newConnectionImpl(cb);
-              context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
+              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+                  upstream_connection_);
               return nullptr;
             }));
     router_->sendRequestToUpstream(*active_message_);
@@ -167,7 +168,7 @@ TEST_F(RocketmqRouterTest, PoolRemoteConnectionFailure) {
       }));
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
@@ -183,7 +184,7 @@ TEST_F(RocketmqRouterTest, PoolTimeout) {
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Timeout);
 }
 
@@ -199,7 +200,7 @@ TEST_F(RocketmqRouterTest, PoolLocalConnectionFailure) {
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
 
@@ -215,7 +216,7 @@ TEST_F(RocketmqRouterTest, PoolOverflowFailure) {
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
-  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Overflow);
 }
 
@@ -244,7 +245,7 @@ TEST_F(RocketmqRouterTest, NoHealthyHosts) {
       .WillOnce(Invoke([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*No host available*."));
       }));
-  EXPECT_CALL(context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(*active_message_, onReset());
 

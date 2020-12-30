@@ -30,6 +30,8 @@ DSR
 HEXDIG
 HEXDIGIT
 OWS
+Preconnecting
+STATNAME
 SkyWalking
 TIDs
 ceil
@@ -896,6 +898,10 @@ precompile
 precompiled
 precompute
 precomputed
+preconnect
+preconnected
+preconnecting
+preconnects
 predeclared
 prefetch
 prefetched

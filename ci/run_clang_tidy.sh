@@ -31,7 +31,7 @@ echo "Generating compilation database..."
 # Do not run clang-tidy against win32 impl
 # TODO(scw00): We should run clang-tidy against win32 impl once we have clang-cl support for Windows
 function exclude_win32_impl() {
-  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32
+  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32 | grep -v source/common/event/win32
 }
 
 # Do not run clang-tidy against macOS impl

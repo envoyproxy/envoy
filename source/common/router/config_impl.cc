@@ -463,6 +463,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
+  if (route.redirect().has_regex_rewrite()) {
+    ASSERT(prefix_rewrite_redirect_.empty());
+    auto rewrite_spec = route.redirect().regex_rewrite();
+    regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
+  }
+
   if (enable_preserve_query_in_path_redirects_ && path_redirect_has_query_ && strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
@@ -567,7 +574,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Handle path rewrite
-  if (!getPathRewrite().empty() || regex_rewrite_ != nullptr) {
+  absl::optional<std::string> container;
+  if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -602,6 +610,30 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
   return runtime;
 }
 
+const std::string&
+RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
+                                   absl::optional<std::string>& container) const {
+  // Just use the prefix rewrite if this isn't a redirect.
+  if (!isRedirect()) {
+    return prefix_rewrite_;
+  }
+
+  // Return the regex rewrite substitution for redirects, if set.
+  if (regex_rewrite_redirect_ != nullptr) {
+    // Copy just the path and rewrite it using the regex.
+    //
+    // Store the result in the output container, and return a reference to the underlying string.
+    auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
+    container =
+        regex_rewrite_redirect_->replaceAll(just_path, regex_rewrite_redirect_substitution_);
+
+    return container.value();
+  }
+
+  // Otherwise, return the prefix rewrite used for redirects.
+  return prefix_rewrite_redirect_;
+}
+
 // finalizePathHeaders does the "standard" path rewriting, meaning that it
 // handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
 // which can be specified. The "matched_path" argument applies only to the
@@ -612,7 +644,8 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
 void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
-  const auto& rewrite = getPathRewrite();
+  absl::optional<std::string> container;
+  const auto& rewrite = getPathRewrite(headers, container);
   if (rewrite.empty() && regex_rewrite_ == nullptr) {
     // There are no rewrites configured. Just return.
     return;
@@ -1097,7 +1130,8 @@ VirtualHostImpl::VirtualHostImpl(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
-      virtual_cluster_catch_all_(stat_name_pool_, *vcluster_scope_) {
+      virtual_cluster_catch_all_(*vcluster_scope_,
+                                 factory_context.routerContext().virtualClusterStatNames()) {
 
   switch (virtual_host.require_tls()) {
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -1158,7 +1192,8 @@ VirtualHostImpl::VirtualHostImpl(
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, stat_name_pool_, *vcluster_scope_));
+        VirtualClusterEntry(virtual_cluster, stat_name_pool_, *vcluster_scope_,
+                            factory_context.routerContext().virtualClusterStatNames()));
   }
 
   if (virtual_host.has_cors()) {
@@ -1168,9 +1203,9 @@ VirtualHostImpl::VirtualHostImpl(
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool,
-    Stats::Scope& scope)
+    Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
     : VirtualClusterBase(pool.add(virtual_cluster.name()),
-                         scope.createScope(virtual_cluster.name())) {
+                         scope.createScope(virtual_cluster.name()), stat_names) {
   if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
       virtual_cluster.headers().empty()) {
     throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
