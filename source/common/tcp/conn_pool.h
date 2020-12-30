@@ -94,6 +94,7 @@ public:
   void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
   void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
 
+  absl::optional<Http::Protocol> protocol() const override { return {}; }
   void close() override { connection_->close(Network::ConnectionCloseType::NoFlush); }
   uint32_t numActiveStreams() const override { return callbacks_ ? 1 : 0; }
   bool closingWithIncompleteStream() const override { return false; }
@@ -108,6 +109,7 @@ public:
   }
   virtual void clearCallbacks();
 
+  std::shared_ptr<ConnReadFilter> read_filter_handle_;
   Envoy::ConnectionPool::ConnPoolImplBase& parent_;
   ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
@@ -155,8 +157,8 @@ public:
     TcpAttachContext context(&callbacks);
     return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
   }
-  bool maybePrefetch(float prefetch_ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(prefetch_ratio);
+  bool maybePreconnect(float preconnect_ratio) override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(preconnect_ratio);
   }
 
   ConnectionPool::Cancellable*

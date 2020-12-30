@@ -181,6 +181,11 @@ protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
+    initialize(bootstrap_path, use_intializing_instance, hooks_);
+  }
+
+  void initialize(const std::string& bootstrap_path, const bool use_intializing_instance,
+                  ListenerHooks& hooks) {
     if (options_.config_path_.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
@@ -194,7 +199,7 @@ protected:
 
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart_,
         stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
@@ -313,6 +318,18 @@ public:
   std::string name() const override { return "envoy.custom_stats_sink"; }
 };
 
+// CustomListenerHooks is used for synchronization between test thread and server thread.
+class CustomListenerHooks : public DefaultListenerHooks {
+public:
+  CustomListenerHooks(std::function<void()> workers_started_cb)
+      : on_workers_started_cb_(workers_started_cb) {}
+
+  void onWorkersStarted() override { on_workers_started_cb_(); }
+
+private:
+  std::function<void()> on_workers_started_cb_;
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -423,6 +440,37 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
+  bool workers_started = false;
+  absl::Notification workers_started_fired, workers_started_block;
+  // Expect drainParentListeners not to be called before workers start.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+      workers_started_block.WaitForNotification();
+    });
+    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+
+  EXPECT_CALL(restart_, drainParentListeners);
+  workers_started_block.Notify();
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // A test target which never signals that it is ready.
 class NeverReadyTarget : public Init::TargetImpl {
 public:
@@ -460,6 +508,31 @@ TEST_P(ServerInstanceImplTest, NoLifecycleNotificationOnEarlyShutdown) {
 
   // Now shutdown the main dispatcher and trigger server lifecycle notifications.
   server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
+TEST_P(ServerInstanceImplTest, ShutdownBeforeWorkersStarted) {
+  // Test that drainParentListeners() should never be called because we will shutdown
+  // early before the server starts worker threads.
+  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/test_data/server/node_bootstrap.yaml");
+
+    auto post_init_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit,
+                                                      [&] { server_->shutdown(); });
+
+    // This shutdown notification should never be called because we will shutdown early.
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    server_->run();
+
+    post_init_handle = nullptr;
+    shutdown_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
   server_thread->join();
 }
 
@@ -694,6 +767,24 @@ TEST_P(ServerInstanceImplTest,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
 }
 
+// Validate that bootstrap with v2 ADS transport is rejected when --bootstrap-version is not
+// set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2AdsTransportWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/ads_v2.yaml"),
+                          DeprecatedMajorVersionException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+}
+
+// Validate that bootstrap with v2 HDS transport is rejected when --bootstrap-version is not
+// set.
+TEST_P(ServerInstanceImplTest,
+       DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/hds_v2.yaml"),
+                          DeprecatedMajorVersionException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
+}
+
 // Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
 TEST_P(ServerInstanceImplTest,
        DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapWithoutExplicitVersion)) {
@@ -829,6 +920,18 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3S
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2TransportWithoutExplicitVersion)) {
   options_.bootstrap_version_ = 2;
   initialize("test/server/test_data/server/dynamic_v2.yaml");
+}
+
+// Validate that bootstrap with v2 ADS transport loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2AdsTransportWithoutExplicitVersion)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/ads_v2.yaml");
+}
+
+// Validate that bootstrap with v2 HDS transport loads when --bootstrap-version is set.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(LoadsV2HdsTransportWithoutExplicitVersion)) {
+  options_.bootstrap_version_ = 2;
+  initialize("test/server/test_data/server/hds_v2.yaml");
 }
 
 // Validate that bootstrap pb_text loads.
