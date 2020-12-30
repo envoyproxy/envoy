@@ -447,6 +447,9 @@ TEST_P(WasmCommonTest, Utilities) {
 }
 
 TEST_P(WasmCommonTest, Stats) {
+  // We set logger level to critical here to gain more coverage.
+  Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::critical);
+
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Upstream::MockClusterManager cluster_manager;
