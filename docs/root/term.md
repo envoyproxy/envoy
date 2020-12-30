@@ -50,6 +50,7 @@
 - on-premise：物理机，实体机
 - on-premises machines scenario：物理机场景
 - organizational policy：组织策略
+- overview：概览
 - pluggable：可拔插的
 - plugin / addon：插件
 - policy：策略

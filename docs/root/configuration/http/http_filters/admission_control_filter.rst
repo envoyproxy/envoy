@@ -1,80 +1,67 @@
 .. _config_http_filters_admission_control:
 
-Admission Control
+准入控制
 =================
 
 .. attention::
 
-  The admission control filter is experimental and is currently under active development.
+  准入控制过滤器属于实验性功能，目前正在积极开发中。
 
-See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` for details on each configuration parameter.
+有关每个配置项的详细信息，请参见 :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>`。
 
-Overview
+概览
 --------
 
-The admission control filter probabilistically rejects requests based on the success rate of
-previous requests in a configurable sliding time window. It is based on `client-side
-throttling <https://landing.google.com/sre/sre-book/chapters/handling-overload/>`_ from the `Google SRE handbook <https://landing.google.com/sre/sre-book/toc/index.html>`_. The only notable difference between the admission control
-filter's load shedding and load shedding defined in client-side throttling is that users may
-configure how aggressively load shedding starts at a target request success rate. Users may also
-configure the definition of a successful request for the purposes of the rejection probability
-calculation.
+准入控制过滤器会根据滑动时间窗口内之前请求的成功率，概率性的拒绝请求。它基于 `谷歌 SRE 手册 <https://landing.google.com/sre/sre-book/toc/index.html>`_ 中的
+`客户端侧节流 <https://landing.google.com/sre/sre-book/chapters/handling-overload/>`_。唯一值得一提的关于准入控制过滤器的降载
+与客户端侧节流定义的降载的区别是：用户可以配置触发主动降载的成功率阈值。用户还可以通过配置成功请求的定义来计算拒绝的概率。
 
-The probability that the filter will reject a request is as follows:
+过滤器将按照如下的方式来计算拒绝请求的概率：
 
 .. math::
 
    P_{reject} = {(\frac{n_{total} - s}{n_{total} + 1})}^\frac{1}{aggression}
 
-where,
+其中,
 
 .. math::
 
    s = \frac{n_{success}}{threshold}
 
 
-- *n* refers to a request count gathered in the sliding window.
-- *threshold* is a configurable value that dictates the lowest request success rate at which the
-  filter will **not reject** requests. The value is normalized to [0,1] for the calculation.
-- *aggression* controls the rejection probability curve such that 1.0 is a linear increase in
-  rejection probability as the success rate decreases. As the **aggression** increases, the
-  rejection probability will be higher for higher success rates. See `Aggression`_ for a more
-  detailed explanation.
+- *n* 指一个滑动窗口内的请求量总和。
+- *threshold* 是一个可配置的值，该值表示过滤器将 **不再拒绝** 请求的最低请求成功率。该值被归一化为 [0,1] 进行计算。
+- *aggression* 控制拒绝率曲线，因此 1.0 表示拒绝率随成功率降低而线性增加。当 **aggression** 增大时，
+  随着成功率增大，拒绝概率相对更大。更详细的解释请参见 `Aggression`_。
 
 .. note::
-   The success rate calculations are performed on a per-thread basis for increased performance. In
-   addition, the per-thread isolation prevents decreases the blast radius of a single bad connection
-   with an anomalous success rate. Therefore, the rejection probability may vary between worker
-   threads.
+   成功率计算基于每个线程单独执行，以提升性能。此外，线程间隔离也可以降低单个不良连接引起的成功率异常的影响范围。因此，
+   各工作线程间的拒绝率可能不相等。
 
 .. note::
-   Health check traffic does not count towards any of the filter's measurements.
+   健康检查流量不会计入过滤器的任何测量结果。
 
-See the :ref:`v3 API reference
-<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` for more
-details on this parameter.
+关于此参数的更详细信息，请参见 :ref:`v3 API 参考
+<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>`。
 
-The definition of a successful request is a :ref:`configurable parameter
-<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl.SuccessCriteria>`
-for both HTTP and gRPC requests.
+成功请求的定义是一个 :ref:`可配参数
+<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl.SuccessCriteria>`，对 HTTP
+和 gRPC 请求都可以配置。
 
 Aggression
 ~~~~~~~~~~
 
-The aggression value affects the rejection probabilities as shown in the following figures:
+关于 aggression 的值对拒绝率的影响，如下图所示：
 
 .. image:: images/aggression_graph.png
 
-Since the success rate threshold in the first figure is set to 95%, the rejection probability
-remains 0 until then. In the second figure, there rejection probability remains 0 until the success
-rate reaches 50%. In both cases, as success rate drops to 0%, the rejection probability approaches a
-value just under 100%. The aggression values dictate how high the rejection probability will be at a
-given request success rate, so it will shed load more *aggressively*.
+由于第一张图中成功率阈值被设置为 95%，因此在低于此值前拒绝率一直保持为 0。在第二张图中，成功率低于 50% 前，三个拒绝率一直
+保持为 0。在所有的情况下，当成功率跌至 0% 时，拒绝率将达到一个接近 100% 的值。aggression 的值决定了在指定的成功率下，拒绝率
+将达到多高，因此它将更 *积极的* 降载。
 
-Example Configuration
+配置示例
 ---------------------
-An example filter configuration can be found below. Not all fields are required and many of the
-fields can be overridden via runtime settings.
+如下所示，这是一个过滤器的配置示例。并非所有字段都是必要的，并且许多字段都可以通过运行时设置来覆盖。
 
 .. code-block:: yaml
 
@@ -103,25 +90,23 @@ fields can be overridden via runtime settings.
           - 0
           - 1
 
-The above configuration can be understood as follows:
+上述配置可以理解为：
 
-* Calculate the request success-rate over a 120s sliding window.
-* Do not begin shedding any load until the request success-rate drops below 95% in the sliding
-  window.
-* HTTP requests are considered successful if they are 1xx, 2xx, 3xx, or a 404.
-* gRPC requests are considered successful if they are OK or CANCELLED.
+* 计算请求成功率的滑动窗口是 120 秒。
+* 在滑动窗口内的请求成功率低于 95% 前，不执行降载。
+* HTTP 请求响应为 1xx、 2xx、 3xx、或 404 时，将被视为成功请求。
+* gRPC 请求响应为 OK 或 CANCELLED 时，将被视为成功请求。
 
-Statistics
+统计
 ----------
-The admission control filter outputs statistics in the
-*http.<stat_prefix>.admission_control.* namespace. The :ref:`stat prefix
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
-comes from the owning HTTP connection manager.
+准入控制过滤器将统计信息输出在 *http.<stat_prefix>.admission_control.* 命名空间下。
+:ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+来自于所属的 HTTP 连接管理器。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: auto
 
-  rq_rejected, Counter, Total requests that were not admitted by the filter.
-  rq_success, Counter, Total requests that were considered a success.
-  rq_failure, Counter, Total requests that were considered a failure.
+  rq_rejected, Counter, 过滤器未接受的请求总数。
+  rq_success, Counter, 被视为成功的请求总数。
+  rq_failure, Counter, 被视为失败的请求总数。
