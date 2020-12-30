@@ -82,10 +82,10 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
       .WillRepeatedly(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                                  const Http::AsyncClient::RequestOptions&)
                                  -> Http::AsyncClient::Request* {
-        EXPECT_FALSE(message->headers().get(Http::CustomHeaders::get().Accept).empty());
-        EXPECT_EQ(
-            message->headers().get(Http::CustomHeaders::get().Accept)[0]->value().getStringView(),
-            Http::Headers::get().ContentTypeValues.Json);
+        EXPECT_FALSE(
+            message->headers().get(Http::CustomHeaders::get().Accept).empty() ||
+            message->headers().get(Http::CustomHeaders::get().Accept)[0]->value().getStringView() !=
+                Http::Headers::get().ContentTypeValues.Json);
         callbacks_.push_back(&cb);
         return &request_;
       }));
