@@ -210,6 +210,9 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
   Buffer::OwnedImpl data3("end");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data3, true));
 
+  // We only get the last frame here.
+  EXPECT_EQ("end", response_headers.get_(Http::Headers::get().GrpcMessage));
+
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
 }

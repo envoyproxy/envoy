@@ -166,10 +166,11 @@ TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
 
-  // TODO(dio): Need to check each response body, should reflect the requirement mandated by the
-  // request "Accept" header.
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_NE(nullptr, response->headers().GrpcMessage());
+  EXPECT_EQ(absl::StrCat(accept, "+proto"), response->headers().getContentTypeValue());
+  EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
+            "termination",
+            response->headers().getGrpcMessageValue());
   EXPECT_EQ(0U, response->body().length());
 
   codec_client_->close();
