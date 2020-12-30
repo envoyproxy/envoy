@@ -512,6 +512,7 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
   }
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_chunked_header")) {
+    // returning true to account for HTTP/2 where content-length is optional
     return true;
   }
   return false;
