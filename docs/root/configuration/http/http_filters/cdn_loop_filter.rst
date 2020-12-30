@@ -1,56 +1,49 @@
 .. _config_http_filters_cdn_loop:
 
-CDN-Loop header
+CDN-Loop 头部
 ===============
 
-The CDN-Loop header filter participates in the cross-CDN loop detection protocol specified by `RFC
-8586 <https://tools.ietf.org/html/rfc8586>`_. The CDN-Loop header filter performs two actions.
-First, the filter checks to see how many times a particular CDN identifier has appeared in the
-CDN-Loop header. Next, if the check passes, the filter then appends the CDN identifier to the
-CDN-Loop header and passes the request to the next upstream filter. If the check fails, the filter
-stops processing on the request and returns an error response.
+CDN-Loop 头部过滤器参与 `RFC 8586 <https://tools.ietf.org/html/rfc8586>`_  定义的 cross-CDN 循环检测协议。
+CDN-Loop 头部过滤器有两个作用。首先，过滤器会检测 CDN-Loop 头部中特定的 CDN 标识出现过的次数。
+其次，在通过第一步校验后，过滤器会在 CDN-Loop 头部中追加一个 CDN 标识，然后将请求传递给下游过滤器。如果校验失败，
+过滤器会终止该请求的处理并返回一个包含错误信息的响应。
 
-RFC 8586 is particular in how the CDN-Loop header should be modified. As such:
+RFC 8586 在如何修改 CDN-Loop 头部方面有特别的规定。例如：
 
-* other filters in the filter chain should not modify the CDN-Loop header and
-* the HTTP route configuration's :ref:`request_headers_to_add
-  <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_add>` or
-  :ref:`request_headers_to_remove
-  <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_remove>` fields should
-  not contain the CDN-Loop header.
+* 在过滤器链路上的的其他过滤器不能修改 CDN-Loop 头部，且
+* HTTP 路由配置的 :ref:`请求头部增加
+  <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_add>`
+  或 :ref:`请求头部删除 <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_remove>`
+  应不包含 CDN-Loop 头部。
 
-The filter will coalesce multiple CDN-Loop headers into a single, comma-separated header.
+过滤器会将多个 CDN-Loop 头部合并成一个，以逗号分隔。
 
-Configuration
+配置
 -------------
 
-The filter is configured with the name *envoy.filters.http.cdn_loop*.
+此过滤器的名称应该被配置为 *envoy.filters.http.cdn_loop* 。
 
-The `filter config <config_http_filters_cdn_loop>`_ has two fields.
+`过滤器配置 <config_http_filters_cdn_loop>`_ 有两个字段。
 
-* The *cdn_id* field sets the identifier that the filter will look for within and append to the
-  CDN-Loop header. RFC 8586 calls this field the "cdn-id"; "cdn-id" can either be a pseudonym or a
-  hostname the CDN provider has control of. The *cdn_id* field must not be empty.
-* The *max_allowed_occurrences* field controls how many times *cdn_id* can appear in the CDN-Loop
-  header on downstream requests (before the filter appends *cdn_id* to the header). If the *cdn_id*
-  appears more than *max_allowed_occurrences* times in the header, the filter will reject the
-  downstream's request. Most users should configure *max_allowed_occurrences* to be 0 (the
-  default).
+* *cdn_id* 字段设置过滤器查找和追加在 CDN-Loop 头部中的标识； RFC 8586 称该字段为 "cdn-id";
+  "cdn-id" 可以是 CDN 提供的、可控的化名或主机名。*cdn_id* 字段必须非空。
 
-Response Code Details
+* *max_allowed_occurrences* 字段控制下游请求 CDN-Loop 头部中 *cdn_id* 可以出现的次数。
+  （在过滤器追加 *cdn_id* 到头部前） 如果头部中 *cdn_id* 出现的次数大于 *max_allowed_occurrences*，
+  过滤器将拒绝此次下游请求。大多数用户应将 *max_allowed_occurrences* 设置为 0 （默认值）。
+
+响应码详情
 ---------------------
 
 .. list-table::
    :header-rows: 1
 
-   * - Name
-     - HTTP Status
-     - Description
+   * - 名称
+     - HTTP 状态
+     - 描述
    * - invalid_cdn_loop_header
-     - 400 (Bad Request)
-     - The CDN-Loop header in the downstream is invalid or unparseable.
+     - 400 （错误的请求）
+     - 下游系统的 CDN-Loop 头部无效或无法转义。
    * - cdn_loop_detected
-     - 502 (Bad Gateway)
-     - The *cdn_id* value appears more than *max_allowed_occurrences* in the CDN-Loop header,
-       indicating a loop between CDNs.
-
+     - 502 （错误网关）
+     - CDN-Loop 头部中 *cdn_id* 的值超过了 *max_allowed_occurrences*，说明在 CDN 中存在循环。
