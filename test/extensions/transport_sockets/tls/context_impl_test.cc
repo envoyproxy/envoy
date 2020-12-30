@@ -1934,24 +1934,36 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
       "Certificate configuration can't have both private_key and private_key_provider");
 }
 
+// Subclass ContextImpl so we can instantiate directly from tests, despite the
+// constructor being protected.
+class TestContextImpl : public ContextImpl {
+public:
+  TestContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+                  TimeSource& time_source)
+      : ContextImpl(scope, config, time_source), pool_(scope.symbolTable()),
+        fallback_(pool_.add("fallback")) {}
+
+  void incCounter(absl::string_view name, absl::string_view value) {
+    ContextImpl::incCounter(pool_.add(name), value, fallback_);
+  }
+
+  Stats::StatNamePool pool_;
+  const Stats::StatName fallback_;
+};
+
 class SslContextStatsTest : public SslContextImplTest {
 protected:
   SslContextStatsTest() {
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context_);
     client_context_config_ =
         std::make_unique<ClientContextConfigImpl>(tls_context_, factory_context_);
-    context_.reset(new ContextImpl(store_, *client_context_config_, time_system_));
-  }
-
-  void incCounter(absl::string_view name1, absl::string_view name2) {
-    Stats::StatNamePool pool(store_.symbolTable());
-    context_->incCounter(pool.add(name1), name2, pool.add("fallback"));
+    context_ = std::make_unique<TestContextImpl>(store_, *client_context_config_, time_system_);
   }
 
   Stats::TestUtil::TestStore store_;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
   std::unique_ptr<ClientContextConfigImpl> client_context_config_;
-  std::unique_ptr<ContextImpl> context_;
+  std::unique_ptr<TestContextImpl> context_;
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -1965,7 +1977,7 @@ protected:
 TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // Incrementing a value for a cipher that is part of the configuration works, and
   // we'll be able to find the value in the stats store.
-  incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
+  context_->incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
   Stats::CounterOptConstRef cipher =
       store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
   EXPECT_TRUE(cipher);
@@ -1974,7 +1986,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // Incrementing a stat for a random unknown cipher does not work. A
   // rate-limited error log message will also be generated but that is hard to
   // test as it is dependent on timing and test-ordering.
-  incCounter("ssl.ciphers", "unexpected");
+  context_->incCounter("ssl.ciphers", "unexpected");
   EXPECT_FALSE(store_.findCounterByString("ssl.ciphers.unexpected"));
 }
 

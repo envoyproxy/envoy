@@ -465,19 +465,30 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   // Ciphers are configured as a string delimited by ":", with equivalence
   // groups given as "[alt1|alt2]", and exclusions preceded by "!". For the
-  // purposes of collecting stats -- we want to track all these names. We don't
-  // need to fully parse out the structure of the cipher suites -- just extract
+  // purposes of collecting stats, we want to track all these names. We don't
+  // need to fully parse out the structure of the cipher suites. Just extract
   // out the names. We skip exclusions as those do not show up as entire
   // stat-name segments, so they would not match.
   for (absl::string_view cipher_suite :
        absl::StrSplit(config.cipherSuites(), absl::ByAnyChar(":|[]"))) {
-    if (!cipher_suite.empty() && cipher_suite[0] != '!') { // skip exclusions.
+    if (!cipher_suite.empty() && cipher_suite[0] != '!') { // skip exclusions and empty strings.
       stat_name_set_->rememberBuiltin(cipher_suite);
     }
   }
 
-  // This cipher is referenced in a test, though it's not obvious how or why.
+  // This cipher is referenced from
+  // IpVersionsClientVersions/SslCertficateIntegrationTest.ServerRsa/IPv4_TLSv1_3,
+  // possibly due to the call to
+  // ClientSslTransportOptions().setSigningAlgorithmsForTest
+  // in test/extensions/transport_sockets/tls/integration/ssl_integration_test.cc, function
+  // rsaOnlyClientOptions.
   stat_name_set_->rememberBuiltin("TLS_AES_128_GCM_SHA256");
+
+  // This cipher's appearance appears to be induced by setting "cipher_suites" to
+  // "TLS_RSA_WITH_AES_128_GCM_SHA256" in the configuration for
+  // SslSocketTest.RsaPrivateKeyProviderAsyncDecryptSuccess in
+  // test/extensions/transport_sockets/tls/ssl_socket_test.cc
+  stat_name_set_->rememberBuiltin("AES128-GCM-SHA256");
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
