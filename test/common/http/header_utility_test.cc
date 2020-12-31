@@ -53,7 +53,7 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
       {"[fc00::1]:80", "[fc00::1]:80"}      // port not matching w/ ipv6
   };
 
-    const std::vector<std::pair<std::string, std::string>> any_host_headers{
+  const std::vector<std::pair<std::string, std::string>> any_host_headers{
       {"localhost:9999", "localhost"},       // name any port
   };
 
