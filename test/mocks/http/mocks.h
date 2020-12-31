@@ -374,9 +374,12 @@ public:
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
+  MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, (), (const));
   MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (ResponseHeaderMap & headers, bool end_stream));
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, (), (const));
   MOCK_METHOD(FilterDataStatus, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, encodeTrailers, (ResponseTrailerMap & trailers));
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, (), (const));
   MOCK_METHOD(FilterMetadataStatus, encodeMetadata, (MetadataMap & metadata_map));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (StreamEncoderFilterCallbacks & callbacks));
 
