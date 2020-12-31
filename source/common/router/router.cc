@@ -587,7 +587,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->encodeHeaders(end_stream);
+  upstream_requests_.front()->encodeUpstreamHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
   }
@@ -659,7 +659,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // since it's all moves from here on.
     if (!upstream_requests_.empty()) {
       Buffer::OwnedImpl copy(data);
-      upstream_requests_.front()->encodeData(copy, end_stream);
+      upstream_requests_.front()->encodeUpstreamData(copy, end_stream);
     }
 
     // If we are potentially going to retry or shadow this request we need to buffer.
@@ -669,7 +669,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // potentially shadow.
     callbacks_->addDecodedData(data, true);
   } else {
-    upstream_requests_.front()->encodeData(data, end_stream);
+    upstream_requests_.front()->encodeUpstreamData(data, end_stream);
   }
 
   if (end_stream) {
@@ -690,7 +690,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   ASSERT(upstream_requests_.size() <= 1);
   downstream_trailers_ = &trailers;
   for (auto& upstream_request : upstream_requests_) {
-    upstream_request->encodeTrailers(trailers);
+    upstream_request->encodeUpstreamTrailers(trailers);
   }
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
@@ -700,7 +700,7 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   if (!upstream_requests_.empty()) {
     // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
-    upstream_requests_.front()->encodeMetadata(std::move(metadata_map_ptr));
+    upstream_requests_.front()->encodeUpstreamMetadata(std::move(metadata_map_ptr));
   }
   return Http::FilterMetadataStatus::Continue;
 }
@@ -834,7 +834,7 @@ void Filter::onResponseTimeout() {
 
 // Called when the per try timeout is hit but we didn't reset the request
 // (hedge_on_per_try_timeout enabled).
-void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
+void Filter::onSoftPerTryTimeout(RouterUpstreamRequest& upstream_request) {
   // Track this as a timeout for outlier detection purposes even though we didn't
   // cancel the request yet and might get a 2xx later.
   updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
@@ -863,7 +863,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 }
 
-void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
+void Filter::onPerTryTimeout(RouterUpstreamRequest& upstream_request) {
   if (hedging_params_.hedge_on_per_try_timeout_) {
     onSoftPerTryTimeout(upstream_request);
     return;
@@ -891,7 +891,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
                          StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
 }
 
-void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
+void Filter::onStreamMaxDurationReached(RouterUpstreamRequest& upstream_request) {
   upstream_request.resetStream();
 
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
@@ -917,14 +917,15 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
 }
 
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
-                                    UpstreamRequest& upstream_request,
+                                    RouterUpstreamRequest& upstream_request,
                                     absl::optional<uint64_t> code) {
   if (upstream_request.upstreamHost()) {
     upstream_request.upstreamHost()->outlierDetector().putResult(result, code);
   }
 }
 
-void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request) {
+void Filter::chargeUpstreamAbort(Http::Code code, bool dropped,
+                                 RouterUpstreamRequest& upstream_request) {
   if (downstream_response_started_) {
     if (upstream_request.grpcRqSuccessDeferred()) {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
@@ -990,7 +991,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 }
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
-                             UpstreamRequest& upstream_request) {
+                             RouterUpstreamRequest& upstream_request) {
   // We don't retry if we already started the response, don't have a retry policy defined,
   // or if we've already retried this upstream request (currently only possible if a per
   // try timeout occurred and hedge_on_per_try_timeout is enabled).
@@ -1020,7 +1021,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 
 void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                              absl::string_view transport_failure_reason,
-                             UpstreamRequest& upstream_request) {
+                             RouterUpstreamRequest& upstream_request) {
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason: {}, transport failure reason: {}",
                    *callbacks_, Http::Utility::resetReasonToString(reset_reason),
                    transport_failure_reason);
@@ -1095,7 +1096,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
 }
 
 void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                                         UpstreamRequest& upstream_request, bool end_stream,
+                                         RouterUpstreamRequest& upstream_request, bool end_stream,
                                          uint64_t grpc_to_http_status) {
   // We need to defer gRPC success until after we have processed grpc-status in
   // the trailers.
@@ -1115,7 +1116,7 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
 }
 
 void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                          UpstreamRequest& upstream_request) {
+                                          RouterUpstreamRequest& upstream_request) {
   chargeUpstreamCode(100, *headers, upstream_request.upstreamHost(), false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
 
@@ -1148,7 +1149,7 @@ void Filter::resetAll() {
   }
 }
 
-void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
+void Filter::resetOtherUpstreams(RouterUpstreamRequest& upstream_request) {
   // Pop each upstream request on the list and reset it if it's not the one
   // provided. At the end we'll move it back into the list.
   UpstreamRequestPtr final_upstream_request;
@@ -1170,7 +1171,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
 }
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
-                               UpstreamRequest& upstream_request, bool end_stream) {
+                               RouterUpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
   modify_headers_(*headers);
@@ -1302,7 +1303,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
                             StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 }
 
-void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
+void Filter::onUpstreamData(Buffer::Instance& data, RouterUpstreamRequest& upstream_request,
                             bool end_stream) {
   // This should be true because when we saw headers we either reset the stream
   // (hence wouldn't have made it to onUpstreamData) or all other in-flight
@@ -1320,7 +1321,7 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
 }
 
 void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
-                                UpstreamRequest& upstream_request) {
+                                RouterUpstreamRequest& upstream_request) {
   // This should be true because when we saw headers we either reset the stream
   // (hence wouldn't have made it to onUpstreamTrailers) or all other in-flight
   // streams.
@@ -1345,7 +1346,7 @@ void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
   callbacks_->encodeMetadata(std::move(metadata_map));
 }
 
-void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
+void Filter::onUpstreamComplete(RouterUpstreamRequest& upstream_request) {
   if (!downstream_end_stream_) {
     upstream_request.resetStream();
   }
@@ -1402,7 +1403,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 }
 
 bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
-                           UpstreamRequest& upstream_request) {
+                           RouterUpstreamRequest& upstream_request) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
 
@@ -1554,10 +1555,10 @@ void Filter::doRetry() {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
-  UpstreamRequest* upstream_request_tmp = upstream_request.get();
+  RouterUpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() &&
-                                            !downstream_trailers_ && downstream_end_stream_);
+  upstream_requests_.front()->encodeUpstreamHeaders(
+      !callbacks_->decodingBuffer() && !downstream_trailers_ && downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
   // added to the front of the list might have been removed, so we need to check to make
   // sure we don't encodeData on the wrong request.
@@ -1565,11 +1566,12 @@ void Filter::doRetry() {
     if (callbacks_->decodingBuffer()) {
       // If we are doing a retry we need to make a copy.
       Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
-      upstream_requests_.front()->encodeData(copy, !downstream_trailers_ && downstream_end_stream_);
+      upstream_requests_.front()->encodeUpstreamData(copy, !downstream_trailers_ &&
+                                                               downstream_end_stream_);
     }
 
     if (downstream_trailers_) {
-      upstream_requests_.front()->encodeTrailers(*downstream_trailers_);
+      upstream_requests_.front()->encodeUpstreamTrailers(*downstream_trailers_);
     }
   }
 }

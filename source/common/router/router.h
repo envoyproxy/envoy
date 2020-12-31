@@ -229,8 +229,8 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class UpstreamRequest;
-using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
+class RouterUpstreamRequest;
+using UpstreamRequestPtr = std::unique_ptr<RouterUpstreamRequest>;
 
 // The interface the UpstreamRequest has to interact with the router filter.
 // Split out primarily for unit test mocks.
@@ -239,20 +239,20 @@ public:
   virtual ~RouterFilterInterface() = default;
 
   virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                            UpstreamRequest& upstream_request) PURE;
+                                            RouterUpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
-                                 UpstreamRequest& upstream_request, bool end_stream) PURE;
-  virtual void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
+                                 RouterUpstreamRequest& upstream_request, bool end_stream) PURE;
+  virtual void onUpstreamData(Buffer::Instance& data, RouterUpstreamRequest& upstream_request,
                               bool end_stream) PURE;
   virtual void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
-                                  UpstreamRequest& upstream_request) PURE;
+                                  RouterUpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) PURE;
   virtual void onUpstreamReset(Http::StreamResetReason reset_reason,
                                absl::string_view transport_failure,
-                               UpstreamRequest& upstream_request) PURE;
+                               RouterUpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
-  virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
-  virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
+  virtual void onPerTryTimeout(RouterUpstreamRequest& upstream_request) PURE;
+  virtual void onStreamMaxDurationReached(RouterUpstreamRequest& upstream_request) PURE;
 
   virtual Http::StreamDecoderFilterCallbacks* callbacks() PURE;
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
@@ -266,7 +266,7 @@ public:
   virtual const VirtualCluster* requestVcluster() const PURE;
   virtual const RouteEntry* routeEntry() const PURE;
   virtual const std::list<UpstreamRequestPtr>& upstreamRequests() const PURE;
-  virtual const UpstreamRequest* finalUpstreamRequest() const PURE;
+  virtual const RouterUpstreamRequest* finalUpstreamRequest() const PURE;
   virtual TimeSource& timeSource() PURE;
 };
 
@@ -411,19 +411,19 @@ public:
 
   // RouterFilterInterface
   void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                    UpstreamRequest& upstream_request) override;
+                                    RouterUpstreamRequest& upstream_request) override;
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
-                         UpstreamRequest& upstream_request, bool end_stream) override;
-  void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
+                         RouterUpstreamRequest& upstream_request, bool end_stream) override;
+  void onUpstreamData(Buffer::Instance& data, RouterUpstreamRequest& upstream_request,
                       bool end_stream) override;
   void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
-                          UpstreamRequest& upstream_request) override;
+                          RouterUpstreamRequest& upstream_request) override;
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) override;
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
-                       UpstreamRequest& upstream_request) override;
+                       RouterUpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPerTryTimeout(UpstreamRequest& upstream_request) override;
-  void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
+  void onPerTryTimeout(RouterUpstreamRequest& upstream_request) override;
+  void onStreamMaxDurationReached(RouterUpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
@@ -438,12 +438,12 @@ public:
   const std::list<UpstreamRequestPtr>& upstreamRequests() const override {
     return upstream_requests_;
   }
-  const UpstreamRequest* finalUpstreamRequest() const override { return final_upstream_request_; }
+  const RouterUpstreamRequest* finalUpstreamRequest() const override {
+    return final_upstream_request_;
+  }
   TimeSource& timeSource() override { return config_.timeSource(); }
 
 private:
-  friend class UpstreamRequest;
-
   RetryStatePtr retry_state_;
 
   Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
@@ -452,7 +452,7 @@ private:
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
                           bool dropped);
-  void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
+  void chargeUpstreamAbort(Http::Code code, bool dropped, RouterUpstreamRequest& upstream_request);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::RequestHeaderMap& request_headers,
@@ -467,38 +467,41 @@ private:
   UpstreamRequestPtr createUpstreamRequest();
 
   void maybeDoShadowing();
-  bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
+  bool maybeRetryReset(Http::StreamResetReason reset_reason,
+                       RouterUpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
   void onRequestComplete();
   void onResponseTimeout();
   // Handle an upstream request aborted due to a local timeout.
   void onSoftPerTryTimeout();
-  void onSoftPerTryTimeout(UpstreamRequest& upstream_request);
+  void onSoftPerTryTimeout(RouterUpstreamRequest& upstream_request);
   void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag, absl::string_view details);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
                        absl::string_view body, bool dropped, absl::string_view details);
-  void onUpstreamComplete(UpstreamRequest& upstream_request);
+  void onUpstreamComplete(RouterUpstreamRequest& upstream_request);
   // Reset all in-flight upstream requests.
   void resetAll();
   // Reset all in-flight upstream requests that do NOT match the passed argument. This is used
   // if a "good" response comes back and we return downstream, so there is no point in waiting
   // for the remaining upstream requests to return.
-  void resetOtherUpstreams(UpstreamRequest& upstream_request);
+  void resetOtherUpstreams(RouterUpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
-  bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
+  bool setupRedirect(const Http::ResponseHeaderMap& headers,
+                     RouterUpstreamRequest& upstream_request);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                 const Http::HeaderEntry& internal_redirect);
-  void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
+  void updateOutlierDetection(Upstream::Outlier::Result result,
+                              RouterUpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                                   UpstreamRequest& upstream_request, bool end_stream,
+                                   RouterUpstreamRequest& upstream_request, bool end_stream,
                                    uint64_t grpc_to_http_status);
   Http::Context& httpContext() { return config_.http_context_; }
 
@@ -516,7 +519,7 @@ private:
   std::list<UpstreamRequestPtr> upstream_requests_;
   // Tracks which upstream request "wins" and will have the corresponding
   // response forwarded downstream
-  UpstreamRequest* final_upstream_request_;
+  RouterUpstreamRequest* final_upstream_request_;
   bool grpc_request_{};
   Http::RequestHeaderMap* downstream_headers_{};
   Http::RequestTrailerMap* downstream_trailers_{};

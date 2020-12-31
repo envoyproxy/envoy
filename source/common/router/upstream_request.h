@@ -30,25 +30,78 @@ class GenericConnectionPoolCallbacks;
 class RouterFilterInterface;
 class UpstreamRequest;
 
+/**
+ * Interface to allow for switching between new and old UpstreamRequest implementation.
+ */
+class RouterUpstreamRequest : public LinkedObject<RouterUpstreamRequest> {
+public:
+  virtual ~RouterUpstreamRequest() = default;
+
+  virtual void encodeUpstreamHeaders(bool end_stream) PURE;
+  virtual void encodeUpstreamData(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void encodeUpstreamTrailers(const Http::RequestTrailerMap& trailers) PURE;
+  virtual void encodeUpstreamMetadata(Http::MetadataMapPtr&& metadata_map_ptr) PURE;
+
+  virtual void resetStream() PURE;
+  virtual void setupPerTryTimeout() PURE;
+  virtual void onPerTryTimeout() PURE;
+  virtual void maybeEndDecode(bool end_stream) PURE;
+  virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
+  virtual bool createPerTryTimeoutOnRequestComplete() PURE;
+  virtual const StreamInfo::UpstreamTiming& upstreamTiming() PURE;
+  virtual Upstream::HostDescriptionConstSharedPtr& upstreamHost() PURE;
+  virtual bool outlierDetectionTimeoutRecorded() PURE;
+  virtual void outlierDetectionTimeoutRecorded(bool recorded) PURE;
+  virtual bool awaitingHeaders() PURE;
+  virtual void recordTimeoutBudget(bool value) PURE;
+  virtual void retried(bool value) PURE;
+  virtual bool retried() PURE;
+  virtual bool grpcRqSuccessDeferred() PURE;
+  virtual void grpcRqSuccessDeferred(bool deferred) PURE;
+  virtual void upstreamCanary(bool value) PURE;
+  virtual bool upstreamCanary() PURE;
+  virtual bool encodeComplete() const PURE;
+};
+
 // The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
+                        public RouterUpstreamRequest,
                         public UpstreamToDownstream,
-                        public LinkedObject<UpstreamRequest>,
                         public GenericConnectionPoolCallbacks {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequest() override;
 
-  void encodeHeaders(bool end_stream);
-  void encodeData(Buffer::Instance& data, bool end_stream);
-  void encodeTrailers(const Http::RequestTrailerMap& trailers);
-  void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
+  // RouterUpstreamRequest
+  void encodeUpstreamHeaders(bool end_stream) override;
+  void encodeUpstreamData(Buffer::Instance& data, bool end_stream) override;
+  void encodeUpstreamTrailers(const Http::RequestTrailerMap& trailers) override;
+  void encodeUpstreamMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
 
-  void resetStream();
-  void setupPerTryTimeout();
-  void onPerTryTimeout();
-  void maybeEndDecode(bool end_stream);
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+  void resetStream() override;
+  void setupPerTryTimeout() override;
+  void onPerTryTimeout() override;
+  void maybeEndDecode(bool end_stream) override;
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
+
+  bool createPerTryTimeoutOnRequestComplete() override {
+    return create_per_try_timeout_on_request_complete_;
+  }
+  const StreamInfo::UpstreamTiming& upstreamTiming() override { return upstream_timing_; }
+  Upstream::HostDescriptionConstSharedPtr& upstreamHost() override { return upstream_host_; }
+  void outlierDetectionTimeoutRecorded(bool recorded) override {
+    outlier_detection_timeout_recorded_ = recorded;
+  }
+  bool outlierDetectionTimeoutRecorded() override { return outlier_detection_timeout_recorded_; }
+  bool awaitingHeaders() override { return awaiting_headers_; }
+  void recordTimeoutBudget(bool value) override { record_timeout_budget_ = value; }
+  void retried(bool value) override { retried_ = value; }
+  bool retried() override { return retried_; }
+  bool grpcRqSuccessDeferred() override { return grpc_rq_success_deferred_; }
+  void grpcRqSuccessDeferred(bool deferred) override { grpc_rq_success_deferred_ = deferred; }
+  void upstreamCanary(bool value) override { upstream_canary_ = value; }
+  bool upstreamCanary() override { return upstream_canary_; }
+  bool encodeComplete() const override { return encode_complete_; }
 
   // Http::StreamDecoder
   void decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -98,24 +151,6 @@ public:
   void encodeBodyAndTrailers();
 
   // Getters and setters
-  Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
-  void outlierDetectionTimeoutRecorded(bool recorded) {
-    outlier_detection_timeout_recorded_ = recorded;
-  }
-  bool outlierDetectionTimeoutRecorded() { return outlier_detection_timeout_recorded_; }
-  const StreamInfo::UpstreamTiming& upstreamTiming() { return upstream_timing_; }
-  void retried(bool value) { retried_ = value; }
-  bool retried() { return retried_; }
-  bool grpcRqSuccessDeferred() { return grpc_rq_success_deferred_; }
-  void grpcRqSuccessDeferred(bool deferred) { grpc_rq_success_deferred_ = deferred; }
-  void upstreamCanary(bool value) { upstream_canary_ = value; }
-  bool upstreamCanary() { return upstream_canary_; }
-  bool awaitingHeaders() { return awaiting_headers_; }
-  void recordTimeoutBudget(bool value) { record_timeout_budget_ = value; }
-  bool createPerTryTimeoutOnRequestComplete() {
-    return create_per_try_timeout_on_request_complete_;
-  }
-  bool encodeComplete() const { return encode_complete_; }
   RouterFilterInterface& parent() { return parent_; }
 
 private:
