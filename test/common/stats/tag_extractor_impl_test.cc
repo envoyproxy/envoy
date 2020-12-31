@@ -156,9 +156,9 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   // Cluster name
   Tag cluster_tag;
   cluster_tag.name_ = tag_names.CLUSTER_NAME;
-  cluster_tag.value_ = "rate_limit-14";
+  cluster_tag.value_ = "ratelimit";
 
-  regex_tester.testRegex("cluster.rate_limit-14.upstream_rq_timeout", "cluster.upstream_rq_timeout",
+  regex_tester.testRegex("cluster.ratelimit.upstream_rq_timeout", "cluster.upstream_rq_timeout",
                          {cluster_tag});
 
   // Listener SSL
@@ -181,7 +181,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   cipher_suite.name_ = tag_names.SSL_CIPHER_SUITE;
   cipher_suite.value_ = "ECDHE-RSA-AES128-GCM-SHA256";
 
-  regex_tester.testRegex("cluster.rate_limit-14.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
+  regex_tester.testRegex("cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
                          "cluster.ssl.ciphers", {cluster_tag, cipher_suite});
 
   // ipv6 non-loopback (for alphabetical chars)
@@ -198,81 +198,81 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   // Mongo
   Tag mongo_prefix;
   mongo_prefix.name_ = tag_names.MONGO_PREFIX;
-  mongo_prefix.value_ = "mongo_filter-0";
+  mongo_prefix.value_ = "mongo_filter";
 
   Tag mongo_command;
   mongo_command.name_ = tag_names.MONGO_CMD;
-  mongo_command.value_ = "foo-4_cmd";
+  mongo_command.value_ = "foo_cmd";
 
   Tag mongo_collection;
   mongo_collection.name_ = tag_names.MONGO_COLLECTION;
-  mongo_collection.value_ = "bar-1_collection";
+  mongo_collection.value_ = "bar_collection";
 
   Tag mongo_callsite;
   mongo_callsite.name_ = tag_names.MONGO_CALLSITE;
-  mongo_callsite.value_ = "baz_callsite-3";
+  mongo_callsite.value_ = "baz_callsite";
 
-  regex_tester.testRegex("mongo.mongo_filter-0.op_reply", "mongo.op_reply", {mongo_prefix});
-  regex_tester.testRegex("mongo.mongo_filter-0.cmd.foo-4_cmd.reply_size", "mongo.cmd.reply_size",
+  regex_tester.testRegex("mongo.mongo_filter.op_reply", "mongo.op_reply", {mongo_prefix});
+  regex_tester.testRegex("mongo.mongo_filter.cmd.foo_cmd.reply_size", "mongo.cmd.reply_size",
                          {mongo_prefix, mongo_command});
-  regex_tester.testRegex("mongo.mongo_filter-0.collection.bar-1_collection.query.multi_get",
+  regex_tester.testRegex("mongo.mongo_filter.collection.bar_collection.query.multi_get",
                          "mongo.collection.query.multi_get", {mongo_prefix, mongo_collection});
   regex_tester.testRegex(
-      "mongo.mongo_filter-0.collection.bar-1_collection.callsite.baz_callsite-3.query.scatter_get",
+      "mongo.mongo_filter.collection.bar_collection.callsite.baz_callsite.query.scatter_get",
       "mongo.collection.callsite.query.scatter_get",
       {mongo_prefix, mongo_collection, mongo_callsite});
 
   // Ratelimit
   Tag ratelimit_prefix;
   ratelimit_prefix.name_ = tag_names.RATELIMIT_PREFIX;
-  ratelimit_prefix.value_ = "foo_ratelimiter-with-dash";
-  regex_tester.testRegex("ratelimit.foo_ratelimiter-with-dash.over_limit", "ratelimit.over_limit",
+  ratelimit_prefix.value_ = "foo_ratelimiter";
+  regex_tester.testRegex("ratelimit.foo_ratelimiter.over_limit", "ratelimit.over_limit",
                          {ratelimit_prefix});
 
   // Dynamo
   Tag dynamo_http_prefix;
   dynamo_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
-  dynamo_http_prefix.value_ = "egress_dynamodb-iad";
+  dynamo_http_prefix.value_ = "egress_dynamodb_iad";
 
   Tag dynamo_operation;
   dynamo_operation.name_ = tag_names.DYNAMO_OPERATION;
-  dynamo_operation.value_ = "Query_op-2";
+  dynamo_operation.value_ = "Query";
 
   Tag dynamo_table;
   dynamo_table.name_ = tag_names.DYNAMO_TABLE;
-  dynamo_table.value_ = "bar_table-1";
+  dynamo_table.value_ = "bar_table";
 
   Tag dynamo_partition;
   dynamo_partition.name_ = tag_names.DYNAMO_PARTITION_ID;
   dynamo_partition.value_ = "ABC1234";
 
-  regex_tester.testRegex("http.egress_dynamodb-iad.downstream_cx_total", "http.downstream_cx_total",
+  regex_tester.testRegex("http.egress_dynamodb_iad.downstream_cx_total", "http.downstream_cx_total",
                          {dynamo_http_prefix});
-  regex_tester.testRegex("http.egress_dynamodb-iad.dynamodb.operation.Query_op-2.upstream_rq_time",
+  regex_tester.testRegex("http.egress_dynamodb_iad.dynamodb.operation.Query.upstream_rq_time",
                          "http.dynamodb.operation.upstream_rq_time",
                          {dynamo_http_prefix, dynamo_operation});
-  regex_tester.testRegex("http.egress_dynamodb-iad.dynamodb.table.bar_table-1.upstream_rq_time",
+  regex_tester.testRegex("http.egress_dynamodb_iad.dynamodb.table.bar_table.upstream_rq_time",
                          "http.dynamodb.table.upstream_rq_time",
                          {dynamo_http_prefix, dynamo_table});
-  regex_tester.testRegex("http.egress_dynamodb-iad.dynamodb.table.bar_table-1.capacity.Query_op-2._"
-                         "_partition_id=ABC1234",
-                         "http.dynamodb.table.capacity",
-                         {dynamo_http_prefix, dynamo_table, dynamo_operation, dynamo_partition});
+  regex_tester.testRegex(
+      "http.egress_dynamodb_iad.dynamodb.table.bar_table.capacity.Query.__partition_id=ABC1234",
+      "http.dynamodb.table.capacity",
+      {dynamo_http_prefix, dynamo_table, dynamo_operation, dynamo_partition});
 
   // GRPC Http1.1 Bridge
   Tag grpc_cluster;
   grpc_cluster.name_ = tag_names.CLUSTER_NAME;
-  grpc_cluster.value_ = "grpc_cluster-15";
+  grpc_cluster.value_ = "grpc_cluster";
 
   Tag grpc_service;
   grpc_service.name_ = tag_names.GRPC_BRIDGE_SERVICE;
-  grpc_service.value_ = "grpc_service-1";
+  grpc_service.value_ = "grpc_service_1";
 
   Tag grpc_method;
   grpc_method.name_ = tag_names.GRPC_BRIDGE_METHOD;
-  grpc_method.value_ = "grpc_method-1";
+  grpc_method.value_ = "grpc_method_1";
 
-  regex_tester.testRegex("cluster.grpc_cluster-15.grpc.grpc_service-1.grpc_method-1.success",
+  regex_tester.testRegex("cluster.grpc_cluster.grpc.grpc_service_1.grpc_method_1.success",
                          "cluster.grpc.success", {grpc_cluster, grpc_method, grpc_service});
 
   // Virtual host and cluster
@@ -282,7 +282,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   Tag vcluster;
   vcluster.name_ = tag_names.VIRTUAL_CLUSTER;
-  vcluster.value_ = "virtual_cluster-1";
+  vcluster.value_ = "vcluster_1";
 
   Tag response_code_class;
   response_code_class.name_ = tag_names.RESPONSE_CODE_CLASS;
@@ -292,79 +292,78 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   response_code.name_ = tag_names.RESPONSE_CODE;
   response_code.value_ = "200";
 
-  regex_tester.testRegex("vhost.vhost_1.vcluster.virtual_cluster-1.upstream_rq_2xx",
+  regex_tester.testRegex("vhost.vhost_1.vcluster.vcluster_1.upstream_rq_2xx",
                          "vhost.vcluster.upstream_rq_xx", {vhost, vcluster, response_code_class});
-  regex_tester.testRegex("vhost.vhost_1.vcluster.virtual_cluster-1.upstream_rq_200",
+  regex_tester.testRegex("vhost.vhost_1.vcluster.vcluster_1.upstream_rq_200",
                          "vhost.vcluster.upstream_rq", {vhost, vcluster, response_code});
 
   // Listener http prefix
   Tag listener_http_prefix;
   listener_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
-  listener_http_prefix.value_ = "http_prefix-with_dash";
+  listener_http_prefix.value_ = "http_prefix";
 
   listener_address.value_ = "127.0.0.1_3012";
   response_code_class.value_ = "5";
 
-  regex_tester.testRegex("listener.127.0.0.1_3012.http.http_prefix-with_dash.downstream_rq_5xx",
+  regex_tester.testRegex("listener.127.0.0.1_3012.http.http_prefix.downstream_rq_5xx",
                          "listener.http.downstream_rq_xx",
                          {listener_http_prefix, listener_address, response_code_class});
 
   // User agent
   Tag user_agent;
   user_agent.name_ = tag_names.HTTP_USER_AGENT;
-  user_agent.value_ = "ios_v9-2";
+  user_agent.value_ = "ios";
 
-  regex_tester.testRegex("http.egress_dynamodb-iad.user_agent.ios_v9-2.downstream_cx_total",
+  regex_tester.testRegex("http.egress_dynamodb_iad.user_agent.ios.downstream_cx_total",
                          "http.user_agent.downstream_cx_total", {user_agent, dynamo_http_prefix});
 
   // Client SSL Prefix
   Tag client_ssl;
   client_ssl.name_ = tag_names.CLIENTSSL_PREFIX;
-  client_ssl.value_ = "clientssl_prefix-with-dash";
+  client_ssl.value_ = "clientssl_prefix";
 
-  regex_tester.testRegex("auth.clientssl.clientssl_prefix-with-dash.auth_ip_allowlist",
+  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_allowlist",
                          "auth.clientssl.auth_ip_allowlist", {client_ssl});
 
   // TCP Prefix
   Tag tcp_prefix;
   tcp_prefix.name_ = tag_names.TCP_PREFIX;
-  tcp_prefix.value_ = "tcp_prefix-with-dash";
+  tcp_prefix.value_ = "tcp_prefix";
 
-  regex_tester.testRegex("tcp.tcp_prefix-with-dash.downstream_flow_control_resumed_reading_total",
+  regex_tester.testRegex("tcp.tcp_prefix.downstream_flow_control_resumed_reading_total",
                          "tcp.downstream_flow_control_resumed_reading_total", {tcp_prefix});
 
   // UDP Prefix
   Tag udp_prefix;
   udp_prefix.name_ = tag_names.UDP_PREFIX;
-  udp_prefix.value_ = "udp_prefix-with-dash";
+  udp_prefix.value_ = "udp_prefix";
 
-  regex_tester.testRegex("udp.udp_prefix-with-dash.downstream_flow_control_resumed_reading_total",
+  regex_tester.testRegex("udp.udp_prefix.downstream_flow_control_resumed_reading_total",
                          "udp.downstream_flow_control_resumed_reading_total", {udp_prefix});
 
   // Fault Downstream Cluster
   Tag fault_connection_manager;
   fault_connection_manager.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
-  fault_connection_manager.value_ = "fault-connection_manager";
+  fault_connection_manager.value_ = "fault_connection_manager";
 
   Tag fault_downstream_cluster;
   fault_downstream_cluster.name_ = tag_names.FAULT_DOWNSTREAM_CLUSTER;
-  fault_downstream_cluster.value_ = "fault_cluster-01";
+  fault_downstream_cluster.value_ = "fault_cluster";
 
-  regex_tester.testRegex("http.fault-connection_manager.fault.fault_cluster-01.aborts_injected",
+  regex_tester.testRegex("http.fault_connection_manager.fault.fault_cluster.aborts_injected",
                          "http.fault.aborts_injected",
                          {fault_connection_manager, fault_downstream_cluster});
 
   Tag rds_hcm;
   rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
-  rds_hcm.value_ = "rds-connection_manager";
+  rds_hcm.value_ = "rds_connection_manager";
 
   Tag rds_route_config;
   rds_route_config.name_ = tag_names.RDS_ROUTE_CONFIG;
-  rds_route_config.value_ = "route_config-with-dash.123-3_1";
+  rds_route_config.value_ = "route_config.123";
 
-  regex_tester.testRegex(
-      "http.rds-connection_manager.rds.route_config-with-dash.123-3_1.update_success",
-      "http.rds.update_success", {rds_hcm, rds_route_config});
+  regex_tester.testRegex("http.rds_connection_manager.rds.route_config.123.update_success",
+                         "http.rds.update_success", {rds_hcm, rds_route_config});
 
   // Listener manager worker id
   Tag worker_id;
