@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "common/http/conn_manager_config.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
@@ -20,6 +19,7 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/filter/http/filter_config_discovery_impl.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
@@ -272,13 +272,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     strip_port_type_ = Http::StripPortType::None;
   }
 
-      // If we are provided a different request_id_extension implementation to use try and create a
-      // new instance of it, otherwise use default one.
-      if (config.request_id_extension().has_typed_config()) {
+  // If we are provided a different request_id_extension implementation to use try and create a
+  // new instance of it, otherwise use default one.
+  if (config.request_id_extension().has_typed_config()) {
     request_id_extension_ =
         Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
-  }
-  else {
+  } else {
     request_id_extension_ =
         Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
   }

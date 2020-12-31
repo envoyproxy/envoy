@@ -7,7 +7,6 @@
 #include <map>
 #include <string>
 
-#include "common/http/conn_manager_config.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -19,6 +18,7 @@
 #include "envoy/tracing/http_tracer_manager.h"
 
 #include "common/common/logger.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/http1/codec_stats.h"
