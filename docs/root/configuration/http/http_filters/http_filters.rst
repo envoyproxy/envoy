@@ -1,7 +1,7 @@
 .. _config_http_filters:
 
-HTTP filters
-============
+HTTP 过滤器
+=============
 
 .. toctree::
   :maxdepth: 2
