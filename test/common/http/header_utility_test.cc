@@ -54,7 +54,7 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   };
 
   const std::vector<std::pair<std::string, std::string>> any_host_headers{
-      {"localhost:9999", "localhost"},       // name any port
+      {"localhost:9999", "localhost"}, // name any port
   };
 
   for (const auto& host_pair : host_headers) {
