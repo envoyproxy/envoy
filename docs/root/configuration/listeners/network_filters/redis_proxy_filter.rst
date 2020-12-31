@@ -1,103 +1,89 @@
 .. _config_network_filters_redis_proxy:
 
-Redis proxy
+Redis 代理
 ===========
 
-* Redis :ref:`architecture overview <arch_overview_redis>`
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`
-* This filter should be configured with the name *envoy.filters.network.redis_proxy*.
+* Redis :ref:`架构概览 <arch_overview_redis>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`
+* 过滤器的名称应该配置为 *envoy.filters.network.redis_proxy* 。
 
 .. _config_network_filters_redis_proxy_stats:
 
-Statistics
+统计信息
 ----------
 
-Every configured Redis proxy filter has statistics rooted at *redis.<stat_prefix>.* with the
-following statistics:
+每个配置的 Redis 代理过滤器都有以 *redis.<stat_prefix>.* 为根如下所示的统计信息：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  downstream_cx_active, Gauge, Total active connections
-  downstream_cx_protocol_error, Counter, Total protocol errors
-  downstream_cx_rx_bytes_buffered, Gauge, Total received bytes currently buffered
-  downstream_cx_rx_bytes_total, Counter, Total bytes received
-  downstream_cx_total, Counter, Total connections
-  downstream_cx_tx_bytes_buffered, Gauge, Total sent bytes currently buffered
-  downstream_cx_tx_bytes_total, Counter, Total bytes sent
-  downstream_cx_drain_close, Counter, Number of connections closed due to draining
-  downstream_rq_active, Gauge, Total active requests
-  downstream_rq_total, Counter, Total requests
+  downstream_cx_active, Gauge, 活跃连接总数
+  downstream_cx_protocol_error, Counter, 协议异常数
+  downstream_cx_rx_bytes_buffered, Gauge, 当前缓冲中接收的字节数
+  downstream_cx_rx_bytes_total, Counter, 接收的字节数
+  downstream_cx_total, Counter, 总连接数
+  downstream_cx_tx_bytes_buffered, Gauge, 当前缓冲中发送的字节
+  downstream_cx_tx_bytes_total, Counter, 发送的字节数
+  downstream_cx_drain_close, Counter, 由于排空而关闭的连接数
+  downstream_rq_active, Gauge, 活跃的请求数
+  downstream_rq_total, Counter, 请求数
 
 
-Splitter statistics
--------------------
+拆分器（Splitter）统计信息
+-----------------------------
 
-The Redis filter will gather statistics for the command splitter in the
-*redis.<stat_prefix>.splitter.* with the following statistics:
+Redis 过滤器将使用以下所示统计信息收集 *redis.<stat_prefix>.splitter.* 中命令拆分器的统计信息：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  invalid_request, Counter, Number of requests with an incorrect number of arguments
-  unsupported_command, Counter, Number of commands issued which are not recognized by the command splitter
+  invalid_request, Counter, 参数数目不正确的请求数
+  unsupported_command, Counter, 命令拆分器无法识别发出的命令数
 
-Per command statistics
+命令统计信息
 ----------------------
 
-The Redis filter will gather statistics for commands in the
-*redis.<stat_prefix>.command.<command>.* namespace. By default latency stats are in milliseconds and can be
-changed to microseconds by setting the configuration parameter :ref:`latency_in_micros <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.latency_in_micros>` to true.
+Redis 过滤器将会收集 *redis.<stat_prefix>.command.<command>.* 命名空间中命令的统计信息。默认情况下延迟信息以毫秒为单位，并且可以通过设置配置参数 :ref:`latency_in_micros <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.latency_in_micros>` 为 true 更改为微秒。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  total, Counter, Number of commands
-  success, Counter, Number of commands that were successful
-  error, Counter, Number of commands that returned a partial or complete error response
-  latency, Histogram, Command execution time in milliseconds (including delay faults)
-  error_fault, Counter, Number of commands that had an error fault injected
-  delay_fault, Counter, Number of commands that had a delay fault injected
+  total, Counter, 命令数
+  success, Counter, 成功命令数
+  error, Counter, 返回部分或完整异常响应的命令数
+  latency, Histogram, 命令执行时间毫秒（包含延迟故障）
+  error_fault, Counter, 注入异常故障的命令数
+  delay_fault, Counter, 注入延迟故障的命令数
   
 .. _config_network_filters_redis_proxy_per_command_stats:
 
-Runtime
+运行时
 -------
 
-The Redis proxy filter supports the following runtime settings:
+Redis 代理过滤器支持如下所示的运行时设置：
 
 redis.drain_close_enabled
-  % of connections that will be drain closed if the server is draining and would otherwise
-  attempt a drain close. Defaults to 100.
+  连接的百分比表示如果服务器正在关闭，则将关闭连接，否则将尝试关闭连接。默认为 100。
 
 .. _config_network_filters_redis_proxy_fault_injection:
 
-Fault Injection
+故障注入
 ---------------
 
-The Redis filter can perform fault injection. Currently, Delay and Error faults are supported.
-Delay faults delay a request, and Error faults respond with an error. Moreover, errors can be delayed.
+Redis 过滤器可以执行故障注入。当前，延迟和异常故障都是支持的。延迟故障延迟请求，异常故障以异常响应。此外，异常也可以延迟。
 
-Note that the Redis filter does not check for correctness in your configuration - it is the user's
-responsibility to make sure both the default and runtime percentages are correct! This is because
-percentages can be changed during runtime, and validating correctness at request time is expensive.
-If multiple faults are specified, the fault injection percentage should not exceed 100% for a given 
-fault and Redis command combination. For example, if two faults are specified; one applying to GET at 60
-%, and one applying to all commands at 50%, that is a bad configuration as GET now has 110% chance of
-applying a fault. This means that every request will have a fault.
+注意，Redis 过滤器不会检查配置的正确性，因为这是用户负责确保默认值和运行时百分比都是正确的。这是因为百分比可以在运行时被修改，同时在请求时验证正确性是非常昂贵的。
+如果指定了多个故障，对于默认的故障和 Redis 命令组合注入故障百分比之和不会超过 100%。例如，如果指定了两个故障，一个应用于 60% 的 GET 请求，另一个应用于所有命令的 50%，这显然是一个错误的配置，因为 GET 请求有 110% 的机会应用错误。
+这也就意味每个请求都会有一个错误。
 
-If a delay is injected, the delay is additive - if the request took 400ms and a delay of 100ms
-is injected, then the total request latency is 500ms. Also, due to implementation of the redis protocol,
-a delayed request will delay everything that comes in after it, due to the proxy's need to respect the 
-order of commands it receives.
+如果注入一个延迟，那么延迟是会累加的。如果请求花费 400ms 再注入 100ms 的延迟，那么总的请求延迟就是 500ms。此外，由于 Redis 协议的实施，因为代理需要维护它所收到的命令顺序，所以延迟请求将会延迟在他之后的所有请求。
 
-Note that faults must have a `fault_enabled` field, and are not enabled by default (if no default value
-or runtime key are set).
+注意，故障必须有一个 `fault_enabled` 字段，并且默认情况下是不启用的（如果没有默认值或在运行时设置值）。
 
-Example configuration:
+配置示例：
 
 .. code-block:: yaml
 
@@ -118,5 +104,4 @@ Example configuration:
         runtime_key: "bogus_key"
       delay: 2s
 
-This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
-commands at 10%. This means that 20% of GET commands will have a fault applied, as discussed earlier.
+这个示例创建了两个故障，一个应用于 10% 的 GET 请求异常。另一个应用于 10% 的所有命令延迟。这就意味着 20% 的 GET 命令将应用一个错误，如前所述的一样。
