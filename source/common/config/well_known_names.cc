@@ -127,11 +127,6 @@ TagNameValues::TagNameValues() {
   addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
 }
 
-void TagNameValues::addRegex(const std::string& name, const std::string& regex,
-                             const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::StdRegex});
-}
-
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
                            const std::string& substr) {
   descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
