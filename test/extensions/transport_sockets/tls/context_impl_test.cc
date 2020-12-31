@@ -1980,7 +1980,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   context_->incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
   Stats::CounterOptConstRef cipher =
       store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
-  EXPECT_TRUE(cipher);
+  ASSERT_TRUE(cipher);
   EXPECT_EQ(1, cipher->get().value());
 
   // Incrementing a stat for a random unknown cipher does not work. A
@@ -1988,6 +1988,11 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // test as it is dependent on timing and test-ordering.
   context_->incCounter("ssl.ciphers", "unexpected");
   EXPECT_FALSE(store_.findCounterByString("ssl.ciphers.unexpected"));
+
+  // We will account for the 'unexpected' cipher as "fallback".
+  cipher = store_.findCounterByString("ssl.ciphers.fallback");
+  ASSERT_TRUE(cipher);
+  EXPECT_EQ(1, cipher->get().value());
 }
 
 } // namespace Tls

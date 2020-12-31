@@ -463,39 +463,31 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
-  // Ciphers are configured as a string delimited by ":", with equivalence
-  // groups given as "[alt1|alt2]", and exclusions preceded by "!". For the
-  // purposes of collecting stats, we want to track all these names. We don't
-  // need to fully parse out the structure of the cipher suites. Just extract
-  // out the names. We skip exclusions as those do not show up as entire
-  // stat-name segments, so they would not match.
-  for (absl::string_view cipher_suite :
-       absl::StrSplit(config.cipherSuites(), absl::ByAnyChar(":|[]"))) {
-    if (!cipher_suite.empty() && cipher_suite[0] != '!') { // skip exclusions and empty strings.
-      stat_name_set_->rememberBuiltin(cipher_suite);
+  // Use the SSL library to iterate over the configured ciphers.
+  {
+    bssl::UniquePtr<SSL> ssl = newSsl(nullptr);
+    STACK_OF(SSL_CIPHER)* ciphers = SSL_get_ciphers(ssl.get());
+    for (uint32_t i = 0, n = sk_SSL_CIPHER_num(ciphers); i < n; ++i) {
+      const SSL_CIPHER* cipher = sk_SSL_CIPHER_value(ciphers, i);
+      stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
+      ENVOY_LOG_MISC(error, SSL_CIPHER_get_name(cipher));
     }
   }
 
-  // This cipher is referenced from
+  // TLS_AES_128_GCM_SHA256 is referenced from
   // IpVersionsClientVersions/SslCertficateIntegrationTest.ServerRsa/IPv4_TLSv1_3,
   // possibly due to the call to
   // ClientSslTransportOptions().setSigningAlgorithmsForTest
   // in test/extensions/transport_sockets/tls/integration/ssl_integration_test.cc, function
   // rsaOnlyClientOptions.
-  stat_name_set_->rememberBuiltin("TLS_AES_128_GCM_SHA256");
-
-  // This cipher's appearance appears to be induced by setting "cipher_suites" to
-  // "TLS_RSA_WITH_AES_128_GCM_SHA256" in the configuration for
-  // SslSocketTest.RsaPrivateKeyProviderAsyncDecryptSuccess in
-  // test/extensions/transport_sockets/tls/ssl_socket_test.cc
-  stat_name_set_->rememberBuiltin("AES128-GCM-SHA256");
+  //
+  // We must also add two more that are hardcoded into the SSL 1.3 spec:
+  // https://tools.ietf.org/html/rfc8446
+  stat_name_set_->rememberBuiltins(
+      {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_AES_128_GCM_SHA256"});
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
-  //
-  // TODO(jmarantz): consider whether we need this hard-coded list in addition
-  // to the ones from ecdhCurves below. Note there is no harm in remembering a
-  // curve more than once.
   stat_name_set_->rememberBuiltins(
       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
   for (absl::string_view curve : absl::StrSplit(config.ecdhCurves(), ':')) {
