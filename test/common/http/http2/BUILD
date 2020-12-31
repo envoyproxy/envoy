@@ -4,6 +4,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -175,5 +176,24 @@ envoy_cc_fuzz_test(
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
+    ],
+)
+
+envoy_proto_library(
+    name = "hpack_fuzz_proto",
+    srcs = ["hpack_fuzz.proto"],
+    deps = ["//test/fuzz:common_proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "hpack_fuzz_test",
+    srcs = ["hpack_fuzz_test.cc"],
+    corpus = "hpack_corpus",
+    external_deps = [
+        "nghttp2",
+    ],
+    deps = [
+        ":hpack_fuzz_proto_cc_proto",
+        "//test/test_common:utility_lib",
     ],
 )

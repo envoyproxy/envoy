@@ -1,7 +1,9 @@
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 #include "common/router/string_accessor_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
+#include "extensions/filters/common/expr/cel_state.h"
 #include "extensions/filters/common/expr/context.h"
 
 #include "test/mocks/ssl/mocks.h"
@@ -708,6 +710,23 @@ TEST(Context, FilterStateAttributes) {
     EXPECT_TRUE(value.has_value());
     EXPECT_TRUE(value.value().IsBytes());
     EXPECT_EQ(serialized, value.value().BytesOrDie().value());
+  }
+
+  CelStatePrototype prototype(true, CelStateType::Protobuf,
+                              "type.googleapis.com/google.protobuf.DoubleValue",
+                              StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto cel_state = std::make_shared<CelState>(prototype);
+  ProtobufWkt::DoubleValue v;
+  v.set_value(1.0);
+  cel_state->setValue(v.SerializeAsString());
+  const std::string cel_key = "cel_state_key";
+  filter_state.setData(cel_key, cel_state, StreamInfo::FilterState::StateType::ReadOnly);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(cel_key)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsDouble());
+    EXPECT_EQ(value.value().DoubleOrDie(), 1.0);
   }
 }
 

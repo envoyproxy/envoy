@@ -266,7 +266,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2020/07/31  12035    37114       38000   Init manager store unready targets in hash map.
   // 2020/08/10  12275    37061       38000   Re-organize tls histogram maps to improve continuity.
   // 2020/08/11  12202    37061       38500   router: add new retry back-off strategy
-  // 2020/09/11  12973                38993   upstream: predictive prefetch
+  // 2020/09/11  12973                38993   upstream: predictive preconnect
   // 2020/10/02  13251                39326   switch to google tcmalloc
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
