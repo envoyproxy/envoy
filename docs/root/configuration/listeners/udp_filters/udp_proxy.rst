@@ -1,100 +1,88 @@
 .. _config_udp_listener_filters_udp_proxy:
 
-UDP proxy
+UDP 代理
 =========
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
-* This filter should be configured with the name *envoy.filters.udp_listener.udp_proxy*
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
+* 此过滤器的名称应该被配置为 *envoy.filters.udp_listener.udp_proxy* 。
 
-Overview
+概述
 --------
 
-The UDP proxy listener filter allows Envoy to operate as a *non-transparent* proxy between a
-UDP client and server. The lack of transparency means that the upstream server will see the
-source IP and port of the Envoy instance versus the client. All datagrams flow from the client, to
-Envoy, to the upstream server, back to Envoy, and back to the client.
+UDP 代理监听器过滤器允许 Envoy 作为 UDP 客户端和服务器之间的 *非透明* 代理进行操作。非透明意味着上游服务器将
+看到 Envoy 实例相对于客户端的源 IP 地址和端口。所有的数据报都是从客户端，到 Envoy，再到上游服务器，然后回到 Envoy，
+再回到客户端。
 
-Because UDP is not a connection oriented protocol, Envoy must keep track of a client's *session*
-such that the response datagrams from an upstream server can be routed back to the correct client.
-Each session is index by the 4-tuple consisting of source IP/port and local IP/port that the
-datagram is received on. Sessions last until the :ref:`idle timeout
-<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>` is reached.
+由于 UDP 不是面向连接的协议，Envoy 必须保持跟踪客户端的 *session*，以便来自上游服务器的响应数据报可以返回给正确的客户端。
+每个会话由 4 元组进行索引，4 元组由源 IP 地址、源端口和接收数据报的本地 IP 地址、本地端口组成。会话会持续到
+:ref:`空闲超时 <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>` 。
 
-The UDP proxy listener filter also can operate as a *transparent* proxy if the
-:ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
-field is set. But please keep in mind that it does not forward the port to upstreams. It forwards only the IP address to upstreams.
+如果设置了 :ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
+字段，UDP 代理监听器过滤器也可以作为 *透明* 代理运行。但是请记住，它不会把端口转发到上游，它只会把 IP 地址转发到上游。
 
-Load balancing and unhealthy host handling
-------------------------------------------
+负载均衡及异常主机的处理
+-------------------------
 
-Envoy will fully utilize the configured load balancer for the configured upstream cluster when
-load balancing UDP datagrams. When a new session is created, Envoy will associate the session
-with an upstream host selected using the configured load balancer. All future datagrams that
-belong to the session will be routed to the same upstream host.
+在对 UDP 数据报进行负载均衡时，Envoy 将为配置的上游集群充分利用配置的负载均衡器。创建新会话时，Envoy 将会与
+使用配置的负载均衡器选择的上游主机进行关联。将来，所有属于该会话的数据报都将路由到相同的上游主机。
 
-When an upstream host becomes unhealthy (due to :ref:`active health checking
-<arch_overview_health_checking>`), Envoy will attempt to create a new session to a healthy host
-when the next datagram is received.
+当上游主机发生异常时（由于 :ref:`主动健康检查 <arch_overview_health_checking>` ），
+Envoy 将尝试创建一个与健康主机的新会话。
 
-Circuit breaking
-----------------
+断路
+------
 
-The number of sessions that can be created per upstream cluster is limited by the cluster's
-:ref:`maximum connection circuit breaker <arch_overview_circuit_break_cluster_maximum_connections>`.
-By default this is 1024.
+每个上游集群可以创建的会话数受集群 :ref:`最大连接断路器 <arch_overview_circuit_break_cluster_maximum_connections>`
+的限制。默认情况下为 1024。
 
-Example configuration
----------------------
+示例配置
+---------
 
-The following example configuration will cause Envoy to listen on UDP port 1234 and proxy to a UDP
-server listening on port 1235.
+下面的示例配置，Envoy 将在 UDP 端口 1234 上监听，并代理到监听端口为 1235 的 UDP 服务器。
 
 .. literalinclude:: _include/udp-proxy.yaml
     :language: yaml
 
 
-Statistics
-----------
+统计
+------
 
-The UDP proxy filter emits both its own downstream statistics as well as many of the :ref:`cluster
-upstream statistics <config_cluster_manager_cluster_stats>` where applicable. The downstream
-statistics are rooted at *udp.<stat_prefix>.* with the following statistics:
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
-
-  downstream_sess_no_route, Counter, Number of datagrams not routed due to no cluster
-  downstream_sess_rx_bytes, Counter, Number of bytes received
-  downstream_sess_rx_datagrams, Counter, Number of datagrams received
-  downstream_sess_rx_errors, Counter, Number of datagram receive errors
-  downstream_sess_total, Counter, Number sessions created in total
-  downstream_sess_tx_bytes, Counter, Number of bytes transmitted
-  downstream_sess_tx_datagrams, Counter, Number of datagrams transmitted
-  downstream_sess_tx_errors, counter, Number of datagram transmission errors
-  idle_timeout, Counter, Number of sessions destroyed due to idle timeout
-  downstream_sess_active, Gauge, Number of sessions currently active
-
-The following standard :ref:`upstream cluster stats <config_cluster_manager_cluster_stats>` are used
-by the UDP proxy:
+UDP 代理过滤器发出它自己的下游统计信息以及许多适用的 :ref:`集群上游统计信息 <config_cluster_manager_cluster_stats>`。
+下游的统计数据的根是 *udp.<stat_prefix>.*。统计信息如下：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  upstream_cx_none_healthy, Counter, Number of datagrams dropped due to no healthy hosts
-  upstream_cx_overflow, Counter, Number of datagrams dropped due to hitting the session circuit breaker
-  upstream_cx_rx_bytes_total, Counter, Number of bytes received
-  upstream_cx_tx_bytes_total, Counter, Number of bytes transmitted
+  downstream_sess_no_route, Counter, 由于没有群集而未被路由的数据报数
+  downstream_sess_rx_bytes, Counter, 接收的字节数
+  downstream_sess_rx_datagrams, Counter, 接收的数据报数
+  downstream_sess_rx_errors, Counter, 数据报接收错误数
+  downstream_sess_total, Counter, 创建的会话总数
+  downstream_sess_tx_bytes, Counter, 传输的字节数
+  downstream_sess_tx_datagrams, Counter, 传输的数据报数
+  downstream_sess_tx_errors, counter, 数据报传输错误数
+  idle_timeout, Counter, 由于空闲超时而销毁的会话数
+  downstream_sess_active, Gauge, 当前活动会话数
 
-The UDP proxy filter also emits custom upstream cluster stats prefixed with
-*cluster.<cluster_name>.udp.*:
+UDP 代理使用以下标准 :ref:`上游集群统计信息 <config_cluster_manager_cluster_stats>`：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  sess_rx_datagrams, Counter, Number of datagrams received
-  sess_rx_errors, Counter, Number of datagram receive errors
-  sess_tx_datagrams, Counter, Number of datagrams transmitted
-  sess_tx_errors, Counter, Number of datagrams tramsitted
+  upstream_cx_none_healthy, Counter, 由于没有正常主机而丢弃的数据报数
+  upstream_cx_overflow, Counter, 由于命中会话断路器而丢弃的数据报数
+  upstream_cx_rx_bytes_total, Counter, 接收的字节数
+  upstream_cx_tx_bytes_total, Counter, 传输的字节数
+
+UDP 代理过滤器还发出以 *cluster.<cluster_name>.udp.* 为前缀的自定义上游群集统计信息：
+
+.. csv-table::
+  :header: 名称, 类型, 描述
+  :widths: 1, 1, 2
+
+  sess_rx_datagrams, Counter, 接收到的数据报数
+  sess_rx_errors, Counter, 数据报接收错误数
+  sess_tx_datagrams, Counter, 传输的数据报数
+  sess_tx_errors, Counter, 传输错误的数据报数
