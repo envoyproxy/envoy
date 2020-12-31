@@ -36,13 +36,6 @@ message CapabilityRestrictionConfig {
 
 // Configuration for sanitization of inputs to an allowed capability. NOTE: This is currently unimplemented.
 message SanitizationConfig {
-  // [#not-implemented-hide:]
-  // The list of arguments which will be allowed/denied when the capability is called.
-  repeated string argument_list = 1;
-
-  // [#not-implemented-hide:]
-  // Determines whether *argument_list* is treated as an allowlist or a denylist.
-  bool is_allowlist = 2;
 }
 
 // Configuration for a Wasm VM.
