@@ -69,7 +69,7 @@ TagNameValues::TagNameValues() {
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)<base_stat>
   addRe2(MONGO_CMD, R"(^mongo\.<NAME>\.cmd\.((<NAME>)\.))", ".cmd.");
 
-  // cluster.[<route_target_cluster>.]grpc.<grpc_service>.(<grpc_method>.)*
+  // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
   addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
