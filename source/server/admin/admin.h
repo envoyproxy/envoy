@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/http/conn_manager_config.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
@@ -173,8 +174,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
-  bool shouldStripMatchingPort() const override { return false; }
-  bool shouldStripAnyPort() const override { return false; }
+  Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;

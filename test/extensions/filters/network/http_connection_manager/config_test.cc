@@ -1041,7 +1041,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldStripMatchingPort());
+  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that when configured, we remove port.
@@ -1059,7 +1059,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_TRUE(config.shouldStripMatchingPort());
+  EXPECT_EQ(Http::StripPortType::MatchingHost, config.stripPortType());
 }
 
 // Validated that when explicitly set false, we don't remove port.
@@ -1077,7 +1077,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldStripMatchingPort());
+  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that when configured, we remove any port.
@@ -1095,7 +1095,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_TRUE(config.shouldStripAnyPort());
+  EXPECT_EQ(Http::StripPortType::Any, config.stripPortType());
 }
 
 // Validated that when explicitly set false, we don't remove any port.
@@ -1113,7 +1113,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldStripAnyPort());
+  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that by default we allow requests with header names containing underscores.

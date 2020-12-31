@@ -55,7 +55,7 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
 
   for (const auto& host_pair : host_headers) {
     auto& host_header = hostHeaderEntry(host_pair.first);
-    HeaderUtility::stripPortFromHost(headers_, 443);
+    HeaderUtility::stripPortFromHost(headers_, Http::StripPortType::MatchingHost, 443);
     EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
   }
 }
@@ -67,7 +67,31 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHostConnect) {
   };
   for (const auto& host_pair : host_headers) {
     auto& host_header = hostHeaderEntry(host_pair.first, true);
-    HeaderUtility::stripPortFromHost(headers_, 443);
+    HeaderUtility::stripPortFromHost(headers_, Http::StripPortType::MatchingHost, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
+// Port's part from host header won't be removed if StripPortType is None
+TEST_F(HeaderUtilityTest, RemovePortsFromHostNoneStripType) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost:443", "localhost:443"},
+  };
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first, true);
+    HeaderUtility::stripPortFromHost(headers_, Http::StripPortType::None, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+}
+
+// Port's part from host header will get removed even if port does not natch if StripPortType is Any
+TEST_F(HeaderUtilityTest, RemovePortsFromHostAnyStripType) {
+  const std::vector<std::pair<std::string, std::string>> host_headers{
+      {"localhost:443", "localhost"},
+  };
+  for (const auto& host_pair : host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first, true);
+    HeaderUtility::stripPortFromHost(headers_, Http::StripPortType::Any, 9999);
     EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
   }
 }

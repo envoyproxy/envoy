@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 
+#include "common/http/conn_manager_config.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -169,8 +170,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
-  bool shouldStripMatchingPort() const override { return strip_matching_port_; }
-  bool shouldStripAnyPort() const override { return strip_any_port_; }
+  Http::StripPortType stripPortType() const override { return strip_port_type_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return headers_with_underscores_action_;
@@ -251,8 +251,7 @@ private:
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
-  const bool strip_matching_port_;
-  const bool strip_any_port_;
+  Http::StripPortType strip_port_type_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;

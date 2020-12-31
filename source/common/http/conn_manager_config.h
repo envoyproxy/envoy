@@ -168,6 +168,11 @@ enum class ForwardClientCertType {
 enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
 
 /**
+ * Type that indicates how port should be stripped from Host header.
+ */
+enum class StripPortType { MatchingHost, Any, None };
+
+/**
  * Configuration for what addresses should be considered internal beyond the defaults.
  */
 class InternalAddressConfig {
@@ -439,14 +444,9 @@ public:
   virtual bool shouldMergeSlashes() const PURE;
 
   /**
-   * @return if the HttpConnectionManager should remove the matching port from host/authority header
+   * @return port strip type from host/authority header.
    */
-  virtual bool shouldStripMatchingPort() const PURE;
-
-  /**
-   * @return if the HttpConnectionManager should remove the port from host/authority header
-   */
-  virtual bool shouldStripAnyPort() const PURE;
+  virtual StripPortType stripPortType() const PURE;
 
   /**
    * @return the action HttpConnectionManager should take when receiving client request

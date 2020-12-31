@@ -1427,7 +1427,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
 
 // maybeNormalizeHost() removes port part from host header.
 TEST_F(ConnectionManagerUtilityTest, RemovePort) {
-  ON_CALL(config_, shouldStripMatchingPort()).WillByDefault(Return(true));
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::MatchingHost));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setHost("host:443");
 
@@ -1435,13 +1435,21 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 443);
   EXPECT_EQ(header_map.getHostValue(), "host");
 
-  ON_CALL(config_, shouldStripAnyPort()).WillByDefault(Return(true));
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::Any));
   TestRequestHeaderMapImpl original_headers_any;
   original_headers_any.setHost("host:9999");
 
   TestRequestHeaderMapImpl header_map_any(original_headers_any);
   ConnectionManagerUtility::maybeNormalizeHost(header_map_any, config_, 7777);
   EXPECT_EQ(header_map_any.getHostValue(), "host");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::None));
+  TestRequestHeaderMapImpl original_headers_none;
+  original_headers_none.setHost("host:9999");
+
+  TestRequestHeaderMapImpl header_map_none(original_headers_none);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
+  EXPECT_EQ(header_map_none.getHostValue(), "host:9999");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed

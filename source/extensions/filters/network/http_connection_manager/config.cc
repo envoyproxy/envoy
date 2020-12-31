@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "common/http/conn_manager_config.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
@@ -248,8 +249,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0))),
 #endif
       merge_slashes_(config.merge_slashes()),
-      strip_matching_port_(config.strip_matching_host_port()),
-      strip_any_port_(config.strip_any_host_port()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
@@ -265,12 +264,21 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = absl::nullopt;
   }
 
-  // If we are provided a different request_id_extension implementation to use try and create a new
-  // instance of it, otherwise use default one.
-  if (config.request_id_extension().has_typed_config()) {
+  if (config.strip_any_host_port()) {
+    strip_port_type_ = Http::StripPortType::Any;
+  } else if (config.strip_matching_host_port()) {
+    strip_port_type_ = Http::StripPortType::MatchingHost;
+  } else {
+    strip_port_type_ = Http::StripPortType::None;
+  }
+
+      // If we are provided a different request_id_extension implementation to use try and create a
+      // new instance of it, otherwise use default one.
+      if (config.request_id_extension().has_typed_config()) {
     request_id_extension_ =
         Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
-  } else {
+  }
+  else {
     request_id_extension_ =
         Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
   }

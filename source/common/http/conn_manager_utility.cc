@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/http/conn_manager_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/empty_string.h"
@@ -427,11 +428,9 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
 void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config,
                                                   uint32_t port) {
-  if (config.shouldStripAnyPort()) {
+  if (config.stripPortType() == Http::StripPortType::Any) {
     HeaderUtility::stripPortFromHost(request_headers, 0);
-    return;
-  }
-  if (config.shouldStripMatchingPort()) {
+  } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
     HeaderUtility::stripPortFromHost(request_headers, port);
   }
 }
