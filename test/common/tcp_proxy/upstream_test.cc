@@ -28,7 +28,8 @@ public:
           .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
     }
     EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
-    upstream_ = std::make_unique<T>(callbacks_, hostname_);
+    config_.set_hostname("default.host.com:443");
+    upstream_ = std::make_unique<T>(callbacks_, config_);
     upstream_->setRequestEncoder(encoder_, true);
   }
 
@@ -36,7 +37,7 @@ public:
   Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
   NiceMock<Tcp::ConnectionPool::MockUpstreamCallbacks> callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
-  std::string hostname_{"default.host.com:443"};
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config_;
 };
 
 using testing::Types;
@@ -55,7 +56,7 @@ TYPED_TEST(HttpUpstreamTest, WriteUpstream) {
   this->upstream_->encodeData(buffer2, true);
 
   // New upstream with no encoder
-  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->hostname_);
+  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->config_);
   this->upstream_->encodeData(buffer2, true);
 }
 
@@ -89,7 +90,7 @@ TYPED_TEST(HttpUpstreamTest, ReadDisable) {
   EXPECT_TRUE(this->upstream_->readDisable(false));
 
   // New upstream with no encoder
-  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->hostname_);
+  this->upstream_ = std::make_unique<TypeParam>(this->callbacks_, this->config_);
   EXPECT_FALSE(this->upstream_->readDisable(true));
 }
 

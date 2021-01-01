@@ -68,6 +68,17 @@ message TcpProxy {
 
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
     string hostname = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Use POST method instead of CONNECT method to the tunnel the TCP stream.
+    // For HTTP/2 upstream, the 'protocol: bytestream' header is also NOT set to
+    // comply with the HTTP spec.
+    //
+    // The upstream proxy is expected to convert POST back to CONNECT.
+    bool use_post = 2;
+
+    // Additional request headers to upstream proxy. This is mainly used to
+    // trigger upstream to convert POST requests back to CONNECT requests.
+    repeated config.core.v3.HeaderValueOption headers = 3;
   }
 
   reserved 6;
