@@ -464,10 +464,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
   // Use the SSL library to iterate over the configured ciphers.
-  if (!tls_contexts_.empty()) {
-    // We avoid calling newSsl here to avoid the clang-tidy error about calling
-    // a virtual method from the constructor.
-    bssl::UniquePtr<SSL> ssl = bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
+  for (TlsContext& tls_context : tls_contexts_) {
+    bssl::UniquePtr<SSL> ssl = bssl::UniquePtr<SSL>(SSL_new(tls_context.ssl_ctx_.get()));
     STACK_OF(SSL_CIPHER)* ciphers = SSL_get_ciphers(ssl.get());
     for (uint32_t i = 0, n = sk_SSL_CIPHER_num(ciphers); i < n; ++i) {
       const SSL_CIPHER* cipher = sk_SSL_CIPHER_value(ciphers, i);
