@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace TcpProxy {
 using TunnelingConfig =
-      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 TcpUpstream::TcpUpstream(Tcp::ConnectionPool::ConnectionDataPtr&& data,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
@@ -251,7 +251,7 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                           const TunnelingConfig& config)
+                             const TunnelingConfig& config)
     : HttpUpstream(callbacks, config) {}
 
 bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
@@ -266,11 +266,10 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   request_encoder_->getStream().addCallbacks(*this);
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Scheme, scheme},
-      {Http::Headers::get().Path, "/"},
-      {Http::Headers::get().Host, config_.hostname()}
-    });
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
+      {{Http::Headers::get().Scheme, scheme},
+       {Http::Headers::get().Path, "/"},
+       {Http::Headers::get().Host, config_.hostname()}});
 
   if (config_.use_post()) {
     headers->addReferenceKey(Http::Headers::get().Method, "POST");
@@ -282,11 +281,9 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
   for (const auto& header : config_.headers()) {
     if (config_.headers().append().value()) {
-      headers->addCopy(Http::LowerCaseString(header.header().key()),
-                      header.header().value());
+      headers->addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
     } else {
-      headers->setCopy(Http::LowerCaseString(header.header().key()),
-                       header.header().value());
+      headers->setCopy(Http::LowerCaseString(header.header().key()), header.header().value());
     }
   }
 
