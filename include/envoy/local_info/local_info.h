@@ -30,7 +30,7 @@ public:
   /**
    * @return the zone name as a stat name.
    */
-  virtual Stats::StatName zoneStatName() const PURE;
+  virtual const Stats::StatName& zoneStatName() const PURE;
 
   /**
    * @return the human readable cluster name. E.g., "eta".
