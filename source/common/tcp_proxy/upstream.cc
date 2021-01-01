@@ -280,7 +280,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   }
 
   for (const auto& header : config_.headers()) {
-    if (config_.headers().append().value()) {
+    if (header.append().value()) {
       headers->addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
     } else {
       headers->setCopy(Http::LowerCaseString(header.header().key()), header.header().value());
