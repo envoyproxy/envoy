@@ -280,13 +280,14 @@ DetectorImpl::create(const Cluster& cluster,
                      const envoy::config::cluster::v3::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger) {
-  if (config.max_ejection_time() < config.base_ejection_time()) {
+  std::shared_ptr<DetectorImpl> detector(
+      new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
+
+  if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
     throw EnvoyException(
         "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
   }
 
-  std::shared_ptr<DetectorImpl> detector(
-      new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
 
   return detector;

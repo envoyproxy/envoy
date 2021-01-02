@@ -164,6 +164,25 @@ max_ejection_time: 400s
   EXPECT_EQ(400000UL, detector->config().maxEjectionTimeMs());
 }
 
+// Test verifies that detector is properly initialized with
+// default max_ejection_time when such value is
+// not specified in config.
+TEST_F(OutlierDetectorImplTest, DetectorStaticConfigMaxDefaultValue) {
+  const std::string yaml = R"EOF(
+interval: 0.1s
+base_ejection_time: 10s
+  )EOF";
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
+  TestUtility::loadFromYaml(yaml, outlier_detection);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, outlier_detection, dispatcher_, runtime_, time_system_, event_logger_));
+
+  EXPECT_EQ(100UL, detector->config().intervalMs());
+  EXPECT_EQ(10000UL, detector->config().baseEjectionTimeMs());
+  EXPECT_EQ(300000UL, detector->config().maxEjectionTimeMs());
+}
+
 // Test verifies that invalid outlier detector's config is rejected.
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfigiInvalidMaxEjectTime) {
   // Create invalid config. max_ejection_time must not be smaller than base_ejection_time.
@@ -185,7 +204,6 @@ max_ejection_time: 3s
 
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
-  dispatcher_.createTimer([]() -> void {});
   // Detector should reject the config.
   ASSERT_THROW(DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_,
                                     time_system_, event_logger_),
