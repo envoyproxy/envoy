@@ -207,6 +207,7 @@ proto_library(
         "//envoy/extensions/filters/http/router/v3:pkg",
         "//envoy/extensions/filters/http/squash/v3:pkg",
         "//envoy/extensions/filters/http/tap/v3:pkg",
+        "//envoy/extensions/filters/http/tcp_post/v3:pkg",
         "//envoy/extensions/filters/http/wasm/v3:pkg",
         "//envoy/extensions/filters/listener/http_inspector/v3:pkg",
         "//envoy/extensions/filters/listener/original_dst/v3:pkg",
