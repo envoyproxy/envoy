@@ -465,29 +465,24 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   // Use the SSL library to iterate over the configured ciphers.
   for (TlsContext& tls_context : tls_contexts_) {
-    bssl::UniquePtr<SSL> ssl = bssl::UniquePtr<SSL>(SSL_new(tls_context.ssl_ctx_.get()));
-    STACK_OF(SSL_CIPHER)* ciphers = SSL_get_ciphers(ssl.get());
-    for (uint32_t i = 0, n = sk_SSL_CIPHER_num(ciphers); i < n; ++i) {
-      const SSL_CIPHER* cipher = sk_SSL_CIPHER_value(ciphers, i);
+    for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
       stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
       ENVOY_LOG_MISC(error, SSL_CIPHER_get_name(cipher));
     }
   }
 
-  // TLS_AES_128_GCM_SHA256 is referenced from
-  // IpVersionsClientVersions/SslCertficateIntegrationTest.ServerRsa/IPv4_TLSv1_3,
-  // possibly due to the call to
-  // ClientSslTransportOptions().setSigningAlgorithmsForTest
-  // in test/extensions/transport_sockets/tls/integration/ssl_integration_test.cc, function
-  // rsaOnlyClientOptions.
-  //
-  // We must also add two more that are hardcoded into the SSL 1.3 spec:
+  // We must also add two more that are hardcoded into the TLS 1.3 spec:
   // https://tools.ietf.org/html/rfc8446
   stat_name_set_->rememberBuiltins(
       {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_AES_128_GCM_SHA256"});
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
+  //
+  // We include these in case there are implicit ones available in the library,
+  // and we include the configured ones below to cover any new ones that are
+  // added to the library and configured by users. There is no harm in
+  // specifying any of these multiple times.
   stat_name_set_->rememberBuiltins(
       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
   for (absl::string_view curve : absl::StrSplit(config.ecdhCurves(), ':')) {
