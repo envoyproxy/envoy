@@ -25,7 +25,6 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
