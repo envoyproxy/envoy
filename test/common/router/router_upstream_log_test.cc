@@ -148,7 +148,6 @@ public:
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
-    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_->decodeHeaders(headers, true);
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -191,7 +190,6 @@ public:
                                            {"x-envoy-internal", "true"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
-    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(2);
     router_->decodeHeaders(headers, true);
 
     router_->retry_state_->expectResetRetry();
