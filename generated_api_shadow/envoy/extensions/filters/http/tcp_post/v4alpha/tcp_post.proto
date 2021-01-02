@@ -24,7 +24,7 @@ message TcpPost {
   // Specifies a set of request headers to trigger converting POST requests
   // to CONNECT and set ``protocol: bytestream`` header.
   //
-  // This is mainly used by the upstream proxy to coordiante with the downstream
+  // This is mainly used by the upstream proxy to coordinate with the downstream
   // proxy that uses HTTP POST for TCP proxying.
   repeated config.route.v4alpha.HeaderMatcher headers = 1;
 }
