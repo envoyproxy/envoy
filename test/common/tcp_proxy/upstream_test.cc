@@ -169,9 +169,7 @@ public:
     config_.set_hostname("default.host.com:443");
   }
 
-  void setupUpstream() {
-    upstream_ = std::make_unique<T>(callbacks_, config_);
-  }
+  void setupUpstream() { upstream_ = std::make_unique<T>(callbacks_, config_); }
 
   Http::MockRequestEncoder encoder_;
   Http::MockHttp1StreamEncoderOptions stream_encoder_options_;
@@ -190,7 +188,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "CONNECT"},
       {Http::Headers::get().Host, this->config_.hostname()},
-    });
+  });
 
   if (this->is_http2_) {
     expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
@@ -200,8 +198,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
                                       Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  EXPECT_CALL(this->encoder_,
-              encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
@@ -221,10 +218,9 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
       {Http::Headers::get().Host, this->config_.hostname()},
       {Http::Headers::get().Path, "/"},
       {Http::Headers::get().Scheme, Http::Headers::get().SchemeValues.Http},
-    });
+  });
 
-  EXPECT_CALL(this->encoder_,
-              encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
@@ -251,7 +247,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "CONNECT"},
       {Http::Headers::get().Host, this->config_.hostname()},
-    });
+  });
 
   if (this->is_http2_) {
     expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
@@ -265,8 +261,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value1");
   expected_headers->addCopy(Http::LowerCaseString("header1"), "value2");
 
-  EXPECT_CALL(this->encoder_,
-              encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 } // namespace

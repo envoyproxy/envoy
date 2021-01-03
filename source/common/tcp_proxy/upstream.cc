@@ -271,7 +271,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
       {Http::Headers::get().Host, config_.hostname()},
       {Http::Headers::get().Path, "/"},
       {Http::Headers::get().Scheme, scheme},
-      });
+  });
 
   if (!config_.use_post()) {
     headers->addReference(Http::Headers::get().Protocol,
@@ -309,11 +309,9 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
   for (const auto& header : config_.headers()) {
     if (header.append().value()) {
-      headers->addCopy(Http::LowerCaseString(header.header().key()),
-                      header.header().value());
+      headers->addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
     } else {
-      headers->setCopy(Http::LowerCaseString(header.header().key()),
-                       header.header().value());
+      headers->setCopy(Http::LowerCaseString(header.header().key()), header.header().value());
     }
   }
 
