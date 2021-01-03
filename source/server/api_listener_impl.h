@@ -6,6 +6,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/socket.h"
 #include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -16,6 +17,7 @@
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/init/manager_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
@@ -72,7 +74,9 @@ protected:
     class SyntheticConnection : public Network::Connection {
     public:
       SyntheticConnection(SyntheticReadCallbacks& parent)
-          : parent_(parent), stream_info_(parent_.parent_.factory_context_.timeSource()),
+          : parent_(parent), address_provider_(std::make_shared<Network::SocketAddressProviderImpl>(
+                                 parent.parent_.address_, parent.parent_.address_)),
+            stream_info_(parent_.parent_.factory_context_.timeSource(), address_provider_),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       void raiseConnectionEvent(Network::ConnectionEvent event);
@@ -111,6 +115,12 @@ protected:
       void readDisable(bool) override {}
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }
+      const Network::SocketAddressProvider& addressProvider() const override {
+        return *address_provider_;
+      }
+      Network::SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+        return address_provider_;
+      }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
       unixSocketPeerCredentials() const override {
         return absl::nullopt;
@@ -135,6 +145,7 @@ protected:
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
 
       SyntheticReadCallbacks& parent_;
+      Network::SocketAddressProviderConstSharedPtr address_provider_;
       StreamInfo::StreamInfoImpl stream_info_;
       Network::ConnectionSocket::OptionsSharedPtr options_;
       std::list<Network::ConnectionCallbacks*> callbacks_;

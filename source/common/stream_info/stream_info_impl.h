@@ -3,8 +3,6 @@
 #include <chrono>
 #include <cstdint>
 
-#include "common/common/macros.h"
-#include "common/network/socket_impl.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
@@ -14,7 +12,9 @@
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"
+#include "common/common/macros.h"
 #include "common/http/request_id_extension_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "absl/strings/str_replace.h"
@@ -193,7 +193,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
-  const Network::SocketAddressProvider& downstreamAddressProvider() const override {
+  const Network::SocketAddressProviderGetters& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
   }
 

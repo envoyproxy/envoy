@@ -248,9 +248,10 @@ private:
                     bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          iter_(accept_filters_.end()), stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-                                            listener_.parent_.dispatcher_.timeSource(),
-                                            StreamInfo::FilterState::LifeSpan::Connection)) {
+          iter_(accept_filters_.end()),
+          stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+              listener_.parent_.dispatcher_.timeSource(), socket_->addressProviderSharedPtr(),
+              StreamInfo::FilterState::LifeSpan::Connection)) {
       listener_.stats_.downstream_pre_cx_active_.inc();
     }
     ~ActiveTcpSocket() override {

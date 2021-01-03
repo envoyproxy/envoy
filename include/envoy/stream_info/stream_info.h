@@ -454,7 +454,7 @@ public:
   /**
    * fixfix
    */
-  virtual const Network::SocketAddressProvider& downstreamAddressProvider() const PURE;
+  virtual const Network::SocketAddressProviderGetters& downstreamAddressProvider() const PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.

@@ -43,17 +43,37 @@ private:
   Network::SocketOptionName(level, option, #level "/" #option)
 
 /**
- * Interface for providing a socket's local address.
+ * Interfaces for providing a socket's various addresses.
  */
-class SocketAddressProvider {
+class SocketAddressProviderGetters {
 public:
-  virtual ~SocketAddressProvider() = default;
+  virtual ~SocketAddressProviderGetters() = default;
 
   /**
    * @return the local address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
+  /**
+   * @return true if the local address has been restored to a value that is different from the
+   *         address the socket was initially accepted at.
+   */
+  virtual bool localAddressRestored() const PURE;
+
+  /**
+   * @return the remote address of the socket.
+   */
+  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+
+  /**
+   * @return the direct remote address of the socket. This is the address of the directly
+   *         connected peer, and cannot be modified by listener filters.
+   */
+  virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+};
+
+class SocketAddressProvider : public SocketAddressProviderGetters {
+public:
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the
    * one at which the connection was received at, which is the same as the listener's address, if
@@ -74,23 +94,6 @@ public:
    * @param local_address the new local address.
    */
   virtual void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
-
-  /**
-   * @return true if the local address has been restored to a value that is different from the
-   *         address the socket was initially accepted at.
-   */
-  virtual bool localAddressRestored() const PURE;
-
-  /**
-   * @return the remote address of the socket.
-   */
-  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
-
-  /**
-   * @return the direct remote address of the socket. This is the address of the directly
-   *         connected peer, and cannot be modified by listener filters.
-   */
-  virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 
   /**
    * Set the remote address of the socket.

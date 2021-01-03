@@ -161,10 +161,10 @@ private:
         : parent_(parent), request_timer_(new Stats::HistogramCompletableTimespanImpl(
                                parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
-          stream_info_(parent_.time_source_), local_response_sent_{false}, pending_transport_end_{
-                                                                               false} {
+          stream_info_(parent_.time_source_,
+                       parent_.read_callbacks_->connection().addressProviderSharedPtr()),
+          local_response_sent_{false}, pending_transport_end_{false} {
       parent_.stats_.request_active_.inc();
-      stream_info_.setDownstreamAddresses(parent_.read_callbacks_->connection());
     }
     ~ActiveRpc() override {
       request_timer_->complete();

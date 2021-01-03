@@ -186,10 +186,9 @@ ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::HistogramCompletableTimespanImpl>(
                            parent_.stats().request_time_ms_, parent.timeSystem())),
       request_id_(-1), stream_id_(parent.randomGenerator().random()),
-      stream_info_(parent.timeSystem()), pending_stream_decoded_(false),
-      local_response_sent_(false) {
+      stream_info_(parent.timeSystem(), parent_.connection().addressProviderSharedPtr()),
+      pending_stream_decoded_(false), local_response_sent_(false) {
   parent_.stats().request_active_.inc();
-  stream_info_.setDownstreamAddresses(parent_.connection());
 }
 
 ActiveMessage::~ActiveMessage() {

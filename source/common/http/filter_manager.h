@@ -7,6 +7,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
+#include "envoy/network/socket.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/dump_state_utils.h"
@@ -595,6 +596,45 @@ public:
 };
 
 /**
+ * fixfix
+ */
+class OverridableRemoteSocketAddressProviderStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                         Network::SocketAddressProviderGetters {
+public:
+  using StreamInfoImpl::StreamInfoImpl;
+
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    ASSERT(overriden_downstream_remote_address_ == nullptr);
+    overriden_downstream_remote_address_ = downstream_remote_address;
+  }
+
+  // StreamInfo::StreamInfo
+  const Network::SocketAddressProviderGetters& downstreamAddressProvider() const override {
+    return *this;
+  }
+
+  // Network::SocketAddressProviderGetters
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddress();
+  }
+  bool localAddressRestored() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
+  }
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+    return overriden_downstream_remote_address_ != nullptr
+               ? overriden_downstream_remote_address_
+               : StreamInfoImpl::downstreamAddressProvider().remoteAddress();
+  }
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
+  }
+
+private:
+  Network::Address::InstanceConstSharedPtr overriden_downstream_remote_address_;
+};
+
+/**
  * FilterManager manages decoding a request through a series of decoding filter and the encoding
  * of the resulting response.
  */
@@ -850,6 +890,10 @@ public:
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
   const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
+  }
 
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
@@ -942,7 +986,7 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
-  StreamInfo::StreamInfoImpl stream_info_;
+  OverridableRemoteSocketAddressProviderStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;
