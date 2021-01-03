@@ -177,7 +177,7 @@ public:
    * @brief Remove the port part from host/authority header if it is equal to provided port or
    * provided port is 0.
    */
-  static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
+  static void stripPortFromHost(RequestHeaderMap& headers, absl::optional<uint32_t> listener_port);
 
   /* Does a common header check ensuring required headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and

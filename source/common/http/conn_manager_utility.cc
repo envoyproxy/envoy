@@ -429,7 +429,7 @@ void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_head
                                                   const ConnectionManagerConfig& config,
                                                   uint32_t port) {
   if (config.stripPortType() == Http::StripPortType::Any) {
-    HeaderUtility::stripPortFromHost(request_headers, 0);
+    HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
   } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
     HeaderUtility::stripPortFromHost(request_headers, port);
   }

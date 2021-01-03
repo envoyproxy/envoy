@@ -216,7 +216,8 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
-void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port) {
+void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
+                                      absl::optional<uint32_t> listener_port) {
 
   if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     // According to RFC 2817 Connect method should have port part in host header.
@@ -239,9 +240,9 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
     if (!absl::SimpleAtoi(port_str, &port)) {
       return;
     }
-    if (listener_port != 0 && port != listener_port) {
-      // We would strip ports only if they are the same, as local port of the listener or it is
-      // zero.
+    if (listener_port.has_value() && port != listener_port) {
+      // We would strip ports only if it is specified and they are the same, as local port of the
+      // listener.
       return;
     }
     const absl::string_view host = original_host.substr(0, port_start);

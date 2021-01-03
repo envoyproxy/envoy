@@ -64,7 +64,7 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
   }
   for (const auto& host_pair : any_host_headers) {
     auto& host_header = hostHeaderEntry(host_pair.first);
-    HeaderUtility::stripPortFromHost(headers_, 0);
+    HeaderUtility::stripPortFromHost(headers_, absl::nullopt);
     EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
   }
 }
