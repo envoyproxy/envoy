@@ -169,11 +169,15 @@ enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
 
 /**
  * Type that indicates how port should be stripped from Host header.
- * MatchingHost will remove the port from host/authority header only if the port matches with the
- * listener port. Any will just remove the port from host/authority header. None will keep the port
- * in host/authority header as is.
  */
-enum class StripPortType { MatchingHost, Any, None };
+enum class StripPortType {
+  // Removes the port from host/authority header only if the port matches with the listener port.
+  MatchingHost,
+  // Removes any port from host/authority header.
+  Any,
+  // Keeps the port in host/authority header as is.
+  None
+};
 
 /**
  * Configuration for what addresses should be considered internal beyond the defaults.
