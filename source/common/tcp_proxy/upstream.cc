@@ -266,15 +266,14 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   request_encoder_->getStream().addCallbacks(*this);
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
-      {{Http::Headers::get().Scheme, scheme},
-       {Http::Headers::get().Path, "/"},
-       {Http::Headers::get().Host, config_.hostname()}});
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, config_.use_post() ? "POST" : "CONNECT"},
+      {Http::Headers::get().Host, config_.hostname()},
+      {Http::Headers::get().Path, "/"},
+      {Http::Headers::get().Scheme, scheme},
+      });
 
-  if (config_.use_post()) {
-    headers->addReferenceKey(Http::Headers::get().Method, "POST");
-  } else {
-    headers->addReferenceKey(Http::Headers::get().Method, "CONNECT");
+  if (!config_.use_post()) {
     headers->addReference(Http::Headers::get().Protocol,
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
@@ -301,15 +300,15 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   request_encoder_->getStream().addCallbacks(*this);
 
   ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
+  ASSERT(!config_.use_post());
+
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      //{Http::Headers::get().Method, config_.use_post() ? "POST" : "CONNECT"},
       {Http::Headers::get().Method, "CONNECT"},
       {Http::Headers::get().Host, config_.hostname()},
   });
 
-  /*
   for (const auto& header : config_.headers()) {
-    if (config_.headers().append().value()) {
+    if (header.append().value()) {
       headers->addCopy(Http::LowerCaseString(header.header().key()),
                       header.header().value());
     } else {
@@ -317,7 +316,6 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
                        header.header().value());
     }
   }
-  */
 
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
