@@ -1,42 +1,38 @@
 .. _config_http_filters_ip_tagging:
 
-IP Tagging
+IP 标记
 ==========
 
-The HTTP IP Tagging filter sets the header *x-envoy-ip-tags* with the string tags for the trusted address from
-:ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`. If there are no tags for an address,
-the header is not set.
+HTTP IP 标记过滤器为来自 :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` 的受信任地址使用字符串标记
+来设置头部 *x-envoy-ip-tags*。如果地址没有标记，则不设置头部。
 
-The implementation for IP Tagging provides a scalable way to compare an IP address to a large list of CIDR
-ranges efficiently. The underlying algorithm for storing tags and IP address subnets is a Level-Compressed trie
-described in the paper `IP-address lookup using
-LC-tries <https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_ by S. Nilsson and
-G. Karlsson.
+IP 标记的实现提供了一种可伸缩的方法，可以高效地将 IP 地址与大量的 CIDR 进行比较。存储标签和 IP 地址子网的底层算法是 S.Nilsson 和
+G.Karlsson 在论文 `使用 LC 尝试查找 IP 地址 <https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_
+中描述的一种压缩 tire 树。
 
+配置
+--------
 
-Configuration
--------------
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging>`
-* This filter should be configured with the name *envoy.filters.http.ip_tagging*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging>`
+* 此过滤器的名称应该被配置为 *envoy.filters.http.ip_tagging*。
 
-Statistics
+统计
 ----------
 
-The IP Tagging filter outputs statistics in the *http.<stat_prefix>.ip_tagging.* namespace. The stat prefix comes from
-the owning HTTP connection manager.
+IP 标记过滤器在 *http.<stat_prefix>.ip_tagging.* 命名空间中输出统计信息。stat 前缀来自拥有的 HTTP 连接管理器。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-        <tag_name>.hit, Counter, Total number of requests that have the <tag_name> applied to it
-        no_hit, Counter, Total number of requests with no applicable IP tags
-        total, Counter, Total number of requests the IP Tagging Filter operated on
+        <tag_name>.hit, Counter, 应用了 <tag_name> 的请求总数
+        no_hit, Counter, 不适用 IP 标记的请求总数
+        total, Counter, IP 标记过滤器操作的请求总数
 
-Runtime
--------
+运行时
+---------
 
-The IP Tagging filter supports the following runtime settings:
+IP 标记过滤器支持以下运行时设置：
 
 ip_tagging.http_filter_enabled
-    The % of requests for which the filter is enabled. Default is 100.
+    启用过滤器的请求的百分比。默认值为 100。

@@ -1,21 +1,19 @@
 .. _config_cluster_manager_cluster_stats:
 
-Statistics
+统计
 ==========
 
 .. contents::
   :local:
 
-General
+总则
 -------
 
-The cluster manager has a statistics tree rooted at *cluster_manager.* with the following
-statistics. Any ``:`` character in the stats name is replaced with ``_``. Stats include
-all clusters managed by the cluster manager, including both clusters used for data plane
-upstreams and control plane xDS clusters.
+集群管理有一个根在 *cluster_manager.* 的统计树，有如下统计信息。在 stats 名称中的任何 ``:`` 字符都将被替换为 ``_``。
+统计信息包含由集群管理器管理的所有集群，包括用于数据平面上游的集群和控制平面 xD 的集群。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
   cluster_added, Counter, Total clusters added (either via static config or CDS)
