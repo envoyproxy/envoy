@@ -44,7 +44,7 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
 }
 
 // Matches newline pattern in a system time format string (e.g. start time)
-const std::regex& getDateFormatNewlinePattern() {
+const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
@@ -1154,7 +1154,7 @@ SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExt
     : date_formatter_(format), time_field_extractor_(std::move(f)) {
   // Validate the input specifier here. The formatted string may be destined for a header, and
   // should not contain invalid characters {NUL, LR, CF}.
-  if (std::regex_search(format, getDateFormatNewlinePattern())) {
+  if (std::regex_search(format, getSystemTimeFormatNewlinePattern())) {
     throw EnvoyException("Invalid header configuration. Format string contains newline.");
   }
 }
@@ -1166,7 +1166,7 @@ absl::optional<std::string> SystemTimeFormatter::format(const Http::RequestHeade
                                                         absl::string_view) const {
   const auto time_field = (*time_field_extractor_)(stream_info);
   if (!time_field.has_value()) {
-    return absl::optional<std::string>();
+    return absl::nullopt;
   }
   if (date_formatter_.formatString().empty()) {
     return AccessLogDateTimeFormatter::fromTime(time_field.value());
