@@ -452,7 +452,7 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * fixfix
+   * @return the downstream address provider.
    */
   virtual const Network::SocketAddressProviderGetters& downstreamAddressProvider() const PURE;
 

@@ -50,9 +50,10 @@ Http::FilterHeadersStatus
 RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(
       debug,
-      "checking request: requestedServerName: {}, directRemoteIP: {}, remoteIP: {},"
+      "checking request: requestedServerName: {}, sourceIP: {}, directRemoteIP: {}, remoteIP: {},"
       "localAddress: {}, ssl: {}, headers: {}, dynamicMetadata: {}",
       callbacks_->connection()->requestedServerName(),
+      callbacks_->connection()->addressProvider().remoteAddress()->asString(),
       callbacks_->streamInfo().downstreamAddressProvider().directRemoteAddress()->asString(),
       callbacks_->streamInfo().downstreamAddressProvider().remoteAddress()->asString(),
       callbacks_->streamInfo().downstreamAddressProvider().localAddress()->asString(),

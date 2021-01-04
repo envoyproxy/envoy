@@ -43,7 +43,9 @@ private:
   Network::SocketOptionName(level, option, #level "/" #option)
 
 /**
- * Interfaces for providing a socket's various addresses.
+ * Interfaces for providing a socket's various addresses. This is split into a getters interface
+ * and a getters + setters interface. This is so that only the getters portion can be overridden
+ * in certain cases.
  */
 class SocketAddressProviderGetters {
 public:
@@ -102,7 +104,7 @@ public:
 };
 
 using SocketAddressProviderSharedPtr = std::shared_ptr<SocketAddressProvider>;
-using SocketAddressProviderConstSharedPtr = std::shared_ptr<const SocketAddressProvider>;
+using SocketAddressProviderGettersSharedPtr = std::shared_ptr<const SocketAddressProviderGetters>;
 
 /**
  * Base class for Sockets
@@ -116,10 +118,12 @@ public:
    */
   enum class Type { Stream, Datagram };
 
-  // fixfix
+  /**
+   * @return the address provider backing this socket.
+   */
   virtual SocketAddressProvider& addressProvider() PURE;
-  virtual const SocketAddressProvider& addressProvider() const PURE;
-  virtual SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const PURE;
+  virtual const SocketAddressProviderGetters& addressProvider() const PURE;
+  virtual SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection

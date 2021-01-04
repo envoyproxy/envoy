@@ -1539,7 +1539,7 @@ TEST_F(HttpConnectionManagerImplTest,
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
-  static constexpr char local_address[] = "0.0.0.0";
+  static constexpr char remote_address[] = "0.0.0.0";
   static constexpr char xff_address[] = "1.2.3.4";
 
   // stream_info.downstreamRemoteAddress will infer the address from request
@@ -1570,7 +1570,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
                   xff_address);
         EXPECT_EQ(
             stream_info.downstreamAddressProvider().directRemoteAddress()->ip()->addressAsString(),
-            local_address);
+            remote_address);
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))

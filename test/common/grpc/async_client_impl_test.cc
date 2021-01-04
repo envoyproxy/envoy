@@ -2,6 +2,7 @@
 
 #include "common/grpc/async_client_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -128,11 +129,9 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
 
   // Prepare the parent context of this call.
-  NiceMock<Network::MockConnectionSocket> socket;
-  socket.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address);
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
-  stream_info.setDownstreamAddresses(socket);
+  auto address_provider = std::make_shared<Network::SocketAddressProviderImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;

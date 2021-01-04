@@ -118,7 +118,7 @@ protected:
       const Network::SocketAddressProvider& addressProvider() const override {
         return *address_provider_;
       }
-      Network::SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+      Network::SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
         return address_provider_;
       }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
@@ -145,7 +145,7 @@ protected:
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
 
       SyntheticReadCallbacks& parent_;
-      Network::SocketAddressProviderConstSharedPtr address_provider_;
+      Network::SocketAddressProviderSharedPtr address_provider_;
       StreamInfo::StreamInfoImpl stream_info_;
       Network::ConnectionSocket::OptionsSharedPtr options_;
       std::list<Network::ConnectionCallbacks*> callbacks_;

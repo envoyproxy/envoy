@@ -1,7 +1,6 @@
 #include "test/mocks/stream_info/mocks.h"
 
 #include "common/network/address_impl.h"
-#include "common/network/socket_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

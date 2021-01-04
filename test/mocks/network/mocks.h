@@ -224,8 +224,10 @@ public:
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+  const SocketAddressProviderGetters& addressProvider() const override {
+    return *address_provider_;
+  }
+  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(IoHandle&, ioHandle, ());
@@ -276,8 +278,10 @@ public:
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+  const SocketAddressProviderGetters& addressProvider() const override {
+    return *address_provider_;
+  }
+  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));

@@ -125,7 +125,7 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::SocketAddressProviderConstSharedPtr local_address_provider_;
+    Network::SocketAddressProviderGettersSharedPtr local_address_provider_;
     bool expect_reset_{};
   };
 

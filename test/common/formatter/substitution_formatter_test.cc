@@ -428,7 +428,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     // Validate for IPv4 address
     auto address = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("8443", upstream_format.format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -438,7 +438,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("9443", upstream_format.format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -447,7 +447,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("", upstream_format.format(request_headers, response_headers, response_trailers,
                                          stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,

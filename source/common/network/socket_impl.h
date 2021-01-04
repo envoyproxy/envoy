@@ -14,7 +14,11 @@ public:
       : local_address_(local_address), remote_address_(remote_address),
         direct_remote_address_(remote_address) {}
 
-  // fixfix
+  void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
+    direct_remote_address_ = direct_remote_address;
+  }
+
+  // SocketAddressProvider
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
@@ -36,7 +40,7 @@ private:
   Address::InstanceConstSharedPtr local_address_;
   bool local_address_restored_{false};
   Address::InstanceConstSharedPtr remote_address_;
-  const Address::InstanceConstSharedPtr direct_remote_address_;
+  Address::InstanceConstSharedPtr direct_remote_address_;
 };
 
 class SocketImpl : public virtual Socket {
@@ -46,8 +50,10 @@ public:
 
   // Network::Socket
   SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+  const SocketAddressProviderGetters& addressProvider() const override {
+    return *address_provider_;
+  }
+  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   SocketPtr duplicate() override {

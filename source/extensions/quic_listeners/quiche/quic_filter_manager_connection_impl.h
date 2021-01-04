@@ -48,7 +48,7 @@ public:
   const Network::SocketAddressProvider& addressProvider() const override {
     return quic_connection_->connectionSocket()->addressProvider();
   }
-  Network::SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+  Network::SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
     return quic_connection_->connectionSocket()->addressProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>

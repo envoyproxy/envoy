@@ -15,8 +15,10 @@ public:
   ~MockSocket() override;
 
   SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderConstSharedPtr addressProviderSharedPtr() const override {
+  const SocketAddressProviderGetters& addressProvider() const override {
+    return *address_provider_;
+  }
+  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   IoHandle& ioHandle() override;

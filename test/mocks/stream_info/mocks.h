@@ -2,9 +2,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/request_id_extension.h"
-#include "envoy/network/socket.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/network/socket_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
@@ -119,7 +119,7 @@ public:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::SocketAddressProviderSharedPtr downstream_address_provider_;
+  std::shared_ptr<Network::SocketAddressProviderImpl> downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   std::string requested_server_name_;

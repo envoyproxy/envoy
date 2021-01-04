@@ -596,7 +596,8 @@ public:
 };
 
 /**
- * fixfix
+ * This class allows the remote address to be overridden for HTTP stream info. This is used for
+ * XFF handling. This is required to avoid providing stream info with a non-const address provider.
  */
 class OverridableRemoteSocketAddressProviderStreamInfo : public StreamInfo::StreamInfoImpl,
                                                          Network::SocketAddressProviderGetters {
@@ -605,8 +606,8 @@ public:
 
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-    ASSERT(overriden_downstream_remote_address_ == nullptr);
-    overriden_downstream_remote_address_ = downstream_remote_address;
+    ASSERT(overridden_downstream_remote_address_ == nullptr);
+    overridden_downstream_remote_address_ = downstream_remote_address;
   }
 
   // StreamInfo::StreamInfo
@@ -622,8 +623,8 @@ public:
     return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
   }
   const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
-    return overriden_downstream_remote_address_ != nullptr
-               ? overriden_downstream_remote_address_
+    return overridden_downstream_remote_address_ != nullptr
+               ? overridden_downstream_remote_address_
                : StreamInfoImpl::downstreamAddressProvider().remoteAddress();
   }
   const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
@@ -631,7 +632,7 @@ public:
   }
 
 private:
-  Network::Address::InstanceConstSharedPtr overriden_downstream_remote_address_;
+  Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
 };
 
 /**

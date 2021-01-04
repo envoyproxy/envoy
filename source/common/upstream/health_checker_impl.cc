@@ -19,6 +19,7 @@
 #include "common/http/header_utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/socket_impl.h"
+#include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
@@ -216,7 +217,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_address_provider_(std::make_shared<Network::SocketAddressProviderImpl>(
-          std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), nullptr)) {} // fixfix
+          Network::Utility::getCanonicalIpv4LoopbackAddress(),
+          Network::Utility::getCanonicalIpv4LoopbackAddress())) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
