@@ -1206,8 +1206,8 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
     const VirtualClusterStatNames& stat_names)
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
-      VirtualClusterBase(stat_name_storage_->statName(),
-                         scope.scopeFromStatName(stat_name_storage_->statName()), stat_names) {
+      VirtualClusterBase(stat_name_storage_.statName(),
+                         scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
   if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
       virtual_cluster.headers().empty()) {
     throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");

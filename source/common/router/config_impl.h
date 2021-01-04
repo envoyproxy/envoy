@@ -196,8 +196,8 @@ private:
 
   struct StatNameProvider {
     StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
-        : stat_name_storage_(std::make_unique<Stats::StatNameManagedStorage>(name, symbol_table)) {}
-    std::unique_ptr<Stats::StatNameManagedStorage> stat_name_storage_;
+        : stat_name_storage_(name, symbol_table) {}
+    Stats::StatNameManagedStorage stat_name_storage_;
   };
 
   struct VirtualClusterBase : public VirtualCluster {
