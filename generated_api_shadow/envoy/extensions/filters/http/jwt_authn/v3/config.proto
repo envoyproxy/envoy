@@ -68,7 +68,7 @@ message JwtProvider {
   // Note: *JwtRequirement* :ref:`allow_missing <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing>`
   // and :ref:`allow_missing_or_failed <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing_or_failed>`
   // are implemented differently than other *JwtRequirements*. Hence the usage of this field
-  // is different as followings if *allow_missing* or *allow_missing_or_failed* is used:
+  // is different as follows if *allow_missing* or *allow_missing_or_failed* is used:
   //
   // * If a JWT has *iss* field, it needs to be specified by this field in one of *JwtProviders*.
   // * If a JWT doesn't have *iss* field, one of *JwtProviders* should fill this field empty.
