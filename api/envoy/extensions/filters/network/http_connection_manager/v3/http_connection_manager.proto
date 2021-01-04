@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 42]
+// [#next-free-field: 43]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -551,7 +551,20 @@ message HttpConnectionManager {
   // Without setting this option, incoming requests with host `example:443` will not match against
   // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
-  bool strip_matching_host_port = 39;
+  // Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.
+  bool strip_matching_host_port = 39
+      [(udpa.annotations.field_migrate).oneof_promotion = "strip_port_mode"];
+
+  oneof strip_port_mode {
+    // Determines if the port part should be removed from host/authority header before any processing
+    // of request by HTTP filters or routing. The port would be removed only if request method is not CONNECT.
+    // This affects the upstream host header as well.
+    // Without setting this option, incoming requests with host `example:443` will not match against
+    // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
+    // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
+    // Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.
+    bool strip_any_host_port = 42;
+  }
 
   // Governs Envoy's behavior when receiving invalid HTTP from downstream.
   // If this option is false (default), Envoy will err on the conservative side handling HTTP

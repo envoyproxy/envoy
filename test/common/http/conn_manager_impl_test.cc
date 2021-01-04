@@ -723,7 +723,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   setup(false, "");
   // Enable port removal
-  strip_matching_port_ = true;
+  strip_port_type_ = Http::StripPortType::MatchingHost;
   const std::string original_host = "host:443";
   const std::string normalized_host = "host";
 
@@ -765,7 +765,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
 TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   setup(false, "");
   // Enable port removal
-  strip_matching_port_ = true;
+  strip_port_type_ = Http::StripPortType::MatchingHost;
   const std::string original_host = "host:443";
   const std::string normalized_host = "host";
 
