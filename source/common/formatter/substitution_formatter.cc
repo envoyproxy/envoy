@@ -406,7 +406,9 @@ SubstitutionFormatParser::parse(const std::string& format,
     if (formatter) {
       formatters.push_back(std::move(formatter));
     } else {
-      // Try extensions.
+      // Check formatter extensions. These are used for anything not provided by the built-in
+      // operators, e.g.: specialized formatting, computing stats from request/response headers
+      // or from stream info, etc.
       bool added = false;
       for (const auto& cmd : commands) {
         auto formatter = cmd->parse(token, pos, command_end_position);
