@@ -541,11 +541,17 @@ The following command operators are supported:
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See START_TIME for additional format specifiers and examples.
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See START_TIME for additional format specifiers and examples.
 
 %HOSTNAME%
   The system hostname.
