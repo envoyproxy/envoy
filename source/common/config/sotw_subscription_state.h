@@ -39,7 +39,7 @@ public:
   // understanding of the current protocol state, and new resources that Envoy wants to request.
   // Returns a new'd pointer, meant to be owned by the caller.
   void* getNextRequestAckless() override;
-  // The WithAck version first calls the Ackless version, then adds in the passed-in ack.
+  // The WithAck version first calls the ack-less version, then adds in the passed-in ack.
   // Returns a new'd pointer, meant to be owned by the caller.
   void* getNextRequestWithAck(const UpdateAck& ack) override;
 
