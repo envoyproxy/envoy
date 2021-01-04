@@ -147,10 +147,6 @@ public:
   }
 
   void expectResponseBodyRewrite(const std::string& code, bool empty_body, bool enable_wrap_body) {
-    if (!enable_wrap_body) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.lua_always_wrap_body", "false");
-    }
-
     initializeFilter(code);
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -996,7 +992,8 @@ typed_config:
   testRewriteResponse(FILTER_AND_CODE);
 }
 
-// Rewrite response buffer, without original upstream response body.
+// Rewrite response buffer, without original upstream response body
+// and always warp body.
 TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBody) {
   const std::string FILTER_AND_CODE =
       R"EOF(
@@ -1005,7 +1002,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
-      local content_length = response_handle:body():setBytes("ok")
+      local content_length = response_handle:body(true):setBytes("ok")
       response_handle:logTrace(content_length)
 
       response_handle:headers():replace("content-length", content_length)
@@ -1016,7 +1013,7 @@ typed_config:
 }
 
 // Rewrite response buffer, without original upstream response body
-// and disable lua_always_wrap_body feature.
+// and don't always wrap body.
 TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBodyAndDisableWrapBody) {
   const std::string FILTER_AND_CODE =
       R"EOF(
@@ -1025,7 +1022,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
   inline_code: |
     function envoy_on_response(response_handle)
-      if response_handle:body() then
+      if response_handle:body(false) then
         local content_length = response_handle:body():setBytes("ok")
         response_handle:logTrace(content_length)
         response_handle:headers():replace("content-length", content_length)

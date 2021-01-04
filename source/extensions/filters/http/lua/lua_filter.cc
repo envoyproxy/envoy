@@ -11,7 +11,6 @@
 #include "common/config/datasource.h"
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
-#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/escaping.h"
 
@@ -419,6 +418,13 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
 int StreamHandleWrapper::luaBody(lua_State* state) {
   ASSERT(state_ == State::Running);
 
+  int always_wrap_body = 0;
+
+  if (lua_gettop(state) >= 2) {
+    luaL_checktype(state, 2, LUA_TBOOLEAN);
+    always_wrap_body = lua_toboolean(state, 2);
+  }
+
   if (end_stream_) {
     if (!buffered_body_ && saw_body_) {
       return luaL_error(state, "cannot call body() after body has been streamed");
@@ -429,7 +435,7 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
         if (callbacks_.bufferedBody() == nullptr) {
           ENVOY_LOG(debug, "end stream. no body");
 
-          if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.lua_always_wrap_body")) {
+          if (!always_wrap_body) {
             return 0;
           }
 
