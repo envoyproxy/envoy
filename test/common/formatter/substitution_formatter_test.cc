@@ -2195,12 +2195,53 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    // Various START_TIME formats
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
     time_t expected_time_in_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                    expected_time_in_epoch),
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    // Various DOWNSTREAM_PEER_CERT_V_START formats (similar to START_TIME)
+    const std::string format =
+        "%DOWNSTREAM_PEER_CERT_V_START(%Y/%m/"
+        "%d)%|%DOWNSTREAM_PEER_CERT_V_START(%s)%|%DOWNSTREAM_PEER_CERT_V_START(bad_format)%|"
+        "%DOWNSTREAM_PEER_CERT_V_START%|%DOWNSTREAM_PEER_CERT_V_START(%f.%1f.%2f.%3f)%";
+
+    time_t expected_time_in_epoch = 1522280158;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                    expected_time_in_epoch),
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    // Various DOWNSTREAM_PEER_CERT_V_END formats (similar to START_TIME)
+    const std::string format =
+        "%DOWNSTREAM_PEER_CERT_V_END(%Y/%m/"
+        "%d)%|%DOWNSTREAM_PEER_CERT_V_END(%s)%|%DOWNSTREAM_PEER_CERT_V_END(bad_format)%|"
+        "%DOWNSTREAM_PEER_CERT_V_END%|%DOWNSTREAM_PEER_CERT_V_END(%f.%1f.%2f.%3f)%";
+
+    time_t expected_time_in_epoch = 1522280158;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
+    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     FormatterImpl formatter(format, false);
 
     EXPECT_EQ(
