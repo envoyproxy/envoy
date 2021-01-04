@@ -881,6 +881,7 @@ pkey
 plaintext
 pluggable
 pointee
+polymorphism
 popen
 pos
 posix

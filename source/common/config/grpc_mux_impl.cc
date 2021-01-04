@@ -366,12 +366,14 @@ void GrpcMuxSotw::maybeUpdateQueueSizeStat(uint64_t size) {
 bool GrpcMuxSotw::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
 bool GrpcMuxSotw::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
-Watch* NullGrpcMuxImpl::addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                  OpaqueResourceDecoder&, std::chrono::milliseconds, const bool) {
+Watch* NullGrpcMuxImpl::addWatch(const std::string&, const std::set<std::string>&,
+                                 SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                                 std::chrono::milliseconds, const bool) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 
-void NullGrpcMuxImpl::updateWatch(const std::string&, Watch*, const std::set<std::string>&, const bool) {
+void NullGrpcMuxImpl::updateWatch(const std::string&, Watch*, const std::set<std::string>&,
+                                  const bool) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 

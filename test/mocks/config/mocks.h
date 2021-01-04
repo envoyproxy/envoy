@@ -108,7 +108,7 @@ public:
   MOCK_METHOD(ScopedResume, pause, (const std::string& type_url), (override));
   MOCK_METHOD(ScopedResume, pause, (const std::vector<std::string> type_urls), (override));
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
-  MOCK_METHOD0(disableInitFetchTimeoutTimer, void());
+  MOCK_METHOD(void, disableInitFetchTimeoutTimer, ());
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const std::string& type_url, const std::set<std::string>& add_these_names));
 };
