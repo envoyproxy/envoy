@@ -62,7 +62,16 @@ public:
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 
   /**
-   *  Handle builtin commands.
+   * Return a FormatterProviderPtr if a built-in command is parsed from the token. This method
+   * handles mapping the command name to an appropriate formatter after parsing.
+   *
+   * TODO(rgs1): this can be refactored into a dispatch table using the command name as the key and
+   * the parsing parameters as the value.
+   *
+   * @param token the token to parse
+   * @param pos current position in the entire format string
+   * @param command_end_position position at the end of the command token
+   * @return FormattterProviderPtr substitution provider for the parsed command or nullptr
    */
   static FormatterProviderPtr parseBuiltinCommand(const std::string& token, size_t pos,
                                                   int command_end_position);
