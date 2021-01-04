@@ -14,7 +14,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/http/http3:50.0"
 "source/common/init:96.4"
 "source/common/json:90.6"
-"source/common/network:95.3"
+"source/common/network:95.1"
 "source/common/protobuf:94.6"
 "source/common/signal:84.5" # Death tests don't report LCOV
 "source/common/singleton:95.1"
@@ -26,7 +26,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions:96.3"
 "source/extensions/common/crypto:91.5"
 "source/extensions/common/tap:95.9"
-"source/extensions/common/wasm:95.4"
+"source/extensions/common/wasm:95.3"
 "source/extensions/common/wasm/null:77.8"
 "source/extensions/common/wasm/v8:85.4"
 "source/extensions/common:94.4"
