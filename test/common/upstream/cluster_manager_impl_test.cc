@@ -4179,7 +4179,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
                 ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &lb_context));
 }
 
-class PrefetchTest : public ClusterManagerImplTest {
+class PreconnectTest : public ClusterManagerImplTest {
 public:
   void initialize(float ratio) {
     const std::string yaml = R"EOF(
@@ -4197,8 +4197,8 @@ public:
     if (ratio != 0) {
       config.mutable_static_resources()
           ->mutable_clusters(0)
-          ->mutable_prefetch_policy()
-          ->mutable_predictive_prefetch_ratio()
+          ->mutable_preconnect_policy()
+          ->mutable_predictive_preconnect_ratio()
           ->set_value(ratio);
     }
     create(config);
@@ -4231,8 +4231,8 @@ public:
   HostSharedPtr host2_;
 };
 
-TEST_F(PrefetchTest, PrefetchOff) {
-  // With prefetch set to 0, each request for a connection pool will only
+TEST_F(PreconnectTest, PreconnectOff) {
+  // With preconnect set to 0, each request for a connection pool will only
   // allocate that conn pool.
   initialize(0);
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
@@ -4248,9 +4248,9 @@ TEST_F(PrefetchTest, PrefetchOff) {
       ->tcpConnPool(ResourcePriority::Default, nullptr);
 }
 
-TEST_F(PrefetchTest, PrefetchOn) {
-  // With prefetch set to 1.1, each request for a connection pool will kick off
-  // prefetching, so create the pool for both the current connection and the
+TEST_F(PreconnectTest, PreconnectOn) {
+  // With preconnect set to 1.1, each request for a connection pool will kick off
+  // preconnecting, so create the pool for both the current connection and the
   // anticipated one.
   initialize(1.1);
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
