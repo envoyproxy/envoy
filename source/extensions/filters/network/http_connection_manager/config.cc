@@ -264,6 +264,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = absl::nullopt;
   }
 
+  if (config.strip_any_host_port() && config.strip_matching_host_port()) {
+    throw EnvoyException(fmt::format(
+        "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
+  }
+
   if (config.strip_any_host_port()) {
     strip_port_type_ = Http::StripPortType::Any;
   } else if (config.strip_matching_host_port()) {

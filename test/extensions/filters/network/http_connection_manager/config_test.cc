@@ -1062,6 +1062,27 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
   EXPECT_EQ(Http::StripPortType::MatchingHost, config.stripPortType());
 }
 
+// Validated that when both strip options are configured, we throw exception.
+TEST_F(HttpConnectionManagerConfigTest, BothStripOptionsAreSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_matching_host_port: true
+  strip_any_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException,
+      "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.");
+}
+
 // Validated that when explicitly set false, we don't remove port.
 TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
   const std::string yaml_string = R"EOF(
