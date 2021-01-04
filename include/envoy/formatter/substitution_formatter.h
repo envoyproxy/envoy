@@ -79,10 +79,22 @@ public:
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
 
+/**
+ * Interface for command parser.
+ * CommandParser returns a FormatterProviderPtr after successfully parsing an access log format
+ * token, nullptr otherwise.
+ */
 class CommandParser {
 public:
   virtual ~CommandParser() = default;
 
+  /**
+   * Return a FormatterProviderPtr if this command is parsed from the token.
+   * @param token the token to parse
+   * @param pos current position in the entire format string
+   * @param command_end_position position at the end of the command token
+   * @return FormattterProviderPtr substitution provider for the parsed command
+   */
   virtual FormatterProviderPtr parse(const std::string& token, size_t pos,
                                      int command_end_position) const PURE;
 };
@@ -100,9 +112,9 @@ public:
   /**
    * Creates a particular CommandParser implementation.
    *
-   * @param config supplies the configuration for the action.
-   * @param context supplies the GuardDog Action's context.
-   * @return FatalActionsPtr the FatalActions object.
+   * @param config supplies the configuration for the command parser.
+   * @return CommandParserPtr the CommandParser which will be used in
+   * SubstitutionFormatParser::parse() when evaluating an access log format string.
    */
   virtual CommandParserPtr createCommandParserFromProto(const Protobuf::Message& config) PURE;
 
