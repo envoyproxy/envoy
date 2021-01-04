@@ -20,7 +20,7 @@ using ::testing::WithArgs;
 // Decoder mock.
 class MockDecoderTest : public Decoder {
 public:
-  MOCK_METHOD(bool, onData, (Buffer::Instance&, bool), (override));
+  MOCK_METHOD(Decoder::Result, onData, (Buffer::Instance&, bool), (override));
   MOCK_METHOD(PostgresSession&, getSession, (), (override));
 };
 
@@ -79,22 +79,22 @@ TEST_P(PostgresFilterTest, ReadData) {
 
   // Simulate reading entire buffer.
   EXPECT_CALL(*decoderPtr, onData)
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
+      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(data.length());
-        return true;
+        return Decoder::ReadyForNext;
       })));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
 
   // Simulate reading entire data in two steps.
   EXPECT_CALL(*decoderPtr, onData)
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
+      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
-        return true;
+        return Decoder::ReadyForNext;
       })))
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
+      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(156);
-        return true;
+        return Decoder::ReadyForNext;
       })));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
@@ -103,17 +103,17 @@ TEST_P(PostgresFilterTest, ReadData) {
   // for the third one there was not enough data. There should be 56 bytes
   // of unprocessed data.
   EXPECT_CALL(*decoderPtr, onData)
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
+      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
-        return true;
+        return Decoder::ReadyForNext;
       })))
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
+      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
-        return true;
+        return Decoder::ReadyForNext;
       })))
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> bool {
+      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(0);
-        return false;
+        return Decoder::NeedMoreData;
       })));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 56);
@@ -291,8 +291,8 @@ TEST_F(PostgresFilterTest, NoticeMsgsStats) {
 TEST_F(PostgresFilterTest, EncryptedSessionStats) {
   data_.writeBEInt<uint32_t>(8);
   // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
-  data_.writeBEInt<uint32_t>(80877103); // SSL code.
-  filter_->onData(data_, false);
+  data_.writeBEInt<uint32_t>(80877104); // SSL code.
+  ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, true));
   ASSERT_THAT(filter_->getStats().sessions_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 1);
 }
@@ -305,7 +305,7 @@ TEST_F(PostgresFilterTest, MetadataIncorrectSQL) {
   setMetadata();
 
   createPostgresMsg(data_, "Q", "BLAH blah blah");
-  filter_->onData(data_, false);
+  ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, true));
 
   // SQL statement was wrong. No metadata should have been created.
   ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
@@ -325,7 +325,7 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   // Disable creating parsing SQL and creating metadata.
   filter_->getConfig()->enable_sql_parsing_ = false;
   createPostgresMsg(data_, "Q", "SELECT * FROM whatever");
-  filter_->onData(data_, false);
+  ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
 
   ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
                   NetworkFilterNames::get().PostgresProxy),
@@ -335,7 +335,7 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
 
   // Now enable SQL parsing and creating metadata.
   filter_->getConfig()->enable_sql_parsing_ = true;
-  filter_->onData(data_, false);
+  ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
 
   auto& filter_meta = filter_->connection().streamInfo().dynamicMetadata().filter_metadata().at(
       NetworkFilterNames::get().PostgresProxy);
@@ -349,6 +349,35 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
 
   ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 0);
   ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 1);
+}
+
+// Test verifies that filter reacts to RequestSSL message.
+// It should reply with "S" message and OnData should return
+// Decoder::Stopped.
+TEST_F(PostgresFilterTest, TerminateSSL) {
+  filter_->getConfig()->terminate_ssl_ = true;
+  EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  Network::Connection::BytesSentCb cb;
+  EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
+  Buffer::OwnedImpl buf;
+  EXPECT_CALL(connection_, write(_, false)).WillOnce(testing::SaveArg<0>(&buf));
+  data_.writeBEInt<uint32_t>(8);
+  // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
+  data_.writeBEInt<uint32_t>(80877103); // SSL code.
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  ASSERT_THAT('S', buf.peekBEInt<char>(0));
+
+  // Now indicate through the callback that 1 bytes has been sent.
+  // Filter should call startSecureTransport and should not close the connection.
+  EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  cb(1);
+
+  // Call callback again, but this time indicate that startSecureTransport failed.
+  // Filter should close the connection.
+  EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(false));
+  EXPECT_CALL(connection_, close(_));
+  cb(1);
 }
 
 } // namespace PostgresProxy

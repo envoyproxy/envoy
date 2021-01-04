@@ -29,9 +29,12 @@ Network::FilterStatus PostgresFilter::onData(Buffer::Instance& data, bool) {
 
   // Frontend Buffer
   frontend_buffer_.add(data);
-  doDecode(frontend_buffer_, true);
-
-  return Network::FilterStatus::Continue;
+  Network::FilterStatus result = doDecode(frontend_buffer_, true);
+  if (result == Network::FilterStatus::StopIteration) {
+    ASSERT(frontend_buffer_.length() == 0);
+    data.drain(data.length());
+  }
+  return result;
 }
 
 Network::FilterStatus PostgresFilter::onNewConnection() { return Network::FilterStatus::Continue; }
@@ -45,9 +48,7 @@ Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
-  doDecode(backend_buffer_, false);
-
-  return Network::FilterStatus::Continue;
+  return doDecode(backend_buffer_, false);
 }
 
 DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
@@ -186,12 +187,49 @@ void PostgresFilter::processQuery(const std::string& sql) {
   }
 }
 
-void PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
+bool PostgresFilter::onSSLRequest() {
+  if (!config_->terminate_ssl_) {
+    // Signal to the decoder to continue.
+    return true;
+  }
+  // Send single bytes 'S' to indicate switch to TLS.
+  Buffer::OwnedImpl buf;
+  buf.add("S");
+  // Add callback to be notified when the reply message has been
+  // transmitted.
+  read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
+    // Wait until 'S' has been transmitted.
+    if (bytes >= 1) {
+      if (!read_callbacks_->connection().startSecureTransport()) {
+        ENVOY_CONN_LOG(info, "postgres_proxy: cannot enable secure transport. Check configuration.",
+                       read_callbacks_->connection());
+        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      }
+      // Unsubscribe the callback.
+      // Switch to tls has been completed.
+      return false;
+    }
+    return true;
+  });
+  read_callbacks_->connection().write(buf, false);
+
+  return false;
+}
+
+Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says
   // that it cannot process data in the buffer.
-  while ((0 < data.length()) && (decoder_->onData(data, frontend))) {
-    ;
+  while (0 < data.length()) {
+    switch (decoder_->onData(data, frontend)) {
+    case Decoder::NeedMoreData:
+      return Network::FilterStatus::Continue;
+    case Decoder::ReadyForNext:
+      continue;
+    case Decoder::Stopped:
+      return Network::FilterStatus::StopIteration;
+    }
   }
+  return Network::FilterStatus::Continue;
 }
 
 } // namespace PostgresProxy

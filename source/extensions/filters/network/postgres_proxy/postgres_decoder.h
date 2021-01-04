@@ -43,6 +43,8 @@ public:
   virtual void incErrors(ErrorType) PURE;
 
   virtual void processQuery(const std::string&) PURE;
+
+  virtual bool onSSLRequest() PURE;
 };
 
 // Postgres message decoder.
@@ -50,7 +52,8 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
+  enum Result { ReadyForNext, NeedMoreData, Stopped };
+  virtual Result onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
 
   const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
@@ -69,7 +72,7 @@ class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
   DecoderImpl(DecoderCallbacks* callbacks) : callbacks_(callbacks) { initialize(); }
 
-  bool onData(Buffer::Instance& data, bool frontend) override;
+  Result onData(Buffer::Instance& data, bool frontend) override;
   PostgresSession& getSession() override { return session_; }
 
   std::string getMessage() { return message_; }
@@ -121,7 +124,7 @@ protected:
     MsgAction unknown_;
   };
 
-  bool parseHeader(Buffer::Instance& data);
+  Result parseHeader(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
   void decodeBackendStatements();
