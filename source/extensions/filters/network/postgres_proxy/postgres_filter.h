@@ -63,11 +63,11 @@ struct PostgresProxyStats {
  */
 class PostgresFilterConfig {
 public:
-  PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
+  PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing, bool terminate_ssl,
                        Stats::Scope& scope);
 
   bool enable_sql_parsing_{true};
-  bool terminate_ssl_{true};
+  bool terminate_ssl_{false};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 

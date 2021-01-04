@@ -31,7 +31,7 @@ class PostgresFilterTest
                      std::function<uint32_t(const PostgresFilter*)>>> {
 public:
   PostgresFilterTest() {
-    config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, true, scope_);
+    config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, true, false, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
 
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
