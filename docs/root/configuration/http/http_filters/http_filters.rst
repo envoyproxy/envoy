@@ -42,6 +42,7 @@ HTTP filters
   router_filter
   squash_filter
   tap_filter
+  tcp_post_filter
   wasm_filter
 
 .. TODO(toddmgreer): Remove this hack and add user-visible CacheFilter docs when CacheFilter is production-ready.
