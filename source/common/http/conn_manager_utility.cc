@@ -8,6 +8,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
@@ -427,7 +428,9 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
 void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config,
                                                   uint32_t port) {
-  if (config.shouldStripMatchingPort()) {
+  if (config.stripPortType() == Http::StripPortType::Any) {
+    HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
+  } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
     HeaderUtility::stripPortFromHost(request_headers, port);
   }
 }
