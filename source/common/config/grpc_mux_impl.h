@@ -228,15 +228,9 @@ public:
   void disableInitFetchTimeoutTimer() override {}
 
   Watch* addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                  OpaqueResourceDecoder&, std::chrono::milliseconds, const bool) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-  void updateWatch(const std::string&, Watch*, const std::set<std::string>&, const bool) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-  void removeWatch(const std::string&, Watch*) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
+                  OpaqueResourceDecoder&, std::chrono::milliseconds, const bool) override;
+  void updateWatch(const std::string&, Watch*, const std::set<std::string>&, const bool) override;
+  void removeWatch(const std::string&, Watch*) override; 
 
   void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;

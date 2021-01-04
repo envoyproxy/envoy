@@ -79,9 +79,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                      api_config_source, scope, true)
                   ->create(),
               dispatcher_, sotwGrpcMethod(type_url, transport_api_version), transport_api_version,
-	      api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_,
-              api_config_source.set_node_on_first_message_only()),
+              api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
+              local_info_, api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
           Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);
@@ -91,10 +90,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
                   ->create(),
-              dispatcher_, deltaGrpcMethod(type_url, transport_api_version),
-              transport_api_version, api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_,
-              api_config_source.set_node_on_first_message_only()),
+              dispatcher_, deltaGrpcMethod(type_url, transport_api_version), transport_api_version,
+              api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
+              local_info_, api_config_source.set_node_on_first_message_only()),
           type_url, callbacks, resource_decoder, stats, dispatcher_.timeSource(),
           Utility::configSourceInitialFetchTimeout(config), false);
     }

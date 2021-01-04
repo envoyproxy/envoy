@@ -333,7 +333,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                     "DeltaAggregatedResources"),
           Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-	  dyn_resources.ads_config().set_node_on_first_message_only());
+          dyn_resources.ads_config().set_node_on_first_message_only());
     } else {
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.legacy_sotw_xds")) {
         ads_mux_ = std::make_shared<Config::LegacyGrpcMuxImpl>(
@@ -352,8 +352,8 @@ ClusterManagerImpl::ClusterManagerImpl(
                       "StreamAggregatedResources"
                     : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                       "StreamAggregatedResources"),
-            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
-            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_,
+            stats_, Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxSotw>(
@@ -371,8 +371,9 @@ ClusterManagerImpl::ClusterManagerImpl(
                       "StreamAggregatedResources"
                     : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                       "StreamAggregatedResources"),
-            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
-            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_,
+            stats_, Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
       }
     }

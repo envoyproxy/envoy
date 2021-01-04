@@ -40,7 +40,7 @@ public:
         async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(1);
+    EXPECT_CALL(dispatcher_, createTimer_(_));
     grpc_mux_ = std::make_shared<GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,

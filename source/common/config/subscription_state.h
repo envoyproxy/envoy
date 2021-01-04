@@ -49,7 +49,7 @@ public:
   // Returns a new'd pointer, meant to be owned by the caller, who is expected to know what type the
   // pointer actually is.
   virtual void* getNextRequestAckless() PURE;
-  // The WithAck version first calls the Ackless version, then adds in the passed-in ack.
+  // The WithAck version first calls the ack-less version, then adds in the passed-in ack.
   // Returns a new'd pointer, meant to be owned by the caller, who is expected to know what type the
   // pointer actually is.
   virtual void* getNextRequestWithAck(const UpdateAck& ack) PURE;
