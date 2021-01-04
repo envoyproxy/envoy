@@ -382,60 +382,53 @@ private:
 };
 
 /**
- * FormatterProvider for request start time from StreamInfo.
+ * Base FormatterProvider for system times from StreamInfo.
  */
-class StartTimeFormatter : public FormatterProvider {
+class SystemTimeFormatter : public FormatterProvider {
+public:
+  using TimeFieldExtractor =
+      std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
+  using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
+
+  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+
+private:
+  const Envoy::DateFormatter date_formatter_;
+  const TimeFieldExtractorPtr time_field_extractor_;
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for request start time from StreamInfo.
+ */
+class StartTimeFormatter : public SystemTimeFormatter {
 public:
   StartTimeFormatter(const std::string& format);
-
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
-
-private:
-  const Envoy::DateFormatter date_formatter_;
 };
 
 /**
- * FormatterProvider for downstream cert start time from ConnectionInfo.
+ * SystemTimeFormatter (FormatterProvider) for downstream cert start time from the StreamInfo's
+ * ConnectionInfo.
  */
-class DownstreamPeerCertVStartFormatter : public FormatterProvider {
+class DownstreamPeerCertVStartFormatter : public SystemTimeFormatter {
 public:
   DownstreamPeerCertVStartFormatter(const std::string& format);
-
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
-
-private:
-  const Envoy::DateFormatter date_formatter_;
 };
 
 /**
- * FormatterProvider for downstream cert end time from ConnectionInfo.
+ * SystemTimeFormatter (FormatterProvider) for downstream cert end time from the StreamInfo's
+ * ConnectionInfo.
  */
-class DownstreamPeerCertVEndFormatter : public FormatterProvider {
+class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
 public:
   DownstreamPeerCertVEndFormatter(const std::string& format);
-
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
-
-private:
-  const Envoy::DateFormatter date_formatter_;
 };
 
 } // namespace Formatter

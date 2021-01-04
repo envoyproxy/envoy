@@ -370,45 +370,24 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
         formatters.push_back(
             std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
       } else if (absl::StartsWith(token, "START_TIME")) {
-        const size_t parameters_length = pos + StartTimeParamStart + 1;
-        const size_t parameters_end = command_end_position - parameters_length;
-
+        const size_t parameters_end = token.length() - (StartTimeParamStart + 1);
         const std::string args = token[StartTimeParamStart - 1] == '('
                                      ? token.substr(StartTimeParamStart, parameters_end)
                                      : "";
-        // Validate the input specifier here. The formatted string may be destined for a header, and
-        // should not contain invalid characters {NUL, LR, CF}.
-        if (std::regex_search(args, getDateFormatNewlinePattern())) {
-          throw EnvoyException("Invalid header configuration. Format string contains newline.");
-        }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
-        const size_t parameters_length = pos + DownstreamPeerCertVStartParamStart + 1;
-        const size_t parameters_end = command_end_position - parameters_length;
-
+        const size_t parameters_end = token.length() - (DownstreamPeerCertVStartParamStart + 1);
         const std::string args =
             token[DownstreamPeerCertVStartParamStart - 1] == '('
                 ? token.substr(DownstreamPeerCertVStartParamStart, parameters_end)
                 : "";
-        // Validate the input specifier here. The formatted string may be destined for a header, and
-        // should not contain invalid characters {NUL, LR, CF}.
-        if (std::regex_search(args, getDateFormatNewlinePattern())) {
-          throw EnvoyException("Invalid header configuration. Format string contains newline.");
-        }
         formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVStartFormatter(args)});
       } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
-        const size_t parameters_length = pos + DownstreamPeerCertVEndParamStart + 1;
-        const size_t parameters_end = command_end_position - parameters_length;
-
+        const size_t parameters_end = token.length() - (DownstreamPeerCertVEndParamStart + 1);
         const std::string args =
             token[DownstreamPeerCertVEndParamStart - 1] == '('
                 ? token.substr(DownstreamPeerCertVEndParamStart, parameters_end)
                 : "";
-        // Validate the input specifier here. The formatted string may be destined for a header, and
-        // should not contain invalid characters {NUL, LR, CF}.
-        if (std::regex_search(args, getDateFormatNewlinePattern())) {
-          throw EnvoyException("Invalid header configuration. Format string contains newline.");
-        }
         formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVEndFormatter(args)});
       } else if (absl::StartsWith(token, "GRPC_STATUS")) {
         formatters.emplace_back(FormatterProviderPtr{
@@ -798,26 +777,6 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.urlEncodedPemEncodedPeerCertificate();
         });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          absl::optional<SystemTime> time = connection_info.validFromPeerCertificate();
-          absl::optional<std::string> result;
-          if (time.has_value()) {
-            result = AccessLogDateTimeFormatter::fromTime(time.value());
-          }
-          return result;
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          absl::optional<SystemTime> time = connection_info.expirationPeerCertificate();
-          absl::optional<std::string> result;
-          if (time.has_value()) {
-            result = AccessLogDateTimeFormatter::fromTime(time.value());
-          }
-          return result;
-        });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
@@ -1159,66 +1118,53 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   return val;
 }
 
-StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
+// A SystemTime formatter that extracts the startTime from StreamInfo
+StartTimeFormatter::StartTimeFormatter(const std::string& format)
+    : SystemTimeFormatter(
+          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        return stream_info.startTime();
+                      })) {}
 
-absl::optional<std::string> StartTimeFormatter::format(const Http::RequestHeaderMap&,
-                                                       const Http::ResponseHeaderMap&,
-                                                       const Http::ResponseTrailerMap&,
-                                                       const StreamInfo::StreamInfo& stream_info,
-                                                       absl::string_view) const {
-  if (date_formatter_.formatString().empty()) {
-    return AccessLogDateTimeFormatter::fromTime(stream_info.startTime());
-  }
-  return date_formatter_.fromTime(stream_info.startTime());
-}
-
-ProtobufWkt::Value StartTimeFormatter::formatValue(
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
-  return ValueUtil::optionalStringValue(
-      format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
-}
-
+// A SystemTime formatter that optionally extracts the start date from the downstream peer's
+// certificate
 DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::string& format)
-    : date_formatter_(format) {}
+    : SystemTimeFormatter(
+          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        const auto connection_info = stream_info.downstreamSslConnection();
+                        return connection_info != nullptr
+                                   ? connection_info->validFromPeerCertificate()
+                                   : absl::optional<SystemTime>();
+                      })) {}
 
-absl::optional<std::string> DownstreamPeerCertVStartFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
-  const auto connection_info = stream_info.downstreamSslConnection();
-  if (connection_info == nullptr) {
-    return absl::optional<std::string>();
-  }
-  const auto time_field = connection_info->validFromPeerCertificate();
-  if (!time_field.has_value()) {
-    return absl::optional<std::string>();
-  }
-  if (date_formatter_.formatString().empty()) {
-    return AccessLogDateTimeFormatter::fromTime(time_field.value());
-  }
-  return date_formatter_.fromTime(time_field.value());
-}
-
-ProtobufWkt::Value DownstreamPeerCertVStartFormatter::formatValue(
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
-  return ValueUtil::optionalStringValue(
-      format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
-}
-
+// A SystemTime formatter that optionally extracts the end date from the downstream peer's
+// certificate
 DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::string& format)
-    : date_formatter_(format) {}
+    : SystemTimeFormatter(
+          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        const auto connection_info = stream_info.downstreamSslConnection();
+                        return connection_info != nullptr
+                                   ? connection_info->expirationPeerCertificate()
+                                   : absl::optional<SystemTime>();
+                      })) {}
 
-absl::optional<std::string> DownstreamPeerCertVEndFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
-  const auto connection_info = stream_info.downstreamSslConnection();
-  if (connection_info == nullptr) {
-    return absl::optional<std::string>();
+SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f)
+    : date_formatter_(format), time_field_extractor_(std::move(f)) {
+  // Validate the input specifier here. The formatted string may be destined for a header, and
+  // should not contain invalid characters {NUL, LR, CF}.
+  if (std::regex_search(format, getDateFormatNewlinePattern())) {
+    throw EnvoyException("Invalid header configuration. Format string contains newline.");
   }
-  const auto time_field = connection_info->expirationPeerCertificate();
+}
+
+absl::optional<std::string> SystemTimeFormatter::format(const Http::RequestHeaderMap&,
+                                                        const Http::ResponseHeaderMap&,
+                                                        const Http::ResponseTrailerMap&,
+                                                        const StreamInfo::StreamInfo& stream_info,
+                                                        absl::string_view) const {
+  const auto time_field = (*time_field_extractor_)(stream_info);
   if (!time_field.has_value()) {
     return absl::optional<std::string>();
   }
@@ -1228,7 +1174,7 @@ absl::optional<std::string> DownstreamPeerCertVEndFormatter::format(
   return date_formatter_.fromTime(time_field.value());
 }
 
-ProtobufWkt::Value DownstreamPeerCertVEndFormatter::formatValue(
+ProtobufWkt::Value SystemTimeFormatter::formatValue(
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
     absl::string_view local_reply_body) const {
