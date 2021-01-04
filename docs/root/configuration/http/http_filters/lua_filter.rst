@@ -327,7 +327,7 @@ body()
 
 .. code-block:: lua
 
-  local body = handle:body(always_wrap_body?)
+  local body = handle:body(always_wrap_body)
 
 Returns the stream's body. This call will cause Envoy to suspend execution of the script until
 the entire body has been received in a buffer. Note that all buffering must adhere to the
