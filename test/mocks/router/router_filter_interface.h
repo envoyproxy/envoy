@@ -17,21 +17,23 @@ public:
   ~MockRouterFilterInterface() override;
 
   MOCK_METHOD(void, onUpstream100ContinueHeaders,
-              (Envoy::Http::ResponseHeaderMapPtr && headers, UpstreamRequest& upstream_request));
+              (Envoy::Http::ResponseHeaderMapPtr && headers,
+               RouterUpstreamRequest& upstream_request));
   MOCK_METHOD(void, onUpstreamHeaders,
               (uint64_t response_code, Envoy::Http::ResponseHeaderMapPtr&& headers,
-               UpstreamRequest& upstream_request, bool end_stream));
+               RouterUpstreamRequest& upstream_request, bool end_stream));
   MOCK_METHOD(void, onUpstreamData,
-              (Buffer::Instance & data, UpstreamRequest& upstream_request, bool end_stream));
+              (Buffer::Instance & data, RouterUpstreamRequest& upstream_request, bool end_stream));
   MOCK_METHOD(void, onUpstreamTrailers,
-              (Envoy::Http::ResponseTrailerMapPtr && trailers, UpstreamRequest& upstream_request));
+              (Envoy::Http::ResponseTrailerMapPtr && trailers,
+               RouterUpstreamRequest& upstream_request));
   MOCK_METHOD(void, onUpstreamMetadata, (Envoy::Http::MetadataMapPtr && metadata_map));
   MOCK_METHOD(void, onUpstreamReset,
               (Envoy::Http::StreamResetReason reset_reason, absl::string_view transport_failure,
-               UpstreamRequest& upstream_request));
+               RouterUpstreamRequest& upstream_request));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
-  MOCK_METHOD(void, onPerTryTimeout, (UpstreamRequest & upstream_request));
-  MOCK_METHOD(void, onStreamMaxDurationReached, (UpstreamRequest & upstream_request));
+  MOCK_METHOD(void, onPerTryTimeout, (RouterUpstreamRequest & upstream_request));
+  MOCK_METHOD(void, onStreamMaxDurationReached, (RouterUpstreamRequest & upstream_request));
 
   MOCK_METHOD(Envoy::Http::StreamDecoderFilterCallbacks*, callbacks, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, cluster, ());
