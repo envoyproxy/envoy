@@ -370,23 +370,23 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
         formatters.push_back(
             std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
       } else if (absl::StartsWith(token, "START_TIME")) {
-        const size_t parameters_end = token.length() - (StartTimeParamStart + 1);
+        const size_t parameters_length = token.length() - (StartTimeParamStart + 1);
         const std::string args = token[StartTimeParamStart - 1] == '('
-                                     ? token.substr(StartTimeParamStart, parameters_end)
+                                     ? token.substr(StartTimeParamStart, parameters_length)
                                      : "";
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
-        const size_t parameters_end = token.length() - (DownstreamPeerCertVStartParamStart + 1);
+        const size_t parameters_length = token.length() - (DownstreamPeerCertVStartParamStart + 1);
         const std::string args =
             token[DownstreamPeerCertVStartParamStart - 1] == '('
-                ? token.substr(DownstreamPeerCertVStartParamStart, parameters_end)
+                ? token.substr(DownstreamPeerCertVStartParamStart, parameters_length)
                 : "";
         formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVStartFormatter(args)});
       } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
-        const size_t parameters_end = token.length() - (DownstreamPeerCertVEndParamStart + 1);
+        const size_t parameters_length = token.length() - (DownstreamPeerCertVEndParamStart + 1);
         const std::string args =
             token[DownstreamPeerCertVEndParamStart - 1] == '('
-                ? token.substr(DownstreamPeerCertVEndParamStart, parameters_end)
+                ? token.substr(DownstreamPeerCertVEndParamStart, parameters_length)
                 : "";
         formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVEndFormatter(args)});
       } else if (absl::StartsWith(token, "GRPC_STATUS")) {
