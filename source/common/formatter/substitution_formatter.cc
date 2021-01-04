@@ -409,7 +409,7 @@ SubstitutionFormatParser::parse(const std::string& format,
       // Try extensions.
       bool added = false;
       for (const auto& cmd : commands) {
-        auto formatter = cmd->parse(token);
+        auto formatter = cmd->parse(token, pos, command_end_position);
         if (formatter) {
           formatters.push_back(std::move(formatter));
           added = true;

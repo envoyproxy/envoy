@@ -117,7 +117,7 @@ class TestCommandParser : public CommandParser {
 public:
   TestCommandParser() = default;
 
-  FormatterProviderPtr parse(const std::string& token) const override {
+  FormatterProviderPtr parse(const std::string& token, size_t, int) const override {
     if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
       return std::make_unique<TestFormatter>();
     }
