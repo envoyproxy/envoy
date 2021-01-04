@@ -495,6 +495,10 @@ bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
 
 bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     const Http::RequestOrResponseHeaderMap& headers) const {
+  if (StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                Http::Headers::get().TransferEncodingValues.Chunked)) {
+    return true;
+  }
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length != nullptr) {
     uint64_t length;
@@ -506,9 +510,12 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     }
     return is_minimum_content_length;
   }
-
-  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
-                                   Http::Headers::get().TransferEncodingValues.Chunked);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_compression_without_chunked_header")) {
+    // returning true to account for HTTP/2 where content-length is optional
+    return true;
+  }
+  return false;
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const {
