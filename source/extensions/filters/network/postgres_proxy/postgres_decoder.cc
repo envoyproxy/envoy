@@ -221,6 +221,8 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
         }
       }
 
+      // Count it as recognized frontend message.
+      callbacks_->incMessagesFrontend();
       if (encrypted_) {
         ENVOY_LOG(trace, "postgres_proxy: detected encrypted traffic.");
         incSessionsEncrypted();

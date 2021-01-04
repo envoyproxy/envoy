@@ -364,20 +364,29 @@ TEST_F(PostgresFilterTest, TerminateSSL) {
   data_.writeBEInt<uint32_t>(8);
   // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
   data_.writeBEInt<uint32_t>(80877103); // SSL code.
-  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, true));
   ASSERT_THAT('S', buf.peekBEInt<char>(0));
+  ASSERT_THAT(filter_->getStats().messages_.value(), 1);
+  ASSERT_THAT(filter_->getStats().messages_frontend_.value(), 1);
 
   // Now indicate through the callback that 1 bytes has been sent.
   // Filter should call startSecureTransport and should not close the connection.
   EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
   EXPECT_CALL(connection_, close(_)).Times(0);
   cb(1);
+  // Verify stats. This should not count as encrypted or unencrypted session.
+  ASSERT_THAT(filter_->getStats().sessions_terminated_ssl_.value(), 1);
+  ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 0);
+  ASSERT_THAT(filter_->getStats().sessions_unencrypted_.value(), 0);
 
   // Call callback again, but this time indicate that startSecureTransport failed.
   // Filter should close the connection.
   EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(false));
   EXPECT_CALL(connection_, close(_));
   cb(1);
+  ASSERT_THAT(filter_->getStats().sessions_terminated_ssl_.value(), 1);
+  ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 0);
+  ASSERT_THAT(filter_->getStats().sessions_unencrypted_.value(), 0);
 }
 
 } // namespace PostgresProxy

@@ -204,10 +204,12 @@ bool PostgresFilter::onSSLRequest() {
         ENVOY_CONN_LOG(info, "postgres_proxy: cannot enable secure transport. Check configuration.",
                        read_callbacks_->connection());
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      } else {
+        // Unsubscribe the callback.
+        config_->stats_.sessions_terminated_ssl_.inc();
+        // Switch to tls has been completed.
+        return false;
       }
-      // Unsubscribe the callback.
-      // Switch to tls has been completed.
-      return false;
     }
     return true;
   });

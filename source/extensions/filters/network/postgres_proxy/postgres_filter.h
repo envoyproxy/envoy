@@ -30,6 +30,7 @@ namespace PostgresProxy {
   COUNTER(messages_unknown)                                                                        \
   COUNTER(sessions)                                                                                \
   COUNTER(sessions_encrypted)                                                                      \
+  COUNTER(sessions_terminated_ssl)                                                                 \
   COUNTER(sessions_unencrypted)                                                                    \
   COUNTER(statements)                                                                              \
   COUNTER(statements_insert)                                                                       \
