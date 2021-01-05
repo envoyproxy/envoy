@@ -111,7 +111,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
       First, you need to create the service. Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``. After you create the service you
       can start it.
       
-      From an **administrator** prompt run the following commands:
+      From an **administrator** prompt run the following commands (note that you need envoy-static.exe to be on the PATH or modify the commands bellow with the full path):
 
       .. substitution-code-block:: console
 
