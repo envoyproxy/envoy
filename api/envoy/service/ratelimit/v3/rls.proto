@@ -143,6 +143,6 @@ message RateLimitResponse {
   //
   // - :ref:`envoy.filters.http.ratelimit <config_http_filters_ratelimit_dynamic_metadata>` for HTTP filter.
   // - :ref:`envoy.filters.network.ratelimit <config_network_filters_ratelimit_dynamic_metadata>` for network filter.
-  // - :ref:`envoy.filters.thrift.rate_limit <config_network_filters_ratelimit_dynamic_metadata>` for Thrift filter.
+  // - :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit_dynamic_metadata>` for Thrift filter.
   google.protobuf.Struct dynamic_metadata = 6;
 }
