@@ -1980,19 +1980,25 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   context_->incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
   Stats::CounterOptConstRef cipher =
       store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
-  ASSERT_TRUE(cipher);
+  ASSERT_TRUE(cipher.has_value());
   EXPECT_EQ(1, cipher->get().value());
 
   // Incrementing a stat for a random unknown cipher does not work. A
   // rate-limited error log message will also be generated but that is hard to
   // test as it is dependent on timing and test-ordering.
-  context_->incCounter("ssl.ciphers", "unexpected");
+  EXPECT_DEBUG_DEATH(context_->incCounter("ssl.ciphers", "unexpected"),
+                     "Unexpected ssl.ciphers value: unexpected");
   EXPECT_FALSE(store_.findCounterByString("ssl.ciphers.unexpected"));
 
-  // We will account for the 'unexpected' cipher as "fallback".
+  // We will account for the 'unexpected' cipher as "fallback", however in debug
+  // mode that will not work as the ENVOY_BUG macro will assert first, thus the
+  // fallback registration does not occur. So we test for the fallback only in
+  // release builds.
+#ifdef NDEBUG
   cipher = store_.findCounterByString("ssl.ciphers.fallback");
-  ASSERT_TRUE(cipher);
+  ASSERT_TRUE(cipher.has_value());
   EXPECT_EQ(1, cipher->get().value());
+#endif
 }
 
 } // namespace Tls

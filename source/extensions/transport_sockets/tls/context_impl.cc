@@ -467,7 +467,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   for (TlsContext& tls_context : tls_contexts_) {
     for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
       stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
-      ENVOY_LOG_MISC(error, SSL_CIPHER_get_name(cipher));
     }
   }
 
@@ -479,15 +478,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
   //
-  // We include these in case there are implicit ones available in the library,
-  // and we include the configured ones below to cover any new ones that are
-  // added to the library and configured by users. There is no harm in
-  // specifying any of these multiple times.
+  // Note that if a curve is configured outside this set, we'll issue an ENVOY_BUG so
+  // it will hopefully be caught.
   stat_name_set_->rememberBuiltins(
       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
-  for (absl::string_view curve : absl::StrSplit(config.ecdhCurves(), ':')) {
-    stat_name_set_->rememberBuiltin(curve);
-  }
 
   // Algorithms
   stat_name_set_->rememberBuiltins({"ecdsa_secp256r1_sha256", "rsa_pss_rsae_sha256"});
@@ -645,16 +639,9 @@ Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
                              const Stats::StatName fallback) const {
   const Stats::StatName value_stat_name = stat_name_set_->getBuiltin(value, fallback);
-  if (value_stat_name == fallback) {
-    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::minutes(1), "Unexpected {} value: {}",
-                            scope_.symbolTable().toString(name), value);
-  }
+  ENVOY_BUG(value_stat_name != fallback,
+            absl::StrCat("Unexpected ", scope_.symbolTable().toString(name), " value: ", value));
   Stats::Utility::counterFromElements(scope_, {name, value_stat_name}).inc();
-
-#ifdef LOG_BUILTIN_STAT_NAMES
-  std::cerr << absl::StrCat("Builtin ", scope_.symbolTable().toString(name), ": ", value, "\n")
-            << std::flush;
-#endif
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
