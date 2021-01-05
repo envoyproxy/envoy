@@ -113,6 +113,8 @@ TagNameValues::TagNameValues() {
   addRe2(CLUSTER_NAME, R"(^cluster\.((<NAME>)\.))");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
+  // The <address> part can be anything here (.*?) for the sake of a simpler
+  // internal state of the regex which performs better.
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<NAME>)\.))", ".http.");
 
   // http.(<stat_prefix>.)*
