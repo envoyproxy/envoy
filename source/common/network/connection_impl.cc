@@ -18,6 +18,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -758,7 +759,11 @@ ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                                            TransportSocketPtr&& transport_socket,
                                            StreamInfo::StreamInfo& stream_info, bool connected)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected) {}
+                     connected) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    noDelay(true);
+  }
+}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
   if (!transport_connect_pending_) {
@@ -836,6 +841,9 @@ void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
   const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
   if (result.rc_ == 0) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+      noDelay(true);
+    }
     // write will become ready.
     ASSERT(connecting_);
   } else {

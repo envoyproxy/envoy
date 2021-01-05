@@ -75,7 +75,6 @@ public:
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
         .WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*upstream_connection_, connect());
-    EXPECT_CALL(*upstream_connection_, noDelay(true));
 
     redis_command_stats_ =
         Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
