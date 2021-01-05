@@ -65,7 +65,7 @@ protected:
   SotwSubscriptionState state_;
 };
 
-// Basic gaining/losing interest in resources should lead to (un)subscriptions.
+// Basic gaining/losing interest in resources should lead to changes in subscriptions.
 TEST_F(SotwSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
     state_.updateSubscriptionInterest({"name4"}, {"name1"});
