@@ -36,14 +36,15 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
     // segments, which trigger some inconsistent handling as described in that
     // bug.
     uint32_t num_bytes = (1 + data[index]) & 0x7;
+
+    // Carve out the segment and use the 4th bit from the control-byte to
+    // determine whether to treat this segment symbolic or not.
     bool is_symbolic = (data[index] & 0x8) == 0x0;
     ++index;
     ASSERT(data.size() > index);
     uint32_t remaining = data.size() - index;
     num_bytes = std::min(remaining, num_bytes); // restrict number up to the size of data
 
-    // Carve out the segment and use the 4th bit from the control-byte to
-    // determine whether to treat this segment symbolic or not.
     absl::string_view segment = data.substr(index, num_bytes);
     index += num_bytes;
     if (is_symbolic) {
