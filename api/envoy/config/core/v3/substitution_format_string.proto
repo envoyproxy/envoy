@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -16,15 +17,6 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Substitution format string]
-
-// Specifies the configuration for a formatter extension.
-message Formatter {
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  oneof config_type {
-    google.protobuf.Any typed_config = 2;
-  }
-}
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
 // to generate a new string in either plain text or JSON format.
@@ -116,5 +108,5 @@ message SubstitutionFormatString {
 
   // Specifies a collection of Formatter plugins that can be called from the access log configuration.
   // See the formatters extensions documentation for details.
-  repeated Formatter formatters = 6;
+  repeated TypedExtensionConfig formatters = 6;
 }

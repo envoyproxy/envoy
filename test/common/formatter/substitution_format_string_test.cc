@@ -131,8 +131,9 @@ public:
   CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override {
     return std::make_unique<TestCommandParser>();
   }
+  std::string configType() override { return "google.protobuf.StringValue"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<ProtobufWkt::StringValue>();
   }
   std::string name() const override { return "envoy.formatter.TestFormatter"; }
 };
