@@ -81,7 +81,7 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
     }
   }
   if (!downstream_headers.empty()) {
-    for (auto& header : headers) {
+    for (auto& header : downstream_headers) {
       authz_response.response_headers_to_add.emplace_back(
           Http::LowerCaseString(header.header().key()), header.header().value());
     }
