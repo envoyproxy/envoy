@@ -28,7 +28,19 @@ namespace {
 constexpr absl::string_view kTransportSocketConnectTimeoutTerminationDetails =
     "transport socket timeout was reached";
 
+std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
+  switch (connection_state) {
+  case Connection::State::Open:
+    return os << "Open";
+  case Connection::State::Closing:
+    return os << "Closing";
+  case Connection::State::Closed:
+    return os << "Closed";
+  }
+  return os;
 }
+
+} // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
@@ -756,19 +768,6 @@ void ConnectionImpl::flushWriteBuffer() {
   }
 }
 
-std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
-  switch (connection_state) {
-  case Connection::State::Open:
-    return os << "Open";
-  case Connection::State::Closing:
-    return os << "Closing";
-  case Connection::State::Closed:
-    return os << "Closed";
-  }
-  return os;
-}
-
-// ScopeTrackedObject
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "ConnectionImpl " << this << DUMP_MEMBER(connecting_) << DUMP_MEMBER(bind_error_)

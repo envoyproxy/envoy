@@ -5,9 +5,9 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/common/dumpable.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
@@ -26,7 +26,7 @@ namespace Network {
  * TODO(jrajahalme): Hide internals (e.g., fd) from listener filters by providing callbacks filters
  * may need (set/getsockopt(), peek(), recv(), etc.)
  */
-class ConnectionSocket : public virtual Socket, public virtual Dumpable {
+class ConnectionSocket : public virtual Socket, public virtual ScopeTrackedObject {
 public:
   ~ConnectionSocket() override = default;
 
