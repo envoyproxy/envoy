@@ -535,7 +535,7 @@ The following command operators are supported:
   TCP
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
 
-.. _config_access_log_format_downstream_peer_cert_v_start
+.. _config_access_log_format_downstream_peer_cert_v_start:
 
 %DOWNSTREAM_PEER_CERT_V_START%
   HTTP
@@ -546,7 +546,7 @@ The following command operators are supported:
   DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
-.. _config_access_log_format_downstream_peer_cert_v_end
+.. _config_access_log_format_downstream_peer_cert_v_end:
 
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
