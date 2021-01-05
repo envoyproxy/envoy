@@ -712,8 +712,9 @@ TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope2 = scope1->scopeFromStatName(makeStatName("foo"));
   EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
 
-  // Validate that we sanitize away bad characters in the stats prefix.
-  ScopePtr scope3 = scope1->scopeFromStatName(makeStatName(absl::string_view("foo:\0:.", 7)));
+  // Validate that we sanitize away bad characters in the stats prefix. This happens only
+  // when constructing a stat from a string, not from a stat name.
+  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, store_->counters().size());
