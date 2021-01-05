@@ -97,6 +97,7 @@ envoy_cc_library(
     hdrs = ["context_impl.h"],
     deps = [
         "//include/envoy/router:context_interface",
+        "//include/envoy/router:router_interface",
         "//include/envoy/stats:stats_macros",
     ],
 )

@@ -255,7 +255,8 @@ public:
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
-  mutable VirtualClusterStats stats_{generateStats(stats_store_)};
+  VirtualClusterStatNames stat_names_{stats_store_.symbolTable()};
+  mutable VirtualClusterStats stats_{generateStats(stats_store_, stat_names_)};
 };
 
 class MockVirtualHost : public VirtualHost {
