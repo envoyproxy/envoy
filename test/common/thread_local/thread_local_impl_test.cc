@@ -23,7 +23,7 @@ TEST(MainThreadVerificationTest, All) {
                  "InjectableSingleton used prior to initialization");
     InstanceImpl tls;
     ASSERT(Thread::MainThread::isMainThread());
-    tls_.shutdownThread();
+    tls.shutdownThread();
   }
   EXPECT_DEATH(Thread::MainThread::isMainThread(),
                "InjectableSingleton used prior to initialization");
