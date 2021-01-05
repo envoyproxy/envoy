@@ -230,6 +230,7 @@ private:
  */
 class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::StreamDecoderFilter,
+               public Http::StreamEncoderFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
@@ -244,6 +245,15 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& trailers) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // ExtAuthz::RequestCallbacks
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
@@ -275,8 +285,10 @@ private:
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
+  std::unique_ptr<Http::HeaderVector> response_headers_to_add_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;

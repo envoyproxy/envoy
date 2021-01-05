@@ -63,6 +63,7 @@ public:
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
 
@@ -77,6 +78,7 @@ public:
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_filter_callbacks_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -1713,6 +1715,8 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
   response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
   response.headers_to_remove = std::vector<Http::LowerCaseString>{key_to_remove};
+  response.response_headers_to_add =
+      Http::HeaderVector{{Http::LowerCaseString{"cookie"}, "flavor=gingerbread"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1730,6 +1734,10 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(request_headers_.get_(key_to_add), "foo");
   EXPECT_EQ(request_headers_.get_(key_to_override), "bar");
   EXPECT_EQ(request_headers_.has(key_to_remove), false);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  EXPECT_EQ(response_headers.get_("cookie"), "flavor=gingerbread");
 }
 
 // Test that an synchronous denied response from the authorization service, on the call stack,
