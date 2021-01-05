@@ -64,10 +64,6 @@ private:
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
   static const size_t TrailParamStart{sizeof("TRAILER(") - 1};
-  static const size_t StartTimeParamStart{sizeof("START_TIME(") - 1};
-  static const size_t DownstreamPeerCertVStartParamStart{sizeof("DOWNSTREAM_PEER_CERT_V_START(") -
-                                                         1};
-  static const size_t DownstreamPeerCertVEndParamStart{sizeof("DOWNSTREAM_PEER_CERT_V_END(") - 1};
 };
 
 /**
@@ -399,6 +395,16 @@ public:
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
+
+protected:
+  // Given an access log token, attempt to parse out the format string between parenthesis.
+  //
+  // @param token The access log token, e.g. `START_TIME` or `START_TIME(...)`
+  // @param parameters_start The index of the first character where the parameters parenthesis would
+  //                         begin if it exists. Must not be out of bounds of `token` or its NUL
+  //                         char.
+  // @return The format string between parenthesis, or an empty string if none exists.
+  static std::string parseFormat(const std::string& token, size_t parameters_start);
 
 private:
   const Envoy::DateFormatter date_formatter_;

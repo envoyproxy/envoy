@@ -370,25 +370,11 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
         formatters.push_back(
             std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
       } else if (absl::StartsWith(token, "START_TIME")) {
-        const size_t parameters_length = token.length() - (StartTimeParamStart + 1);
-        const std::string args = token[StartTimeParamStart - 1] == '('
-                                     ? token.substr(StartTimeParamStart, parameters_length)
-                                     : "";
-        formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
+        formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(token)});
       } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
-        const size_t parameters_length = token.length() - (DownstreamPeerCertVStartParamStart + 1);
-        const std::string args =
-            token[DownstreamPeerCertVStartParamStart - 1] == '('
-                ? token.substr(DownstreamPeerCertVStartParamStart, parameters_length)
-                : "";
-        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVStartFormatter(args)});
+        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVStartFormatter(token)});
       } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
-        const size_t parameters_length = token.length() - (DownstreamPeerCertVEndParamStart + 1);
-        const std::string args =
-            token[DownstreamPeerCertVEndParamStart - 1] == '('
-                ? token.substr(DownstreamPeerCertVEndParamStart, parameters_length)
-                : "";
-        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVEndFormatter(args)});
+        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVEndFormatter(token)});
       } else if (absl::StartsWith(token, "GRPC_STATUS")) {
         formatters.emplace_back(FormatterProviderPtr{
             new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
@@ -1118,37 +1104,46 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   return val;
 }
 
-// A SystemTime formatter that extracts the startTime from StreamInfo
-StartTimeFormatter::StartTimeFormatter(const std::string& format)
+// Given a token, extract the command string between parenthesis if it exists.
+std::string SystemTimeFormatter::parseFormat(const std::string& token, size_t parameters_start) {
+  const size_t parameters_length = token.length() - (parameters_start + 1);
+  return token[parameters_start - 1] == '(' ? token.substr(parameters_start, parameters_length)
+                                            : "";
+}
+
+// A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided
+// an access log token that starts with `START_TIME`.
+StartTimeFormatter::StartTimeFormatter(const std::string& token)
     : SystemTimeFormatter(
-          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
-                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                        return stream_info.startTime();
-                      })) {}
+          parseFormat(token, sizeof("START_TIME(") - 1),
+          std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                return stream_info.startTime();
+              })) {}
 
 // A SystemTime formatter that optionally extracts the start date from the downstream peer's
-// certificate
-DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::string& format)
+// certificate. Must be provided an access log token that starts with `DOWNSTREAM_PEER_CERT_V_START`
+DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::string& token)
     : SystemTimeFormatter(
-          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
-                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                        const auto connection_info = stream_info.downstreamSslConnection();
-                        return connection_info != nullptr
-                                   ? connection_info->validFromPeerCertificate()
-                                   : absl::optional<SystemTime>();
-                      })) {}
+          parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_START(") - 1),
+          std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                const auto connection_info = stream_info.downstreamSslConnection();
+                return connection_info != nullptr ? connection_info->validFromPeerCertificate()
+                                                  : absl::optional<SystemTime>();
+              })) {}
 
 // A SystemTime formatter that optionally extracts the end date from the downstream peer's
-// certificate
-DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::string& format)
+// certificate. Must be provided an access log token that starts with `DOWNSTREAM_PEER_CERT_V_END`
+DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::string& token)
     : SystemTimeFormatter(
-          format, std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
-                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                        const auto connection_info = stream_info.downstreamSslConnection();
-                        return connection_info != nullptr
-                                   ? connection_info->expirationPeerCertificate()
-                                   : absl::optional<SystemTime>();
-                      })) {}
+          parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_END(") - 1),
+          std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                const auto connection_info = stream_info.downstreamSslConnection();
+                return connection_info != nullptr ? connection_info->expirationPeerCertificate()
+                                                  : absl::optional<SystemTime>();
+              })) {}
 
 SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f)
     : date_formatter_(format), time_field_extractor_(std::move(f)) {
