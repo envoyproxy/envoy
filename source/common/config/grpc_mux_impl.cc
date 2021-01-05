@@ -221,8 +221,8 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
       request = sub.getNextRequestWithAck(pausable_ack_queue_.popFront());
       ENVOY_LOG(debug, "GrpcMuxImpl sent ACK discovery request for {}", next_request_type_url);
     } else {
-      // getNextRequestAckless() returns a raw unowned pointer, which sendGrpcMessage deletes.
-      request = sub.getNextRequestAckless();
+      // Returns a raw unowned pointer, which sendGrpcMessage deletes.
+      request = sub.getNextRequestAckless(); 
       ENVOY_LOG(debug, "GrpcMuxImpl sent non-ACK discovery request for {}", next_request_type_url);
     }
     ENVOY_LOG(debug, "GrpcMuxImpl skip_subsequent_node: {}", skip_subsequent_node());
