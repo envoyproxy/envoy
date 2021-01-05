@@ -194,7 +194,7 @@ TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
 }
 
 TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
-  if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
@@ -220,7 +220,7 @@ TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
 }
 
 TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
-  if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
@@ -246,7 +246,7 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
 }
 
 TEST_P(WasmNetworkFilterTest, RestrictLog) {
-  if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   AllowedCapabilitiesMap allowed_capabilities = {
