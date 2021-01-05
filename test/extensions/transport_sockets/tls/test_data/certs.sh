@@ -186,6 +186,10 @@ generate_rsa_key expired_san_uri
 generate_x509_cert expired_san_uri ca -365
 rm -f expired_san_uri_cert.cfg
 
+# Generate extensions_cert.pem with "1.2.3.4.5.6.7.8" extension.
+generate_rsa_key extenssions
+generate_x509_cert extensions ca
+
 # Initialize information for CRL process
 touch crl_index.txt crl_index.txt.attr
 echo 00 > crl_number
