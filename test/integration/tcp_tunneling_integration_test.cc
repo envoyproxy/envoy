@@ -870,11 +870,11 @@ TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsR
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  // Wait a bit, no data should go through.
-  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
-
   default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
   upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait a bit, no data should go through.
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
 
   tcp_client->close();
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
