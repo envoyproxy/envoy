@@ -112,7 +112,7 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
   * [watchdog](/source/extensions/watchdog): Watchdog extensions use the
     `Envoy::Extensions::Watchdog` namespace.
   * [descriptors](/source/extensions/descriptors): Rate limit descriptor extensions use the
-    `Envoy::Extensions::Descriptor` namespace.
+    `Envoy::Extensions::Descriptors` namespace.
 * Each extension is contained wholly in its own namespace. E.g.,
   `Envoy::Extensions::NetworkFilters::Echo`.
 * Common code that is used by multiple extensions should be in a `common/` directory as close to

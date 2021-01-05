@@ -341,7 +341,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      rate_limit_policy_(route.route().rate_limits()),
+      rate_limit_policy_(route.route().rate_limits(), validator),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       total_cluster_weight_(
@@ -1118,7 +1118,8 @@ VirtualHostImpl::VirtualHostImpl(
     : stat_name_pool_(factory_context.scope().symbolTable()),
       stat_name_(stat_name_pool_.add(virtual_host.name())),
       vcluster_scope_(scope.createScope(virtual_host.name() + ".vcluster")),
-      rate_limit_policy_(virtual_host.rate_limits()), global_route_config_(global_route_config),
+      rate_limit_policy_(virtual_host.rate_limits(), validator),
+      global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),

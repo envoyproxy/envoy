@@ -1,0 +1,93 @@
+#include "extensions/descriptors/expr/config.h"
+
+#include "envoy/extensions/descriptors/expr/v3/expr.pb.h"
+#include "envoy/extensions/descriptors/expr/v3/expr.pb.validate.h"
+
+#include "common/protobuf/utility.h"
+
+#include "parser/parser.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Descriptors {
+namespace Expr {
+
+namespace {
+
+/**
+ * Descriptor producer for a symbolic expression descriptor.
+ */
+class ExpressionDescriptor : public RateLimit::DescriptorProducer {
+public:
+  ExpressionDescriptor(const envoy::extensions::descriptors::expr::v3::Descriptor& config,
+                       Filters::Common::Expr::Builder& builder,
+                       const google::api::expr::v1alpha1::Expr& input_expr)
+      : input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
+        skip_if_error_(config.skip_if_error()) {
+    compiled_expr_ = Extensions::Filters::Common::Expr::createExpression(builder, input_expr_);
+  }
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::Descriptor& descriptor, const std::string&,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override {
+    ProtobufWkt::Arena arena;
+    const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, info,
+                                                        &headers, nullptr, nullptr);
+    if (!result.has_value() || result.value().IsError()) {
+      // If result is an error and if skip_if_error is true skip this descriptor,
+      // while calling rate limiting service. If skip_if_error is false, do not call rate limiting
+      // service.
+      return skip_if_error_;
+    }
+    descriptor.entries_.push_back({descriptor_key_, Filters::Common::Expr::print(result.value())});
+    return true;
+  }
+
+private:
+  const google::api::expr::v1alpha1::Expr input_expr_;
+  const std::string descriptor_key_;
+  const bool skip_if_error_;
+  Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+};
+
+} // namespace
+
+ProtobufTypes::MessagePtr ExprDescriptorFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::descriptors::expr::v3::Descriptor>();
+}
+
+RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducerFromProto(
+    const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validator) {
+  auto config =
+      MessageUtil::downcastAndValidate<const envoy::extensions::descriptors::expr::v3::Descriptor&>(
+          message, validator);
+  switch (config.expr_specifier_case()) {
+  case envoy::extensions::descriptors::expr::v3::Descriptor::kText: {
+    auto parse_status = google::api::expr::parser::Parse(config.text());
+    if (!parse_status.ok()) {
+      throw EnvoyException("Unable to parse descriptor expression: " +
+                           parse_status.status().ToString());
+    }
+    return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(),
+                                                  parse_status.value().expr());
+  }
+  case envoy::extensions::descriptors::expr::v3::Descriptor::kParsed:
+    return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(), config.parsed());
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  return nullptr;
+}
+
+Filters::Common::Expr::Builder& ExprDescriptorFactory::getOrCreateBuilder() {
+  if (expr_builder_ == nullptr) {
+    expr_builder_ = Filters::Common::Expr::createBuilder(nullptr);
+  }
+  return *expr_builder_;
+}
+
+} // namespace Expr
+} // namespace Descriptors
+} // namespace Extensions
+} // namespace Envoy
