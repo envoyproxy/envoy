@@ -7,12 +7,19 @@ namespace Config {
 
 namespace {
 
+// Replaces regex placeholders with actual regexes.
 std::string expandRegex(const std::string& regex) {
   return absl::StrReplaceAll(
-      regex, {{"<ADDRESS>",
+      regex, {// Regex to look for either IPv4 or IPv6 addresses.
+              {"<ADDRESS>",
                R"((?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}_\d+|\[[_aAbBcCdDeEfF[:digit:]]+\]_\d+))"},
+              // Cipher names can contain alphanumerics with dashes and
+              // underscores.
               {"<CIPHER>", R"([0-9A-Za-z_-]+)"},
+              // A generic name can contain any character except dots.
               {"<NAME>", R"([^\.]+)"},
+              // Route names may contain dots in addition to alphanumerics and
+              // dashes with underscores.
               {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"}});
 }
 
