@@ -1,15 +1,9 @@
 .. _config_overview_extension_configuration:
 
-Extension configuration
------------------------
+扩展配置
+----------
 
-Each configuration resource in Envoy has a type URL in the `typed_config`. This
-type corresponds to a versioned schema. If the type URL uniquely identifies an
-extension capable of interpreting the configuration, then the extension is
-selected regardless of the `name` field. In this case the `name` field becomes
-optional and can be used as an identifier or as an annotation for the
-particular instance of the extension configuration. For example, the following
-filter configuration snippet is permitted:
+Envoy 中的每一个配置资源，在 `typed_config` 中都有一个类型 URL。此类型对应于一个带版本的 schema。如果一个类型 URL 能够唯一标识解释性配置的可扩展能力，则此扩展会被选择，而不会去考虑  `name` 字段。在此情况下，`name` 字段是可选的，可以被当作一个标识符或可扩展配置特定实例的注解来使用。比如，允许如下所示的的过滤器配置片段：
 
 .. code-block:: yaml
 
@@ -32,11 +26,8 @@ filter configuration snippet is permitted:
         "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         dynamic_stats: true
 
-In case the control plane lacks the schema definitions for an extension,
-`udpa.type.v1.TypedStruct` should be used as a generic container. The type URL
-inside it is then used by a client to convert the contents to a typed
-configuration resource. For example, the above example could be written as
-follows:
+
+以防控制面缺乏对扩展的 schema 定义能力，`udpa.type.v1.TypedStruct` 应该被用来作为一个通用容器。容器内的类型 URL 就可以被客户端用来将内容转换为特定类型的配置资源。比如，上述示例也可以写为如下所示的例子：
 
 .. code-block:: yaml
 
@@ -63,25 +54,21 @@ follows:
 
 .. _config_overview_extension_discovery:
 
-Discovery service
-^^^^^^^^^^^^^^^^^
+发现服务
+^^^^^^^^^^^
 
-Extension configuration can be supplied dynamically from an :ref:`xDS
-management server<xds_protocol>` using :ref:`ExtensionConfiguration discovery
-service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
-The name field in the extension configuration acts as the resource identifier.
-For example, HTTP connection manager supports :ref:`dynamic filter
-re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`
-for HTTP filters.
+扩展配置可以使用 :ref:`ExtensionConfiguration 发现服务 <envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` 的 :ref:`xDS 管理服务器 <xds_protocol>` 来动态提供。扩展配置中的 name 字段充当资源标识符。比如，HTTP 连接管理器支持 HTTP 过滤器的 :ref:`动态过滤器重配置 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`。
 
 Extension config discovery service has a :ref:`statistics
 <subscription_statistics>` tree rooted at
 *<stat_prefix>.extension_config_discovery.<extension_config_name>*. In addition
 to the common subscription statistics, it also provides the following:
 
+扩展配置发现服务有一个以 *<stat_prefix>.extension_config_discovery.<extension_config_name>* 为根的 :ref:`统计 <subscription_statistics>` 树。除了公共订阅统计，它还提供如下统计：
+
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  config_reload, Counter, Total number of successful configuration updates
-  config_fail, Counter, Total number of failed configuration updates
+  config_reload, Counter, 配置更新成功的总数
+  config_fail, Counter, 配置更新失败的总数
