@@ -165,6 +165,11 @@ TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
   EXPECT_EQ(socket.localAddress(), address);
 }
 
+TEST_P(ListenSocketImplTestTcp, CheckIpVersionWithNullLocalAddress) {
+  TestListenSocket socket(Utility::getIpv4AnyAddress());
+  EXPECT_EQ(Address::IpVersion::v4, socket.ipVersion());
+}
+
 TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
 
 // Validate that we get port allocation when binding to port zero.

@@ -14,6 +14,7 @@ Minor Behavior Changes
 
 * build: the Alpine based debug images are no longer built in CI, use Ubuntu based images instead.
 * cluster manager: the cluster which can't extract secret entity by SDS to be warming and never activate. This feature is disabled by default and is controlled by runtime guard `envoy.reloadable_features.cluster_keep_warming_no_secret_entity`.
+* decompressor: set the default value of window_bits of the decompressor to 15 to be able to decompress responses compressed by a compressor with any window size.
 * expr filter: added `connection.termination_details` property support.
 * ext_authz filter: disable `envoy.reloadable_features.ext_authz_measure_timeout_on_check_created` by default.
 * ext_authz filter: the deprecated field :ref:`use_alpha <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.use_alpha>` is no longer supported and cannot be set anymore.
@@ -63,6 +64,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* compression: added new runtime guard `envoy.reloadable_features.enable_compression_without_chunked_header` (enabled by default) to control compression if no transfer-encoding=chunked header exists (now envoy would compress in such cases) to account for http/2 connections, where such transfer-encoding were removed.
 * compression: the :ref:`compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>` filter adds support for compressing request payloads. Its configuration is unified with the :ref:`decompressor <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor>` filter with two new fields for different directions - :ref:`requests <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.request_direction_config>` and :ref:`responses <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.response_direction_config>`. The latter deprecates the old response-specific fields and, if used, roots the response-specific stats in `<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.response.*` instead of `<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*`.
 * config: added ability to flush stats when the admin's :ref:`/stats endpoint <operations_admin_interface_stats>` is hit instead of on a timer via :ref:`stats_flush_on_admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_on_admin>`.
 * config: added new runtime feature `envoy.features.enable_all_deprecated_features` that allows the use of all deprecated features.
@@ -73,8 +75,10 @@ New Features
 * health_check: added option to use :ref:`no_traffic_healthy_interval <envoy_v3_api_field_config.core.v3.HealthCheck.no_traffic_healthy_interval>` which allows a different no traffic interval when the host is healthy.
 * http: added HCM :ref:`timeout config field <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_headers_timeout>` to control how long a downstream has to finish sending headers before the stream is cancelled.
 * http: added frame flood and abuse checks to the upstream HTTP/2 codec. This check is off by default and can be enabled by setting the `envoy.reloadable_features.upstream_http2_flood_checks` runtime key to true.
+* http: added :ref:`stripping any port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_any_host_port>` support.
 * http: clusters now support selecting HTTP/1 or HTTP/2 based on ALPN, configurable via :ref:`alpn_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` in the :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
 * jwt_authn: added support for :ref:`per-route config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.PerRouteConfig>`.
+* jwt_authn: changed config field :ref:`issuer <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.issuer>` to be optional to comply with JWT `RFC <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ requirements.
 * kill_request: added new :ref:`HTTP kill request filter <config_http_filters_kill_request>`.
 * listener: added an optional :ref:`default filter chain <envoy_v3_api_field_config.listener.v3.Listener.default_filter_chain>`. If this field is supplied, and none of the :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` matches, this default filter chain is used to serve the connection.
 * listener: added back the :ref:`use_original_dst field <envoy_v3_api_field_config.listener.v3.Listener.use_original_dst>`.
