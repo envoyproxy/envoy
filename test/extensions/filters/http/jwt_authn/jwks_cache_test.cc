@@ -25,9 +25,13 @@ class JwksCacheTest : public testing::Test {
 protected:
   JwksCacheTest() : api_(Api::createApiForTest()) {}
   void SetUp() override {
-    TestUtility::loadFromYaml(ExampleConfig, config_);
-    cache_ = JwksCache::create(config_, time_system_, *api_);
+    setupCache(ExampleConfig);
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  }
+
+  void setupCache(const std::string& config_str) {
+    TestUtility::loadFromYaml(config_str, config_);
+    cache_ = JwksCache::create(config_, time_system_, *api_);
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -37,10 +41,40 @@ protected:
   Api::ApiPtr api_;
 };
 
+// Test findByProvider
+TEST_F(JwksCacheTest, TestFindByProvider) {
+  EXPECT_TRUE(cache_->findByProvider(ProviderName) != nullptr);
+}
+
 // Test findByIssuer
 TEST_F(JwksCacheTest, TestFindByIssuer) {
   EXPECT_TRUE(cache_->findByIssuer("https://example.com") != nullptr);
   EXPECT_TRUE(cache_->findByIssuer("other-issuer") == nullptr);
+}
+
+// Test findByIssuer with issuer not specified.
+TEST_F(JwksCacheTest, TestEmptyIssuer) {
+  setupCache(R"(
+providers:
+  provider1:
+    forward_payload_header: jwt-payload1
+  provider2:
+    issuer: issuer2
+    forward_payload_header: jwt-payload2
+)");
+
+  // provider1 doesn't have "issuer" specified, any non-specified issuers,
+  // including empty issuer can use it.
+  auto* data1 = cache_->findByIssuer("abcd");
+  auto* data_empty = cache_->findByIssuer("");
+  EXPECT_TRUE(data1 != nullptr);
+  EXPECT_TRUE(data_empty == data1);
+  EXPECT_EQ(data1->getJwtProvider().forward_payload_header(), "jwt-payload1");
+
+  // provider2 has "issuer" specified, only its specified issuer can use it.
+  auto* data2 = cache_->findByIssuer("issuer2");
+  EXPECT_TRUE(data2 != nullptr);
+  EXPECT_EQ(data2->getJwtProvider().forward_payload_header(), "jwt-payload2");
 }
 
 // Test setRemoteJwks and its expiration
@@ -136,12 +170,6 @@ TEST_F(JwksCacheTest, TestAudiences) {
 
   // Wrong multiple audiences
   EXPECT_FALSE(jwks->areAudiencesAllowed({"wrong-audience1", "wrong-audience2"}));
-}
-
-// Test findByProvider
-TEST_F(JwksCacheTest, TestFindByProvider) {
-  EXPECT_TRUE(cache_->findByProvider(ProviderName) != nullptr);
-  EXPECT_TRUE(cache_->findByProvider("other-provider") == nullptr);
 }
 
 } // namespace
