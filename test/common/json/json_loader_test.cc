@@ -73,8 +73,7 @@ TEST_F(JsonLoaderTest, Basic) {
   {
     EXPECT_THROW_WITH_MESSAGE(
         Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
-        "JSON supplied is not valid. Error(offset 20, token \"world\"): "
-        "[json.exception.parse_error.101] parse error at line 3, column 8: syntax error while "
+        "JSON supplied is not valid. Error(line 3, column 8, token \"world\"): syntax error while "
         "parsing object - unexpected end of input; expected '}'\n");
   }
 
@@ -290,9 +289,8 @@ TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
 
   EXPECT_THROW_WITH_MESSAGE(
       Factory::loadFromString(json_string), Exception,
-      "JSON supplied is not valid. Error(offset 16, token \"listeners\" :): "
-      "[json.exception.parse_error.101] parse error at line 2, column 15: syntax error while "
-      "parsing value - unexpected ':'; expected end of input\n");
+      "JSON supplied is not valid. Error(line 2, column 15, token \"listeners\" :): syntax error "
+      "while parsing value - unexpected ':'; expected end of input\n");
 }
 
 TEST_F(JsonLoaderTest, AsString) {

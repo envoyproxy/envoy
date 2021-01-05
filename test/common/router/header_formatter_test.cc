@@ -690,12 +690,12 @@ TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVA
 
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
-                            "Error(offset 0, line 1): Invalid value.\n");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false), EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
+      "Error(line 1, column 1, token a): syntax error while parsing value - invalid literal; last "
+      "read: 'a'\n");
 
   // No parameters.
   EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
@@ -703,11 +703,12 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                            "UPSTREAM_METADATA(), because JSON supplied is not valid. "
-                            "Error(offset 0, line 1): The document is empty.\n");
+  EXPECT_THROW_WITH_MESSAGE(
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA(), because JSON supplied is not valid. Error(line 1, "
+      "column 1, token ): syntax error while parsing value - unexpected end of input; expected "
+      "'[', '{', or a literal\n");
 
   // One parameter.
   EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
@@ -745,10 +746,10 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
       StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false), EnvoyException,
-      "Invalid header configuration. Expected format "
-      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-      "UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is not valid. "
-      "Error(offset 7, line 1): Incorrect hex digit after \\u escape in string.\n");
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is "
+      "not valid. Error(line 1, column 10, token \"\\un): syntax error while parsing value - "
+      "invalid string: '\\u' must be followed by 4 hex digits; last read: '\"\\un'\n");
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
@@ -829,12 +830,14 @@ TEST(HeaderParserTest, TestParseInternal) {
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA(no array), because JSON supplied is not valid. "
-        "Error(offset 1, line 1): Invalid value.\n"}},
+        "Error(line 1, column 2, token no): syntax error while parsing value - invalid literal; "
+        "last read: 'no'\n"}},
       {"%UPSTREAM_METADATA( no array)%",
        {},
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
-        "Error(offset 2, line 1): Invalid value.\n"}},
+        "Error(line 1, column 3, token  no): syntax error while parsing value - invalid literal; "
+        "last read: ' no'\n"}},
       {"%UPSTREAM_METADATA([\"unterminated array\")%",
        {},
        {"Invalid header configuration. Expecting ',', ']', or whitespace after "

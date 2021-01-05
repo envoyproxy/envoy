@@ -170,7 +170,6 @@ private:
   Value value_;
 };
 
-
 /**
  * Consume events from SAX callbacks to build JSON Field.
  */
@@ -200,18 +199,24 @@ public:
   bool null() override { return handleValueEvent(Field::createNull()); }
   bool string(std::string& value) override { return handleValueEvent(Field::createValue(value)); }
   bool binary(binary_t&) override { return false; }
-  bool parse_error(std::size_t position, const std::string& token,
+  bool parse_error(std::size_t, const std::string& token,
                    const nlohmann::detail::exception& ex) override {
-    error_offset_ = position;
-    error_ = ex.what();
-    error_token_ = token;
+    // Errors are formatted like "[json.exception.parse_error.101] parse error at line x, column y:
+    // error string."
+    absl::string_view error = ex.what();
+    // Extract position information (line, column, token) in the error.
+    auto start = error.find("line");
+    auto npos = error.find(":");
+    ENVOY_LOG_MISC(info, "ERROR {}", error);
+    error_position_ = absl::StrCat(error.substr(start, npos - start), ", token ", token);
+    // Extract portion after ":" to get error string.
+    error_ = error.substr(npos + 2);
     return false;
   }
 
   bool hasParseError() { return !error_.empty(); }
-  std::size_t getErrorOffset() { return error_offset_; }
-  std::string getParseError() { return error_;}
-  std::string getErrorToken() { return error_token_; }
+  std::string getParseError() { return error_; }
+  std::string getErrorPosition() { return error_position_; }
 
   ObjectSharedPtr getRoot() { return root_; }
 
@@ -235,8 +240,7 @@ private:
   FieldSharedPtr root_;
 
   std::string error_;
-  std::string error_token_;
-  std::size_t error_offset_;
+  std::string error_position_;
 };
 
 struct JsonContainer {
@@ -277,7 +281,6 @@ JsonIterator begin(const JsonContainer& c) {
 JsonIterator end(const JsonContainer& c) {
   return JsonIterator{JsonContainer(c.data + strlen(c.data), c.handler_)};
 }
-
 
 void Field::buildJsonDocument(const Field& field, nlohmann::json& value) {
   switch (field.type_) {
@@ -354,15 +357,13 @@ nlohmann::json Field::asJsonDocument() const {
   return j;
 }
 
-uint64_t Field::hash() const {
-  return HashUtil::xxHash64(asJsonString());
-}
+uint64_t Field::hash() const { return HashUtil::xxHash64(asJsonString()); }
 
 bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
-        throw Exception(fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
+    throw Exception(fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
   return value_itr->second->booleanValue();
@@ -382,7 +383,7 @@ double Field::getDouble(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
-        throw Exception(fmt::format("key '{}' missing or not a double from lines {}-{}", name,
+    throw Exception(fmt::format("key '{}' missing or not a double from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
   return value_itr->second->doubleValue();
@@ -402,7 +403,7 @@ int64_t Field::getInteger(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
-        throw Exception(fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
+    throw Exception(fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
   return value_itr->second->integerValue();
@@ -425,11 +426,11 @@ ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) cons
     if (allow_empty) {
       return createObject();
     } else {
-            throw Exception(fmt::format("key '{}' missing from lines {}-{}", name, line_number_start_,
+      throw Exception(fmt::format("key '{}' missing from lines {}-{}", name, line_number_start_,
                                   line_number_end_));
     }
   } else if (!value_itr->second->isType(Type::Object)) {
-        throw Exception(fmt::format("key '{}' not an object from line {}", name,
+    throw Exception(fmt::format("key '{}' not an object from line {}", name,
                                 value_itr->second->line_number_start_));
   } else {
     return value_itr->second;
@@ -444,7 +445,7 @@ std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
     if (allow_empty && value_itr == value_.object_value_.end()) {
       return std::vector<ObjectSharedPtr>();
     }
-        throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+    throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
 
@@ -456,7 +457,7 @@ std::string Field::getString(const std::string& name) const {
   checkType(Type::Object);
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
-        throw Exception(fmt::format("key '{}' missing or not a string from lines {}-{}", name,
+    throw Exception(fmt::format("key '{}' missing or not a string from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
   return value_itr->second->stringValue();
@@ -480,7 +481,7 @@ std::vector<std::string> Field::getStringArray(const std::string& name, bool all
     if (allow_empty && value_itr == value_.object_value_.end()) {
       return string_array;
     }
-        throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
+    throw Exception(fmt::format("key '{}' missing or not an array from lines {}-{}", name,
                                 line_number_start_, line_number_end_));
   }
 
@@ -488,7 +489,7 @@ std::vector<std::string> Field::getStringArray(const std::string& name, bool all
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {
-            throw Exception(fmt::format("JSON array '{}' from line {} does not contain all strings", name,
+      throw Exception(fmt::format("JSON array '{}' from line {} does not contain all strings", name,
                                   line_number_start_));
     }
     string_array.push_back(element->stringValue());
@@ -534,9 +535,7 @@ void Field::iterate(const ObjectCallback& callback) const {
   }
 }
 
-void Field::validateSchema(const std::string&) const {
-  throw Exception("not implemented");
-}
+void Field::validateSchema(const std::string&) const { throw Exception("not implemented"); }
 
 bool ObjectHandler::start_object(std::size_t) {
   FieldSharedPtr object = Field::createObject();
@@ -662,9 +661,8 @@ ObjectSharedPtr Factory::loadFromString(const std::string& json) {
   nlohmann::json::sax_parse(json_container, &handler);
 
   if (handler.hasParseError()) {
-    throw Exception(fmt::format("JSON supplied is not valid. Error(offset {}, token {}): {}\n",
-                                handler.getErrorOffset(), handler.getErrorToken(),
-                                handler.getParseError()));
+    throw Exception(fmt::format("JSON supplied is not valid. Error({}): {}\n",
+                                handler.getErrorPosition(), handler.getParseError()));
   }
   return handler.getRoot();
 }
