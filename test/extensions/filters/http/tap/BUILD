@@ -52,9 +52,6 @@ envoy_extension_cc_test(
     name = "tap_filter_integration_test",
     srcs = ["tap_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.tap",
-    # TODO(envoyproxy/windows-dev): Diagnose flake, observed to hang at;
-    # IpVersions/TapIntegrationTest.AdminLdsReload/IPv6
-    tags = ["flaky_on_windows"],
     deps = [
         "//source/extensions/filters/http/tap:config",
         "//test/extensions/common/tap:common",
