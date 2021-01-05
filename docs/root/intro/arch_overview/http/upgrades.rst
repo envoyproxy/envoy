@@ -124,5 +124,6 @@ In both cases you will be running a first Envoy listening for TCP traffic on por
 CONNECT request, and a second one listening on 10001, stripping the CONNECT headers, and forwarding the 
 original TCP upstream, in this case to google.com.
 
-When runtime flag ``envoy.reloadable_features.http_upstream_wait_connect_response`` is set to ``true``, the CONNECT response
-is waited before start sending the downstream TCP data to the upstream. This flags default to ``true``.
+When runtime flag ``envoy.reloadable_features.http_upstream_wait_connect_response`` is set to ``true``, Envoy waits for
+the HTTP tunnel to be established (i.e. a successful response to the  CONNECT request is received), before start
+streaming the downstream TCP data to the upstream. This flags default to ``true``.

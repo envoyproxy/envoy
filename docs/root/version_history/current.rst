@@ -28,6 +28,7 @@ Minor Behavior Changes
 * mongo proxy metrics: swapped network connection remote and local closed counters previously set reversed (`cx_destroy_local_with_active_rq` and `cx_destroy_remote_with_active_rq`).
 * outlier detection: added :ref:`max_ejection_time <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` to limit ejection time growth when a node stays unhealthy for extended period of time. By default :ref:`max_ejection_time <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` limits ejection time to 5 minutes. Additionally, when the node stays healthy, ejection time decreases. See :ref:`ejection algorithm<arch_overview_outlier_detection_algorithm>` for more info. Previously, ejection time could grow without limit and never decreased.
 * performance: improve performance when handling large HTTP/1 bodies.
+* tcp_proxy: wait for HTTP tunnel to be established before start streaming the downstream data, the `envoy.reloadable_features.http_upstream_wait_connect_response` can be set to "false" to disable this behavior.
 * tls: removed RSA key transport and SHA-1 cipher suites from the client-side defaults.
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
 * xds: to support TTLs, heartbeating has been added to xDS. As a result, responses that contain empty resources without updating the version will no longer be propagated to the
