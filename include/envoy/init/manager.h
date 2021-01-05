@@ -78,11 +78,6 @@ struct Manager {
   virtual void initialize(const Watcher& watcher) PURE;
 
   /**
-   * @return the unready targets of the manager.
-   */
-  virtual const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const PURE;
-
-  /**
    * Add unready targets information into the config dump.
    */
   virtual void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) PURE;
