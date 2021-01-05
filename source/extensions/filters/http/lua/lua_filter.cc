@@ -418,7 +418,7 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
 int StreamHandleWrapper::luaBody(lua_State* state) {
   ASSERT(state_ == State::Running);
 
-  int always_wrap_body = 0;
+  bool always_wrap_body = false;
 
   if (lua_gettop(state) >= 2) {
     luaL_checktype(state, 2, LUA_TBOOLEAN);
