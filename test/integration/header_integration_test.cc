@@ -57,6 +57,11 @@ route_config:
         - header:
             key: "x-vhost-request"
             value: "vhost"
+      request_headers_to_add:
+        - header:
+            key: "host"
+            value: "FOO"
+          append: false
       request_headers_to_remove: ["x-vhost-request-remove"]
       response_headers_to_add:
         - header:
@@ -444,6 +449,8 @@ protected:
     headers.remove(Envoy::Http::LowerCaseString{"x-request-id"});
     headers.remove(Envoy::Http::LowerCaseString{"x-envoy-internal"});
 
+    std::cerr << expected_headers;
+    std::cerr << headers;
     EXPECT_EQ(expected_headers, headers);
   }
 
