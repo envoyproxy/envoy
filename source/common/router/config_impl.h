@@ -196,8 +196,10 @@ private:
 
   struct VirtualClusterBase : public VirtualCluster {
   public:
-    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope)
-        : stat_name_(stat_name), scope_(std::move(scope)), stats_(generateStats(*scope_)) {}
+    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope,
+                       const VirtualClusterStatNames& stat_names)
+        : stat_name_(stat_name), scope_(std::move(scope)),
+          stats_(generateStats(*scope_, stat_names)) {}
 
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
@@ -211,14 +213,15 @@ private:
 
   struct VirtualClusterEntry : public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
-                        Stats::StatNamePool& pool, Stats::Scope& scope);
+                        Stats::StatNamePool& pool, Stats::Scope& scope,
+                        const VirtualClusterStatNames& stat_names);
 
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
-    explicit CatchAllVirtualCluster(Stats::StatNamePool& pool, Stats::Scope& scope)
-        : VirtualClusterBase(pool.add("other"), scope.createScope("other")) {}
+    explicit CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
+        : VirtualClusterBase(stat_names.other_, scope.createScope("other"), stat_names) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
