@@ -2031,7 +2031,7 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedFilterStateTest) {
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
 }
 
-// Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additiona specifier,
+// Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
 // the FilterState can call the serializeAsProto or serializeAsString methods correctly.
 TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   Http::TestRequestHeaderMapImpl request_headers;
