@@ -13,7 +13,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: TCP Post]
-// Kill Request :ref:`configuration overview <config_http_filters_tcp_post>`.
+// TCP Post :ref:`configuration overview <config_http_filters_tcp_post>`.
 // [#extension: envoy.filters.http.tcp_post]
 
 // Configuration for TcpPost filter.
