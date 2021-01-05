@@ -15,6 +15,19 @@ using testing::ReturnPointee;
 namespace Envoy {
 namespace ThreadLocal {
 
+Test(MainThreadVerificationTest, All) {
+  EXPECT_DEATH(Thread::MainThread::isMainThread(),
+               "InjectableSingleton used prior to initialization");
+  {
+    EXPECT_DEATH(Thread::MainThread::isMainThread(),
+                 "InjectableSingleton used prior to initialization");
+    InstanceImpl tls_;
+    ASSERT(Thread::MainThread::isMainThread());
+  }
+  EXPECT_DEATH(Thread::MainThread::isMainThread(),
+               "InjectableSingleton used prior to initialization");
+}
+
 class TestThreadLocalObject : public ThreadLocalObject {
 public:
   ~TestThreadLocalObject() override { onDestroy(); }
