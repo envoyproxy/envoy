@@ -25,8 +25,7 @@ namespace Stats {
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
-    : alloc_(alloc), default_scope_(ThreadLocalStoreImpl::createScope("")),
-      tag_producer_(std::make_unique<TagProducerImpl>()),
+    : alloc_(alloc), tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
       heap_allocator_(alloc.symbolTable()), null_counter_(alloc.symbolTable()),
@@ -36,6 +35,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
   }
+  StatNameManagedStorage empty("", alloc.symbolTable());
+  default_scope_ = ThreadLocalStoreImpl::scopeFromStatName(empty.statName());
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
