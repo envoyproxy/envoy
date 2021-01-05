@@ -123,3 +123,6 @@ and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_con
 In both cases you will be running a first Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP
 CONNECT request, and a second one listening on 10001, stripping the CONNECT headers, and forwarding the 
 original TCP upstream, in this case to google.com.
+
+When runtime flag ``envoy.reloadable_features.http_upstream_wait_connect_response`` is set to ``true``, the CONNECT response
+is waited before start sending the downstream TCP data to the upstream. This flags default to ``true``.
