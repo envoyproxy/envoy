@@ -77,8 +77,8 @@ public:
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
 
-    redis_command_stats_ =
-        Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
+    redis_command_stats_ = Common::Redis::RedisCommandStats::createRedisCommandStats(
+        stats_.symbolTable(), std::make_shared<SupportedCommands>());
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
                                  *config_, redis_command_stats_, stats_);
@@ -1209,8 +1209,8 @@ TEST(RedisClientFactoryImplTest, Basic) {
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
   Stats::IsolatedStoreImpl stats_;
-  auto redis_command_stats =
-      Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
+  auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
+      stats_.symbolTable(), std::make_shared<SupportedCommands>());
   const std::string auth_username;
   const std::string auth_password;
   ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_,
