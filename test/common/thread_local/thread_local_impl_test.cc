@@ -21,7 +21,7 @@ Test(MainThreadVerificationTest, All) {
   {
     EXPECT_DEATH(Thread::MainThread::isMainThread(),
                  "InjectableSingleton used prior to initialization");
-    InstanceImpl tls_;
+    InstanceImpl tls;
     ASSERT(Thread::MainThread::isMainThread());
   }
   EXPECT_DEATH(Thread::MainThread::isMainThread(),
