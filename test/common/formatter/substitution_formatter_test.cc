@@ -1541,22 +1541,14 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
   }
 }
 
-void verifyJsonOutput(std::string json_string,
-                      absl::node_hash_map<std::string, std::string> expected_map) {
-  const auto parsed = Json::Factory::loadFromString(json_string);
-
-  // Every json log line should have only one newline character, and it should be the last character
-  // in the string
-  const auto newline_pos = json_string.find('\n');
-  EXPECT_NE(newline_pos, std::string::npos);
-  EXPECT_EQ(newline_pos, json_string.length() - 1);
-
+void verifyStructOutput(ProtobufWkt::Struct output,
+                        absl::node_hash_map<std::string, std::string> expected_map) {
   for (const auto& pair : expected_map) {
-    EXPECT_EQ(parsed->getString(pair.first), pair.second);
+    EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
   }
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
+TEST(SubstitutionFormatterTest, StructFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1576,14 +1568,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
     plain_string: plain_string_value
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterNestedObject) {
+TEST(SubstitutionFormatterTest, StructFormatterNestedObject) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1604,9 +1596,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObject) {
           protocol: '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  const std::string expected = R"EOF({
+  const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
     "level_one": {
       "level_two": {
         "level_three": {
@@ -1615,13 +1607,13 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObject) {
         }
       }
     }
-  })EOF";
-  std::string out_json =
+  })EOF");
+  const ProtobufWkt::Struct out_struct =
       formatter.format(request_header, response_header, response_trailer, stream_info, body);
-  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+  EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
+TEST(SubstitutionFormatterTest, StructFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1640,14 +1632,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
     protocol: '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
+TEST(SubstitutionFormatterTest, StructFormatterNonExistentHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
   Http::TestResponseHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
@@ -1668,17 +1660,17 @@ TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
     some_response_header: '%RESP(some_response_header)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
+TEST(SubstitutionFormatterTest, StructFormatterAlternateHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{
       {"request_present_header", "REQUEST_PRESENT_HEADER"}};
@@ -1701,17 +1693,17 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
     response_present_header_or_response_absent_header: '%RESP(response_present_header?response_absent_header)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
+TEST(SubstitutionFormatterTest, StructFormatterDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -1735,14 +1727,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
     test_obj.inner_key: '%DYNAMIC_METADATA(com.test:test_obj:inner_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
+TEST(SubstitutionFormatterTest, StructFormatterTypedDynamicMetadataTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
@@ -1761,12 +1753,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
     test_obj.inner_key: '%DYNAMIC_METADATA(com.test:test_obj:inner_key)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  const std::string json =
+  ProtobufWkt::Struct output =
       formatter.format(request_header, response_header, response_trailer, stream_info, body);
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   const auto& fields = output.fields();
   EXPECT_EQ("test_value", fields.at("test_key").string_value());
@@ -1775,7 +1765,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
             fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
+TEST(SubstitutionFormatterTest, StructFormatterFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1798,14 +1788,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
     test_obj: '%FILTER_STATE(test_obj)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterOmitEmptyTest) {
+TEST(SubstitutionFormatterTest, StructFormatterOmitEmptyTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1823,14 +1813,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterOmitEmptyTest) {
       test_key_dynamic_metadata: '%DYNAMIC_METADATA(nonexistent_key)%'
     )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, true);
+  StructFormatter formatter(key_mapping, false, true);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
       {});
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterTypedFilterStateTest) {
+TEST(SubstitutionFormatterTest, StructFormatterTypedFilterStateTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -1850,12 +1840,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedFilterStateTest) {
     test_obj: '%FILTER_STATE(test_obj)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  std::string json =
+  ProtobufWkt::Struct output =
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body);
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   const auto& fields = output.fields();
   EXPECT_EQ("test_value", fields.at("test_key").string_value());
@@ -1887,9 +1875,9 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
       expected_json_map);
 }
@@ -1913,13 +1901,10 @@ TEST(SubstitutionFormatterTest, TypedFilterStateSpeciferTest) {
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  std::string json =
+  ProtobufWkt::Struct output =
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body);
-
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   const auto& fields = output.fields();
   EXPECT_EQ("test_value By PLAIN", fields.at("test_key_plain").string_value());
@@ -1944,11 +1929,11 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(JsonFormatterImpl formatter(key_mapping, false, false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StructFormatter formatter(key_mapping, false, false), EnvoyException,
                             "Invalid filter state serialize type, only support PLAIN/TYPED.");
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
+TEST(SubstitutionFormatterTest, StructFormatterStartTimeTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1975,14 +1960,14 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
     all_zeroes: '%START_TIME(%f.%1f.%2f.%3f)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false);
+  StructFormatter formatter(key_mapping, false, false);
 
-  verifyJsonOutput(
+  verifyStructOutput(
       formatter.format(request_header, response_header, response_trailer, stream_info, body),
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
+TEST(SubstitutionFormatterTest, StructFormatterMultiTokenTest) {
   {
     StreamInfo::MockStreamInfo stream_info;
     Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
@@ -2000,21 +1985,19 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
     )EOF",
                               key_mapping);
     for (const bool preserve_types : {false, true}) {
-      JsonFormatterImpl formatter(key_mapping, preserve_types, false);
+      StructFormatter formatter(key_mapping, preserve_types, false);
 
       absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
       EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-      const auto parsed = Json::Factory::loadFromString(
-          formatter.format(request_header, response_header, response_trailer, stream_info, body));
-      for (const auto& pair : expected_json_map) {
-        EXPECT_EQ(parsed->getString(pair.first), pair.second);
-      }
+      verifyStructOutput(
+          formatter.format(request_header, response_header, response_trailer, stream_info, body),
+          expected_json_map);
     }
   }
 }
 
-TEST(SubstitutionFormatterTest, JsonFormatterTypedTest) {
+TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -2043,12 +2026,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedTest) {
     filter_state: '%FILTER_STATE(test_obj)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, true, false);
+  StructFormatter formatter(key_mapping, true, false);
 
-  const auto json =
+  ProtobufWkt::Struct output =
       formatter.format(request_headers, response_headers, response_trailers, stream_info, body);
-  ProtobufWkt::Struct output;
-  MessageUtil::loadFromJson(json, output);
 
   EXPECT_THAT(output.fields().at("request_duration"), ProtoEq(ValueUtil::numberValue(5.0)));
   EXPECT_THAT(output.fields().at("request_duration_multi"), ProtoEq(ValueUtil::stringValue("5ms")));
@@ -2056,6 +2037,43 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypedTest) {
   ProtobufWkt::Value expected;
   expected.mutable_struct_value()->CopyFrom(s);
   EXPECT_THAT(output.fields().at("filter_state"), ProtoEq(expected));
+}
+
+TEST(SubstitutionFormatterTest, JsonFormatterTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
+      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    request_duration: '%REQUEST_DURATION%'
+    nested_level:
+      plain_string: plain_string_value
+      protocol: '%PROTOCOL%'
+  )EOF",
+                            key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false, false);
+
+  const std::string expected = R"EOF({
+    "request_duration": "5",
+    "nested_level": {
+      "plain_string": "plain_string_value",
+      "protocol": "HTTP/1.1"
+    }
+  })EOF";
+
+  const std::string out_json =
+      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
 
 TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
@@ -2195,7 +2213,13 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
         "%%|%%123456000|1522796769%%123|1%%1522796769",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
-#ifndef WIN32
+
+  // The %E formatting option in Absl::FormatTime() behaves differently for non Linux platforms.
+  //
+  // See:
+  // https://github.com/abseil/abseil-cpp/issues/869
+  // https://github.com/google/cctz/issues/180
+#if !defined(WIN32) && !defined(__APPLE__)
   {
     const std::string format = "%START_TIME(%E4n)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));

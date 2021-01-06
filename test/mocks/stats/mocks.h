@@ -84,7 +84,7 @@ public:
     }
   }
 
-  TestSymbolTable symbol_table_; // Must outlive name_.
+  TestUtil::TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
 
   void setTags(const TagVector& tags) {
@@ -285,6 +285,9 @@ public:
   ~MockStore() override;
 
   ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
+  ScopePtr scopeFromStatName(StatName name) override {
+    return createScope(symbolTable().toString(name));
+  }
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
   MOCK_METHOD(Counter&, counter, (const std::string&));
@@ -324,7 +327,7 @@ public:
     return textReadout(symbol_table_->toString(name));
   }
 
-  TestSymbolTable symbol_table_;
+  TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };

@@ -351,15 +351,7 @@ def _com_github_zlib_ng_zlib_ng():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive(
-        "com_google_cel_cpp",
-        patch_args = ["-p1"],
-        # Patches to remove "fast" protobuf-internal access
-        # The patch can be removed when the "fast" access is safe to be enabled back.
-        # This requires public visibility of Reflection::LookupMapValue in protobuf and
-        # any release of cel-cpp after 10/27/2020.
-        patches = ["@envoy//bazel:cel-cpp.patch"],
-    )
+    external_http_archive("com_google_cel_cpp")
     external_http_archive("rules_antlr")
 
     # Parser dependencies
@@ -754,12 +746,23 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _upb():
-    external_http_archive(
-        name = "upb",
-        patches = ["@envoy//bazel:upb.patch"],
-        patch_args = ["-p1"],
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
+
+    native.bind(
+        name = "upb_lib_descriptor",
+        actual = "@upb//:descriptor_upb_proto",
+    )
+
+    native.bind(
+        name = "upb_textformat_lib",
+        actual = "@upb//:textformat",
+    )
+
+def _upb():
+    external_http_archive(name = "upb")
 
     native.bind(
         name = "upb_lib",

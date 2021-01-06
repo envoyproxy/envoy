@@ -173,9 +173,8 @@ public:
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
-        stat_name_pool_(scope_.symbolTable()),
-        zone_name_(stat_name_pool_.add(local_info_.zoneName())),
-        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
+        zone_name_(local_info_.zoneStatName()), shadow_writer_(std::move(shadow_writer)),
+        time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
@@ -217,8 +216,6 @@ public:
   HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
-  Stats::StatNamePool
-      stat_name_pool_; // TODO(#14242): use dynamic name for zone_name and drop pool.
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
 
@@ -462,7 +459,8 @@ private:
                                          Event::Dispatcher& dispatcher, TimeSource& time_source,
                                          Upstream::ResourcePriority priority) PURE;
 
-  std::unique_ptr<GenericConnPool> createConnPool();
+  std::unique_ptr<GenericConnPool>
+  createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster);
   UpstreamRequestPtr createUpstreamRequest();
 
   void maybeDoShadowing();

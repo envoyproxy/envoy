@@ -3,8 +3,11 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/thread_local/thread_local_object.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
+#include "common/common/logger.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -29,76 +32,53 @@ struct PriorityContext {
 
 using PriorityContextPtr = std::unique_ptr<PriorityContext>;
 
-class AggregateClusterLoadBalancer;
+// Order matters so a vector must be used for rebuilds. If the vector size becomes larger we can
+// maintain a parallel set for lookups during cluster update callbacks.
+using ClusterSet = std::vector<std::string>;
+using ClusterSetConstSharedPtr = std::shared_ptr<const ClusterSet>;
 
-class Cluster : public Upstream::ClusterImplBase, Upstream::ClusterUpdateCallbacks {
+class Cluster : public Upstream::ClusterImplBase {
 public:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Random::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api);
-
-  struct PerThreadLoadBalancer : public ThreadLocal::ThreadLocalObject {
-    AggregateClusterLoadBalancer& get() {
-      // We can refresh before the per-worker LB is created. One of these variants should hold
-      // a non-null value.
-      if (absl::holds_alternative<std::unique_ptr<AggregateClusterLoadBalancer>>(lb_)) {
-        ASSERT(absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(lb_) != nullptr);
-        return *absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(lb_);
-      } else {
-        ASSERT(absl::get<AggregateClusterLoadBalancer*>(lb_) != nullptr);
-        return *absl::get<AggregateClusterLoadBalancer*>(lb_);
-      }
-    }
-
-    // For aggregate cluster the per-thread LB is only created once. We need to own it so we
-    // can pre-populate it before the LB is created and handed to the cluster.
-    absl::variant<std::unique_ptr<AggregateClusterLoadBalancer>, AggregateClusterLoadBalancer*> lb_;
-  };
+          Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
     return Upstream::Cluster::InitializePhase::Secondary;
   }
 
-  // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
-  void onClusterRemoval(const std::string& cluster_name) override;
-
-  void refresh() {
-    refresh([](const std::string&) { return false; });
-  }
-
-  Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
-  ThreadLocal::TypedSlot<PerThreadLoadBalancer> tls_;
-  const std::vector<std::string> clusters_;
+  const ClusterSetConstSharedPtr clusters_;
 
 private:
   // Upstream::ClusterImplBase
-  void startPreInit() override;
-
-  void refresh(const std::function<bool(const std::string&)>& skip_predicate);
-  PriorityContextPtr
-  linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate);
+  void startPreInit() override { onPreInitComplete(); }
 };
 
 // Load balancer used by each worker thread. It will be refreshed when clusters, hosts or priorities
 // are updated.
-class AggregateClusterLoadBalancer : public Upstream::LoadBalancer {
+class AggregateClusterLoadBalancer : public Upstream::LoadBalancer,
+                                     Upstream::ClusterUpdateCallbacks,
+                                     Logger::Loggable<Logger::Id::upstream> {
 public:
-  AggregateClusterLoadBalancer(
-      Upstream::ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : stats_(stats), runtime_(runtime), random_(random), common_config_(common_config) {}
+  AggregateClusterLoadBalancer(const Upstream::ClusterInfoConstSharedPtr& parent_info,
+                               Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
+                               Random::RandomGenerator& random,
+                               const ClusterSetConstSharedPtr& clusters);
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterRemoval(const std::string& cluster_name) override;
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-  // Prefetching not yet implemented for extensions.
+  // Preconnecting not yet implemented for extensions.
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
     return nullptr;
   }
@@ -117,7 +97,7 @@ private:
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-    // Prefetching not yet implemented for extensions.
+    // Preconnecting not yet implemented for extensions.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
@@ -135,23 +115,18 @@ private:
 
   using LoadBalancerImplPtr = std::unique_ptr<LoadBalancerImpl>;
 
+  void addMemberUpdateCallbackForCluster(Upstream::ThreadLocalCluster& thread_local_cluster);
+  PriorityContextPtr linearizePrioritySet(OptRef<const std::string> excluded_cluster);
+  void refresh(OptRef<const std::string> excluded_cluster = OptRef<const std::string>());
+
   LoadBalancerImplPtr load_balancer_;
-  Upstream::ClusterStats& stats_;
+  Upstream::ClusterInfoConstSharedPtr parent_info_;
+  Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
-  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config_;
   PriorityContextPtr priority_context_;
-
-public:
-  void refresh(PriorityContextPtr priority_context) {
-    if (!priority_context->priority_set_.hostSetsPerPriority().empty()) {
-      load_balancer_ = std::make_unique<LoadBalancerImpl>(*priority_context, stats_, runtime_,
-                                                          random_, common_config_);
-    } else {
-      load_balancer_ = nullptr;
-    }
-    priority_context_ = std::move(priority_context);
-  }
+  const ClusterSetConstSharedPtr clusters_;
+  Upstream::ClusterUpdateCallbacksHandlePtr handle_;
 };
 
 // Load balancer factory created by the main thread and will be called in each worker thread to
@@ -160,14 +135,9 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
   AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create() override {
-    // See comments in PerThreadLoadBalancer above for why the follow is done.
-    auto per_thread_local_balancer = cluster_.tls_.get();
-    ASSERT(absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(
-               per_thread_local_balancer->lb_) != nullptr);
-    auto to_return = std::move(
-        absl::get<std::unique_ptr<AggregateClusterLoadBalancer>>(per_thread_local_balancer->lb_));
-    per_thread_local_balancer->lb_ = to_return.get();
-    return to_return;
+    return std::make_unique<AggregateClusterLoadBalancer>(
+        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
+        cluster_.clusters_);
   }
 
   const Cluster& cluster_;

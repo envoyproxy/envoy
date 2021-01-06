@@ -8,12 +8,11 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -53,26 +52,14 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
         headers_with_underscores_action) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http2::ServerConnectionImpl>(
-          connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    } else {
-      return std::make_unique<Legacy::Http2::ServerConnectionImpl>(
-          connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    }
+    return std::make_unique<Http2::ServerConnectionImpl>(
+        connection, callbacks, stats, random, http2_options, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http1::ServerConnectionImpl>(
-          connection, stats, callbacks, http1_settings, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    } else {
-      return std::make_unique<Legacy::Http1::ServerConnectionImpl>(
-          connection, stats, callbacks, http1_settings, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    }
+    return std::make_unique<Http1::ServerConnectionImpl>(
+        connection, stats, callbacks, http1_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
   }
 }
 
@@ -441,7 +428,9 @@ bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_head
 void ConnectionManagerUtility::maybeNormalizeHost(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config,
                                                   uint32_t port) {
-  if (config.shouldStripMatchingPort()) {
+  if (config.stripPortType() == Http::StripPortType::Any) {
+    HeaderUtility::stripPortFromHost(request_headers, absl::nullopt);
+  } else if (config.stripPortType() == Http::StripPortType::MatchingHost) {
     HeaderUtility::stripPortFromHost(request_headers, port);
   }
 }

@@ -65,11 +65,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
-  ENVOY_LOG_MISC(debug, "Using new codecs");
-  setNewCodecs();
-#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -300,7 +295,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, use_real_stats_, v2_bootstrap_);
+      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
+      v2_bootstrap_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
