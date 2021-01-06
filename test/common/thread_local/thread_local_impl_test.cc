@@ -29,7 +29,7 @@ TEST(MainThreadVerificationTest, All) {
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
-  // Main thread singleton is cleared in the constructor of tls instance. Call to main thread
+  // Main thread singleton is cleared in the destructor of tls instance. Call to main thread
   // verification will fail after that.
   EXPECT_DEATH(Thread::MainThread::isMainThread(),
                "InjectableSingleton used prior to initialization");
