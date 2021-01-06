@@ -610,9 +610,18 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.http.generic");
   }
-  const bool should_tcp_proxy =
-      route_entry_->connectConfig().has_value() &&
-      downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
+
+  bool should_tcp_proxy = false;
+
+  if (route_entry_->connectConfig().has_value()) {
+    auto method = downstream_headers_->getMethodValue();
+    if (route_entry_->connectConfig().value().use_post()) {
+      should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
+    } else {
+      should_tcp_proxy = (method == Http::Headers::get().MethodValues.Connect);
+    }
+  }
+
   return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }
