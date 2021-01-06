@@ -27,8 +27,6 @@ private:
   Filters::Common::Expr::BuilderPtr expr_builder_;
 };
 
-DECLARE_FACTORY(ExprDescriptorFactory);
-
 } // namespace Expr
 } // namespace Descriptors
 } // namespace Extensions

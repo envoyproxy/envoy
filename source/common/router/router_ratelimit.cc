@@ -188,11 +188,13 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       auto* factory = Envoy::Config::Utility::getFactory<RateLimit::DescriptorProducerFactory>(
           action.extension());
       if (!factory) {
-        throw new EnvoyException(
+        throw EnvoyException(
             absl::StrCat("Rate limit descriptor extension not found: ", action.extension().name()));
       }
-      actions_.emplace_back(
-          factory->createDescriptorProducerFromProto(action.extension().typed_config(), validator));
+      auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+          action.extension().typed_config(), validator, *factory);
+      actions_.emplace_back(factory->createDescriptorProducerFromProto(*message, validator));
+      break;
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

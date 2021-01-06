@@ -59,7 +59,7 @@ ProtobufTypes::MessagePtr ExprDescriptorFactory::createEmptyConfigProto() {
 
 RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducerFromProto(
     const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validator) {
-  auto config =
+  const auto& config =
       MessageUtil::downcastAndValidate<const envoy::extensions::descriptors::expr::v3::Descriptor&>(
           message, validator);
   switch (config.expr_specifier_case()) {
@@ -86,6 +86,8 @@ Filters::Common::Expr::Builder& ExprDescriptorFactory::getOrCreateBuilder() {
   }
   return *expr_builder_;
 }
+
+REGISTER_FACTORY(ExprDescriptorFactory, RateLimit::DescriptorProducerFactory);
 
 } // namespace Expr
 } // namespace Descriptors
