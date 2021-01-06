@@ -1,7 +1,5 @@
 #pragma once
 
-// NOLINT(namespace-envoy)
-
 #include <exception>
 #include <memory>
 #include <optional>
@@ -9,11 +7,17 @@
 
 #include "absl/types/optional.h"
 
+namespace Envoy {
+namespace Platform {
+
 struct EnvoyError {
   int error_code;
   std::string message;
   absl::optional<int> attempt_count;
-  std::exception cause;
+  absl::optional<std::exception> cause;
 };
 
 using EnvoyErrorSharedPtr = std::shared_ptr<EnvoyError>;
+
+} // namespace Platform
+} // namespace Envoy

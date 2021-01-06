@@ -1,7 +1,5 @@
 #pragma once
 
-// NOLINT(namespace-envoy)
-
 #include <optional>
 #include <vector>
 
@@ -9,17 +7,23 @@
 #include "headers.h"
 #include "request_headers.h"
 
+namespace Envoy {
+namespace Platform {
+
 class RequestHeaders;
 
 enum RetryRule {
   Status5xx,
-  GatewayFailure,
+  GatewayError,
   ConnectFailure,
   RefusedStream,
   Retriable4xx,
   RetriableHeaders,
   Reset,
 };
+
+std::string retry_rule_to_string(RetryRule retry_rule);
+RetryRule retry_rule_from_string(const std::string& str);
 
 struct RetryPolicy {
   int max_retry_count;
@@ -28,8 +32,11 @@ struct RetryPolicy {
   absl::optional<int> per_try_timeout_ms;
   absl::optional<int> total_upstream_timeout_ms;
 
-  RawHeaders output_headers() const;
-  static RetryPolicy from(const RequestHeaders& headers);
+  RawHeaderMap as_raw_header_map() const;
+  static RetryPolicy from_raw_header_map(const RawHeaderMap& headers);
 };
 
 using RetryPolicySharedPtr = std::shared_ptr<RetryPolicy>;
+
+} // namespace Platform
+} // namespace Envoy

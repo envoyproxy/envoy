@@ -1,9 +1,10 @@
 #pragma once
 
-// NOLINT(namespace-envoy)
-
 #include "headers_builder.h"
 #include "request_trailers.h"
+
+namespace Envoy {
+namespace Platform {
 
 class RequestTrailers;
 
@@ -15,3 +16,6 @@ public:
 };
 
 using RequestTrailersBuilderSharedPtr = std::shared_ptr<RequestTrailersBuilder>;
+
+} // namespace Platform
+} // namespace Envoy
