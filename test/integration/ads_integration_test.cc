@@ -307,6 +307,32 @@ TEST_P(AdsIntegrationTest, Failure) {
   makeSingleRequest();
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/9682.
+TEST_P(AdsIntegrationTest, ResendNodeOnStreamReset) {
+  initialize();
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+  // A second CDS request should be sent so that the node is cleared in the cached request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+
+  xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+  AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  xds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {"cluster_0"},
+                                      {"cluster_0"}, {}, true));
+}
+
 // Validate that xds can support a mix of v2 and v3 type url.
 TEST_P(AdsIntegrationTest, MixV2V3TypeUrlInDiscoveryResponse) {
   config_helper_.addRuntimeOverride(
