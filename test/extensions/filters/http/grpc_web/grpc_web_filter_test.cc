@@ -204,9 +204,9 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data1("start");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data1, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data1, false));
   Buffer::OwnedImpl data2("hello");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data2, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data2, false));
   Buffer::OwnedImpl data3("end");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data3, true));
 

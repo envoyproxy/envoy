@@ -1,4 +1,5 @@
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
+#include <bits/stdint-uintn.h>
 
 #ifndef WIN32
 #include <arpa/inet.h>
@@ -196,19 +197,20 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   // response, we set the "grpc-message" header with the upstream body content.
   if (response_headers_ != nullptr) {
     if (!end_stream) {
-      return Http::FilterDataStatus::StopIterationAndBuffer;
+      return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    constexpr uint64_t max_grpc_message_length = 1024;
     // Take the last frame as the grpc-message value, but the size of it is limited by
     // max_grpc_message_length.
-    const auto message =
-        Http::Utility::PercentEncoding::encode(data.toString().substr(0, max_grpc_message_length));
+    constexpr uint64_t max_grpc_message_length = 1024;
+    const uint64_t message_size = std::min(max_grpc_message_length, data.length());
+    std::string message(message_size, 0);
+    data.copyOut(0, message_size, message.data());
     data.drain(data.length());
 
     response_headers_->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(
         enumToInt(Http::Utility::getResponseStatus(*response_headers_))));
-    response_headers_->setGrpcMessage(message);
+    response_headers_->setGrpcMessage(Http::Utility::PercentEncoding::encode(message));
     response_headers_->setContentLength(0);
     return Http::FilterDataStatus::Continue;
   }
