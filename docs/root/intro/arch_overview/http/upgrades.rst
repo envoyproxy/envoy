@@ -125,4 +125,4 @@ CONNECT request, and a second one listening on 10001, stripping the CONNECT head
 original TCP upstream, in this case to google.com.
 
 Envoy waits for the HTTP tunnel to be established (i.e. a successful response to the  CONNECT request is received),
-before start streaming the downstream TCP data to the upstream. This flags default to ``true``.
+before start streaming the downstream TCP data to the upstream.
