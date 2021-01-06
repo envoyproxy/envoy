@@ -32,7 +32,7 @@ The following v2 xDS resource types are supported:
 -  :ref:`envoy.api.v2.Auth.Secret <envoy_api_msg_Auth.Secret>`
 -  :ref:`envoy.service.discovery.v2.Runtime <envoy_api_msg_service.discovery.v2.Runtime>`
 
-The following v3 xdS resource types are supported:
+The following v3 xDS resource types are supported:
 
 -  :ref:`envoy.config.listener.v3.Listener <envoy_v3_api_msg_config.listener.v3.Listener>`
 -  :ref:`envoy.config.route.v3.RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
