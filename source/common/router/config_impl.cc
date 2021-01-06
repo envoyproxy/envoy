@@ -1115,11 +1115,11 @@ VirtualHostImpl::VirtualHostImpl(
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
-    : stat_name_pool_(factory_context.scope().symbolTable()),
-      stat_name_(stat_name_pool_.add(virtual_host.name())),
-      vcluster_scope_(scope.createScope(virtual_host.name() + ".vcluster")),
-      rate_limit_policy_(virtual_host.rate_limits(), validator),
-      global_route_config_(global_route_config),
+    : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
+      vcluster_scope_(Stats::Utility::scopeFromStatNames(
+          scope, {stat_name_storage_.statName(),
+                  factory_context.routerContext().virtualClusterStatNames().vcluster_})),
+      rate_limit_policy_(virtual_host.rate_limits(), validator), global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
@@ -1193,7 +1193,7 @@ VirtualHostImpl::VirtualHostImpl(
 
   for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
     virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, stat_name_pool_, *vcluster_scope_,
+        VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
                             factory_context.routerContext().virtualClusterStatNames()));
   }
 
@@ -1203,10 +1203,11 @@ VirtualHostImpl::VirtualHostImpl(
 }
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
-    const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool,
-    Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-    : VirtualClusterBase(pool.add(virtual_cluster.name()),
-                         scope.createScope(virtual_cluster.name()), stat_names) {
+    const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
+    const VirtualClusterStatNames& stat_names)
+    : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
+      VirtualClusterBase(stat_name_storage_.statName(),
+                         scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
   if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
       virtual_cluster.headers().empty()) {
     throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
@@ -1265,7 +1266,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            const ConfigImpl& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
-    : vhost_scope_(factory_context.scope().createScope("vhost")) {
+    : vhost_scope_(factory_context.scope().scopeFromStatName(
+          factory_context.routerContext().virtualClusterStatNames().vhost_)) {
   absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
   if (validate_clusters) {
     validation_clusters = factory_context.clusterManager().clusters();
