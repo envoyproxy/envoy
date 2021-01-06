@@ -64,10 +64,10 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   // When we open the file we want to perform the following translations if applicable:
   // * If the path is a standard unix path to the standard output/error fd, then retrieve the
   // standard handle of the process.
-  // * If the path is a standard unix path to the console, then translate the path to `CONOUT$`.
+  // * If the path is a standard unix path to the console, then translate the path to `CONOUT`.
   // * If the path is a standard unix path to null, then translate the path to `NUL`.
   // * Otherwise maintain the path as it is.
-  auto std_handle = toStandardHandle(path_);
+  DWORD std_handle = toStandardHandle(path_);
   if (std_handle) {
     fd_ = GetStdHandle(std_handle);
     is_std_handle_ = true;
