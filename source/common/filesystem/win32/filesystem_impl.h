@@ -26,6 +26,7 @@ private:
 
   FlagsAndMode translateFlag(FlagSet in);
   friend class FileSystemImplTest;
+  bool is_std_handle_{false};
 };
 
 class InstanceImplWin32 : public Instance {

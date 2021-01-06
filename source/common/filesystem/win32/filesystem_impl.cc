@@ -19,6 +19,35 @@
 namespace Envoy {
 namespace Filesystem {
 
+static const std::unordered_map<std::string, DWORD> unix_output_pipes_to_windows_standard_handle{
+    {"/dev/stdin", STD_INPUT_HANDLE},       {"/dev/fd/0", STD_INPUT_HANDLE},
+    {"/proc/self/fd/0", STD_INPUT_HANDLE},
+
+    {"/dev/stdout", STD_OUTPUT_HANDLE},     {"/dev/fd/1", STD_OUTPUT_HANDLE},
+    {"/proc/self/fd/1", STD_OUTPUT_HANDLE},
+
+    {"/dev/err", STD_ERROR_HANDLE},         {"/dev/fd/2", STD_ERROR_HANDLE},
+    {"/proc/self/fd/2", STD_ERROR_HANDLE}};
+
+static const std::unordered_map<std::string, std::string> unix_output_pipes_to_windows_file{
+    {"/dev/null", "NUL"}, {"/dev/console", "CONOUT$"}, {"/dev/tty", "CONOUT$"}};
+
+DWORD toStandardHandle(const std::string& path) {
+  auto it = unix_output_pipes_to_windows_standard_handle.find(path);
+  if (it == unix_output_pipes_to_windows_standard_handle.end()) {
+    return 0;
+  }
+  return (*it).second;
+}
+
+std::string translateUnixPath(const std::string& path) {
+  auto it = unix_output_pipes_to_windows_file.find(path);
+  if (it == unix_output_pipes_to_windows_file.end()) {
+    return path;
+  }
+  return (*it).second;
+}
+
 FileImplWin32::~FileImplWin32() {
   if (isOpen()) {
     const Api::IoCallBoolResult result = close();
@@ -31,8 +60,31 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
     return resultSuccess(true);
   }
 
+  auto std_handle = toStandardHandle(path_);
+  if (std_handle) {
+    fd_ = GetStdHandle(std_handle);
+    if (fd_ == NULL) {
+      // If an application does not have associated standard handles,
+      // such as a service running on an interactive desktop
+      // and has not redirected them, the return value is NULL.
+      // In that case we throw an exception instead of failing since there is no last error.
+      throw EnvoyException(
+          fmt::format("The process does not have an associated handle for '{}'", path_));
+      return resultFailure(false, ::GetLastError());
+    }
+
+    if (fd_ == INVALID_HANDLE) {
+      return resultFailure(false, ::GetLastError());
+    }
+
+    is_std_handle_ = true;
+    return resultSuccess(true);
+  }
+
+  auto translated_path = translateUnixPath(path_);
+
   auto flags = translateFlag(in);
-  fd_ = CreateFileA(path_.c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+  fd_ = CreateFileA(translated_path.c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
                     flags.creation_, 0, NULL);
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
@@ -51,7 +103,12 @@ Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
 
 Api::IoCallBoolResult FileImplWin32::close() {
   ASSERT(isOpen());
-
+  if (is_std_handle_) {
+    // If we are writing to the standard output of the process we are
+    // not the owners of the handle, we are just using it.
+    fd_ = INVALID_HANDLE;
+    return resultSuccess(true);
+  }
   BOOL result = CloseHandle(fd_);
   fd_ = INVALID_HANDLE;
   if (result == 0) {
@@ -92,7 +149,14 @@ FilePtr InstanceImplWin32::createFile(const std::string& path) {
 }
 
 bool InstanceImplWin32::fileExists(const std::string& path) {
-  const DWORD attributes = ::GetFileAttributes(path.c_str());
+  auto std_handle = toStandardHandle(path);
+  if (std_handle) {
+    auto fd = GetStdHandle(std_handle);
+    return (fd != NULL && fd != INVALID_HANDLE);
+  }
+
+  auto translated_path = translateUnixPath(path);
+  const DWORD attributes = ::GetFileAttributes(translated_path.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES;
 }
 
