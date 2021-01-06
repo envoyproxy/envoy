@@ -16,16 +16,19 @@ namespace Envoy {
 namespace ThreadLocal {
 
 TEST(MainThreadVerificationTest, All) {
+  // Main thread utility is initialized in the constructor of tls instance. Call to main thread verification will fail before that.
   EXPECT_DEATH(Thread::MainThread::isMainThread(),
                "InjectableSingleton used prior to initialization");
   {
     EXPECT_DEATH(Thread::MainThread::isMainThread(),
                  "InjectableSingleton used prior to initialization");
     InstanceImpl tls;
+    // Call to main thread verification should succeed after tls instance has been intialized.
     ASSERT(Thread::MainThread::isMainThread());
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
+  // Main thread utility is cleared in the constructor of tls instance. Call to main thread verification will fail after that.
   EXPECT_DEATH(Thread::MainThread::isMainThread(),
                "InjectableSingleton used prior to initialization");
 }
