@@ -1363,7 +1363,7 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
 #ifndef WIN32
 class SafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(const std::vector<const ScopeTrackedObject*>& /*tracked_objects*/) override {
     std::cerr << "Called SafeFatalAction" << std::endl;
   }
 
@@ -1372,7 +1372,7 @@ public:
 
 class UnsafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(const std::vector<const ScopeTrackedObject*>& /*tracked_objects*/) override {
     std::cerr << "Called UnsafeFatalAction" << std::endl;
   }
 

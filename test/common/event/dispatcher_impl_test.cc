@@ -535,7 +535,9 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
 
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
+  void run(const std::vector<const ScopeTrackedObject*>& /*tracked_objects*/) override {
+    ++times_ran_;
+  }
   bool isAsyncSignalSafe() const override { return true; }
   int getNumTimesRan() { return times_ran_; }
 

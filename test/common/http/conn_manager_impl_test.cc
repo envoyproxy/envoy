@@ -2654,7 +2654,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, appendTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     request_timer->invokeCallback();
     return Http::okStatus();
   }));
@@ -2884,7 +2885,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutCallbackDisarmsAndRetu
     EXPECT_CALL(*request_header_timer, enableTimer(request_headers_timeout_, _));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, appendTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     return Http::okStatus();
   }));
 

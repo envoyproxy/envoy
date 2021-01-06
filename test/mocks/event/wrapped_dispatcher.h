@@ -97,8 +97,12 @@ public:
   void run(RunType type) override { impl_.run(type); }
 
   Buffer::WatermarkFactory& getWatermarkFactory() override { return impl_.getWatermarkFactory(); }
-  const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {
-    return impl_.setTrackedObject(object);
+  void appendTrackedObject(const ScopeTrackedObject* object) override {
+    return impl_.appendTrackedObject(object);
+  }
+
+  void popTrackedObject(const ScopeTrackedObject* expected_object) override {
+    return impl_.popTrackedObject(expected_object);
   }
 
   MonotonicTime approximateMonotonicTime() const override {

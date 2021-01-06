@@ -2348,9 +2348,10 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
   {
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_))
-        .Times(2)
-        .WillOnce(Invoke([](const ScopeTrackedObject* object) -> const ScopeTrackedObject* {
+
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, appendTrackedObject(_))
+        .Times(1)
+        .WillOnce(Invoke([](const ScopeTrackedObject* object) -> void {
           ASSERT(object != nullptr); // On the first call, this should be the active stream.
           std::stringstream out;
           object->dumpState(out);
@@ -2358,9 +2359,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           EXPECT_THAT(state,
                       testing::HasSubstr("filter_manager_callbacks_.requestHeaders():   null"));
           EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
-          return nullptr;
-        }))
-        .WillRepeatedly(Return(nullptr));
+        }));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
         .WillOnce(Invoke([](HeaderMap&, bool) -> FilterHeadersStatus {
           return FilterHeadersStatus::StopIteration;
@@ -2371,9 +2371,9 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
   // Send trailers to that stream, and verify by this point headers are in logged state.
   {
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_))
-        .Times(2)
-        .WillOnce(Invoke([](const ScopeTrackedObject* object) -> const ScopeTrackedObject* {
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, appendTrackedObject(_))
+        .Times(1)
+        .WillOnce(Invoke([](const ScopeTrackedObject* object) -> void {
           ASSERT(object != nullptr); // On the first call, this should be the active stream.
           std::stringstream out;
           object->dumpState(out);
@@ -2381,9 +2381,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           EXPECT_THAT(state, testing::HasSubstr("filter_manager_callbacks_.requestHeaders(): \n"));
           EXPECT_THAT(state, testing::HasSubstr("':authority', 'host'\n"));
           EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
-          return nullptr;
-        }))
-        .WillRepeatedly(Return(nullptr));
+        }));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     EXPECT_CALL(*decoder_filters_[0], decodeComplete());
     EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
         .WillOnce(Return(FilterTrailersStatus::StopIteration));

@@ -127,7 +127,8 @@ public:
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
-    EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
+    EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, appendTrackedObject(_)).Times(AnyNumber());
+    EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
 
   void SetUpTest(const std::string& yaml) { SetUpTest(convertYamlStrToProtoConfig(yaml)); }
@@ -624,7 +625,8 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
 
-  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
+  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, appendTrackedObject(_));
+  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_));
   timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));

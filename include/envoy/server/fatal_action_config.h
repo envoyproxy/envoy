@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -18,10 +19,9 @@ public:
   virtual ~FatalAction() = default;
   /**
    * Callback function to run when we are crashing.
-   * @param current_object the object we were working on when we started
-   * crashing.
+   * @param objects a vector of objects we were working on when we started crashing.
    */
-  virtual void run(const ScopeTrackedObject* current_object) PURE;
+  virtual void run(const std::vector<const ScopeTrackedObject*>& tracked_objects) PURE;
 
   /**
    * @return whether the action is async-signal-safe.

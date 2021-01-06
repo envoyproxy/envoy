@@ -1,3 +1,6 @@
+#include <vector>
+
+#include "envoy/common/scope_tracker.h"
 #include "envoy/server/fatal_action_config.h"
 
 #include "common/signal/fatal_action.h"
@@ -23,9 +26,10 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
   void onFatalError(std::ostream& /*os*/) const override {}
   void
   runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override {
-    // Call the Fatal Actions with nullptr
+    // Call the Fatal Actions with a non-empty vector so it runs the action.
+    std::vector<const ScopeTrackedObject*> tracked_objects{nullptr};
     for (const Server::Configuration::FatalActionPtr& action : actions) {
-      action->run(nullptr);
+      action->run(tracked_objects);
     }
   }
 };
@@ -33,7 +37,11 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
   TestFatalAction(bool is_safe, int* const counter) : is_safe_(is_safe), counter_(counter) {}
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++(*counter_); }
+  void run(const std::vector<const ScopeTrackedObject*>& tracked_objects) override {
+    for (size_t i = 0; i < tracked_objects.size(); ++i) {
+      ++(*counter_);
+    }
+  }
   bool isAsyncSignalSafe() const override { return is_safe_; }
 
 private:

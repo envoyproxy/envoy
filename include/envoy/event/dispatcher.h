@@ -86,15 +86,18 @@ public:
   virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
 
   /**
-   * Sets a tracked object, which is currently operating in this Dispatcher.
-   * This should be cleared with another call to setTrackedObject() when the object is done doing
-   * work. Calling setTrackedObject(nullptr) results in no object being tracked.
+   * Appends a tracked object to the current stack of tracked objects operating
+   * in the dispatcher.
    *
-   * This is optimized for performance, to avoid allocation where we do scoped object tracking.
-   *
-   * @return The previously tracked object or nullptr if there was none.
+   * It's recommended to use ScopeTrackerScopeState to manage the object's tracking. If directly
+   * invoking, there needs to be a subsequent call to popTrackedObject().
    */
-  virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
+  virtual void appendTrackedObject(const ScopeTrackedObject* object) PURE;
+
+  /**
+   * Removes the top of the stack of tracked object and asserts that it was expected.
+   */
+  virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
 
   /**
    * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the

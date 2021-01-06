@@ -7,10 +7,12 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
@@ -36,6 +38,12 @@
 
 namespace Envoy {
 namespace Event {
+namespace {
+// Our tracked object stack likely won't grow larger than this initial
+// reservation; this should make appends constant time since we shouldn't
+// have to grow the stack larger.
+constexpr size_t ExpectedMaxTrackedObjectStackDepth = 10;
+} // namespace
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
@@ -49,6 +57,7 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
+  tracked_object_stack_.reserve(ExpectedMaxTrackedObjectStackDepth);
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
   base_scheduler_.registerOnPrepareCallback(
@@ -287,6 +296,16 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
+void DispatcherImpl::onFatalError(std::ostream& os) const {
+  // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
+  // results in dumping the active state only for the thread which caused the fatal error.
+  if (isThreadSafe()) {
+    for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
+      (*iter)->dumpState(os);
+    }
+  }
+}
+
 void DispatcherImpl::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
   // Only run if this is the dispatcher of the current thread and
@@ -296,7 +315,7 @@ void DispatcherImpl::runFatalActionsOnTrackedObject(
   }
 
   for (const auto& action : actions) {
-    action->run(current_object_);
+    action->run(tracked_object_stack_);
   }
 }
 
@@ -304,6 +323,23 @@ void DispatcherImpl::touchWatchdog() {
   if (watchdog_registration_) {
     watchdog_registration_->touchWatchdog();
   }
+}
+
+void DispatcherImpl::appendTrackedObject(const ScopeTrackedObject* object) {
+  tracked_object_stack_.push_back(object);
+}
+
+void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object) {
+  if (tracked_object_stack_.empty()) {
+    ASSERT(!expected_object,
+           "Tracked object stack is empty yet we expected a non-null tracked object on the top.");
+    return;
+  }
+
+  const ScopeTrackedObject* top = tracked_object_stack_.back();
+  tracked_object_stack_.pop_back();
+  ASSERT(top == expected_object,
+         "Popped the top of the tracked object stack, but it wasn't the expected object!");
 }
 
 } // namespace Event
