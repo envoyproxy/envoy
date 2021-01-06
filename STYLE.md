@@ -192,10 +192,10 @@ A few general notes on our error handling philosophy:
   general we view `ASSERT` as the common case and `RELEASE_ASSERT` as the uncommon case, but
   experience and judgment may dictate a particular approach depending on the situation.
 
-Below is a guideline for macro usage. On the left side are invariants and the right side is for
-error conditions that can be triggered. `ENVOY_BUG` represents a middle ground that can be used for
-uncertain conditions that need detectability. `ENVOY_BUG`s can also be added for errors if they need
-detection.
+Below is a guideline for macro usage. The left side of the table has invariants and the right side
+has error conditions that can be triggered and should be gracefully handled. `ENVOY_BUG` represents
+a middle ground that can be used for uncertain conditions that need detectability. `ENVOY_BUG`s can
+also be added for errors if they warrant detection.
 
 | `ASSERT`/`RELEASE_ASSERT` | `ENVOY_BUG` | Error handling and Testing |
 | --- | --- | --- |
