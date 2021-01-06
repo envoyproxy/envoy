@@ -13,10 +13,10 @@
 
 #include "common/api/api_impl.h"
 #include "common/common/assert.h"
+#include "common/common/random_generator.h"
 #include "common/event/real_time_system.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/common/random_generator.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "exe/platform_impl.h"
