@@ -273,7 +273,8 @@ message Listener {
   google.protobuf.UInt32Value tcp_backlog_size = 24;
 
   // Whether the listener should bind to the port. A listener that doesn't
-  // bind can only receive connections redirected from other listeners that
-  // set use_original_dst parameter to true. Default is true.
+  // bind can only receive connections redirected from other listeners that set
+  // :ref:`use_original_dst <envoy_api_field_config.listener.v4alpha.Listener.use_original_dst>`
+  // to true. Default is true.
   google.protobuf.BoolValue bind_to_port = 26;
 }
