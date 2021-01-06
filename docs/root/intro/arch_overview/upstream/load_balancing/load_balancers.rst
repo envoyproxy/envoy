@@ -75,6 +75,7 @@ that specifies a value to hash on. If you want something other than the host's a
 as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it 
 in the ``"envoy.lb"``:ref:`filter_metadata <envoy_api_msg_core.Metadata>` e.g.: 
 .. code-block:: yaml
+
     filter_metadata:
       envoy.lb:
         hash_key: "YOUR HASH KEY"
@@ -113,6 +114,7 @@ hash on. If you want something other than the host's address to be used as the h
 semantic name of your host in a Kubernetes StatefulSet), then you can specify it in the ``"envoy.lb"``
 :ref:`filter_metadata <envoy_api_msg_core.Metadata>` e.g.: 
 .. code-block:: yaml
+
     filter_metadata:
       envoy.lb:
         hash_key: "YOUR HASH KEY"
