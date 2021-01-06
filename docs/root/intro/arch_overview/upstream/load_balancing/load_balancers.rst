@@ -71,7 +71,15 @@ mapped onto a circle (the "ring") by hashing its address; each request is then r
 hashing some property of the request, and finding the nearest corresponding host clockwise around
 the ring. This technique is also commonly known as `"Ketama" <https://github.com/RJ/ketama>`_
 hashing, and like all hash-based load balancers, it is only effective when protocol routing is used
-that specifies a value to hash on.
+that specifies a value to hash on. If you want something other than the host's address to be used
+as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it 
+in the ``"envoy.lb"``:ref:`filter_metadata <envoy_api_msg_core.Metadata>` e.g.: 
+.. code-block:: yaml
+    filter_metadata:
+      envoy.lb:
+        hash_key: "YOUR HASH KEY"
+
+This will override :ref:`use_hostname_for_hashing<envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
 
 Each host is hashed and placed on the ring some number of times proportional to its weight. For
 example, if host A has a weight of 1 and host B has a weight of 2, then there might be three entries
@@ -101,7 +109,15 @@ with a fixed table size of 65537 (see section 5.3 of the same paper). Maglev can
 in replacement for the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`
 any place in which consistent hashing is desired. Like the ring hash load balancer, a consistent
 hashing load balancer is only effective when protocol routing is used that specifies a value to
-hash on.
+hash on. If you want something other than the host's address to be used as the hash key (e.g. the 
+semantic name of your host in a Kubernetes StatefulSet), then you can specify it in the ``"envoy.lb"``
+:ref:`filter_metadata <envoy_api_msg_core.Metadata>` e.g.: 
+.. code-block:: yaml
+    filter_metadata:
+      envoy.lb:
+        hash_key: "YOUR HASH KEY"
+
+This will override :ref:`use_hostname_for_hashing<envoy_api_field_Cluster.CommonLbConfig.consistent_hashing_lb_config>`.
 
 The table construction algorithm places each host in the table some number of times proportional
 to its weight, until the table is completely filled. For example, if host A has a weight of 1 and
