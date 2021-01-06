@@ -160,6 +160,7 @@ A few general notes on our error handling philosophy:
 # Macro Usage
 
 The following macros are available:
+
     * `RELEASE_ASSERT`: fatal check.
     * `ASSERT`: fatal check in debug-only builds. These should be used to document (and check in
       debug-only builds) program invariants.
@@ -168,8 +169,7 @@ The following macros are available:
       production (and check in debug-only builds).
     
 Sub-macros alias the macros above and can be used to annotate specific situations:
-    * `ASSERT_INTERNAL` (by default compiles to `ASSERT` but can be built to behave like
-      `ENVOY_BUG`). Used for provable, internal class invariants. No error handling is needed.
+
     * `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
       detectability on probable or changing invariants.
 
@@ -199,14 +199,14 @@ error conditions that can be triggered. `ENVOY_BUG` represents a middle ground t
 uncertain conditions that need detectability. `ENVOY_BUG`s can also be added for errors if they need
 detection.
 
-| ASSERT/RELEASE_ASSERT                                                               | ENVOY_BUG                                                                                    | Error handling and Testing                                                                                                                                        |
-| ---                                                                                 | ---                                                                                          | ---                                                                                                                                                               |
-| Low level invariants in data structures                                             |                                                                                              |                                                                                                                                                                   |
-| Simple, provable internal class invariants (denote ASSERT_INVARIANT                 | Complex, uncertain internal class invariants (e.g. need detectability if violated)           |                                                                                                                                                                   |
-| Provable (pre/post)-conditions                                                      | Complicated but likely (pre-/post-) conditions that are low-risk (Envoy can continue safely) | Triggerable or uncertain conditions, may be based on untrusted data plane traffic or an extensions’ contract.                                                     |
-|                                                                                     | Conditions in alpha or changing extensions that need detectability. (ENVOY_BUG_ALPHA)        |                                                                                                                                                                   |
-| Unlikely environment errors after process initialization that would otherwise crash |                                                                                              | Likely environment errors, e.g. return codes from untrusted extensions, dependencies or system calls, network error, bad data read, permission based errors, etc. |
-| Fatal crashing events. e.g. OOMs, deadlocks, no process recovery possible           |                                                                                              |                                                                                                                                                                   |
+| `ASSERT`/`RELEASE_ASSERT` | `ENVOY_BUG` | Error handling and Testing |
+| --- | --- | --- |
+| Low level invariants in data structures | | |
+| Simple, provable internal class invariants | Complex, uncertain internal class invariants (e.g. need detectability if violated) | |
+| Provable (pre/post)-conditions | Complicated but likely (pre-/post-) conditions that are low-risk (Envoy can continue safely) | Triggerable or uncertain conditions, may be based on untrusted data plane traffic or an extensions’ contract.  |
+|                                                                                     | Conditions in alpha or changing extensions that need detectability. (`ENVOY_BUG_ALPHA`) | |
+| Unlikely environment errors after process initialization that would otherwise crash | | Likely environment errors, e.g. return codes from untrusted extensions, dependencies or system calls, network error, bad data read, permission based errors, etc. |
+| Fatal crashing events. e.g. OOMs, deadlocks, no process recovery possible | | |
 
 # Hermetic and deterministic tests
 
