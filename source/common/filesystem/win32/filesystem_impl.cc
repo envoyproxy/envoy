@@ -26,7 +26,7 @@ static const absl::flat_hash_map<std::string, DWORD> unix_output_pipes_to_window
     {"/dev/stdout", STD_OUTPUT_HANDLE},     {"/dev/fd/1", STD_OUTPUT_HANDLE},
     {"/proc/self/fd/1", STD_OUTPUT_HANDLE},
 
-    {"/dev/stderr", STD_ERROR_HANDLE},         {"/dev/fd/2", STD_ERROR_HANDLE},
+    {"/dev/stderr", STD_ERROR_HANDLE},      {"/dev/fd/2", STD_ERROR_HANDLE},
     {"/proc/self/fd/2", STD_ERROR_HANDLE}};
 
 static const absl::flat_hash_map<std::string, std::string> unix_output_pipes_to_windows_file{
@@ -63,7 +63,7 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   auto std_handle = toStandardHandle(path_);
   if (std_handle) {
     fd_ = GetStdHandle(std_handle);
-    is_std_handle_  = true;
+    is_std_handle_ = true;
     if (fd_ == NULL) {
       // If an application does not have associated standard handles,
       // such as a service running on an interactive desktop
