@@ -159,17 +159,17 @@ A few general notes on our error handling philosophy:
   
 # Macro Usage
 
-The following macros are available:
-    - `RELEASE_ASSERT`: fatal check.
-    - `ASSERT`: fatal check in debug-only builds. These should be used to document (and check in
-      debug-only builds) program invariants.
-    - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
-      should be used where it may be useful to detect if an efficient condition is violated in
-      production (and check in debug-only builds).
-    
-Sub-macros alias the macros above and can be used to annotate specific situations:
-    - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
-      detectability on probable or changing invariants.
+* The following macros are available:
+  - `RELEASE_ASSERT`: fatal check.
+  - `ASSERT`: fatal check in debug-only builds. These should be used to document (and check in
+    debug-only builds) program invariants.
+  - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
+    should be used where it may be useful to detect if an efficient condition is violated in
+    production (and check in debug-only builds).
+
+* Sub-macros alias the macros above and can be used to annotate specific situations:
+  - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
+  detectability on probable or changing invariants.
 
 * Per above it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
   `PANIC(message)` if there is no other sensible behavior, e.g.  in OOM (memory/FD) scenarios.
