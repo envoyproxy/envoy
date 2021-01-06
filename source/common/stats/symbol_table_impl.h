@@ -497,6 +497,8 @@ public:
       : StatNameStorage(name, table), symbol_table_(table) {}
   StatNameManagedStorage(StatNameManagedStorage&& src) noexcept
       : StatNameStorage(std::move(src)), symbol_table_(src.symbol_table_) {}
+  StatNameManagedStorage(StatName src, SymbolTable& table) noexcept
+      : StatNameStorage(src, table), symbol_table_(table) {}
 
   ~StatNameManagedStorage() { free(symbol_table_); }
 

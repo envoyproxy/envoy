@@ -16,14 +16,14 @@ ScopePrefixer::ScopePrefixer(StatName prefix, Scope& scope)
 
 ScopePrefixer::~ScopePrefixer() { prefix_.free(symbolTable()); }
 
-ScopePtr ScopePrefixer::createScopeFromStatName(StatName name) {
+ScopePtr ScopePrefixer::scopeFromStatName(StatName name) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
   return std::make_unique<ScopePrefixer>(StatName(joined.get()), scope_);
 }
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return createScopeFromStatName(stat_name_storage.statName());
+  return scopeFromStatName(stat_name_storage.statName());
 }
 
 Counter& ScopePrefixer::counterFromStatNameWithTags(const StatName& name,

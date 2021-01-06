@@ -25,8 +25,7 @@ namespace Stats {
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
-    : alloc_(alloc), default_scope_(ThreadLocalStoreImpl::createScope("")),
-      tag_producer_(std::make_unique<TagProducerImpl>()),
+    : alloc_(alloc), tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
       heap_allocator_(alloc.symbolTable()), null_counter_(alloc.symbolTable()),
@@ -36,6 +35,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     well_known_tags_->rememberBuiltin(desc.name_);
   }
+  StatNameManagedStorage empty("", alloc.symbolTable());
+  default_scope_ = ThreadLocalStoreImpl::scopeFromStatName(empty.statName());
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -128,6 +129,11 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 }
 
 ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
+  return scopeFromStatName(stat_name_storage.statName());
+}
+
+ScopePtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
@@ -324,9 +330,9 @@ void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
   }
 }
 
-ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
+ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix)
     : scope_id_(parent.next_scope_id_++), parent_(parent),
-      prefix_(Utility::sanitizeStatsName(prefix), parent.alloc_.symbolTable()),
+      prefix_(prefix, parent.alloc_.symbolTable()),
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {

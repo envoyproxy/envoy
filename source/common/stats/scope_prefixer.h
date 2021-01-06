@@ -13,10 +13,9 @@ public:
   ScopePrefixer(StatName prefix, Scope& scope);
   ~ScopePrefixer() override;
 
-  ScopePtr createScopeFromStatName(StatName name);
-
   // Scope
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,

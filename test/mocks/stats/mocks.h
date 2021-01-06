@@ -285,6 +285,9 @@ public:
   ~MockStore() override;
 
   ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
+  ScopePtr scopeFromStatName(StatName name) override {
+    return createScope(symbolTable().toString(name));
+  }
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
   MOCK_METHOD(Counter&, counter, (const std::string&));

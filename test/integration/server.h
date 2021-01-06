@@ -79,6 +79,11 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
   }
 
+  ScopePtr scopeFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
+  }
+
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     Thread::LockGuard lock(lock_);
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
@@ -285,6 +290,10 @@ public:
   ScopePtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+  }
+  ScopePtr scopeFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return ScopePtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,

@@ -108,7 +108,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
 
-  ScopePtr scope2 = scope1->createScope("foo.");
+  ScopePtr scope2 = scope1->scopeFromStatName(makeStatName("foo."));
   EXPECT_EQ("scope1.foo.bar", scope2->counterFromString("bar").name());
 
   // Validate that we sanitize away bad characters in the stats prefix.
@@ -126,7 +126,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
   ScopePtr scope1 = store_->createScope("scope1");
-  ScopePtr scope2 = scope1->createScope("scope2");
+  ScopePtr scope2 = scope1->scopeFromStatName(makeStatName("scope2"));
   Counter& c1 = scope2->counterFromString("c1");
   EXPECT_EQ("scope1.scope2.c1", c1.name());
 }
