@@ -3,6 +3,7 @@
 #include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 
 namespace Envoy {
 namespace Network {
@@ -16,6 +17,14 @@ public:
 
   void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
     direct_remote_address_ = direct_remote_address;
+  }
+
+  void dumpState(std::ostream& os, int indent_level) const {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "SocketAddressSetterImpl " << this
+       << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())
+       << DUMP_NULLABLE_MEMBER(direct_remote_address_, direct_remote_address_->asStringView())
+       << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView()) << "\n";
   }
 
   // SocketAddressSetter
@@ -101,7 +110,7 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  const SocketAddressSetterSharedPtr address_provider_;
+  const std::shared_ptr<SocketAddressSetterImpl> address_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;
