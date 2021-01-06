@@ -4,11 +4,13 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_impl.h"
@@ -1851,6 +1853,76 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
+// Test DumpState methods.
+TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  Address::InstanceConstSharedPtr server_addr;
+  Address::InstanceConstSharedPtr local_addr;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    server_addr = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("1.1.1.1", 80, nullptr)};
+    local_addr = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("1.2.3.4", 56789, nullptr)};
+  } else {
+    server_addr = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance("::1", 80, nullptr)};
+    local_addr = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance("::1:2:3:4", 56789, nullptr)};
+  }
+
+  auto connection_socket =
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, server_addr);
+  connection_socket->setRequestedServerName("envoyproxy.io");
+
+  // Start measuring memory and dump state.
+  Stats::TestUtil::MemoryTest memory_test;
+  connection_socket->dumpState(ostream, 0);
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+  // Check socket dump
+  EXPECT_THAT(ostream.contents(), HasSubstr("ListenSocketImpl"));
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    EXPECT_THAT(
+        ostream.contents(),
+        HasSubstr(
+            "remote_address_: 1.1.1.1:80, direct_remote_address_: 1.1.1.1:80, local_address_: "
+            "1.2.3.4:56789, transport_protocol_: , server_name_: envoyproxy.io"));
+  } else {
+    EXPECT_THAT(
+        ostream.contents(),
+        HasSubstr("remote_address_: [::1]:80, direct_remote_address_: [::1]:80, local_address_: "
+                  "[::1:2:3:4]:56789, transport_protocol_: , server_name_: envoyproxy.io"));
+  }
+}
+
+TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  ConnectionMocks mocks = createConnectionMocks(false);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+
+  auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_, true);
+
+  // Start measuring memory and dump state.
+  Stats::TestUtil::MemoryTest memory_test;
+  server_connection->dumpState(ostream, 0);
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+  // Check connection data
+  EXPECT_THAT(ostream.contents(), HasSubstr("ConnectionImpl"));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("connecting_: 0, bind_error_: 0, state(): Open, read_buffer_limit_: 0"));
+  // Check socket starts dumping
+  EXPECT_THAT(ostream.contents(), HasSubstr("ListenSocketImpl"));
+
+  server_connection->close(ConnectionCloseType::NoFlush);
+}
+
 class FakeReadFilter : public Network::ReadFilter {
 public:
   FakeReadFilter() = default;
@@ -1898,6 +1970,8 @@ public:
         dispatcher_, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
         TransportSocketPtr(transport_socket_), stream_info_, true);
     connection_->addConnectionCallbacks(callbacks_);
+    // File events will trigger setTrackedObject on the dispatcher.
+    EXPECT_CALL(dispatcher_, setTrackedObject(_)).WillRepeatedly(Return(nullptr));
   }
 
   ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }

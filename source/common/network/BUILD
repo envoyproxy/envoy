@@ -60,8 +60,10 @@ envoy_cc_library(
     hdrs = ["connection_impl_base.h"],
     deps = [
         ":filter_manager_lib",
+        "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:dump_state_utils",
     ],
 )
 
@@ -246,6 +248,7 @@ envoy_cc_library(
         "//include/envoy/network:exception_interface",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:dump_state_utils",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

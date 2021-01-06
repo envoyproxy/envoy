@@ -130,6 +130,7 @@ envoy_cc_library(
     deps = [
         ":io_handle_interface",
         ":socket_interface",
+        "//include/envoy/common:scope_tracker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

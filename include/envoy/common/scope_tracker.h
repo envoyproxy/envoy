@@ -7,16 +7,19 @@
 namespace Envoy {
 
 /*
- * A class for tracking the scope of work.
- * Currently this is only used for best-effort tracking the L7 stream doing
- * work if a fatal error occurs.
+ * An interface for tracking the scope of work. Implementors of this interface
+ * can be registered to the dispatcher when they're active on the stack. If a
+ * fatal error occurs while they were active, the dumpState method will be
+ * called.
+ *
+ * Currently this is only used for the L4 network connection and L7 stream.
  */
 class ScopeTrackedObject {
 public:
   virtual ~ScopeTrackedObject() = default;
 
   /**
-   * Dump debug state of the object in question to the provided ostream
+   * Dump debug state of the object in question to the provided ostream.
    *
    * This is called on Envoy fatal errors, so should do minimal memory allocation.
    *
