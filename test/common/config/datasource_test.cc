@@ -105,6 +105,36 @@ TEST_F(AsyncDataSourceTest, LoadLocalDataSource) {
   EXPECT_EQ(async_data, "xxxxxx");
 }
 
+TEST_F(AsyncDataSourceTest, LoadLocalEmptyDataSource) {
+  AsyncDataSourcePb config;
+
+  std::string yaml = R"EOF(
+    local:
+      inline_string: ""
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  EXPECT_TRUE(config.has_local());
+
+  std::string async_data;
+
+  EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    init_target_handle_ = target.createHandle("test");
+  }));
+
+  local_data_provider_ = std::make_unique<Config::DataSource::LocalAsyncDataProvider>(
+      init_manager_, config.local(), true, *api_, [&](const std::string& data) {
+        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+        EXPECT_EQ(data, "");
+        async_data = data;
+      });
+
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(init_watcher_, ready());
+
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_EQ(async_data, "");
+}
+
 TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
   AsyncDataSourcePb config;
 

@@ -304,6 +304,7 @@ protected:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
+  NiceMock<testing::MockFunction<void()>> callback_;
 };
 
 } // namespace Server
