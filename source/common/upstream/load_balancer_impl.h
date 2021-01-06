@@ -611,31 +611,31 @@ private:
 /**
  * Implementation of SubsetSelector
  */
-class ShuffleSubsetSelectorImpl : public ShuffleSubsetSelector {
-public:
-  ShuffleSubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
-                     envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
-                         LbShuffleSubsetSelectorFallbackPolicy fallback_policy,
-                     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
-                     bool single_host_per_subset);
-
-  // SubsetSelector
-  const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
-  envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
-      LbShuffleSubsetSelectorFallbackPolicy
-      fallbackPolicy() const override {
-    return fallback_policy_;
-  }
-  const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
-  bool singleHostPerSubset() const override { return single_host_per_subset_; }
-
-private:
-  const std::set<std::string> selector_keys_;
-  const envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
-      LbShuffleSubsetSelectorFallbackPolicy fallback_policy_;
-  const std::set<std::string> fallback_keys_subset_;
-  const bool single_host_per_subset_;
-};
+// class ShuffleSubsetSelectorImpl : public ShuffleSubsetSelector {
+// public:
+//   ShuffleSubsetSelectorImpl(const Protobuf::RepeatedPtrField<std::string>& selector_keys,
+//                      envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
+//                          LbShuffleSubsetSelectorFallbackPolicy fallback_policy,
+//                      const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset,
+//                      bool single_host_per_subset);
+//
+//   // SubsetSelector
+//   const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
+//   envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
+//       LbShuffleSubsetSelectorFallbackPolicy
+//       fallbackPolicy() const override {
+//     return fallback_policy_;
+//   }
+//   const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+//   bool singleHostPerSubset() const override { return single_host_per_subset_; }
+//
+// private:
+//   const std::set<std::string> selector_keys_;
+//   const envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetSelector::
+//       LbShuffleSubsetSelectorFallbackPolicy fallback_policy_;
+//   const std::set<std::string> fallback_keys_subset_;
+//   const bool single_host_per_subset_;
+// };
 
 
 /**
@@ -691,7 +691,8 @@ class LoadBalancerShuffleSubsetInfoImpl : public LoadBalancerShuffleSubsetInfo {
 public:
   LoadBalancerShuffleSubsetInfoImpl(
       const envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig& subset_config)
-      : shard_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(subset_config, shard_size, 0)) { }
+      : shard_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(subset_config, shard_size, 0)),
+        cache_capacity_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(subset_config, cache_capacity, 256)) { }
 
   bool isEnabled() const override { return shard_size_ > 0; }
 
@@ -699,8 +700,13 @@ public:
     return shard_size_;
   }
 
+  uint32_t cache_capacity() const override {
+    return cache_capacity_;
+  }
+
 private:
   const uint64_t shard_size_;
+  const uint64_t cache_capacity_;
 };
 
 } // namespace Upstream

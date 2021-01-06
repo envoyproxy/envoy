@@ -150,7 +150,7 @@ public:
   // virtual envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig::LbSubsetFallbackPolicy
   // fallbackPolicy() const PURE;
   virtual uint32_t shard_size() const PURE;
-
+  virtual uint32_t cache_capacity() const PURE;
 
   /**
    * @return ProtobufWkt::Struct the struct describing the metadata for a

@@ -477,6 +477,7 @@ message Cluster {
     // bool list_as_any = 7;
 
     google.protobuf.UInt32Value shard_size = 8;
+    google.protobuf.UInt32Value cache_capacity = 9;
   }
 
   // Specific configuration for the LeastRequest load balancing policy.

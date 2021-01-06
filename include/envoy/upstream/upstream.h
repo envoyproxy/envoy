@@ -522,6 +522,9 @@ public:
   COUNTER(lb_healthy_panic)                                                                        \
   COUNTER(lb_local_cluster_not_ok)                                                                 \
   COUNTER(lb_recalculate_zone_structures)                                                          \
+  COUNTER(lb_shuffle_cache_hit)                                                                    \
+  COUNTER(lb_shuffle_cache_miss)                                                                   \
+  COUNTER(lb_shuffle_created)                                                                      \
   COUNTER(lb_subsets_created)                                                                      \
   COUNTER(lb_subsets_fallback)                                                                     \
   COUNTER(lb_subsets_fallback_panic)                                                               \

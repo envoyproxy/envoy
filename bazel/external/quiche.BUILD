@@ -2535,6 +2535,7 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_lru_cache.h"],
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
 )
 

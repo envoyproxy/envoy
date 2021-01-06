@@ -687,6 +687,14 @@ def _com_googlesource_quiche():
         name = "quiche_quic_platform_base",
         actual = "@com_googlesource_quiche//:quic_platform_base",
     )
+    native.bind(
+        name = "quiche_quic_platform_export",
+        actual = "@com_googlesource_quiche//:quic_platform_export",
+    )
+    native.bind(
+        name = "quiche_quic_core_lru_cache_lib",
+        actual = "@com_googlesource_quiche//:quic_core_lru_cache_lib",
+    )
 
 def _com_googlesource_googleurl():
     external_http_archive(
