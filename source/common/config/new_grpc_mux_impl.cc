@@ -162,6 +162,8 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                  fmt::format("Watch of {} has no subscription to update.", type_url));
   // If this is a glob collection subscription, we need to compute actual context parameters.
   std::set<std::string> xdstp_resources;
+  // TODO(htuch): add support for resources beyond LDS glob collections, the constraints below
+  // around resource size and ID reflect the progress of the xdstp:// implementation.
   if (resources.size() == 1 && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
     auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
     // We only know how to deal with glob collections right now.
