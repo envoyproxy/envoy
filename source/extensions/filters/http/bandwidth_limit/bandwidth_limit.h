@@ -19,6 +19,8 @@
 
 #include "extensions/filters/http/common/stream_rate_limiter.h"
 
+#include "absl/synchronization/mutex.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -79,8 +81,9 @@ private:
   const uint64_t limit_kbps_;
   const EnableMode enable_mode_;
   const uint64_t fill_rate_;
+  absl::Mutex mutex_;
   // Filter chain's shared token bucket
-  std::shared_ptr<TokenBucketImpl> token_bucket_;
+  std::shared_ptr<TokenBucketImpl> token_bucket_ ABSL_GUARDED_BY(mutex_);
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

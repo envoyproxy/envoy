@@ -19,23 +19,34 @@ public:
    * @param time_source supplies the time source.
    * @param fill_rate supplies the number of tokens that will return to the bucket on each second.
    * The default is 1.
+   * @param mutex supplies the mutex object to be used to ensure thread-safety when the token bucket
+   * is shared. By default the class will be thread-unsafe.
    */
   explicit TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate = 1,
-                           bool allow_multiple_resets = false);
+                           absl::Mutex* mutex = nullptr);
+
+  TokenBucketImpl(const Envoy::TokenBucketImpl&) = delete;
+  TokenBucketImpl(Envoy::TokenBucketImpl&&) = delete;
 
   // TokenBucket
-  uint64_t consume(uint64_t tokens, bool allow_partial) override;
-  std::chrono::milliseconds nextTokenAvailable() override;
-  void reset(uint64_t num_tokens) override;
+  uint64_t consume(uint64_t tokens, bool allow_partial) ABSL_GUARDED_BY(mutex_) override;
+  std::chrono::milliseconds nextTokenAvailable() ABSL_GUARDED_BY(mutex_) override;
+
+  /**
+   * Resets the bucket to contain tokens equal to @param num_tokens
+   * When the token bucket is shared, only the first reset call will work. Subsequent calls to reset
+   * method will be ignored.
+   */
+  void reset(uint64_t num_tokens) ABSL_GUARDED_BY(mutex_) override;
 
 private:
   const double max_tokens_;
   const double fill_rate_;
-  double tokens_;
-  absl::optional<bool> reset_once_;
-  MonotonicTime last_fill_;
+  double tokens_ ABSL_GUARDED_BY(mutex_);
+  MonotonicTime last_fill_ ABSL_GUARDED_BY(mutex_);
   TimeSource& time_source_;
-  absl::Mutex mutex_;
+  absl::Mutex* const mutex_;
+  bool reset_once_;
 };
 
 } // namespace Envoy

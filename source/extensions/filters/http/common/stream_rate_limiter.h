@@ -23,7 +23,10 @@ namespace HttpFilters {
 namespace Common {
 
 /**
- * An HTTP stream rate limiter. Used in the fault filter and bandwidth filter.
+ * A generic HTTP stream rate limiter. It limits the rate of transfer for a stream to the specified
+ * max rate. It calls appropriate callbacks when the buffered data crosses certain high and low
+ * watermarks based on the max buffer size. It's used by the fault filter and bandwidth filter as
+ * the core logic for their stream limit functionality.
  */
 class StreamRateLimiter : Logger::Loggable<Logger::Id::filter> {
 public:
