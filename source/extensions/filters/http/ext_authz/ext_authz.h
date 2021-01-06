@@ -23,6 +23,7 @@
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -230,7 +231,7 @@ private:
  */
 class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::StreamDecoderFilter,
-               public Http::StreamEncoderFilter,
+               public Http::PassThroughEncoderFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
@@ -246,14 +247,9 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
-  // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
+  // Http::StreamEncoderFilter / Http::PassThroughEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& trailers) override;
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // ExtAuthz::RequestCallbacks
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
