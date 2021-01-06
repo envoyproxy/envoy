@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -156,7 +157,8 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   }
 
   const auto& request_config = config_->requestDirectionConfig();
-  if (!end_stream && request_config.compressionEnabled() &&
+  if (!end_stream && request_config.compressionEnabled() && !Http::Utility::isUpgrade(headers) &&
+      !Http::Utility::isH2UpgradeRequest(headers) &&
       request_config.isMinimumContentLength(headers) &&
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
@@ -221,10 +223,10 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   const auto& config = config_->responseDirectionConfig();
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
-  const bool isCompressible = isEnabledAndContentLengthBigEnough &&
-                              config.isContentTypeAllowed(headers) &&
-                              !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
-                              !headers.getInline(response_content_encoding_handle.handle());
+  const bool isCompressible =
+      isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
+      config.isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
+      isEtagAllowed(headers) && !headers.getInline(response_content_encoding_handle.handle());
   if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
@@ -495,6 +497,10 @@ bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
 
 bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     const Http::RequestOrResponseHeaderMap& headers) const {
+  if (StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                Http::Headers::get().TransferEncodingValues.Chunked)) {
+    return true;
+  }
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length != nullptr) {
     uint64_t length;
@@ -506,9 +512,12 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     }
     return is_minimum_content_length;
   }
-
-  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
-                                   Http::Headers::get().TransferEncodingValues.Chunked);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_compression_without_chunked_header")) {
+    // returning true to account for HTTP/2 where content-length is optional
+    return true;
+  }
+  return false;
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const {

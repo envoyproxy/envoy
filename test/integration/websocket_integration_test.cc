@@ -133,6 +133,15 @@ void WebsocketIntegrationTest::initialize() {
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   }
+  config_helper_.addFilter(R"EOF(
+name: envoy.filters.http.compressor
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+  compressor_library:
+    name: test
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+)EOF");
   HttpProtocolIntegrationTest::initialize();
 }
 
