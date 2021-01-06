@@ -1561,8 +1561,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
                         &final_hosts, &max_host_weight](const HostSharedPtr& p) {
                          if (all_new_hosts.contains(p->address()->asString()) &&
                              !new_hosts_for_current_priority.contains(p->address()->asString())) {
-                           // It'll be an immediate deletion if the host exists in the cluster
-                           // somewhere other than this priority.
+                           // If the address is being completely deleted from this priority, but is
+                           // referenced from another priority, then we assume that the other
+                           // priority will perform an in-place update to re-use the existing Host.
+                           // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
+                           // instead remove it immediately from this priority.
                            return false;
                          }
 
