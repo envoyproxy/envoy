@@ -7,6 +7,7 @@
 
 #include "common/config/context_provider_impl.h"
 #include "common/config/version_converter.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace LocalInfo {
@@ -35,16 +36,19 @@ const envoy::config::core::v3::Node buildLocalNode(const envoy::config::core::v3
 
 class LocalInfoImpl : public LocalInfo {
 public:
-  LocalInfoImpl(const envoy::config::core::v3::Node& node,
+  LocalInfoImpl(Stats::SymbolTable& symbol_table, const envoy::config::core::v3::Node& node,
                 const Protobuf::RepeatedPtrField<std::string>& node_context_params,
                 const Network::Address::InstanceConstSharedPtr& address,
                 absl::string_view zone_name, absl::string_view cluster_name,
                 absl::string_view node_name)
       : node_(buildLocalNode(node, zone_name, cluster_name, node_name)), address_(address),
-        context_provider_(node_, node_context_params) {}
+        context_provider_(node_, node_context_params),
+        zone_stat_name_storage_(zone_name, symbol_table),
+        zone_stat_name_(zone_stat_name_storage_.statName()) {}
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string& zoneName() const override { return node_.locality().zone(); }
+  const Stats::StatName& zoneStatName() const override { return zone_stat_name_; }
   const std::string& clusterName() const override { return node_.cluster(); }
   const std::string& nodeName() const override { return node_.id(); }
   const envoy::config::core::v3::Node& node() const override { return node_; }
@@ -54,6 +58,8 @@ private:
   const envoy::config::core::v3::Node node_;
   const Network::Address::InstanceConstSharedPtr address_;
   const Config::ContextProviderImpl context_provider_;
+  const Stats::StatNameManagedStorage zone_stat_name_storage_;
+  const Stats::StatName zone_stat_name_;
 };
 
 } // namespace LocalInfo

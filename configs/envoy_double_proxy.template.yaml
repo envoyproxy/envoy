@@ -5,6 +5,12 @@
       protocol: {{protocol}}
       address: {{address}}
       port_value: {{port_value}}
+  {% if proxy_proto %}
+  listener_filters:
+  - name: envoy.filters.listener.proxy_protocol
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+  {% endif %}
   filter_chains:
   - filter_chain_match: {}
     {% if tls %}
@@ -23,9 +29,6 @@
           - h2
           - http/1.1
     {% endif %}
-    {% if proxy_proto %}
-    use_proxy_proto: true
-    {%endif -%}
     filters:
     - name: envoy.filters.network.http_connection_manager
       typed_config:
