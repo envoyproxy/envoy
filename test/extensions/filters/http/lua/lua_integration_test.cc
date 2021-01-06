@@ -993,7 +993,7 @@ typed_config:
 }
 
 // Rewrite response buffer, without original upstream response body
-// and always warp body.
+// and always wrap body.
 TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBody) {
   const std::string FILTER_AND_CODE =
       R"EOF(
