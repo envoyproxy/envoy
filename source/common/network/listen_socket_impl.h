@@ -11,6 +11,7 @@
 #include "envoy/network/socket_interface.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/network/socket_impl.h"
 
 namespace Envoy {
@@ -121,6 +122,15 @@ public:
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
+  }
+
+  void dumpState(std::ostream& os, int indent_level) const override {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "ListenSocketImpl " << this
+       << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())
+       << DUMP_NULLABLE_MEMBER(direct_remote_address_, direct_remote_address_->asStringView())
+       << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView())
+       << DUMP_MEMBER(transport_protocol_) << DUMP_MEMBER(server_name_) << "\n";
   }
 
 protected:

@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -41,9 +42,12 @@ public:
 };
 
 /**
- * Implementation of Network::Connection and Network::FilterManagerConnection.
+ * Implementation of Network::Connection, Network::FilterManagerConnection and
+ * Envoy::ScopeTrackedObject.
  */
-class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
+class ConnectionImpl : public ConnectionImplBase,
+                       public TransportSocketCallbacks,
+                       public ScopeTrackedObject {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
@@ -121,6 +125,9 @@ public:
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
   // A convenience function which returns true if
