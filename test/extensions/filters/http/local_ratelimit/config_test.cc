@@ -326,9 +326,6 @@ descriptors:
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-
-  EXPECT_CALL(context.dispatcher_, createTimer_(_));
-
   EXPECT_THROW(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
                EnvoyException);
 }
