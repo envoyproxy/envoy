@@ -45,10 +45,10 @@ public:
   void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
-  const Network::SocketAddressProvider& addressProvider() const override {
+  const Network::SocketAddressSetter& addressProvider() const override {
     return quic_connection_->connectionSocket()->addressProvider();
   }
-  Network::SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
+  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
     return quic_connection_->connectionSocket()->addressProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>

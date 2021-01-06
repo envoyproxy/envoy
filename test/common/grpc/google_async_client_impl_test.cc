@@ -121,7 +121,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, MetadataIsInitialized) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
 
   // Prepare the parent context of this call.
-  auto address_provider = std::make_shared<Network::SocketAddressProviderImpl>(
+  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
   StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
   Http::AsyncClient::ParentContext parent_context{&stream_info};

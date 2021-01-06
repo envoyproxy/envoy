@@ -13,15 +13,14 @@ SocketImpl::SocketImpl(Socket::Type sock_type,
                        const Address::InstanceConstSharedPtr& address_for_io_handle,
                        const Address::InstanceConstSharedPtr& remote_address)
     : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle)),
-      address_provider_(std::make_shared<SocketAddressProviderImpl>(nullptr, remote_address)),
+      address_provider_(std::make_shared<SocketAddressSetterImpl>(nullptr, remote_address)),
       sock_type_(sock_type), addr_type_(address_for_io_handle->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
     : io_handle_(std::move(io_handle)),
-      address_provider_(
-          std::make_shared<SocketAddressProviderImpl>(local_address, remote_address)) {
+      address_provider_(std::make_shared<SocketAddressSetterImpl>(local_address, remote_address)) {
 
   if (address_provider_->localAddress() != nullptr) {
     addr_type_ = address_provider_->localAddress()->type();

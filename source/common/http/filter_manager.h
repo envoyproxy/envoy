@@ -598,9 +598,11 @@ public:
 /**
  * This class allows the remote address to be overridden for HTTP stream info. This is used for
  * XFF handling. This is required to avoid providing stream info with a non-const address provider.
+ * Private inheritance from SocketAddressProvider is used to make sure users get the address
+ * provider via the normal getter.
  */
-class OverridableRemoteSocketAddressProviderStreamInfo : public StreamInfo::StreamInfoImpl,
-                                                         Network::SocketAddressProviderGetters {
+class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                       private Network::SocketAddressProvider {
 public:
   using StreamInfoImpl::StreamInfoImpl;
 
@@ -611,11 +613,9 @@ public:
   }
 
   // StreamInfo::StreamInfo
-  const Network::SocketAddressProviderGetters& downstreamAddressProvider() const override {
-    return *this;
-  }
+  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
 
-  // Network::SocketAddressProviderGetters
+  // Network::SocketAddressProvider
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
   }
@@ -987,7 +987,7 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
-  OverridableRemoteSocketAddressProviderStreamInfo stream_info_;
+  OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;

@@ -18,7 +18,7 @@ namespace StreamInfo {
 MockStreamInfo::MockStreamInfo()
     : start_time_(ts_.systemTime()),
       filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
-      downstream_address_provider_(std::make_shared<Network::SocketAddressProviderImpl>(
+      downstream_address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"),
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"))) {
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {

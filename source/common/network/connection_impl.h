@@ -68,10 +68,10 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const SocketAddressProviderGetters& addressProvider() const override {
+  const SocketAddressProvider& addressProvider() const override {
     return socket_->addressProvider();
   }
-  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
+  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
     return socket_->addressProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;

@@ -7,10 +7,10 @@
 namespace Envoy {
 namespace Network {
 
-class SocketAddressProviderImpl : public SocketAddressProvider {
+class SocketAddressSetterImpl : public SocketAddressSetter {
 public:
-  SocketAddressProviderImpl(const Address::InstanceConstSharedPtr& local_address,
-                            const Address::InstanceConstSharedPtr& remote_address)
+  SocketAddressSetterImpl(const Address::InstanceConstSharedPtr& local_address,
+                          const Address::InstanceConstSharedPtr& remote_address)
       : local_address_(local_address), remote_address_(remote_address),
         direct_remote_address_(remote_address) {}
 
@@ -18,7 +18,7 @@ public:
     direct_remote_address_ = direct_remote_address;
   }
 
-  // SocketAddressProvider
+  // SocketAddressSetter
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
@@ -49,11 +49,9 @@ public:
              const Address::InstanceConstSharedPtr& remote_address);
 
   // Network::Socket
-  SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  const SocketAddressProviderGetters& addressProvider() const override {
-    return *address_provider_;
-  }
-  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
+  SocketAddressSetter& addressProvider() override { return *address_provider_; }
+  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
+  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   SocketPtr duplicate() override {
@@ -103,7 +101,7 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  const SocketAddressProviderSharedPtr address_provider_;
+  const SocketAddressSetterSharedPtr address_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;

@@ -223,11 +223,9 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  const SocketAddressProviderGetters& addressProvider() const override {
-    return *address_provider_;
-  }
-  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
+  SocketAddressSetter& addressProvider() override { return *address_provider_; }
+  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
+  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(IoHandle&, ioHandle, ());
@@ -252,7 +250,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   IoHandlePtr io_handle_;
-  Network::SocketAddressProviderSharedPtr address_provider_;
+  Network::SocketAddressSetterSharedPtr address_provider_;
   OptionsSharedPtr options_;
   bool socket_is_open_ = true;
 };
@@ -277,11 +275,9 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  SocketAddressProvider& addressProvider() override { return *address_provider_; }
-  const SocketAddressProviderGetters& addressProvider() const override {
-    return *address_provider_;
-  }
-  SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const override {
+  SocketAddressSetter& addressProvider() override { return *address_provider_; }
+  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
+  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));
@@ -313,7 +309,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
 
   IoHandlePtr io_handle_;
-  Network::SocketAddressProviderSharedPtr address_provider_;
+  Network::SocketAddressSetterSharedPtr address_provider_;
   bool is_closed_;
 };
 

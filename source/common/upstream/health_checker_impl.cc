@@ -216,7 +216,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent),
       hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
-      local_address_provider_(std::make_shared<Network::SocketAddressProviderImpl>(
+      local_address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(
           Network::Utility::getCanonicalIpv4LoopbackAddress(),
           Network::Utility::getCanonicalIpv4LoopbackAddress())) {}
 

@@ -47,9 +47,9 @@ private:
  * and a getters + setters interface. This is so that only the getters portion can be overridden
  * in certain cases.
  */
-class SocketAddressProviderGetters {
+class SocketAddressProvider {
 public:
-  virtual ~SocketAddressProviderGetters() = default;
+  virtual ~SocketAddressProvider() = default;
 
   /**
    * @return the local address of the socket.
@@ -74,7 +74,7 @@ public:
   virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 };
 
-class SocketAddressProvider : public SocketAddressProviderGetters {
+class SocketAddressSetter : public SocketAddressProvider {
 public:
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the
@@ -103,8 +103,8 @@ public:
   virtual void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
 };
 
-using SocketAddressProviderSharedPtr = std::shared_ptr<SocketAddressProvider>;
-using SocketAddressProviderGettersSharedPtr = std::shared_ptr<const SocketAddressProviderGetters>;
+using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;
+using SocketAddressProviderSharedPtr = std::shared_ptr<const SocketAddressProvider>;
 
 /**
  * Base class for Sockets
@@ -121,9 +121,9 @@ public:
   /**
    * @return the address provider backing this socket.
    */
-  virtual SocketAddressProvider& addressProvider() PURE;
-  virtual const SocketAddressProviderGetters& addressProvider() const PURE;
-  virtual SocketAddressProviderGettersSharedPtr addressProviderSharedPtr() const PURE;
+  virtual SocketAddressSetter& addressProvider() PURE;
+  virtual const SocketAddressProvider& addressProvider() const PURE;
+  virtual SocketAddressProviderSharedPtr addressProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection
