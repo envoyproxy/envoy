@@ -31,7 +31,7 @@ Minor Behavior Changes
 * tls: removed RSA key transport and SHA-1 cipher suites from the client-side defaults.
 * upstream: host weight changes now cause a full load balancer rebuild as opposed to happening
   atomically inline. This change has been made to support load balancer pre-computation of data
-  structures based on host weight, but may have performance implications of host weight changes
+  structures based on host weight, but may have performance implications if host weight changes
   are very frequent. This change can be disabled by setting the `envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`
   feature flag to false. If setting this flag to false is required in a deployment please open an
   issue against the project.
