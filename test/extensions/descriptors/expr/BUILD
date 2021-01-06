@@ -14,6 +14,12 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     extension_name = "envoy.descriptors.expr",
     deps = [
         "//source/common/protobuf:utility_lib",

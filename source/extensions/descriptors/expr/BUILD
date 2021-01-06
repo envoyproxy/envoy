@@ -12,13 +12,25 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     security_posture = "unknown",
     deps = [
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
-        "@com_google_cel_cpp//parser",
         "@envoy_api//envoy/extensions/descriptors/expr/v3:pkg_cc_proto",
-    ],
+    ] + select(
+        {
+            "//bazel:windows_x86_64": [],
+            "//conditions:default": [
+                "@com_google_cel_cpp//parser",
+            ],
+        },
+    ),
 )

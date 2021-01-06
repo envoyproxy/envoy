@@ -52,6 +52,7 @@ actions:
                           "Rate limit descriptor extension not found: .*");
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, ExpressionText) {
   const std::string yaml = R"EOF(
 actions:
@@ -99,6 +100,7 @@ actions:
   EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException,
                           "Unable to parse descriptor expression: .*");
 }
+#endif
 
 TEST_F(RateLimitPolicyEntryTest, ExpressionParsed) {
   const std::string yaml = R"EOF(
@@ -148,6 +150,7 @@ actions:
   EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException, "failed to create an expression: .*");
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, ExpressionTextError) {
   const std::string yaml = R"EOF(
 actions:
@@ -195,6 +198,7 @@ actions:
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"test_key", "a"}}}}),
               testing::ContainerEq(descriptors_));
 }
+#endif
 
 } // namespace
 } // namespace Expr

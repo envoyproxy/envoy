@@ -5,7 +5,9 @@
 
 #include "common/protobuf/utility.h"
 
+#if defined(USE_CEL_PARSER)
 #include "parser/parser.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -63,6 +65,7 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
       MessageUtil::downcastAndValidate<const envoy::extensions::descriptors::expr::v3::Descriptor&>(
           message, validator);
   switch (config.expr_specifier_case()) {
+#if defined(USE_CEL_PARSER)
   case envoy::extensions::descriptors::expr::v3::Descriptor::kText: {
     auto parse_status = google::api::expr::parser::Parse(config.text());
     if (!parse_status.ok()) {
@@ -72,6 +75,7 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
     return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(),
                                                   parse_status.value().expr());
   }
+#endif
   case envoy::extensions::descriptors::expr::v3::Descriptor::kParsed:
     return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(), config.parsed());
   default:
