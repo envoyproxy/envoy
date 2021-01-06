@@ -19,7 +19,7 @@
 namespace Envoy {
 namespace Filesystem {
 
-static const std::unordered_map<std::string, DWORD> unix_output_pipes_to_windows_standard_handle{
+static const absl::flat_hash_map<std::string, DWORD> unix_output_pipes_to_windows_standard_handle{
     {"/dev/stdin", STD_INPUT_HANDLE},       {"/dev/fd/0", STD_INPUT_HANDLE},
     {"/proc/self/fd/0", STD_INPUT_HANDLE},
 
@@ -29,7 +29,7 @@ static const std::unordered_map<std::string, DWORD> unix_output_pipes_to_windows
     {"/dev/stderr", STD_ERROR_HANDLE},         {"/dev/fd/2", STD_ERROR_HANDLE},
     {"/proc/self/fd/2", STD_ERROR_HANDLE}};
 
-static const std::unordered_map<std::string, std::string> unix_output_pipes_to_windows_file{
+static const absl::flat_hash_map<std::string, std::string> unix_output_pipes_to_windows_file{
     {"/dev/null", "NUL"}, {"/dev/console", "CONOUT$"}, {"/dev/tty", "CONOUT$"}};
 
 DWORD toStandardHandle(const std::string& path) {
