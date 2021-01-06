@@ -121,7 +121,8 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
       {32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
 }
 
-TEST(OpenCensusTracerConfigTest, DEPRECATED_FEATURE_TEST(OpenCensusHttpTracerWithDeprecatedTypedConfig)) {
+TEST(OpenCensusTracerConfigTest,
+     DEPRECATED_FEATURE_TEST(OpenCensusHttpTracerWithDeprecatedTypedConfig)) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
