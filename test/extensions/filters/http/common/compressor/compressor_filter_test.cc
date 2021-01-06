@@ -11,7 +11,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -78,14 +77,8 @@ public:
   }
 
   void verifyCompressedData() {
-    EXPECT_EQ(
-        expected_str_.length(),
-        stats_.counter(fmt::format("test.test.{}total_uncompressed_bytes", response_stats_prefix_))
-            .value());
-    EXPECT_EQ(
-        data_.length(),
-        stats_.counter(fmt::format("test.test.{}total_compressed_bytes", response_stats_prefix_))
-            .value());
+    EXPECT_EQ(expected_str_.length(), stats_.counter("test.test.total_uncompressed_bytes").value());
+    EXPECT_EQ(data_.length(), stats_.counter("test.test.total_compressed_bytes").value());
   }
 
   void populateBuffer(uint64_t size) {
@@ -139,6 +132,9 @@ public:
                   bool with_trailers) {
     uint64_t buffer_content_size;
     if (!absl::SimpleAtoi(headers.get_("content-length"), &buffer_content_size)) {
+      ASSERT_TRUE(
+          StringUtil::CaseInsensitiveCompare()(headers.get_("transfer-encoding"), "chunked"));
+      // In case of chunked stream just feed the buffer with 1000 bytes.
       buffer_content_size = 1000;
     }
     populateBuffer(buffer_content_size);
@@ -160,8 +156,7 @@ public:
         EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
       }
       verifyCompressedData();
-      EXPECT_EQ(
-          1, stats_.counter(fmt::format("test.test.{}compressed", response_stats_prefix_)).value());
+      EXPECT_EQ(1, stats_.counter("test.test.compressed").value());
     } else {
       EXPECT_EQ("", headers.get_("content-encoding"));
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -235,82 +230,6 @@ TEST_F(CompressorFilterTest, CompressRequest) {
 )EOF");
   doRequestCompression({{":method", "post"}, {"content-length", "256"}}, false);
   Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
-  doResponseNoCompression(headers);
-}
-
-TEST_F(CompressorFilterTest, CompressRequestNoContentLength) {
-  setUpFilter(R"EOF(
-{
-  "request_direction_config": {},
-  "compressor_library": {
-     "name": "test",
-     "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-     }
-  }
-}
-)EOF");
-  doRequestCompression({{":method", "post"}}, false);
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  doResponseNoCompression(headers);
-}
-
-TEST_F(CompressorFilterTest, CompressRequestNoContentLengthRuntimeDisabled) {
-  setUpFilter(R"EOF(
-{
-  "request_direction_config": {},
-  "compressor_library": {
-    "name": "test",
-    "typed_config": {
-      "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-    }
-  }
-}
-)EOF");
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_compression_without_chunked_header", "false"}});
-  doRequestNoCompression({{":method", "post"}});
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  doResponseNoCompression(headers);
-}
-
-TEST_F(CompressorFilterTest, CompressResponseNoContentLength) {
-  setUpFilter(R"EOF(
-{
-  "response_direction_config": {},
-  "compressor_library": {
-     "name": "test",
-     "typed_config": {
-       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-     }
-  }
-}
-)EOF");
-  response_stats_prefix_ = "response.";
-  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  doResponseCompression(headers, false);
-}
-
-TEST_F(CompressorFilterTest, CompressResponseNoContentLengthRuntimeDisabled) {
-  setUpFilter(R"EOF(
-{
-  "response_direction_config": {},
-  "compressor_library": {
-    "name": "test",
-    "typed_config": {
-      "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-    }
-  }
-}
-)EOF");
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_compression_without_chunked_header", "false"}});
-  response_stats_prefix_ = "response.";
-  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseNoCompression(headers);
 }
 
@@ -637,7 +556,6 @@ INSTANTIATE_TEST_SUITE_P(
                     std::make_tuple("transfer-encoding", "Chunked", "", true),
                     std::make_tuple("transfer-encoding", "chunked", "\"content_length\": 500,",
                                     true),
-                    std::make_tuple("", "", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "501", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "499", "\"content_length\": 500,", false)));
 
