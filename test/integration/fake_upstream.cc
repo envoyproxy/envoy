@@ -648,14 +648,14 @@ testing::AssertionResult
 FakeUpstream::waitForAndConsumeDisconnectedConnection(std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-    return !new_connections_.empty() && !new_connections_.front()->connected();
+    return !new_connections_.empty();
   };
 
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for raw connection";
   }
-  consumeConnection();
-  return AssertionSuccess();
+  auto& connection = consumeConnection();
+  return connection.waitForDisconnect(timeout);
 }
 
 SharedConnectionWrapper& FakeUpstream::consumeConnection() {

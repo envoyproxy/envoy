@@ -285,6 +285,17 @@ public:
     return !disconnected_;
   }
 
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult waitForDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    absl::MutexLock lock(&lock_);
+    Event::TestTimeSystem& time_system =
+        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSource());
+    if (!time_system.waitFor(lock_, absl::Condition(&disconnected_), timeout)) {
+      return AssertionFailure() << "Timed out waiting for disconnect";
+    }
+    return AssertionSuccess();
+  }
+
   // This provides direct access to the underlying connection, but only to const methods.
   // Stateful connection related methods should happen on the connection's dispatcher via
   // executeOnDispatcher.
