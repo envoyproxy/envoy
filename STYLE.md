@@ -172,7 +172,7 @@ A few general notes on our error handling philosophy:
   detectability on probable or changing invariants.
 
 * Per above it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
-  `PANIC(message)` if there is no other sensible behavior, e.g.  in OOM (memory/FD) scenarios.
+  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios.
 * Only `RELEASE_ASSERT(condition)` should be used to validate conditions that might be imposed by
   the external environment.
 * Annotate macro usage with comments on belief (probable or provable condition).
@@ -201,7 +201,7 @@ also be added for errors if they warrant detection.
 | --- | --- | --- |
 | Low level invariants in data structures | | |
 | Simple, provable internal class invariants | Complex, uncertain internal class invariants (e.g. need detectability if violated) | |
-| Provable (pre/post)-conditions | Complicated but likely (pre-/post-) conditions that are low-risk (Envoy can continue safely) | Triggerable or uncertain conditions, may be based on untrusted data plane traffic or an extensions’ contract.  |
+| Provable (pre/post)-conditions | Complicated but likely (pre-/post-) conditions that are low-risk (Envoy can continue safely) | Triggerable or uncertain conditions, may be based on untrusted data plane traffic or an extensions’ contract. |
 |                                                                                     | Conditions in alpha or changing extensions that need detectability. (`ENVOY_BUG_ALPHA`) | |
 | Unlikely environment errors after process initialization that would otherwise crash | | Likely environment errors, e.g. return codes from untrusted extensions, dependencies or system calls, network error, bad data read, permission based errors, etc. |
 | Fatal crashing events. e.g. OOMs, deadlocks, no process recovery possible | | |
