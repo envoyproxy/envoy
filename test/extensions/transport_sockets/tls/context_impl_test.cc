@@ -1934,6 +1934,73 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
       "Certificate configuration can't have both private_key and private_key_provider");
 }
 
+// Subclass ContextImpl so we can instantiate directly from tests, despite the
+// constructor being protected.
+class TestContextImpl : public ContextImpl {
+public:
+  TestContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+                  TimeSource& time_source)
+      : ContextImpl(scope, config, time_source), pool_(scope.symbolTable()),
+        fallback_(pool_.add("fallback")) {}
+
+  void incCounter(absl::string_view name, absl::string_view value) {
+    ContextImpl::incCounter(pool_.add(name), value, fallback_);
+  }
+
+  Stats::StatNamePool pool_;
+  const Stats::StatName fallback_;
+};
+
+class SslContextStatsTest : public SslContextImplTest {
+protected:
+  SslContextStatsTest() {
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context_);
+    client_context_config_ =
+        std::make_unique<ClientContextConfigImpl>(tls_context_, factory_context_);
+    context_ = std::make_unique<TestContextImpl>(store_, *client_context_config_, time_system_);
+  }
+
+  Stats::TestUtil::TestStore store_;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
+  std::unique_ptr<ClientContextConfigImpl> client_context_config_;
+  std::unique_ptr<TestContextImpl> context_;
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+  )EOF";
+};
+
+TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
+  // Incrementing a value for a cipher that is part of the configuration works, and
+  // we'll be able to find the value in the stats store.
+  context_->incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
+  Stats::CounterOptConstRef cipher =
+      store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
+  ASSERT_TRUE(cipher.has_value());
+  EXPECT_EQ(1, cipher->get().value());
+
+  // Incrementing a stat for a random unknown cipher does not work. A
+  // rate-limited error log message will also be generated but that is hard to
+  // test as it is dependent on timing and test-ordering.
+  EXPECT_DEBUG_DEATH(context_->incCounter("ssl.ciphers", "unexpected"),
+                     "Unexpected ssl.ciphers value: unexpected");
+  EXPECT_FALSE(store_.findCounterByString("ssl.ciphers.unexpected"));
+
+  // We will account for the 'unexpected' cipher as "fallback", however in debug
+  // mode that will not work as the ENVOY_BUG macro will assert first, thus the
+  // fallback registration does not occur. So we test for the fallback only in
+  // release builds.
+#ifdef NDEBUG
+  cipher = store_.findCounterByString("ssl.ciphers.fallback");
+  ASSERT_TRUE(cipher.has_value());
+  EXPECT_EQ(1, cipher->get().value());
+#endif
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
