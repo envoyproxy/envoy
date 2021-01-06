@@ -58,7 +58,7 @@ message Tracing {
     // See the trace drivers for examples:
     //
     // - :ref:`LightstepConfig <envoy_api_msg_extensions.tracers.lightstep.v4alpha.LightstepConfig>`
-    // - :ref:`ZipkinConfig <envoy_api_msg_extensions.tracers.zipkin.v4alpha.ZipkinConfig>`
+    // - :ref:`ZipkinConfig <envoy_v3_api_msg_config.trace.v3.ZipkinConfig>`
     // - :ref:`DynamicOtConfig <envoy_api_msg_extensions.tracers.dynamic_ot.v4alpha.DynamicOtConfig>`
     // - :ref:`DatadogConfig <envoy_api_msg_extensions.tracers.datadog.v4alpha.DatadogConfig>`
     // - :ref:`OpenCensusConfig <envoy_api_msg_extensions.tracers.opencensus.v4alpha.OpenCensusConfig>`
