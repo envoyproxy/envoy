@@ -327,12 +327,16 @@ body()
 
 .. code-block:: lua
 
-  local body = handle:body()
+  local body = handle:body(always_wrap_body)
 
 Returns the stream's body. This call will cause Envoy to suspend execution of the script until
 the entire body has been received in a buffer. Note that all buffering must adhere to the
 flow-control policies in place. Envoy will not buffer more data than is allowed by the connection
 manager.
+
+An optional boolean argument `always_wrap_body` can be used to require Envoy always returns a
+`body` object even if the body is empty. Therefore we can modify the body regardless of whether the
+original body exists or not.
 
 Returns a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
 
