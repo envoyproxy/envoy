@@ -733,7 +733,6 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutput) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 }
 
-
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryOnRootPath) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
 
