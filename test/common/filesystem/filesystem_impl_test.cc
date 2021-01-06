@@ -339,8 +339,10 @@ TEST_F(FileSystemImplTest, StdErr) {
   }
 }
 
+
 TEST_F(FileSystemImplTest, Console) {
-  const std::array<std::string, 2> console_aliases{"/dev/console", "/dev/tty"};
+  // Do not test "/dev/console" since it requires root permissions
+  const std::array<std::string, 2> console_aliases{"/dev/tty"};
   for (const auto& console_alias : console_aliases) {
     FilePtr file = file_system_.createFile(console_alias);
     const Api::IoCallBoolResult open_result = file->open(DefaultFlags);

@@ -19,6 +19,7 @@
 namespace Envoy {
 namespace Filesystem {
 
+namespace {
 static const absl::flat_hash_map<std::string, DWORD> unix_output_pipes_to_windows_standard_handle{
     {"/dev/stdin", STD_INPUT_HANDLE},       {"/dev/fd/0", STD_INPUT_HANDLE},
     {"/proc/self/fd/0", STD_INPUT_HANDLE},
@@ -31,7 +32,7 @@ static const absl::flat_hash_map<std::string, DWORD> unix_output_pipes_to_window
 
 static const absl::flat_hash_map<std::string, std::string> unix_output_pipes_to_windows_file{
     {"/dev/null", "NUL"}, {"/dev/console", "CONOUT$"}, {"/dev/tty", "CONOUT$"}};
-
+} // namespace
 DWORD toStandardHandle(const std::string& path) {
   auto it = unix_output_pipes_to_windows_standard_handle.find(path);
   if (it == unix_output_pipes_to_windows_standard_handle.end()) {
@@ -60,6 +61,12 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
     return resultSuccess(true);
   }
 
+  // When we open the file we want to perform the following translations if applicable:
+  // * If the path is a standard unix path to the standard output/error fd, then retrieve the
+  // standard handle of the process.
+  // * If the path is a standard unix path to the console, then translate the path to `CONOUT$`.
+  // * If the path is a standard unix path to null, then translate the path to `NUL`.
+  // * Otherwise maintain the path as it is.
   auto std_handle = toStandardHandle(path_);
   if (std_handle) {
     fd_ = GetStdHandle(std_handle);
