@@ -57,6 +57,12 @@ private:
 
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
+  bool isGrpcWebRequest(const Http::RequestHeaderMap& headers);
+  bool hasGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const;
+  bool isValidResponseHeaders(Http::ResponseHeaderMap& headers, bool end_stream) const;
+
+  static const uint8_t GRPC_WEB_TRAILER;
+  const absl::flat_hash_set<std::string>& gRpcWebContentTypes() const;
 
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

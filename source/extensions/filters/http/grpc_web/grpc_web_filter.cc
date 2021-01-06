@@ -19,45 +19,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
-namespace {
-
-// Bit mask denotes a trailers frame of gRPC-Web.
-constexpr const uint8_t GRPC_WEB_TRAILER = 0b10000000;
-constexpr const uint64_t MAX_GRPC_MESSAGE_LENGTH = 1024;
-
-const absl::flat_hash_set<std::string>& gRpcWebContentTypes() {
-  // Supported gRPC-Web content-types.
-  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
-                         Http::Headers::get().ContentTypeValues.GrpcWeb,
-                         Http::Headers::get().ContentTypeValues.GrpcWebProto,
-                         Http::Headers::get().ContentTypeValues.GrpcWebText,
-                         Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
-}
-
-bool hasGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type != nullptr) {
-    return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
-  }
-  return false;
-}
-
-bool isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
-  if (!headers.Path()) {
-    return false;
-  }
-  return hasGrpcWebContentType(headers);
-}
-
-// Valid response headers contain gRPC or gRPC-Web response headers.
-bool isValidResponseHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
-  return Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
-         (Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
-          hasGrpcWebContentType(headers));
-}
-
-} // namespace
-
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     accept_handle(Http::CustomHeaders::get().Accept);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -70,6 +31,46 @@ struct RcDetailsValues {
   const std::string GrpcDecodeFailedDueToData = "grpc_base_64_decode_failed";
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
+
+// Bit mask denotes a trailers frame of gRPC-Web.
+const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
+
+// Supported gRPC-Web content-types.
+const absl::flat_hash_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() const {
+  static const absl::flat_hash_set<std::string>* types = new absl::flat_hash_set<std::string>(
+      {Http::Headers::get().ContentTypeValues.GrpcWeb,
+       Http::Headers::get().ContentTypeValues.GrpcWebProto,
+       Http::Headers::get().ContentTypeValues.GrpcWebText,
+       Http::Headers::get().ContentTypeValues.GrpcWebTextProto});
+  return *types;
+}
+
+bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  if (content_type != nullptr) {
+    return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
+  }
+  return false;
+}
+
+bool GrpcWebFilter::hasGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const {
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  if (content_type != nullptr) {
+    return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
+  }
+  return false;
+}
+
+// Valid response headers contain gRPC or gRPC-Web response headers.
+bool GrpcWebFilter::isValidResponseHeaders(Http::ResponseHeaderMap& headers,
+                                           bool end_stream) const {
+  return Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
+         (Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
+          hasGrpcWebContentType(headers));
+}
 
 // Implements StreamDecoderFilter.
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
@@ -195,13 +196,14 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   // response, we set the "grpc-message" header with the upstream body content.
   if (response_headers_ != nullptr) {
     if (!end_stream) {
-      return Http::FilterDataStatus::StopIterationNoBuffer;
+      return Http::FilterDataStatus::StopIterationAndBuffer;
     }
 
+    constexpr uint64_t max_grpc_message_length = 1024;
     // Take the last frame as the grpc-message value, but the size of it is limited by
-    // MAX_GRPC_MESSAGE_LENGTH.
+    // max_grpc_message_length.
     const auto message =
-        Http::Utility::PercentEncoding::encode(data.toString().substr(0, MAX_GRPC_MESSAGE_LENGTH));
+        Http::Utility::PercentEncoding::encode(data.toString().substr(0, max_grpc_message_length));
     data.drain(data.length());
 
     response_headers_->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(
