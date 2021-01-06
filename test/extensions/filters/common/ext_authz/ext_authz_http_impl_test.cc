@@ -89,6 +89,10 @@ public:
                 ignore_case: true
               - prefix: "X-"
                 ignore_case: true
+            allowed_client_headers_on_success:
+              patterns:
+              - prefix: "X-Downstream-"
+                ignore_case: true
         )EOF";
       TestUtility::loadFromYaml(default_yaml, proto_config);
     } else {
@@ -296,8 +300,11 @@ using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string
 
 // Verify client response headers when authorization_headers_to_add is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  const auto expected_headers = TestCommon::makeHeaderValueOption(
+      {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::OK, Http::Code::OK, "", TestCommon::makeHeaderValueOption({}),
+      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", false}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =
