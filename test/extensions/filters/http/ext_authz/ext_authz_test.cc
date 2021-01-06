@@ -1735,8 +1735,14 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(request_headers_.get_(key_to_override), "bar");
   EXPECT_EQ(request_headers_.has(key_to_remove), false);
 
+  Buffer::OwnedImpl response_data{};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  Http::TestResponseTrailerMapImpl response_trailers{};
+  Http::MetadataMap response_metadata{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
   EXPECT_EQ(response_headers.get_("cookie"), "flavor=gingerbread");
 }
 
