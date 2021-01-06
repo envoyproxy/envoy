@@ -1,12 +1,12 @@
 #include "common/http/path_utility.h"
 
-#include "url/url_canon.h"
-#include "url/url_canon_stdstring.h"
 #include "common/common/logger.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
+#include "url/url_canon.h"
+#include "url/url_canon_stdstring.h"
 
 namespace Envoy {
 namespace Http {
