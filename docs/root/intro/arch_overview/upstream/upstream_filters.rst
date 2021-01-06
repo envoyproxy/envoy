@@ -1,13 +1,6 @@
 .. _arch_overview_upstream_filters:
 
-Upstream network filters
-========================
+上游网络过滤器
+================
 
-Upstream clusters provide an ability to inject network level (L3/L4)
-filters. It should be noted that a network filter needs to
-be registered in code as an upstream filter before usage. Currently,
-there are no upstream filters available in Envoy out of the box.
-The filters apply to the connection to the upstream hosts, using the same API presented by listeners for
-the downstream connections. The write-callbacks are invoked for any chunk of
-data sent to the upstream host, and the read-callbacks are invoked for data
-received from the upstream host.
+上游集群提供了注入网络级（L3/L4）过滤器的能力。需要注意的是，网络过滤器在使用前需要在代码中先注册为上游过滤器。目前，Envoy 中还没有开箱即用的上游过滤器可用。过滤器应用于到上游主机的连接，使用监听器为下游连接提供的相同 API，来对发送到上游主机的任何数据块进行写回调，对从上游主机接收的数据进行读回调。
