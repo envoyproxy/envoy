@@ -1,8 +1,8 @@
 // NOLINT(namespace-envoy)
 constexpr char TEST_SELFSIGNED_RSA_1024_CERT_HASH[] =
-    "8e6062d7c3b26ff8918d2e80b68bba4cf1fdc33a07a642c63f689a72c0ae2e1b";
+    "6ff715e7ae7855942737eec0d0dc0af87c4f0f52e96899c7b5afc6a3d38f4d95";
 constexpr char TEST_SELFSIGNED_RSA_1024_CERT_SPKI[] =
-    "mNhxspYLv1WBrfZjUGoO32jg/FcurL6q9i1RXCzawoU=";
-constexpr char TEST_SELFSIGNED_RSA_1024_CERT_SERIAL[] = "f61f5cf6fdfb958a";
-constexpr char TEST_SELFSIGNED_RSA_1024_CERT_NOT_BEFORE[] = "Dec 18 01:50:35 2018 GMT";
-constexpr char TEST_SELFSIGNED_RSA_1024_CERT_NOT_AFTER[] = "Dec 17 01:50:35 2020 GMT";
+    "zJz0e3SpojEitMjkld8zmryCLOsKFCOxdjhtjpNdePg=";
+constexpr char TEST_SELFSIGNED_RSA_1024_CERT_SERIAL[] = "6f1cb644507e3b502a2dab2af6a2c9a5c9d9d9ae";
+constexpr char TEST_SELFSIGNED_RSA_1024_CERT_NOT_BEFORE[] = "Dec 22 17:32:29 2020 GMT";
+constexpr char TEST_SELFSIGNED_RSA_1024_CERT_NOT_AFTER[] = "Dec 22 17:32:29 2022 GMT";
