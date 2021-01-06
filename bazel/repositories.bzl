@@ -693,7 +693,6 @@ def _com_googlesource_googleurl():
         name = "com_googlesource_googleurl",
         patches = ["@envoy//bazel/external:googleurl.patch"],
         patch_args = ["-p1"],
-        build_file = "@envoy//bazel/external:googleurl.BUILD",
     )
     native.bind(
         name = "googleurl",
