@@ -26,7 +26,7 @@ static const std::unordered_map<std::string, DWORD> unix_output_pipes_to_windows
     {"/dev/stdout", STD_OUTPUT_HANDLE},     {"/dev/fd/1", STD_OUTPUT_HANDLE},
     {"/proc/self/fd/1", STD_OUTPUT_HANDLE},
 
-    {"/dev/err", STD_ERROR_HANDLE},         {"/dev/fd/2", STD_ERROR_HANDLE},
+    {"/dev/stderr", STD_ERROR_HANDLE},         {"/dev/fd/2", STD_ERROR_HANDLE},
     {"/proc/self/fd/2", STD_ERROR_HANDLE}};
 
 static const std::unordered_map<std::string, std::string> unix_output_pipes_to_windows_file{
@@ -63,6 +63,7 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   auto std_handle = toStandardHandle(path_);
   if (std_handle) {
     fd_ = GetStdHandle(std_handle);
+    is_std_handle_  = true;
     if (fd_ == NULL) {
       // If an application does not have associated standard handles,
       // such as a service running on an interactive desktop
@@ -70,20 +71,25 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
       // In that case we throw an exception instead of failing since there is no last error.
       throw EnvoyException(
           fmt::format("The process does not have an associated handle for '{}'", path_));
-      return resultFailure(false, ::GetLastError());
     }
 
     if (fd_ == INVALID_HANDLE) {
       return resultFailure(false, ::GetLastError());
     }
-
-    is_std_handle_ = true;
     return resultSuccess(true);
   }
 
   auto translated_path = translateUnixPath(path_);
 
-  auto flags = translateFlag(in);
+  FlagsAndMode flags;
+
+  if (translated_path == "CONOUT$") {
+    flags.access_ = GENERIC_WRITE | GENERIC_READ;
+    flags.creation_ = OPEN_EXISTING;
+  } else {
+    flags = translateFlag(in);
+  }
+
   fd_ = CreateFileA(translated_path.c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
                     flags.creation_, 0, NULL);
   if (fd_ == INVALID_HANDLE) {
@@ -103,7 +109,7 @@ Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
 
 Api::IoCallBoolResult FileImplWin32::close() {
   ASSERT(isOpen());
-  if (is_std_handle_) {
+  if (is_std_handle_ || fd_ == NULL) {
     // If we are writing to the standard output of the process we are
     // not the owners of the handle, we are just using it.
     fd_ = INVALID_HANDLE;

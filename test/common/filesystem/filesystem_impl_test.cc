@@ -41,12 +41,12 @@ protected:
 
 TEST_F(FileSystemImplTest, FileExists) {
   EXPECT_FALSE(file_system_.fileExists("/dev/blahblahblah"));
+  EXPECT_TRUE(file_system_.fileExists("/dev/null"));
 #ifdef WIN32
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
   EXPECT_TRUE(file_system_.fileExists(file_path));
   EXPECT_TRUE(file_system_.fileExists("c:/windows"));
 #else
-  EXPECT_TRUE(file_system_.fileExists("/dev/null"));
   EXPECT_TRUE(file_system_.fileExists("/dev"));
 #endif
 }
@@ -312,6 +312,55 @@ TEST_F(FileSystemImplTest, NonExistingFile) {
   auto contents = TestEnvironment::readFileToStringForTest(new_file_path);
   EXPECT_EQ(" new data", contents);
 }
+
+TEST_F(FileSystemImplTest, StdOut) {
+  const std::array<std::string, 3> stdout_aliases{"/dev/stdout", "/dev/fd/1", "/proc/self/fd/1"};
+  for (const auto& stdout_alias : stdout_aliases) {
+    FilePtr file = file_system_.createFile(stdout_alias);
+    const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+    EXPECT_TRUE(open_result.rc_);
+    EXPECT_TRUE(file->isOpen());
+    std::string data(" new data\n");
+    const Api::IoCallSizeResult result = file->write(data);
+    EXPECT_EQ(data.length(), result.rc_);
+  }
+}
+
+TEST_F(FileSystemImplTest, StdErr) {
+  const std::array<std::string, 3> stderr_aliases{"/dev/stderr", "/dev/fd/2", "/proc/self/fd/2"};
+  for (const auto& stderr_alias : stderr_aliases) {
+    FilePtr file = file_system_.createFile(stderr_alias);
+    const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+    EXPECT_TRUE(open_result.rc_) << fmt::format("{}", open_result.err_);
+    EXPECT_TRUE(file->isOpen());
+    std::string data(" new data\n");
+    const Api::IoCallSizeResult result = file->write(data);
+    EXPECT_EQ(data.length(), result.rc_);
+  }
+}
+
+TEST_F(FileSystemImplTest, Console) {
+  const std::array<std::string, 2> console_aliases{"/dev/console", "/dev/tty"};
+  for (const auto& console_alias : console_aliases) {
+    FilePtr file = file_system_.createFile(console_alias);
+    const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+    EXPECT_TRUE(open_result.rc_) << fmt::format("{}", open_result.err_);
+    EXPECT_TRUE(file->isOpen());
+    std::string data(" new data\n");
+    const Api::IoCallSizeResult result = file->write(data);
+    EXPECT_EQ(data.length(), result.rc_) << result.err_->getErrorDetails();
+  }
+}
+
+#ifdef WIN32
+TEST_F(FileSystemImplTest, Win32InvalidHandleThrows) {
+  FilePtr file = file_system_.createFile("/dev/stdout");
+  auto original_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, NULL));
+  EXPECT_THROW(file->open(DefaultFlags), EnvoyException);
+  EXPECT_TRUE(SetStdHandle(STD_OUTPUT_HANDLE, original_handle));
+}
+#endif
 
 TEST_F(FileSystemImplTest, Close) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
