@@ -583,6 +583,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 

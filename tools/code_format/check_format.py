@@ -75,6 +75,7 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
+    "./test/extensions/filters/common/expr/context_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
     "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
 )
