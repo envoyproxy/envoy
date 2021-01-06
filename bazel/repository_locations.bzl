@@ -511,7 +511,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2020-11-13",
+        release_date = "2021-01-06",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
