@@ -10,6 +10,7 @@
 #include "common/common/macros.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Extensions {
