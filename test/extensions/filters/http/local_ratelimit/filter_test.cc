@@ -236,6 +236,21 @@ TEST_F(DescriptorFilterTest, NoCluster) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
 }
 
+TEST_F(DescriptorFilterTest, DisabledInRoute) {
+  setUpTest(fmt::format(descriptor_config_yaml, "1", "1", "0"));
+
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  route_rate_limit_.disable_key_ = "disabled";
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+}
+
 TEST_F(DescriptorFilterTest, RouteDescriptorRequestOk) {
   setUpTest(fmt::format(descriptor_config_yaml, "1", "1", "0"));
 
