@@ -141,9 +141,9 @@ public:
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
         .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                    *connection_socket.localAddress());
+                    *connection_socket.addressProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                    *connection_socket.remoteAddress());
+                    *connection_socket.addressProvider().remoteAddress());
           EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                     connection_socket.detectedTransportProtocol());
           EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);

@@ -52,7 +52,7 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
   std::getline(address_file, address_from_file);
-  EXPECT_EQ(admin_.socket().localAddress()->asString(), address_from_file);
+  EXPECT_EQ(admin_.socket().addressProvider().localAddress()->asString(), address_from_file);
 }
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {

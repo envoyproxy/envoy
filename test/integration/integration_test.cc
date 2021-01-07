@@ -67,7 +67,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
     socket_option->set_level(10000);     // Invalid level.
@@ -89,7 +89,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
     socket_option->set_level(10000);     // Invalid level.
@@ -1140,8 +1140,11 @@ TEST_P(IntegrationTest, TestBind) {
                                          1024);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_NE(fake_upstream_connection_, nullptr);
-  std::string address =
-      fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
+  std::string address = fake_upstream_connection_->connection()
+                            .addressProvider()
+                            .remoteAddress()
+                            ->ip()
+                            ->addressAsString();
   EXPECT_EQ(address, address_string);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_NE(upstream_request_, nullptr);

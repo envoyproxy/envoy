@@ -7,6 +7,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
+#include "envoy/network/socket.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/dump_state_utils.h"
@@ -595,6 +596,46 @@ public:
 };
 
 /**
+ * This class allows the remote address to be overridden for HTTP stream info. This is used for
+ * XFF handling. This is required to avoid providing stream info with a non-const address provider.
+ * Private inheritance from SocketAddressProvider is used to make sure users get the address
+ * provider via the normal getter.
+ */
+class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                       private Network::SocketAddressProvider {
+public:
+  using StreamInfoImpl::StreamInfoImpl;
+
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    ASSERT(overridden_downstream_remote_address_ == nullptr);
+    overridden_downstream_remote_address_ = downstream_remote_address;
+  }
+
+  // StreamInfo::StreamInfo
+  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
+
+  // Network::SocketAddressProvider
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddress();
+  }
+  bool localAddressRestored() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
+  }
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+    return overridden_downstream_remote_address_ != nullptr
+               ? overridden_downstream_remote_address_
+               : StreamInfoImpl::downstreamAddressProvider().remoteAddress();
+  }
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
+  }
+
+private:
+  Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
+};
+
+/**
  * FilterManager manages decoding a request through a series of decoding filter and the encoding
  * of the resulting response.
  */
@@ -612,7 +653,8 @@ public:
         connection_(connection), stream_id_(stream_id), proxy_100_continue_(proxy_100_continue),
         buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
         local_reply_(local_reply),
-        stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
+        stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
+                     parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -849,6 +891,10 @@ public:
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
   const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
+  }
 
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
@@ -941,7 +987,7 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
-  StreamInfo::StreamInfoImpl stream_info_;
+  OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;

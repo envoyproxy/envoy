@@ -45,9 +45,12 @@ public:
   void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
-  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override;
-  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override;
-  const Network::Address::InstanceConstSharedPtr& localAddress() const override;
+  const Network::SocketAddressSetter& addressProvider() const override {
+    return quic_connection_->connectionSocket()->addressProvider();
+  }
+  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+    return quic_connection_->connectionSocket()->addressProviderSharedPtr();
+  }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
     // Unix domain socket is not supported.
@@ -78,10 +81,6 @@ public:
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override {
     // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  bool localAddressRestored() const override {
-    // SO_ORIGINAL_DST not supported by QUIC.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool aboveHighWatermark() const override;

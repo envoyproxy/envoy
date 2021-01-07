@@ -196,8 +196,8 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
     // First have initial payload added to the udp_packet_writer's internal buffer.
     Buffer::InstancePtr initial_buffer(new Buffer::OwnedImpl());
     initial_buffer->add(initial_payload);
-    UdpSendData initial_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
-                                  *initial_buffer};
+    UdpSendData initial_send_data{
+        send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(), *initial_buffer};
     auto send_result = listener_->send(initial_send_data);
     internal_buffer.append(initial_payload);
     EXPECT_TRUE(send_result.ok());
@@ -220,8 +220,8 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
     // Now send the following payload
     Buffer::InstancePtr following_buffer(new Buffer::OwnedImpl());
     following_buffer->add(following_payload);
-    UdpSendData following_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
-                                    *following_buffer};
+    UdpSendData following_send_data{
+        send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(), *following_buffer};
     send_result = listener_->send(following_send_data);
 
     if (following_payload.length() < initial_payload.length()) {
@@ -238,7 +238,8 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
             return -1;
           }));
       following_buffer->add(following_payload);
-      UdpSendData final_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
+      UdpSendData final_send_data{send_to_addr_->ip(),
+                                  *server_socket_->addressProvider().localAddress(),
                                   *following_buffer};
       send_result = listener_->send(final_send_data);
     }

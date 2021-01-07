@@ -28,12 +28,13 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   if (!EnvoyQuicConnection::OnPacketHeader(header)) {
     return false;
   }
-  if (connectionSocket()->localAddress() != nullptr) {
+  if (connectionSocket()->addressProvider().localAddress() != nullptr) {
     return true;
   }
   ASSERT(self_address().IsInitialized());
   // Self address should be initialized by now.
-  connectionSocket()->setLocalAddress(quicAddressToEnvoyAddressInstance(self_address()));
+  connectionSocket()->addressProvider().setLocalAddress(
+      quicAddressToEnvoyAddressInstance(self_address()));
   connectionSocket()->setDetectedTransportProtocol(
       Extensions::TransportSockets::TransportProtocolNames::get().Quic);
   return true;

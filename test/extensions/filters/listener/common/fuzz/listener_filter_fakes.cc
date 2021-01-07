@@ -8,35 +8,16 @@ Network::IoHandle& FakeConnectionSocket::ioHandle() { return *io_handle_; }
 
 const Network::IoHandle& FakeConnectionSocket::ioHandle() const { return *io_handle_; }
 
-void FakeConnectionSocket::setLocalAddress(
-    const Network::Address::InstanceConstSharedPtr& local_address) {
-  local_address_ = local_address;
-  if (local_address_ != nullptr) {
-    addr_type_ = local_address_->type();
-  }
+Network::Address::Type FakeConnectionSocket::addressType() const {
+  return address_provider_->localAddress()->type();
 }
-
-void FakeConnectionSocket::setRemoteAddress(
-    const Network::Address::InstanceConstSharedPtr& remote_address) {
-  remote_address_ = remote_address;
-}
-
-const Network::Address::InstanceConstSharedPtr& FakeConnectionSocket::localAddress() const {
-  return local_address_;
-}
-
-const Network::Address::InstanceConstSharedPtr& FakeConnectionSocket::remoteAddress() const {
-  return remote_address_;
-}
-
-Network::Address::Type FakeConnectionSocket::addressType() const { return addr_type_; }
 
 absl::optional<Network::Address::IpVersion> FakeConnectionSocket::ipVersion() const {
-  if (local_address_ == nullptr || addr_type_ != Network::Address::Type::Ip) {
+  if (address_provider_->localAddress() == nullptr || addressType() != Network::Address::Type::Ip) {
     return absl::nullopt;
   }
 
-  return local_address_->ip()->version();
+  return address_provider_->localAddress()->ip()->version();
 }
 
 void FakeConnectionSocket::setDetectedTransportProtocol(absl::string_view protocol) {

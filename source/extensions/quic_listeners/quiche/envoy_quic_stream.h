@@ -79,7 +79,7 @@ public:
   }
   uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-    return connection()->localAddress();
+    return connection()->addressProvider().localAddress();
   }
 
   void maybeCheckWatermark(uint64_t buffered_data_old, uint64_t buffered_data_new,

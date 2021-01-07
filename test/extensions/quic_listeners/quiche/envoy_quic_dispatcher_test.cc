@@ -130,8 +130,8 @@ public:
     EnvoyQuicClock clock(*dispatcher_);
     Buffer::OwnedImpl payload = generateChloPacketToSend(
         quic_version_, quic_config_, crypto_config_, connection_id_, clock,
-        envoyIpAddressToQuicSocketAddress(listen_socket_->localAddress()->ip()), peer_addr,
-        "test.example.org");
+        envoyIpAddressToQuicSocketAddress(listen_socket_->addressProvider().localAddress()->ip()),
+        peer_addr, "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT(slice.size() == 1);
     auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
@@ -141,8 +141,8 @@ public:
             quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
 
     envoy_quic_dispatcher_.ProcessPacket(
-        envoyIpAddressToQuicSocketAddress(listen_socket_->localAddress()->ip()), peer_addr,
-        *received_packet);
+        envoyIpAddressToQuicSocketAddress(listen_socket_->addressProvider().localAddress()->ip()),
+        peer_addr, *received_packet);
 
     if (should_buffer) {
       // Incoming CHLO packet is buffered, because ProcessPacket() is called before
@@ -166,10 +166,11 @@ public:
     EXPECT_EQ(1u, connection_handler_.numConnections());
     auto envoy_connection = static_cast<EnvoyQuicServerSession*>(session);
     EXPECT_EQ("test.example.org", envoy_connection->requestedServerName());
-    EXPECT_EQ(peer_addr,
-              envoyIpAddressToQuicSocketAddress(envoy_connection->remoteAddress()->ip()));
-    ASSERT(envoy_connection->localAddress() != nullptr);
-    EXPECT_EQ(*listen_socket_->localAddress(), *envoy_connection->localAddress());
+    EXPECT_EQ(peer_addr, envoyIpAddressToQuicSocketAddress(
+                             envoy_connection->addressProvider().remoteAddress()->ip()));
+    ASSERT(envoy_connection->addressProvider().localAddress() != nullptr);
+    EXPECT_EQ(*listen_socket_->addressProvider().localAddress(),
+              *envoy_connection->addressProvider().localAddress());
   }
 
   void processValidChloPacketAndInitializeFilters(bool should_buffer) {

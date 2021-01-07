@@ -8,14 +8,16 @@ void ListenerFilterFuzzer::fuzz(
     Network::ListenerFilter& filter,
     const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
-    socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
+    socket_.addressProvider().setLocalAddress(
+        Network::Utility::resolveUrl(input.sock().local_address()));
   } catch (const EnvoyException& e) {
-    socket_.setLocalAddress(Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
+    socket_.addressProvider().setLocalAddress(Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
   }
   try {
-    socket_.setRemoteAddress(Network::Utility::resolveUrl(input.sock().remote_address()));
+    socket_.addressProvider().setRemoteAddress(
+        Network::Utility::resolveUrl(input.sock().remote_address()));
   } catch (const EnvoyException& e) {
-    socket_.setRemoteAddress(Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
+    socket_.addressProvider().setRemoteAddress(Network::Utility::resolveUrl("tcp://0.0.0.0:0"));
   }
 
   FuzzedInputStream data(input);

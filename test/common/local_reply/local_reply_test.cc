@@ -23,7 +23,7 @@ const absl::string_view TestInitContentType = "content-type";
 
 class LocalReplyTest : public testing::Test {
 public:
-  LocalReplyTest() : stream_info_(time_system_.timeSystem()) { resetData(TestInitCode); }
+  LocalReplyTest() : stream_info_(time_system_.timeSystem(), nullptr) { resetData(TestInitCode); }
 
   void resetData(Http::Code code) {
     code_ = code;

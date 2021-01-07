@@ -173,7 +173,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
         Tracing::Tags::get().HttpProtocol,
         Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
-    const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
+    const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
 
     if (remote_address->type() == Network::Address::Type::Ip) {
       const auto remote_ip = remote_address->ip();

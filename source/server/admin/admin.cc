@@ -140,7 +140,7 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
       ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
                 address_out_path);
     } else {
-      address_out_file << socket_->localAddress()->asString();
+      address_out_file << socket_->addressProvider().localAddress()->asString();
     }
   }
 }

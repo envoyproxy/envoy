@@ -121,9 +121,9 @@ void Filter::populateRateLimitDescriptors(
             fmt::format("ratelimit.{}.thrift_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   metadata,
-                                   *decoder_callbacks_->streamInfo().downstreamRemoteAddress());
+    rate_limit.populateDescriptors(
+        *route_entry, descriptors, config_->localInfo().clusterName(), metadata,
+        *decoder_callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
   }
 }
 

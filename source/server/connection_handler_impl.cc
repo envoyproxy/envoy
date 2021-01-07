@@ -360,9 +360,11 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
   // Check if the socket may need to be redirected to another listener.
   ActiveTcpListenerOptRef new_listener;
 
-  if (hand_off_restored_destination_connections_ && socket_->localAddressRestored()) {
+  if (hand_off_restored_destination_connections_ &&
+      socket_->addressProvider().localAddressRestored()) {
     // Find a listener associated with the original destination address.
-    new_listener = listener_.parent_.findActiveTcpListenerByAddress(*socket_->localAddress());
+    new_listener = listener_.parent_.findActiveTcpListenerByAddress(
+        *socket_->addressProvider().localAddress());
   }
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
@@ -460,10 +462,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-  // Refresh addresses in case they are modified by listener filters, such as proxy protocol or
-  // original_dst.
-  stream_info->setDownstreamLocalAddress(socket->localAddress());
-  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);

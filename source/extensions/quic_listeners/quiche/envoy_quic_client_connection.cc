@@ -42,11 +42,11 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
     Network::ConnectionSocketPtr&& connection_socket)
-    : EnvoyQuicConnection(
-          server_connection_id, quic::QuicSocketAddress(),
-          envoyIpAddressToQuicSocketAddress(connection_socket->remoteAddress()->ip()), helper,
-          alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
-          std::move(connection_socket)),
+    : EnvoyQuicConnection(server_connection_id, quic::QuicSocketAddress(),
+                          envoyIpAddressToQuicSocketAddress(
+                              connection_socket->addressProvider().remoteAddress()->ip()),
+                          helper, alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT,
+                          supported_versions, std::move(connection_socket)),
       dispatcher_(dispatcher) {}
 
 void EnvoyQuicClientConnection::processPacket(
@@ -117,8 +117,8 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   // event processing.
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
-        connectionSocket()->ioHandle(), *connectionSocket()->localAddress(), *this,
-        dispatcher_.timeSource(), packets_dropped_);
+        connectionSocket()->ioHandle(), *connectionSocket()->addressProvider().localAddress(),
+        *this, dispatcher_.timeSource(), packets_dropped_);
     // TODO(danzh): Handle no error when we limit the number of packets read.
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),

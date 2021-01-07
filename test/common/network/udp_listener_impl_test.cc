@@ -258,7 +258,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
  * Tests UDP listener's `enable` and `disable` APIs.
  */
 TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
-  auto const* server_ip = server_socket_->localAddress()->ip();
+  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // We first disable the listener and then send two packets.
@@ -304,7 +304,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
  * Tests UDP listener's error callback.
  */
 TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
-  auto const* server_ip = server_socket_->localAddress()->ip();
+  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // When the `receive` system call returns an error, we expect the `onReceiveError`
@@ -377,7 +377,8 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // send data to itself
-  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->localAddress(), *buffer};
+  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(),
+                        *buffer};
 
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;

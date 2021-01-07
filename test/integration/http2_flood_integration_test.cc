@@ -201,7 +201,7 @@ void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num
 
   // Make Envoy's writes into the upstream connection to return EAGAIN
   writev_matcher_->setSourcePort(
-      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+      fake_upstream_connection_->connection().addressProvider().remoteAddress()->ip()->port());
 
   auto buf = serializeFrames(frame, num_frames);
 
@@ -304,7 +304,7 @@ Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
 
   // Make Envoy's writes into the upstream connection to return EAGAIN
   writev_matcher_->setSourcePort(
-      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+      fake_upstream_connection_->connection().addressProvider().remoteAddress()->ip()->port());
 
   auto buf = serializeFrames(Http2Frame::makePingFrame(), frame_count);
 
@@ -1527,7 +1527,7 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
   // Make Envoy's writes into the upstream connection to return EAGAIN, preventing proxying of the
   // METADATA frames
   writev_matcher_->setSourcePort(
-      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+      fake_upstream_connection_->connection().addressProvider().remoteAddress()->ip()->port());
 
   writev_matcher_->setWritevReturnsEgain();
 

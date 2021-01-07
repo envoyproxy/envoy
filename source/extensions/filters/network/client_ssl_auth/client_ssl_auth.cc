@@ -112,7 +112,8 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipAllowlist().contains(*read_callbacks_->connection().remoteAddress())) {
+  if (config_->ipAllowlist().contains(
+          *read_callbacks_->connection().addressProvider().remoteAddress())) {
     config_->stats().auth_ip_allowlist_.inc();
     read_callbacks_->continueReading();
     return;

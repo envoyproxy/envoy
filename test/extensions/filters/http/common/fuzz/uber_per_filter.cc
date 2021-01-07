@@ -124,8 +124,8 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
 void UberFilterFuzzer::perFilterSetup() {
   // Prepare expectations for the ext_authz filter.
   addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
   ON_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillByDefault(Return(&async_request_));

@@ -193,7 +193,9 @@ public:
   void recv(Network::UdpRecvData& datagram);
 
   // Return the local peer's socket address.
-  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+  const Network::Address::InstanceConstSharedPtr& localAddress() {
+    return socket_->addressProvider().localAddress();
+  }
 
 private:
   const Network::SocketPtr socket_;

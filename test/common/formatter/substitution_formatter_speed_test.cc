@@ -48,7 +48,7 @@ std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool type
 
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
   auto stream_info = std::make_unique<Envoy::TestStreamInfo>();
-  stream_info->setDownstreamRemoteAddress(
+  stream_info->downstream_address_provider_->setRemoteAddress(
       std::make_shared<Envoy::Network::Address::Ipv4Instance>("203.0.113.1"));
   return stream_info;
 }

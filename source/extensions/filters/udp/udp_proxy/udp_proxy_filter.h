@@ -259,7 +259,8 @@ private:
 
   virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address());
+    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
+                                                 nullptr);
   }
 
   // Upstream::ClusterUpdateCallbacks

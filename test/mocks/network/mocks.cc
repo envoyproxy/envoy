@@ -30,7 +30,8 @@ MockListenerConfig::MockListenerConfig()
       udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
   ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-  ON_CALL(socket_factory_, localAddress()).WillByDefault(ReturnRef(socket_->localAddress()));
+  ON_CALL(socket_factory_, localAddress())
+      .WillByDefault(ReturnRef(socket_->addressProvider().localAddress()));
   ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(socket_));
   ON_CALL(socket_factory_, sharedSocket())
       .WillByDefault(Return(std::reference_wrapper<Socket>(*socket_)));
@@ -131,8 +132,8 @@ MockFilterChainFactory::~MockFilterChainFactory() = default;
 
 MockListenSocket::MockListenSocket()
     : io_handle_(std::make_unique<IoSocketHandleImpl>()),
-      local_address_(new Address::Ipv4Instance(80)) {
-  ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
+      address_provider_(std::make_shared<SocketAddressSetterImpl>(
+          std::make_shared<Address::Ipv4Instance>(80), nullptr)) {
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
@@ -140,7 +141,8 @@ MockListenSocket::MockListenSocket()
   ON_CALL(testing::Const(*this), isOpen()).WillByDefault(Invoke([this]() {
     return socket_is_open_;
   }));
-  ON_CALL(*this, ipVersion()).WillByDefault(Return(local_address_->ip()->version()));
+  ON_CALL(*this, ipVersion())
+      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
 }
 
 MockSocketOption::MockSocketOption() {
@@ -151,14 +153,13 @@ MockSocketOption::~MockSocketOption() = default;
 
 MockConnectionSocket::MockConnectionSocket()
     : io_handle_(std::make_unique<IoSocketHandleImpl>()),
-      local_address_(new Address::Ipv4Instance(80)),
-      remote_address_(new Address::Ipv4Instance(80)) {
-  ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
-  ON_CALL(*this, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
-  ON_CALL(*this, directRemoteAddress()).WillByDefault(ReturnRef(remote_address_));
+      address_provider_(
+          std::make_shared<SocketAddressSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
+                                                    std::make_shared<Address::Ipv4Instance>(80))) {
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
-  ON_CALL(*this, ipVersion()).WillByDefault(Return(local_address_->ip()->version()));
+  ON_CALL(*this, ipVersion())
+      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
 }
 
 MockConnectionSocket::~MockConnectionSocket() = default;

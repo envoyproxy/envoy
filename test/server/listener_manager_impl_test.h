@@ -181,7 +181,7 @@ protected:
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
-    ON_CALL(*socket_, localAddress()).WillByDefault(ReturnRef(local_address_));
+    socket_->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*socket_, requestedServerName()).WillByDefault(Return(absl::string_view(server_name)));
     ON_CALL(*socket_, detectedTransportProtocol())
@@ -194,7 +194,7 @@ protected:
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
-    ON_CALL(*socket_, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
+    socket_->address_provider_->setRemoteAddress(remote_address_);
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }

@@ -28,7 +28,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  SocketImpl sock(type, addr_port);
+  SocketImpl sock(type, addr_port, nullptr);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
@@ -57,7 +57,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << ")";
     return nullptr;
   }
-  return sock.localAddress();
+  return sock.addressProvider().localAddress();
 }
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
@@ -164,7 +164,7 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
 bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_port) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
+  SocketPtr sock = std::make_unique<SocketImpl>(type, addr, nullptr);
   if (reuse_port) {
     sock->addOptions(SocketOptionFactory::buildReusePortOptions());
     Socket::applyOptions(sock->options(), *sock,
@@ -179,7 +179,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_p
     throw EnvoyException(msg);
   }
 
-  return std::make_pair(sock->localAddress(), std::move(sock));
+  return std::make_pair(sock->addressProvider().localAddress(), std::move(sock));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
@@ -235,8 +235,8 @@ void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Insta
 
 void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
   if (received_datagrams_.empty()) {
-    const auto rc = Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(),
-                                                  received_datagrams_);
+    const auto rc = Network::Test::readFromSocket(
+        socket_->ioHandle(), *socket_->addressProvider().localAddress(), received_datagrams_);
     ASSERT_TRUE(rc.ok());
   }
   datagram = std::move(received_datagrams_.front());

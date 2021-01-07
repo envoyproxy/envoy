@@ -28,42 +28,6 @@ namespace Network {
  */
 class ConnectionSocket : public virtual Socket, public virtual ScopeTrackedObject {
 public:
-  ~ConnectionSocket() override = default;
-
-  /**
-   * @return the remote address of the socket.
-   */
-  virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
-
-  /**
-   * @return the direct remote address of the socket. This is the address of the directly
-   *         connected peer, and cannot be modified by listener filters.
-   */
-  virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
-
-  /**
-   * Restores the local address of the socket. On accepted sockets the local address defaults to the
-   * one at which the connection was received at, which is the same as the listener's address, if
-   * the listener is bound to a specific address. Call this to restore the address to a value
-   * different from the one the socket was initially accepted at. This should only be called when
-   * restoring the original destination address of a connection redirected by iptables REDIRECT. The
-   * caller is responsible for making sure the new address is actually different.
-   *
-   * @param local_address the new local address.
-   */
-  virtual void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
-
-  /**
-   * Set the remote address of the socket.
-   */
-  virtual void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
-
-  /**
-   * @return true if the local address has been restored to a value that is different from the
-   *         address the socket was initially accepted at.
-   */
-  virtual bool localAddressRestored() const PURE;
-
   /**
    * Set detected transport protocol (e.g. RAW_BUFFER, TLS).
    */

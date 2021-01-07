@@ -45,7 +45,7 @@ public:
   explicit ListenerFilterDstPortMatcher(const ::envoy::type::v3::Int32Range& range)
       : start_(range.start()), end_(range.end()) {}
   bool matches(ListenerFilterCallbacks& cb) const override {
-    const auto& address = cb.socket().localAddress();
+    const auto& address = cb.socket().addressProvider().localAddress();
     // Match on destination port (only for IP addresses).
     if (address->type() == Address::Type::Ip) {
       const auto port = address->ip()->port();

@@ -175,7 +175,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 
   auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
   callbacks_->onGenericPoolReady(&connection.streamInfo(), std::move(upstream), host,
-                                 latched_data->connection().localAddress(),
+                                 latched_data->connection().addressProvider().localAddress(),
                                  latched_data->connection().streamInfo().downstreamSslConnection());
 }
 
