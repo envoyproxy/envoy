@@ -51,8 +51,9 @@ public:
 class HandshakerTest : public SslCertsTest {
 protected:
   HandshakerTest()
-      : dispatcher_(api_->allocateDispatcher("test_thread")), stream_info_(api_->timeSource()),
-        client_ctx_(SSL_CTX_new(TLS_method())), server_ctx_(SSL_CTX_new(TLS_method())) {}
+      : dispatcher_(api_->allocateDispatcher("test_thread")),
+        stream_info_(api_->timeSource(), nullptr), client_ctx_(SSL_CTX_new(TLS_method())),
+        server_ctx_(SSL_CTX_new(TLS_method())) {}
 
   void SetUp() override {
     // Set up key and cert, initialize two SSL objects and a pair of BIOs for

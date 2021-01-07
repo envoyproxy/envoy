@@ -52,8 +52,8 @@ void UpstreamProxyProtocolSocket::generateHeader() {
 
 void UpstreamProxyProtocolSocket::generateHeaderV1() {
   // Default to local addresses (used if no downstream connection exists e.g. health checks)
-  auto src_addr = callbacks_->connection().localAddress();
-  auto dst_addr = callbacks_->connection().remoteAddress();
+  auto src_addr = callbacks_->connection().addressProvider().localAddress();
+  auto dst_addr = callbacks_->connection().addressProvider().remoteAddress();
 
   if (options_ && options_->proxyProtocolOptions().has_value()) {
     const auto options = options_->proxyProtocolOptions().value();
