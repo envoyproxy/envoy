@@ -79,6 +79,25 @@ xds::core::v3::ContextParams XdsContextParams::encodeResource(
 xds::core::v3::ContextParams XdsContextParams::encodeNodeContext(
     const envoy::config::core::v3::Node& node,
     const Protobuf::RepeatedPtrField<std::string>& node_context_params) {
+  // E.g. if we have a node instance with contents
+  //
+  // user_agent_build_version:
+  //   version:
+  //     major_number: 1
+  //     minor_number: 2
+  //     patch: 3
+  //   metadata:
+  //     foo: true
+  //     bar: "a"
+  //     baz: 42
+  //
+  // and node_context_params [user_agent_build_version.version, user_agent_build_version.metadata],
+  // we end up with the map:
+  //
+  // xds.node.user_agent_build_version.metadata.bar: "\"a\""
+  // xds.node.user_agent_build_version.metadata.baz: "42"
+  // xds.node.user_agent_build_version.metadata.foo: "true"
+  // xds.node.user_agent_build_version.version: "1.2.3"
   xds::core::v3::ContextParams context_params;
   auto& mutable_params = *context_params.mutable_params();
   for (const std::string& ncp : node_context_params) {

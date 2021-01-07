@@ -168,7 +168,8 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
     // Callers must be asking for a single resource, the collection.
     ASSERT(resources.size() == 1);
     auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
-    // We only know how to deal with glob collections right now.
+    // We only know how to deal with glob collections and static context parameters right now.
+    // TODO(htuch): add support for dynamic context params and list collections in the future.
     if (absl::EndsWith(resource.id(), "/*")) {
       auto encoded_context = XdsContextParams::encodeResource(
           local_info_.contextProvider().nodeContext(), resource.context(), {}, {});
