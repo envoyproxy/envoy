@@ -330,12 +330,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
   // Create an HTTP connection and start a request.
-  FakeStreamPtr http_stream;
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeRequestWithBody(request_headers, 10);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, http_stream));
-  ASSERT_TRUE(http_stream->waitForHeadersComplete());
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   // At this point, Envoy is waiting for the upstream to respond, but that won't
   // happen before it hits the stream timeout.
 
