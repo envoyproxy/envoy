@@ -1,12 +1,12 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
-#include "envoy/extensions/descriptors/expr/v3/expr.pb.h"
-#include "envoy/extensions/descriptors/expr/v3/expr.pb.validate.h"
+#include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.h"
+#include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.validate.h"
 
 #include "common/protobuf/utility.h"
 #include "common/router/router_ratelimit.h"
 
-#include "extensions/descriptors/expr/config.h"
+#include "extensions/rate_limit_descriptors/expr/config.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
@@ -19,7 +19,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
-namespace Descriptors {
+namespace RateLimitDescriptors {
 namespace Expr {
 namespace {
 
@@ -59,7 +59,7 @@ actions:
 - extension:
     name: custom_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: my_descriptor_name
       text: request.headers["x-header-name"]
   )EOF";
@@ -78,7 +78,7 @@ actions:
 - extension:
     name: custom_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: my_descriptor_name
       text: undefined_ext(false)
   )EOF";
@@ -92,7 +92,7 @@ actions:
 - extension:
     name: custom_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: my_descriptor_name
       text: ++
   )EOF";
@@ -108,7 +108,7 @@ actions:
 - extension:
     name: custom_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: my_descriptor_name
       parsed:
         call_expr:
@@ -137,7 +137,7 @@ actions:
 - extension:
     name: custom_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: my_descriptor_name
       parsed:
         call_expr:
@@ -157,13 +157,13 @@ actions:
 - extension:
     name: first_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: test_key
       text: "'a'"
 - extension:
     name: second_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: my_descriptor_name
       text: request.headers["x-header-name"]
   )EOF";
@@ -180,13 +180,13 @@ actions:
 - extension:
     name: first_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: test_key
       text: "'a'"
 - extension:
     name: second_descriptor
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
       descriptor_key: my_descriptor_name
       text: request.headers["x-header-name"]
       skip_if_error: true
@@ -202,6 +202,6 @@ actions:
 
 } // namespace
 } // namespace Expr
-} // namespace Descriptors
+} // namespace RateLimitDescriptors
 } // namespace Extensions
 } // namespace Envoy

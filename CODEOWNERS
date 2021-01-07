@@ -161,4 +161,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # Rate limit expression descriptor
-/*/extensions/descriptors/expr @kyessenov @lizan
+/*/extensions/rate_limit_descriptors/expr @kyessenov @lizan

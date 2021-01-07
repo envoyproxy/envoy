@@ -234,7 +234,7 @@ EXTENSIONS = {
     # Rate limit descriptors
     #
 
-    "envoy.descriptors.expr":                           "//source/extensions/descriptors/expr:config",
+    "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

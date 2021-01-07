@@ -80,7 +80,7 @@ public:
   createDescriptorProducerFromProto(const Protobuf::Message& config,
                                     ProtobufMessage::ValidationVisitor& validator) PURE;
 
-  std::string category() const override { return "envoy.descriptors"; }
+  std::string category() const override { return "envoy.rate_limit_descriptors"; }
 };
 
 } // namespace RateLimit

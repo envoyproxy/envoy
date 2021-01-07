@@ -7,7 +7,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Descriptors {
+namespace RateLimitDescriptors {
 namespace Expr {
 
 /**
@@ -16,7 +16,7 @@ namespace Expr {
  */
 class ExprDescriptorFactory : public RateLimit::DescriptorProducerFactory {
 public:
-  std::string name() const override { return "envoy.descriptors.expr"; }
+  std::string name() const override { return "envoy.rate_limit_descriptors.expr"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   RateLimit::DescriptorProducerPtr
   createDescriptorProducerFromProto(const Protobuf::Message& message,
@@ -28,6 +28,6 @@ private:
 };
 
 } // namespace Expr
-} // namespace Descriptors
+} // namespace RateLimitDescriptors
 } // namespace Extensions
 } // namespace Envoy

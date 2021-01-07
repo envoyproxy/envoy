@@ -5,4 +5,4 @@ Rate limit descriptors
   :glob:
   :maxdepth: 2
 
-  ../../extensions/descriptors/expr/v3/*
+  ../../extensions/rate_limit_descriptors/expr/v3/*

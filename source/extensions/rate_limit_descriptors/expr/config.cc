@@ -1,7 +1,7 @@
-#include "extensions/descriptors/expr/config.h"
+#include "extensions/rate_limit_descriptors/expr/config.h"
 
-#include "envoy/extensions/descriptors/expr/v3/expr.pb.h"
-#include "envoy/extensions/descriptors/expr/v3/expr.pb.validate.h"
+#include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.h"
+#include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.validate.h"
 
 #include "common/protobuf/utility.h"
 
@@ -11,7 +11,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Descriptors {
+namespace RateLimitDescriptors {
 namespace Expr {
 
 namespace {
@@ -21,9 +21,9 @@ namespace {
  */
 class ExpressionDescriptor : public RateLimit::DescriptorProducer {
 public:
-  ExpressionDescriptor(const envoy::extensions::descriptors::expr::v3::Descriptor& config,
-                       Filters::Common::Expr::Builder& builder,
-                       const google::api::expr::v1alpha1::Expr& input_expr)
+  ExpressionDescriptor(
+      const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor& config,
+      Filters::Common::Expr::Builder& builder, const google::api::expr::v1alpha1::Expr& input_expr)
       : input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
         skip_if_error_(config.skip_if_error()) {
     compiled_expr_ = Extensions::Filters::Common::Expr::createExpression(builder, input_expr_);
@@ -56,17 +56,16 @@ private:
 } // namespace
 
 ProtobufTypes::MessagePtr ExprDescriptorFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::descriptors::expr::v3::Descriptor>();
+  return std::make_unique<envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor>();
 }
 
 RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducerFromProto(
     const Protobuf::Message& message, ProtobufMessage::ValidationVisitor& validator) {
-  const auto& config =
-      MessageUtil::downcastAndValidate<const envoy::extensions::descriptors::expr::v3::Descriptor&>(
-          message, validator);
+  const auto& config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor&>(message, validator);
   switch (config.expr_specifier_case()) {
 #if defined(USE_CEL_PARSER)
-  case envoy::extensions::descriptors::expr::v3::Descriptor::kText: {
+  case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kText: {
     auto parse_status = google::api::expr::parser::Parse(config.text());
     if (!parse_status.ok()) {
       throw EnvoyException("Unable to parse descriptor expression: " +
@@ -76,7 +75,7 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
                                                   parse_status.value().expr());
   }
 #endif
-  case envoy::extensions::descriptors::expr::v3::Descriptor::kParsed:
+  case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:
     return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(), config.parsed());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -94,6 +93,6 @@ Filters::Common::Expr::Builder& ExprDescriptorFactory::getOrCreateBuilder() {
 REGISTER_FACTORY(ExprDescriptorFactory, RateLimit::DescriptorProducerFactory);
 
 } // namespace Expr
-} // namespace Descriptors
+} // namespace RateLimitDescriptors
 } // namespace Extensions
 } // namespace Envoy

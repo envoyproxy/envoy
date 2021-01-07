@@ -24,7 +24,7 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
-        "@envoy_api//envoy/extensions/descriptors/expr/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/rate_limit_descriptors/expr/v3:pkg_cc_proto",
     ] + select(
         {
             "//bazel:windows_x86_64": [],
