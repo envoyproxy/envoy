@@ -125,7 +125,7 @@ Descriptor extensions
 ---------------------
 
 Rate limit descriptors are extensible with custom descriptors. For example, :ref:`computed descriptors
-<envoy_v3_api_msg_extensions.descriptors.expr.v3.Descriptor>` extension allows using any of the
+<envoy_v3_api_msg_extensions.rate_limit_descriptors.expr.v3.Descriptor>` extension allows using any of the
 :ref:`request attributes <arch_overview_request_attributes>` as a descriptor value:
 
 .. code-block:: yaml
@@ -134,7 +134,7 @@ Rate limit descriptors are extensible with custom descriptors. For example, :ref
       - extension:
             name: custom
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.descriptors.expr.v3.Descriptor
+              "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
               descriptor_key: my_descriptor_name
               text: request.method
 
