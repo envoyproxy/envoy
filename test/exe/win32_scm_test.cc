@@ -157,10 +157,10 @@ TEST_P(ScmTest, EnvoyMergesArgumentsFromCreateAndStart) {
   EXPECT_TRUE(StartServiceA(service_handle_, 2, extra_args))
       << fmt::format("Could not start service, error {}", ::GetLastError());
   waitForServiceStatus(SERVICE_RUNNING);
-  std::ifstream genereated_file(log_path.c_str());
-  EXPECT_TRUE(genereated_file.good());
+  std::ifstream generated_file(log_path.c_str());
+  EXPECT_TRUE(generated_file.good());
   stopService();
-  genereated_file.close();
+  generated_file.close();
   remove(log_path.c_str());
 }
 

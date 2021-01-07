@@ -106,16 +106,20 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
    .. tab:: Windows Service
 
+      .. note::
+
+         This feature is still in an Experimental state.
+
       You can start Envoy as Windows Service that is managed under `Windows Service Control Manager <https://docs.microsoft.com/en-us/windows/win32/services/using-services/>`_. 
 
       First, you need to create the service. Assuming you have a custom configuration in the current directory named ``envoy-custom.yaml``. After you create the service you
       can start it.
       
-      From an **administrator** prompt run the following commands (note that you need envoy-static.exe to be on the PATH or modify the commands below with the full path):
+      From an **administrator** prompt run the following commands (note that you need replace C:\EnvoyProxy\ with the path to the envoy.exe binary):
 
       .. substitution-code-block:: console
 
-         > sc create EnvoyProxy binpath="envoy-static.exe --config-path envoy-demo.yaml"
+         > sc create EnvoyProxy binpath="C:\EnvoyProxy\envoy.exe --config-path envoy-demo.yaml"
             [SC] CreateService SUCCESS
          > sc start EnvoyProxy
             SERVICE_NAME: envoyproxy
@@ -142,6 +146,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
       Use `sc.exe <https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/sc-create/>`_ to configure the service startup and error handling.
       
       .. tip::
+
          The output of``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``.
 
 Check Envoy is proxying on http://localhost:10000.
