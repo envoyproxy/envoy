@@ -238,9 +238,8 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
             fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(
-        descriptors, config_->localInfo().clusterName(), headers,
-        *callbacks_->streamInfo());
+    rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
+                                   callbacks_->streamInfo());
   }
 }
 

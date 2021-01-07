@@ -82,7 +82,7 @@ public:
     TestUtility::loadFromYaml(yaml, route_config);
     config_ =
         std::make_unique<ConfigImpl>(route_config, factory_context_, any_validation_visitor_, true);
-    stream_info_.downstream_remote_address_ = default_remote_address_;
+    stream_info_.downstream_address_provider_->setRemoteAddress(default_remote_address_);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
@@ -277,7 +277,7 @@ public:
     rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(
         parseRateLimitFromV3Yaml(yaml), ProtobufMessage::getStrictValidationVisitor());
     descriptors_.clear();
-    stream_info_.downstream_remote_address_ = default_remote_address_;
+    stream_info_.downstream_address_provider_->setRemoteAddress(default_remote_address_);
     ON_CALL(Const(stream_info_), routeEntry()).WillByDefault(testing::Return(&route_));
   }
 
@@ -326,8 +326,8 @@ actions:
 
   setupTest(yaml);
 
-  stream_info_.downstream_remote_address_ =
-      std::make_shared<Network::Address::PipeInstance>("/hello");
+  stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::PipeInstance>("/hello"));
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   EXPECT_TRUE(descriptors_.empty());
 }

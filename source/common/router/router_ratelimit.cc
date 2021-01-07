@@ -79,7 +79,8 @@ bool RequestHeadersAction::populateDescriptor(RateLimit::Descriptor& descriptor,
 bool RemoteAddressAction::populateDescriptor(RateLimit::Descriptor& descriptor, const std::string&,
                                              const Http::RequestHeaderMap&,
                                              const StreamInfo::StreamInfo& info) const {
-  const Network::Address::InstanceConstSharedPtr& remote_address = info.downstreamRemoteAddress();
+  const Network::Address::InstanceConstSharedPtr& remote_address =
+      info.downstreamAddressProvider().remoteAddress();
   if (remote_address->type() != Network::Address::Type::Ip) {
     return false;
   }
