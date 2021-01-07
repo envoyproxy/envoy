@@ -454,7 +454,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # This will be a replacement for rapidJSON used in extensions and may also be a fast
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-07-06",
+        release_date = "2020-08-06",
         cpe = "cpe:2.3:a:json_project:json:*",
     ),
     com_github_twitter_common_lang = dict(
