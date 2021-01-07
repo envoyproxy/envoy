@@ -34,7 +34,7 @@ public:
       const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2);
 
-  // Given the supplied cluster config, and protcol options configuration,
+  // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
   static uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
                                 std::shared_ptr<const ProtocolOptionsConfigImpl> options);
