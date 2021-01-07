@@ -983,7 +983,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   EXPECT_FALSE(testClientConnection()->readBuffer().highWatermarkTriggered());
   EXPECT_FALSE(testClientConnection()->shouldDrainReadBuffer());
   EXPECT_TRUE(client_connection_->readEnabled());
-  // Add 3 bytes to the buffer so that it sits at exactly the read limit. Verify that
+  // Add 2 bytes to the buffer so that it sits at exactly the read limit. Verify that
   // shouldDrainReadBuffer is true, but the connection remains read enabled.
   {
     Buffer::OwnedImpl buffer("12");
