@@ -69,12 +69,9 @@ public:
    * the parsing parameters as the value.
    *
    * @param token the token to parse
-   * @param pos current position in the entire format string
-   * @param command_end_position position at the end of the command token
    * @return FormattterProviderPtr substitution provider for the parsed command or nullptr
    */
-  static FormatterProviderPtr parseBuiltinCommand(const std::string& token, size_t pos,
-                                                  int command_end_position);
+  static FormatterProviderPtr parseBuiltinCommand(const std::string& token);
 
 private:
   // the indexes of where the parameters for each directive is expected to begin

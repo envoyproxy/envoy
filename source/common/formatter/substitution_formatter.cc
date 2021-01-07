@@ -292,9 +292,7 @@ std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::str
   return SubstitutionFormatParser::parse(format, {});
 }
 
-FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token,
-                                                                   size_t pos,
-                                                                   int command_end_position) {
+FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token) {
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
@@ -352,18 +350,11 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
 
     return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string);
   } else if (absl::StartsWith(token, "START_TIME")) {
-    const size_t parameters_length = pos + StartTimeParamStart + 1;
-    const size_t parameters_end = command_end_position - parameters_length;
-
-    const std::string args = token[StartTimeParamStart - 1] == '('
-                                 ? token.substr(StartTimeParamStart, parameters_end)
-                                 : "";
-    // Validate the input specifier here. The formatted string may be destined for a header, and
-    // should not contain invalid characters {NUL, LR, CF}.
-    if (std::regex_search(args, getStartTimeNewlinePattern())) {
-      throw EnvoyException("Invalid header configuration. Format string contains newline.");
-    }
-    return std::make_unique<StartTimeFormatter>(args);
+    return std::make_unique<StartTimeFormatter>(token);
+  } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
+    return std::make_unique<DownstreamPeerCertVStartFormatter>(token);
+  } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
+    return std::make_unique<DownstreamPeerCertVEndFormatter>(token);
   } else if (absl::StartsWith(token, "GRPC_STATUS")) {
     return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>());
   }
@@ -402,7 +393,7 @@ SubstitutionFormatParser::parse(const std::string& format,
     pos += 1;
     const int command_end_position = pos + token.length();
 
-    auto formatter = parseBuiltinCommand(token, pos, command_end_position);
+    auto formatter = parseBuiltinCommand(token);
     if (formatter) {
       formatters.push_back(std::move(formatter));
     } else {
