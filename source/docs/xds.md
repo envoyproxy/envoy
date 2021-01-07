@@ -17,7 +17,7 @@ An overview of the architecture is provided in the diagram below:
 ![xDS implementation architecture overview](xDS_code_diagram.png)
 
 Note that this is currently somewhat idealized, with Envoy having two gRPC mux implementations,
-`GrpcMuxImpl` and `NewGrpxMuxImpl`, while we complete migration to a single muxer, see
+`GrpcMuxImpl` and `NewGrpcMuxImpl`, while we complete migration to a single muxer, see
 https://github.com/envoyproxy/envoy/issues/11477.
 
 The key components are:
@@ -59,6 +59,8 @@ Implementation is in progress and we support the following aspects of `xdstp://`
 
 It should be noted that `xdstp://` support is experimental at this time while we complete
 implementation.
+
+`xdstp://` support will only be added for delta xDS.
 
 ## gRPC xDS internals
 
