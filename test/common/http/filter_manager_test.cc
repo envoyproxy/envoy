@@ -198,7 +198,7 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionDecodingHeaders) {
 TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
   initialize();
 
-  EXPECT_CALL(dispatcher_, appendTrackedObject(_));
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
 
   // This stream filter will skip further callbacks once it sees both the request and response

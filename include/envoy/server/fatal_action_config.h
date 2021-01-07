@@ -21,7 +21,7 @@ public:
    * Callback function to run when we are crashing.
    * @param objects a vector of objects we were working on when we started crashing.
    */
-  virtual void run(const std::vector<const ScopeTrackedObject*>& tracked_objects) PURE;
+  virtual void run(absl::Span<const ScopeTrackedObject* const> tracked_objects) PURE;
 
   /**
    * @return whether the action is async-signal-safe.

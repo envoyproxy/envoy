@@ -325,7 +325,7 @@ void DispatcherImpl::touchWatchdog() {
   }
 }
 
-void DispatcherImpl::appendTrackedObject(const ScopeTrackedObject* object) {
+void DispatcherImpl::pushTrackedObject(const ScopeTrackedObject* object) {
   tracked_object_stack_.push_back(object);
 }
 

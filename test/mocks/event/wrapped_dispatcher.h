@@ -97,8 +97,8 @@ public:
   void run(RunType type) override { impl_.run(type); }
 
   Buffer::WatermarkFactory& getWatermarkFactory() override { return impl_.getWatermarkFactory(); }
-  void appendTrackedObject(const ScopeTrackedObject* object) override {
-    return impl_.appendTrackedObject(object);
+  void pushTrackedObject(const ScopeTrackedObject* object) override {
+    return impl_.pushTrackedObject(object);
   }
 
   void popTrackedObject(const ScopeTrackedObject* expected_object) override {

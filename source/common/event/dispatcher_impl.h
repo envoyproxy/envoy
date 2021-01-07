@@ -74,7 +74,7 @@ public:
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
-  void appendTrackedObject(const ScopeTrackedObject* object) override;
+  void pushTrackedObject(const ScopeTrackedObject* object) override;
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;

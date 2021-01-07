@@ -92,7 +92,7 @@ public:
    * It's recommended to use ScopeTrackerScopeState to manage the object's tracking. If directly
    * invoking, there needs to be a subsequent call to popTrackedObject().
    */
-  virtual void appendTrackedObject(const ScopeTrackedObject* object) PURE;
+  virtual void pushTrackedObject(const ScopeTrackedObject* object) PURE;
 
   /**
    * Removes the top of the stack of tracked object and asserts that it was expected.

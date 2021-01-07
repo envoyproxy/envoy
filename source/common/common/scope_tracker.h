@@ -17,7 +17,7 @@ class ScopeTrackerScopeState {
 public:
   ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::Dispatcher& dispatcher)
       : registered_object_(object), dispatcher_(dispatcher) {
-    dispatcher_.appendTrackedObject(registered_object_);
+    dispatcher_.pushTrackedObject(registered_object_);
   }
 
   ~ScopeTrackerScopeState() {

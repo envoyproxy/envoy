@@ -2349,7 +2349,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
 
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, appendTrackedObject(_))
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_))
         .Times(1)
         .WillOnce(Invoke([](const ScopeTrackedObject* object) -> void {
           ASSERT(object != nullptr); // On the first call, this should be the active stream.
@@ -2371,7 +2371,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
   // Send trailers to that stream, and verify by this point headers are in logged state.
   {
     RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, appendTrackedObject(_))
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_))
         .Times(1)
         .WillOnce(Invoke([](const ScopeTrackedObject* object) -> void {
           ASSERT(object != nullptr); // On the first call, this should be the active stream.

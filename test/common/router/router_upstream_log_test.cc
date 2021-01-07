@@ -99,7 +99,7 @@ public:
                                              ShadowWriterPtr(new MockShadowWriter()), router_proto);
     router_ = std::make_shared<TestFilter>(*config_);
     router_->setDecoderFilterCallbacks(callbacks_);
-    EXPECT_CALL(callbacks_.dispatcher_, appendTrackedObject(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AnyNumber());
     EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");

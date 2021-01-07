@@ -25,9 +25,9 @@ public:
   ScopeTrackingDispatcher(DispatcherPtr dispatcher)
       : WrappedDispatcher(*dispatcher), dispatcher_(std::move(dispatcher)) {}
 
-  void appendTrackedObject(const ScopeTrackedObject* object) override {
+  void pushTrackedObject(const ScopeTrackedObject* object) override {
     scope_ = object;
-    return impl_.appendTrackedObject(object);
+    return impl_.pushTrackedObject(object);
   }
 
   void popTrackedObject(const ScopeTrackedObject* expected_object) override {

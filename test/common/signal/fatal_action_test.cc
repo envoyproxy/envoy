@@ -37,10 +37,8 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
   TestFatalAction(bool is_safe, int* const counter) : is_safe_(is_safe), counter_(counter) {}
-  void run(const std::vector<const ScopeTrackedObject*>& tracked_objects) override {
-    for (size_t i = 0; i < tracked_objects.size(); ++i) {
-      ++(*counter_);
-    }
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
+    ++(*counter_);
   }
   bool isAsyncSignalSafe() const override { return is_safe_; }
 
