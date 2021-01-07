@@ -35,6 +35,7 @@ enum class LimitStatus {
 using DescriptorStatusList =
     std::vector<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>;
 using DescriptorStatusListPtr = std::unique_ptr<DescriptorStatusList>;
+using DynamicMetadataPtr = std::unique_ptr<ProtobufWkt::Struct>;
 
 /**
  * Async callbacks used during limit() calls.
@@ -57,7 +58,8 @@ public:
   virtual void complete(LimitStatus status, DescriptorStatusListPtr&& descriptor_statuses,
                         Http::ResponseHeaderMapPtr&& response_headers_to_add,
                         Http::RequestHeaderMapPtr&& request_headers_to_add,
-                        const std::string& response_body) PURE;
+                        const std::string& response_body,
+                        DynamicMetadataPtr&& dynamic_metadata) PURE;
 };
 
 /**

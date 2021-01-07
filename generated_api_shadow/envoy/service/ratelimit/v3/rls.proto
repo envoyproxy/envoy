@@ -6,6 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -51,7 +52,7 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
@@ -135,4 +136,13 @@ message RateLimitResponse {
 
   // A response body to send to the downstream client when the response code is not OK.
   bytes raw_body = 5;
+
+  // Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
+  // filter. This metadata lives in a namespace specified by the canonical name of extension filter
+  // that requires it:
+  //
+  // - :ref:`envoy.filters.http.ratelimit <config_http_filters_ratelimit_dynamic_metadata>` for HTTP filter.
+  // - :ref:`envoy.filters.network.ratelimit <config_network_filters_ratelimit_dynamic_metadata>` for network filter.
+  // - :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit_dynamic_metadata>` for Thrift filter.
+  google.protobuf.Struct dynamic_metadata = 6;
 }

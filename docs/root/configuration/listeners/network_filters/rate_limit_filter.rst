@@ -43,3 +43,12 @@ ratelimit.tcp_filter_enabled
 ratelimit.tcp_filter_enforcing
   % of connections that will call the rate limit service and enforce the decision. Defaults to 100.
   This can be used to test what would happen before fully enforcing the outcome.
+
+Dynamic Metadata
+----------------
+.. _config_network_filters_ratelimit_dynamic_metadata:
+
+The ratelimit filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
+*only* when the gRPC ratelimit service returns a :ref:`CheckResponse
+<envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse>` with a filled :ref:`dynamic_metadata
+<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field.
