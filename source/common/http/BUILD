@@ -429,15 +429,23 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "path_utility_lib",
-    srcs = ["path_utility.cc"],
-    hdrs = ["path_utility.h"],
+    srcs = [
+        "deprecated_path_canonicalizer.cc",
+        "path_utility.cc",
+    ],
+    hdrs = [
+        "deprecated_path_canonicalizer.h",
+        "path_utility.h",
+    ],
     external_deps = [
         "abseil_optional",
         "googleurl",
     ],
     deps = [
         "//include/envoy/http:header_map_interface",
+        "//source/common/chromium_url",
         "//source/common/common:logger_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 

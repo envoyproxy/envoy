@@ -3,6 +3,7 @@
 
 #include "common/http/path_utility.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -26,8 +27,33 @@ public:
   TestRequestHeaderMapImpl headers_;
 };
 
+// Already normalized path don't change using deprecated path canonicalizer.
+TEST_F(PathUtilityTest, DeprecatedAlreadyNormalPaths) {
+  const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
+  for (const auto& path : normal_paths) {
+    auto& path_header = pathHeaderEntry(path);
+    const auto result = PathUtil::canonicalPath(headers_);
+    EXPECT_TRUE(result) << "original path: " << path;
+    EXPECT_EQ(path_header.value().getStringView(), absl::string_view(path));
+  }
+}
+
+// Invalid paths are rejected using deprecated path canonicalizer.
+TEST_F(PathUtilityTest, DeprecatedInvalidPaths) {
+  const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
+                                               "/xyz/AAAAA%%0000/abc"};
+  for (const auto& path : invalid_paths) {
+    pathHeaderEntry(path);
+    EXPECT_FALSE(PathUtil::canonicalPath(headers_)) << "original path: " << path;
+  }
+}
+
 // Already normalized path don't change.
 TEST_F(PathUtilityTest, AlreadyNormalPaths) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.use_forked_chromium_url", "false"}});
+
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
     auto& path_header = pathHeaderEntry(path);
@@ -39,6 +65,10 @@ TEST_F(PathUtilityTest, AlreadyNormalPaths) {
 
 // Invalid paths are rejected.
 TEST_F(PathUtilityTest, InvalidPaths) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.use_forked_chromium_url", "false"}});
+
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {

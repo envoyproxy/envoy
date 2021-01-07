@@ -1,6 +1,8 @@
 #include "common/http/path_utility.h"
 
 #include "common/common/logger.h"
+#include "common/http/deprecated_path_canonicalizer.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -13,6 +15,9 @@ namespace Http {
 
 namespace {
 absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
+  if (Runtime::runtimeFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url")) {
+    return DeprecatedPathCanonicalizer::canonicalizePath(original_path);
+  }
   std::string canonical_path;
   url::Component in_component(0, original_path.size());
   url::Component out_component;
