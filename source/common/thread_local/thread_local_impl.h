@@ -19,7 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
-  InstanceImpl() : main_thread_id_(std::this_thread::get_id()) {}
+  InstanceImpl() { Thread::MainThread::init(); }
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -81,7 +81,6 @@ private:
   // A list of index of freed slots.
   std::list<uint32_t> free_slot_indexes_;
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
-  std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
 
