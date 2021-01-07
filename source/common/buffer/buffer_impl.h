@@ -326,7 +326,7 @@ public:
   // SliceData
   absl::Span<uint8_t> getMutableData() override {
     RELEASE_ASSERT(slice_.isMutable(), "Not allowed to call getMutableData if slice is immutable");
-    return {slice_.data(), slice_.dataSize()};
+    return {slice_.data(), static_cast<absl::Span<uint8_t>::size_type>(slice_.dataSize())};
   }
 
 private:
