@@ -654,8 +654,9 @@ FakeUpstream::waitForAndConsumeDisconnectedConnection(std::chrono::milliseconds 
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << "Timed out waiting for raw connection";
   }
+
   auto& connection = consumeConnection();
-  return connection.waitForDisconnect(timeout);
+  return connection.waitForDisconnect(time_system_, timeout);
 }
 
 SharedConnectionWrapper& FakeUpstream::consumeConnection() {

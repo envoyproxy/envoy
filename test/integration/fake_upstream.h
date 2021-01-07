@@ -286,10 +286,10 @@ public:
   }
 
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult waitForDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+  testing::AssertionResult
+  waitForDisconnect(Event::TestTimeSystem& time_system,
+                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     absl::MutexLock lock(&lock_);
-    Event::TestTimeSystem& time_system =
-        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSource());
     if (!time_system.waitFor(lock_, absl::Condition(&disconnected_), timeout)) {
       return AssertionFailure() << "Timed out waiting for disconnect";
     }
