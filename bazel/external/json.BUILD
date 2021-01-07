@@ -9,11 +9,8 @@ cc_library(
         "include/nlohmann/**/*.hpp",
         "include/nlohmann/*/*/*.hpp",
     ]),
-    copts = [
-        "-I external/nlohmann_json_lib",
-    ],
+    includes = ["external/nlohmann_json_lib"],
     visibility = ["//visibility:public"],
-    alwayslink = 1,
 )
 
 cc_library(
