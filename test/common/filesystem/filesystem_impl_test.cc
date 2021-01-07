@@ -339,7 +339,6 @@ TEST_F(FileSystemImplTest, StdErr) {
   }
 }
 
-
 TEST_F(FileSystemImplTest, Console) {
   // Do not test `/dev/console` since it requires root permissions
   const std::array<std::string, 1> console_aliases{"/dev/tty"};
