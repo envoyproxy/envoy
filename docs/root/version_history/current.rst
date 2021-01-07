@@ -119,3 +119,4 @@ Deprecated
 * logging: the `--log-format-prefix-with-location` option is removed.
 * ratelimit: the :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` action is deprecated in favor of the more generic :ref:`metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>` action.
 * stats: the `--use-fake-symbol-table` option is removed.
+* tracing: OpenCensus :ref:`Zipkin configuration <envoy_api_field_config.trace.v2.OpenCensusConfig.zipkin_exporter_enabled>` is now deprecated, the preferred Zipkin export is via Envoy's :ref:`native Zipkin tracer <envoy_v3_api_msg_config.trace.v3.ZipkinConfig>`.
