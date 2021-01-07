@@ -240,7 +240,8 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
 
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", request_accept()}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
@@ -262,7 +263,8 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
       {"content-type", request_content_type()},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", request_accept()}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
@@ -280,7 +282,8 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
 }
 
 TEST_P(GrpcWebFilterTest, ExternallyProvidedEncodingHeader) {
-  Http::TestRequestHeaderMapImpl request_headers{{"grpc-accept-encoding", "foo"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"grpc-accept-encoding", "foo"}, {":path", "/"}, {"content-type", request_accept()}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ("foo", request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
@@ -339,6 +342,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
   // Tests response headers.
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.addCopy(Http::Headers::get().Status, "200");
+  response_headers.addCopy(Http::Headers::get().ContentType, request_accept());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("200", response_headers.get_(Http::Headers::get().Status.get()));
   if (accept_binary_response()) {
