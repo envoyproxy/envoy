@@ -144,12 +144,18 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
-                      const std::string& response_body) {
+                      const std::string& response_body,
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
   Stats::StatName empty_stat_name;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
+
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
+                                                *dynamic_metadata);
+  }
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
@@ -232,8 +238,9 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
             fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
-                                   callbacks_->streamInfo());
+    rate_limit.populateDescriptors(
+        descriptors, config_->localInfo().clusterName(), headers,
+        *callbacks_->streamInfo());
   }
 }
 
