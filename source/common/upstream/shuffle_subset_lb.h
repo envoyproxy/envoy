@@ -43,9 +43,6 @@ public:
 
 private:
   using HostPredicate = std::function<bool(const Host&)>;
-  struct SubsetSelectorFallbackParams;
-
-  std::vector<uint32_t>* combo(uint32_t i, uint32_t n, uint32_t k);
 
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
@@ -64,7 +61,7 @@ private:
   // Represents a subset of an original PrioritySet.
   class PriorityShuffleSubsetImpl : public PrioritySetImpl {
   public:
-    PriorityShuffleSubsetImpl(const ShuffleSubsetLoadBalancer& subset_lb, HostPredicate predicate);//,
+    PriorityShuffleSubsetImpl(const ShuffleSubsetLoadBalancer& subset_lb, std::vector<uint32_t> * set);//,
 
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
@@ -73,19 +70,15 @@ private:
         runReferenceUpdateCallbacks(i, {}, {});
       }
     }
-
     void updateSubset(uint32_t priority, const HostVector& hosts_added,
-                      const HostVector& hosts_removed, HostPredicate predicate) {
-      reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
-          ->update(hosts_added, hosts_removed, predicate);
-
-      runUpdateCallbacks(hosts_added, hosts_removed);
-    }
+                      const HostVector& hosts_removed);
 
     // Thread aware LB if applicable.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
     // Current active LB.
     LoadBalancerPtr lb_;
+
+    std::vector<uint32_t> * set_;
 
   protected:
     HostSetImplPtr createHostSet(uint32_t priority,
@@ -94,21 +87,15 @@ private:
   private:
     const PrioritySet& original_priority_set_;
     const HostPredicate predicate_;
+  // private:
   };
 
   // using HostSubsetImplPtr = std::shared_ptr<HostSubsetImpl>;
   using PriorityShuffleSubsetImplPtr = std::shared_ptr<PriorityShuffleSubsetImpl>;
-  // using CachePtr = std::shared_ptr<quic::QuicLRUCache<uint32_t, PriorityShuffleSubsetImpl>>;
 
-  // Create filtered default subset (if necessary) and other subsets based on current hosts.
-  // void refreshSubsets();
-  // void refreshSubsets(uint32_t priority);
+  std::vector<uint32_t> * combo(uint32_t i, uint32_t n, uint32_t k);
 
-  // Called by HostSet::MemberUpdateCb
-  // void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
-  //
-  // void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
-  //                           const HostVector& hosts_removed);
+  void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
@@ -122,13 +109,15 @@ private:
   Random::RandomGenerator& random_;
 
   const uint32_t shard_size_;
-  // CachePtr shard_cache_;
-  quic::QuicLinkedHashMap<uint32_t, PriorityShuffleSubsetImplPtr> cache_;
   const uint32_t cache_capacity_;
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
+  Common::CallbackHandle* original_priority_set_callback_handle_;
 
+  quic::QuicLinkedHashMap<uint32_t, PriorityShuffleSubsetImplPtr> cache_;
+  uint32_t num_hosts_;
+  uint32_t num_indices_;
   // PriorityShuffleSubsetImplPtr priority_subset_;
 
   friend class ShuffleSubsetLoadBalancerDescribeMetadataTester;
