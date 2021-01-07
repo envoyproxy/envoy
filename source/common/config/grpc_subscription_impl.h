@@ -67,7 +67,7 @@ public:
   GrpcCollectionSubscriptionImpl(const xds::core::v3::ResourceLocator& collection_locator,
                                  GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
                                  OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-                                 absl::string_view type_url, Event::Dispatcher& dispatcher,
+                                 Event::Dispatcher& dispatcher,
                                  std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
 
   void start(const std::set<std::string>& resource_names,

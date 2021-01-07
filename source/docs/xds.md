@@ -27,7 +27,7 @@ The key components are:
   type URLs may be managed by a single muxer.
 * `SubscriptionState` tracks subscription state for a single resource type URL.
 * `WatchMap` tracks all the subscribers for a given resource type.
-* Each Envoy subsystem, e.g. LDS, CDS, etc. has a `GrpcSubscription` that points at a `GrpcMuxImpl`.
+* Each Envoy subsystem, e.g. LDS, CDS, etc. has a `GrpcSubscriptionImpl` that points at a `GrpcMuxImpl`.
 
 The above components are responsible for subscriptions, watches, muxing and stream management.
 Caching is not currently a centralized service, and is instead delegated to per-resource type
@@ -47,7 +47,7 @@ https://github.com/envoyproxy/envoy/issues/11264. This introduces new requiremen
 transport; it needs to manage subscriptions to new forms of resource collections and provide
 contextual information in resource name subscriptions.
 
-To support this, the server `LocalInfo` owns a `Config::ContextProvider`, providing all node
+To support this, the Envoy's `LocalInfo` owns a `Config::ContextProvider`, providing all node
 specific context parameters required for `xdstp://` naming. This is consumed by `GrpcMuxImpl`. In
 addition, `GrpcMuxImpl` and `WatchMap` are aware of this naming scheme and implement the expected
 match semantics and naming schemes.

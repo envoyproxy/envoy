@@ -119,7 +119,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           fmt::format("xdstp:// type does not match {} in {}", resource_type,
                       Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
     }
-    const std::string type_url = TypeUtil::descriptorFullNameToTypeUrl(resource_type);
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
@@ -127,7 +126,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
       return std::make_unique<GrpcCollectionSubscriptionImpl>(
-          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, type_url,
+          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats,
           dispatcher_, Utility::configSourceInitialFetchTimeout(config), false);
     }
     default:

@@ -125,10 +125,12 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
 GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
     const xds::core::v3::ResourceLocator& collection_locator, GrpcMuxSharedPtr grpc_mux,
     SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-    SubscriptionStats stats, absl::string_view type_url, Event::Dispatcher& dispatcher,
+    SubscriptionStats stats, Event::Dispatcher& dispatcher,
     std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
-    : GrpcSubscriptionImpl(grpc_mux, callbacks, resource_decoder, stats, type_url, dispatcher,
-                           init_fetch_timeout, is_aggregated),
+    : GrpcSubscriptionImpl(
+          grpc_mux, callbacks, resource_decoder, stats,
+          TypeUtil::descriptorFullNameToTypeUrl(collection_locator.resource_type()), dispatcher,
+          init_fetch_timeout, is_aggregated),
       collection_locator_(collection_locator) {}
 
 void GrpcCollectionSubscriptionImpl::start(const std::set<std::string>& /*resource_names*/,
