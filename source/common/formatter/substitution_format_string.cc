@@ -20,9 +20,7 @@ FormatterPtr SubstitutionFormatStringUtils::fromProtoConfig(
   // Instantiate formatter extensions.
   std::vector<CommandParserPtr> commands;
   for (const auto& formatter : config.formatters()) {
-    const std::string type{
-        TypeUtil::typeUrlToDescriptorFullName(formatter.typed_config().type_url())};
-    auto* factory = Registry::FactoryRegistry<CommandParserFactory>::getFactoryByType(type);
+    auto* factory = Envoy::Config::Utility::getFactory<CommandParserFactory>(formatter);
     if (!factory) {
       throw EnvoyException(absl::StrCat("Formatter not found: ", formatter.name()));
     }
