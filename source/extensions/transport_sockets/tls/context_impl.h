@@ -251,7 +251,8 @@ public:
                     const std::vector<std::string>& server_names, TimeSource& time_source);
 
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
-  // ClientHello details.
+  // ClientHello details. This is made public for use by custom TLS extensions who want to
+  // manually create and use this as a client hello callback.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
 
 private:
