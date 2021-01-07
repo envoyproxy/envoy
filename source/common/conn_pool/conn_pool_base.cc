@@ -35,6 +35,28 @@ void ConnPoolImplBase::destructAllConnections() {
   dispatcher_.clearDeferredDeleteList();
 }
 
+bool ConnPoolImplBase::shouldConnect(size_t pending_streams, size_t active_streams,
+                                     uint32_t connecting_capacity, float preconnect_ratio,
+                                     bool anticipate_incoming_stream) {
+  // This is set to true any time global preconnect is being calculated.
+  // ClusterManagerImpl::maybePreconnect is called directly before a stream is created, so the
+  // stream must be anticipated.
+  //
+  // Also without this, we would never pre-establish a connection as the first
+  // connection in a pool because pending/active streams could both be 0.
+  int anticipated_streams = anticipate_incoming_stream ? 1 : 0;
+
+  // The number of streams we want to be provisioned for is the number of
+  // pending, active, and anticipated streams times the preconnect ratio.
+  // The number of streams we are (theoretically) provisioned for is the
+  // connecting stream capacity plus the number of active streams.
+  //
+  // If preconnect ratio is not set, it defaults to 1, and this simplifies to the
+  // legacy value of pending_streams_.size() > connecting_stream_capacity_
+  return (pending_streams + active_streams + anticipated_streams) * preconnect_ratio >
+         connecting_capacity + active_streams;
+}
+
 bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) const {
   // If the host is not healthy, don't make it do extra work, especially as
   // upstream selection logic may result in bypassing this upstream entirely.
@@ -48,9 +70,8 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
   // preconnect limit, preconnect.
   // We may eventually want to track preconnect_attempts to allow more preconnecting for
   // heavily weighted upstreams or sticky picks.
-  if (global_preconnect_ratio > 1.0 &&
-      ((pending_streams_.size() + 1 + num_active_streams_) * global_preconnect_ratio >
-       (connecting_stream_capacity_ + num_active_streams_))) {
+  if (shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
+                    global_preconnect_ratio, true)) {
     return true;
   }
 
@@ -61,8 +82,8 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
   //
   // If preconnect ratio is not set, it defaults to 1, and this simplifies to the
   // legacy value of pending_streams_.size() > connecting_stream_capacity_
-  return (pending_streams_.size() + num_active_streams_) * perUpstreamPreconnectRatio() >
-         (connecting_stream_capacity_ + num_active_streams_);
+  return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
+                       perUpstreamPreconnectRatio());
 }
 
 float ConnPoolImplBase::perUpstreamPreconnectRatio() const {

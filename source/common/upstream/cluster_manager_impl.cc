@@ -856,10 +856,14 @@ void ClusterManagerImpl::maybePreconnect(
   // 3 here is arbitrary. Just as in ConnPoolImplBase::tryCreateNewConnections
   // we want to limit the work which can be done on any given preconnect attempt.
   for (int i = 0; i < 3; ++i) {
-    // Just as in ConnPoolImplBase::shouldCreateNewConnection, see if adding this one new connection
+    // See if adding this one new connection
     // would put the cluster over desired capacity. If so, stop preconnecting.
-    if ((state.connecting_stream_capacity_ + state.active_streams_) >
-        (state.pending_streams_ + 1 + state.active_streams_) * peekahead_ratio) {
+    //
+    // We anticipate the incoming stream here, because maybePreconnect is called
+    // before a new stream is established.
+    if (!ConnectionPool::ConnPoolImplBase::shouldConnect(
+            state.pending_streams_, state.active_streams_, state.connecting_stream_capacity_,
+            peekahead_ratio, true)) {
       return;
     }
     ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
