@@ -39,30 +39,35 @@ TEST(MutationUtils, TestBuildHeaders) {
 
 TEST(MutationUtils, TestApplyMutations) {
   Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},         {":path", "/foo/the/bar?size=123"},
-      {"host", "localhost:1000"}, {"content-type", "text/plain; encoding=UTF8"},
-      {"x-append-this", "1"},     {"x-replace-this", "Yes"},
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"host", "localhost:1000"},
+      {":authority", "localhost:1000"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-append-this", "1"},
+      {"x-replace-this", "Yes"},
       {"x-remove-this", "Yes"},
+      {"x-envoy-strange-thing", "No"},
   };
 
   envoy::service::ext_proc::v3alpha::HeaderMutation mutation;
-  auto* set1 = mutation.add_set_headers();
-  set1->mutable_append()->set_value(true);
-  set1->mutable_header()->set_key("x-append-this");
-  set1->mutable_header()->set_value("2");
-  auto* set2 = mutation.add_set_headers();
-  set2->mutable_append()->set_value(true);
-  set2->mutable_header()->set_key("x-append-this");
-  set2->mutable_header()->set_value("3");
-  auto* set3 = mutation.add_set_headers();
-  set3->mutable_append()->set_value(false);
-  set3->mutable_header()->set_key("x-replace-this");
-  set3->mutable_header()->set_value("no");
+  auto* s = mutation.add_set_headers();
+  s->mutable_append()->set_value(true);
+  s->mutable_header()->set_key("x-append-this");
+  s->mutable_header()->set_value("2");
+  s = mutation.add_set_headers();
+  s->mutable_append()->set_value(true);
+  s->mutable_header()->set_key("x-append-this");
+  s->mutable_header()->set_value("3");
+  s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
+  s->mutable_header()->set_key("x-replace-this");
+  s->mutable_header()->set_value("no");
   // Default of "append" is "false" and mutations
   // are applied in order.
-  auto* set4 = mutation.add_set_headers();
-  set4->mutable_header()->set_key("x-replace-this");
-  set4->mutable_header()->set_value("nope");
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("x-replace-this");
+  s->mutable_header()->set_value("nope");
   // Incomplete structures should be ignored
   mutation.add_set_headers();
 
@@ -72,13 +77,37 @@ TEST(MutationUtils, TestApplyMutations) {
   mutation.add_remove_headers(":method");
   mutation.add_remove_headers("");
 
+  // Attempts to set method, host, authority, and x-envoy headers
+  // should be ignored until we explicitly allow them.
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("host");
+  s->mutable_header()->set_value("invalid:123");
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("Host");
+  s->mutable_header()->set_value("invalid:456");
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":authority");
+  s->mutable_header()->set_value("invalid:789");
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":method");
+  s->mutable_header()->set_value("PATCH");
+  s = mutation.add_set_headers();
+  s->mutable_header()->set_key("X-Envoy-StrangeThing");
+  s->mutable_header()->set_value("Yes");
+
   MutationUtils::applyHeaderMutations(mutation, headers);
 
   Http::TestRequestHeaderMapImpl expected_headers{
-      {":method", "GET"},         {":path", "/foo/the/bar?size=123"},
-      {"host", "localhost:1000"}, {"content-type", "text/plain; encoding=UTF8"},
-      {"x-append-this", "1"},     {"x-append-this", "2"},
-      {"x-append-this", "3"},     {"x-replace-this", "nope"},
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"host", "localhost:1000"},
+      {":authority", "localhost:1000"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-append-this", "1"},
+      {"x-append-this", "2"},
+      {"x-append-this", "3"},
+      {"x-replace-this", "nope"},
+      {"x-envoy-strange-thing", "No"},
   };
 
   EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(headers, expected_headers));

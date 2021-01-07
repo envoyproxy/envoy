@@ -18,6 +18,9 @@ public:
   static void
   applyHeaderMutations(const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation,
                        Http::HeaderMap& headers);
+
+private:
+  static bool isSettableHeader(absl::string_view key);
 };
 
 } // namespace ExternalProcessing
