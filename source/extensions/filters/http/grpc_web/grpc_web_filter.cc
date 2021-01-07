@@ -170,13 +170,16 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
   if (doStatTracking()) {
     chargeStat(headers);
   }
+
+  const bool valid_response = isValidResponseHeaders(headers, end_stream);
+
   if (is_text_response_) {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
   } else {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
 
-  if (end_stream || isValidResponseHeaders(headers, end_stream)) {
+  if (end_stream || valid_response) {
     return Http::FilterHeadersStatus::Continue;
   }
 
