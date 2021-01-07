@@ -439,6 +439,7 @@ public:
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
+using WatermarkFactorySharedPtr = std::shared_ptr<WatermarkFactory>;
 
 } // namespace Buffer
 } // namespace Envoy
