@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <list>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -305,6 +306,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;

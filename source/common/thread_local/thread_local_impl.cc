@@ -16,13 +16,14 @@ namespace ThreadLocal {
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
 InstanceImpl::~InstanceImpl() {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(shutdown_);
   thread_local_data_.data_.clear();
+  Thread::MainThread::clear();
 }
 
 SlotPtr InstanceImpl::allocateSlot() {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
@@ -91,7 +92,7 @@ void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
-  ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!parent_.shutdown_);
 
   for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
@@ -105,7 +106,7 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
 }
 
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
 
   if (main_thread) {
@@ -119,7 +120,7 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
 }
 
 void InstanceImpl::removeSlot(uint32_t slot) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
 
   // When shutting down, we do not post slot removals to other threads. This is because the other
   // threads have already shut down and the dispatcher is no longer alive. There is also no reason
@@ -146,7 +147,7 @@ void InstanceImpl::removeSlot(uint32_t slot) {
 }
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
@@ -158,7 +159,7 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
 }
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
   // Handle main thread first so that when the last worker thread wins, we could just call the
   // all_threads_complete_cb method. Parallelism of main thread execution is being traded off
@@ -185,7 +186,7 @@ void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr obj
 }
 
 void InstanceImpl::shutdownGlobalThreading() {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
   shutdown_ = true;
 }
