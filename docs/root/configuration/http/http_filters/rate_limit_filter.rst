@@ -138,6 +138,15 @@ The rate limit filter outputs statistics in the *cluster.<route target cluster>.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` set to false."
 
+Dynamic Metadata
+----------------
+.. _config_http_filters_ratelimit_dynamic_metadata:
+
+The ratelimit filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
+*only* when the gRPC ratelimit service returns a :ref:`RateLimitResponse
+<envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse>` with a filled :ref:`dynamic_metadata
+<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field.
+
 Runtime
 -------
 
