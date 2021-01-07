@@ -123,7 +123,7 @@ public:
   }
 
   // Determines if prefetching is warranted based on the number of streams in
-  // use, pending streams, anticipated capacity, and preconnect configuation.
+  // use, pending streams, anticipated capacity, and preconnect configuration.
   //
   // If anticipate_incoming_stream is true this assumes a call to newStream is
   // pending, which is true for global preconnect.
