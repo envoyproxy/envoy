@@ -164,7 +164,9 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   std::set<std::string> xdstp_resources;
   // TODO(htuch): add support for resources beyond LDS glob collections, the constraints below
   // around resource size and ID reflect the progress of the xdstp:// implementation.
-  if (resources.size() == 1 && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
+  if (XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
+    // Callers must be asking for a single resource, the collection.
+    ASSERT(resources.size() == 1);
     auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
     // We only know how to deal with glob collections right now.
     if (absl::EndsWith(resource.id(), "/*")) {
@@ -174,6 +176,9 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
       XdsResourceIdentifier::EncodeOptions encode_options;
       encode_options.sort_context_params_ = true;
       xdstp_resources.insert(XdsResourceIdentifier::encodeUrn(resource, encode_options));
+    } else {
+      // TODO(htuch): We will handle list collections here in future work.
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
   }
   auto added_removed = sub->second->watch_map_.updateWatchInterest(

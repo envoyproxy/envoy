@@ -24,7 +24,8 @@ The key components are:
 * `GrpcMuxImpl` which manages the xDS transport and multiplexing one or more subscriptions on a
   single gRPC stream. The muxer is responsible for managing the wire level concerns via
   `GrpcStream`, while also tracking subscription state and watchers for updates. Multiple resource
-  type URLs may be managed by a single muxer.
+  type URLs may be managed by a single muxer. For non-ADS, this will always be one stream per
+  subscription, whereas for ADS, multiple subscriptions will be multiplexed on a single stream.
 * `SubscriptionState` tracks subscription state for a single resource type URL.
 * `WatchMap` tracks all the subscribers for a given resource type.
 * Each Envoy subsystem, e.g. LDS, CDS, etc. has a `GrpcSubscriptionImpl` that points at a `GrpcMuxImpl`.

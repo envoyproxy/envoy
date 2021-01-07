@@ -84,8 +84,9 @@ xds::core::v3::ContextParams XdsContextParams::encodeNodeContext(
   for (const std::string& ncp : node_context_params) {
     // First attempt field accessors known ahead of time, if that fails we consider the cases of
     // metadata, either directly in the Node message, or nested in the user_agent_build_version.
-    if (nodeParamCbs().count(ncp) > 0) {
-      mutable_params["xds.node." + ncp] = nodeParamCbs().at(ncp)(node);
+    auto it = nodeParamCbs().find(ncp);
+    if (it != nodeParamCbs().end()) {
+      mutable_params["xds.node." + ncp] = (it->second)(node);
     } else if (ncp == "metadata") {
       mergeMetadataJson(mutable_params, node.metadata(), "xds.node.metadata.");
     } else if (ncp == "user_agent_build_version.metadata") {

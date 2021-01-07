@@ -13,7 +13,8 @@ namespace {
 // Returns the namespace part (if there's any) in the resource name.
 std::string namespaceFromName(const std::string& resource_name) {
   // Namespace handling for xdstp:// resource is different to legacy VHDS etc., since we need to
-  // canonicalize context parameters and substitute a * for glob collections.
+  // canonicalize context parameters and substitute a * for glob collections. E.g.
+  // xdstp://foo/v3-listener/bar/baz?b=a&a=b becomes xdstp://foo/v3-listener/bar/*?a=b&b=a.
   if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
     // This is not very efficient; it is possible to canonicalize etc. much faster with raw string
     // operations, but this implementation provides a reference for later optimization while we
@@ -26,6 +27,8 @@ std::string namespaceFromName(const std::string& resource_name) {
     encode_options.sort_context_params_ = true;
     return XdsResourceIdentifier::encodeUrn(resource, encode_options);
   }
+  // In the non-xdstp:// legacy case for VHDS, we simple remove the last / component. E.g.
+  // www.foo.com/bar becomes www.foo.com.
   const auto pos = resource_name.find_last_of('/');
   // we are not interested in the "/" character in the namespace
   return pos == std::string::npos ? "" : resource_name.substr(0, pos);

@@ -153,8 +153,11 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& pr
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterSet& primary_clusters,
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
-  if (api_config_source.api_type() ==
-      envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+  // We don't need to check backing sources for ADS sources, the backing cluster must be verified in
+  // the ads_config.
+  if (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC ||
+      api_config_source.api_type() ==
+          envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
     return;
   }
   Utility::checkApiConfigSourceNames(api_config_source);
