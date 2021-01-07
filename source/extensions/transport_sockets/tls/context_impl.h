@@ -250,6 +250,10 @@ public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                     const std::vector<std::string>& server_names, TimeSource& time_source);
 
+  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
+  // ClientHello details.
+  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
+
 private:
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
 
@@ -259,9 +263,6 @@ private:
                            HMAC_CTX* hmac_ctx, int encrypt);
   bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
   bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
-  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
-  // ClientHello details.
-  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
   OcspStapleAction ocspStapleAction(const ServerContextImpl::TlsContext& ctx,
                                     bool client_ocsp_capable);
 
