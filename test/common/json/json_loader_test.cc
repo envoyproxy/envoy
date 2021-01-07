@@ -71,10 +71,16 @@ TEST_F(JsonLoaderTest, Basic) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
-        "JSON supplied is not valid. Error(line 3, column 8, token \"world\"): syntax error while "
-        "parsing object - unexpected end of input; expected '}'\n");
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_rapidjson")) {
+      EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
+                                "JSON supplied is not valid. Error(line 3, column 8, token "
+                                "\"world\"): syntax error while "
+                                "parsing object - unexpected end of input; expected '}'\n");
+    } else {
+      EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
+                                "JSON supplied is not valid. Error(offset 19, line 3): Missing a "
+                                "comma or '}' after an object member.\n");
+    }
   }
 
   {
@@ -273,7 +279,14 @@ TEST_F(JsonLoaderTest, Schema) {
     )EOF";
 
   ObjectSharedPtr json = Factory::loadFromString(json_string);
-  EXPECT_THROW_WITH_MESSAGE(json->validateSchema(invalid_schema), Exception, "not implemented");
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_rapidjson")) {
+    EXPECT_THROW_WITH_MESSAGE(json->validateSchema(invalid_schema), Exception, "not implemented");
+  } else {
+    EXPECT_THROW_WITH_MESSAGE(
+        json->validateSchema(invalid_schema), Exception,
+        "JSON at lines 2-5 does not conform to schema.\n Invalid schema: #/properties/value1\n "
+        "Schema violation: type\n Offending document key: #/value1");
+  }
 }
 
 TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
@@ -286,11 +299,16 @@ TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
     }
   ]
   )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      Factory::loadFromString(json_string), Exception,
-      "JSON supplied is not valid. Error(line 2, column 15, token \"listeners\" :): syntax error "
-      "while parsing value - unexpected ':'; expected end of input\n");
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_rapidjson")) {
+    EXPECT_THROW_WITH_MESSAGE(
+        Factory::loadFromString(json_string), Exception,
+        "JSON supplied is not valid. Error(line 2, column 15, token \"listeners\" :): syntax error "
+        "while parsing value - unexpected ':'; expected end of input\n");
+  } else {
+    EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString(json_string), Exception,
+                              "JSON supplied is not valid. Error(offset 14, line 2): Terminate "
+                              "parsing due to Handler error.\n");
+  }
 }
 
 TEST_F(JsonLoaderTest, AsString) {

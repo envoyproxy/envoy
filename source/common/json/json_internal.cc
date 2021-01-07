@@ -1,4 +1,4 @@
-#include "common/json/rapidjson_loader.h"
+#include "common/json/json_internal.h"
 
 #include <cstdint>
 #include <fstream>
@@ -15,20 +15,14 @@
 #include "common/common/utility.h"
 #include "common/protobuf/utility.h"
 
-// Do not let RapidJson leak outside of this file.
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
-#include "rapidjson/reader.h"
-#include "rapidjson/schema.h"
-#include "rapidjson/stream.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
+// Do not let nlohmann/json leak outside of this file.
+#include "include/nlohmann/json.hpp"
 
 #include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Json {
-namespace RapidJson {
+namespace Nlohmann {
 
 namespace {
 /**
@@ -89,7 +83,7 @@ public:
   bool empty() const override;
   bool hasObject(const std::string& name) const override;
   void iterate(const ObjectCallback& callback) const override;
-  void validateSchema(const std::string& schema) const override;
+  void validateSchema(const std::string&) const override;
 
 private:
   enum class Type {
@@ -168,9 +162,8 @@ private:
     return value_.integer_value_;
   }
 
-  rapidjson::Document asRapidJsonDocument() const;
-  static void buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
-                                     rapidjson::Document::AllocatorType& allocator);
+  nlohmann::json asJsonDocument() const;
+  static void buildJsonDocument(const Field& field, nlohmann::json& value);
 
   uint64_t line_number_start_ = 0;
   uint64_t line_number_end_ = 0;
@@ -179,48 +172,56 @@ private:
 };
 
 /**
- * Custom stream to allow access to the line number for each object.
- */
-class LineCountingStringStream : public rapidjson::StringStream {
-  // Ch is typedef in parent class to handle character encoding.
-public:
-  LineCountingStringStream(const Ch* src) : rapidjson::StringStream(src), line_number_(1) {}
-  Ch Take() {
-    Ch ret = rapidjson::StringStream::Take();
-    if (ret == '\n') {
-      line_number_++;
-    }
-    return ret;
-  }
-  uint64_t getLineNumber() const { return line_number_; }
-
-private:
-  uint64_t line_number_;
-};
-
-/**
  * Consume events from SAX callbacks to build JSON Field.
  */
-class ObjectHandler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, ObjectHandler> {
+class ObjectHandler : public nlohmann::json_sax<nlohmann::json> {
 public:
-  ObjectHandler(LineCountingStringStream& stream) : state_(State::ExpectRoot), stream_(stream){};
+  ObjectHandler() : state_(State::ExpectRoot) {}
 
-  bool StartObject();
-  bool EndObject(rapidjson::SizeType);
-  bool Key(const char* value, rapidjson::SizeType size, bool);
-  bool StartArray();
-  bool EndArray(rapidjson::SizeType);
-  bool Bool(bool value);
-  bool Double(double value);
-  bool Int(int value);
-  bool Uint(unsigned value);
-  bool Int64(int64_t value);
-  bool Uint64(uint64_t value);
-  bool Null();
-  bool String(const char* value, rapidjson::SizeType size, bool);
-  bool RawNumber(const char*, rapidjson::SizeType, bool);
+  bool start_object(std::size_t) override;
+  bool end_object() override;
+  bool key(std::string& val) override;
+  bool start_array(std::size_t) override;
+  bool end_array() override;
+  bool boolean(bool value) override { return handleValueEvent(Field::createValue(value)); }
+  bool number_integer(int64_t value) override {
+    return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
+  }
+  bool number_unsigned(uint64_t value) override {
+    if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+      throw Exception(fmt::format("JSON value from line {} is larger than int64_t (not supported)",
+                                  line_number_));
+    }
+    return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
+  }
+  bool number_float(double value, const std::string&) override {
+    return handleValueEvent(Field::createValue(value));
+  }
+  bool null() override { return handleValueEvent(Field::createNull()); }
+  bool string(std::string& value) override { return handleValueEvent(Field::createValue(value)); }
+  bool binary(binary_t&) override { return false; }
+  bool parse_error(std::size_t, const std::string& token,
+                   const nlohmann::detail::exception& ex) override {
+    // Errors are formatted like "[json.exception.parse_error.101] parse error at line x, column y:
+    // error string."
+    absl::string_view error = ex.what();
+    // Extract position information (line, column, token) in the error.
+    auto start = error.find("line");
+    auto npos = error.find(":");
+    ENVOY_LOG_MISC(info, "ERROR {}", error);
+    error_position_ = absl::StrCat(error.substr(start, npos - start), ", token ", token);
+    // Extract portion after ":" to get error string.
+    error_ = error.substr(npos + 2);
+    return false;
+  }
+
+  bool hasParseError() { return !error_.empty(); }
+  std::string getParseError() { return error_; }
+  std::string getErrorPosition() { return error_position_; }
 
   ObjectSharedPtr getRoot() { return root_; }
+
+  int line_number_{1};
 
 private:
   bool handleValueEvent(FieldSharedPtr ptr);
@@ -233,83 +234,117 @@ private:
     ExpectFinished,
   };
   State state_;
-  LineCountingStringStream& stream_;
 
   std::stack<FieldSharedPtr> stack_;
   std::string key_;
 
   FieldSharedPtr root_;
+
+  std::string error_;
+  std::string error_position_;
 };
 
-void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
-                                   rapidjson::Document::AllocatorType& allocator) {
+struct JsonContainer {
+  JsonContainer(const char* ch, ObjectHandler* handler) : data(ch), handler_(handler) {}
+  const char* data;
+  ObjectHandler* handler_;
+};
 
+struct JsonIterator {
+  using difference_type = std::ptrdiff_t;
+  using value_type = char;
+  using pointer = const char*;
+  using reference = const char&;
+  using iterator_category = std::input_iterator_tag;
+
+  JsonIterator& operator++() {
+    ++ptr.data;
+    return *this;
+  }
+
+  bool operator!=(const JsonIterator& rhs) const { return rhs.ptr.data != ptr.data; }
+
+  reference operator*() {
+    const char& ch = *(ptr.data);
+    if (ch == '\n') {
+      ptr.handler_->line_number_++;
+    }
+    return ch;
+  }
+
+  JsonContainer ptr;
+};
+
+JsonIterator begin(const JsonContainer& c) {
+  return JsonIterator{JsonContainer(c.data, c.handler_)};
+}
+
+JsonIterator end(const JsonContainer& c) {
+  return JsonIterator{JsonContainer(c.data + strlen(c.data), c.handler_)};
+}
+
+void Field::buildJsonDocument(const Field& field, nlohmann::json& value) {
   switch (field.type_) {
   case Type::Array: {
-    value.SetArray();
-    value.Reserve(field.value_.array_value_.size(), allocator);
     for (const auto& element : field.value_.array_value_) {
       switch (element->type_) {
       case Type::Array:
       case Type::Object: {
-        rapidjson::Value nested_value;
-        buildRapidJsonDocument(*element, nested_value, allocator);
-        value.PushBack(nested_value, allocator);
+        nlohmann::json nested_value;
+        buildJsonDocument(*element, nested_value);
+        value.push_back(nested_value);
         break;
       }
       case Type::Boolean:
-        value.PushBack(element->value_.boolean_value_, allocator);
+        value.push_back(element->value_.boolean_value_);
         break;
       case Type::Double:
-        value.PushBack(element->value_.double_value_, allocator);
+        value.push_back(element->value_.double_value_);
         break;
       case Type::Integer:
-        value.PushBack(element->value_.integer_value_, allocator);
+        value.push_back(element->value_.integer_value_);
         break;
       case Type::Null:
-        value.PushBack(rapidjson::Value(), allocator);
+        value.push_back(nlohmann::json::value_t::null);
         break;
       case Type::String:
-        value.PushBack(rapidjson::StringRef(element->value_.string_value_.c_str()), allocator);
+        value.push_back(element->value_.string_value_);
       }
     }
     break;
   }
   case Type::Object: {
-    value.SetObject();
     for (const auto& item : field.value_.object_value_) {
-      auto name = rapidjson::StringRef(item.first.c_str());
+      auto name = std::string(item.first.c_str());
 
       switch (item.second->type_) {
       case Type::Array:
       case Type::Object: {
-        rapidjson::Value nested_value;
-        buildRapidJsonDocument(*item.second, nested_value, allocator);
-        value.AddMember(name, nested_value, allocator);
+        nlohmann::json nested_value;
+        buildJsonDocument(*item.second, nested_value);
+        value.emplace(name, nested_value);
         break;
       }
       case Type::Boolean:
-        value.AddMember(name, item.second->value_.boolean_value_, allocator);
+        value.emplace(name, item.second->value_.boolean_value_);
         break;
       case Type::Double:
-        value.AddMember(name, item.second->value_.double_value_, allocator);
+        value.emplace(name, item.second->value_.double_value_);
         break;
       case Type::Integer:
-        value.AddMember(name, item.second->value_.integer_value_, allocator);
+        value.emplace(name, item.second->value_.integer_value_);
         break;
       case Type::Null:
-        value.AddMember(name, rapidjson::Value(), allocator);
+        value.emplace(name, nlohmann::json::value_t::null);
         break;
       case Type::String:
-        value.AddMember(name, rapidjson::StringRef(item.second->value_.string_value_.c_str()),
-                        allocator);
+        value.emplace(name, item.second->value_.string_value_);
         break;
       }
     }
     break;
   }
   case Type::Null: {
-    value.SetNull();
     break;
   }
   default:
@@ -317,19 +352,13 @@ void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
   }
 }
 
-rapidjson::Document Field::asRapidJsonDocument() const {
-  rapidjson::Document document;
-  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  buildRapidJsonDocument(*this, document, allocator);
-  return document;
+nlohmann::json Field::asJsonDocument() const {
+  nlohmann::json j;
+  buildJsonDocument(*this, j);
+  return j;
 }
 
-uint64_t Field::hash() const {
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  asRapidJsonDocument().Accept(writer);
-  return HashUtil::xxHash64(buffer.GetString());
-}
+uint64_t Field::hash() const { return HashUtil::xxHash64(asJsonString()); }
 
 bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);
@@ -476,11 +505,8 @@ std::vector<ObjectSharedPtr> Field::asObjectArray() const {
 }
 
 std::string Field::asJsonString() const {
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  rapidjson::Document document = asRapidJsonDocument();
-  document.Accept(writer);
-  return buffer.GetString();
+  nlohmann::json j = asJsonDocument();
+  return j.dump();
 }
 
 bool Field::empty() const {
@@ -510,36 +536,11 @@ void Field::iterate(const ObjectCallback& callback) const {
   }
 }
 
-void Field::validateSchema(const std::string& schema) const {
-  rapidjson::Document schema_document;
-  if (schema_document.Parse<0>(schema.c_str()).HasParseError()) {
-    throw std::invalid_argument(fmt::format(
-        "Schema supplied to validateSchema is not valid JSON\n Error(offset {}) : {}\n",
-        schema_document.GetErrorOffset(), GetParseError_En(schema_document.GetParseError())));
-  }
+void Field::validateSchema(const std::string&) const { throw Exception("not implemented"); }
 
-  rapidjson::SchemaDocument schema_document_for_validator(schema_document);
-  rapidjson::SchemaValidator schema_validator(schema_document_for_validator);
-
-  if (!asRapidJsonDocument().Accept(schema_validator)) {
-    rapidjson::StringBuffer schema_string_buffer;
-    rapidjson::StringBuffer document_string_buffer;
-
-    schema_validator.GetInvalidSchemaPointer().StringifyUriFragment(schema_string_buffer);
-    schema_validator.GetInvalidDocumentPointer().StringifyUriFragment(document_string_buffer);
-
-    throw Exception(fmt::format(
-        "JSON at lines {}-{} does not conform to schema.\n Invalid schema: {}\n"
-        " Schema violation: {}\n"
-        " Offending document key: {}",
-        line_number_start_, line_number_end_, schema_string_buffer.GetString(),
-        schema_validator.GetInvalidSchemaKeyword(), document_string_buffer.GetString()));
-  }
-}
-
-bool ObjectHandler::StartObject() {
+bool ObjectHandler::start_object(std::size_t) {
   FieldSharedPtr object = Field::createObject();
-  object->setLineNumberStart(stream_.getLineNumber());
+  object->setLineNumberStart(line_number_);
 
   switch (state_) {
   case State::ExpectValueOrStartObjectArray:
@@ -562,10 +563,10 @@ bool ObjectHandler::StartObject() {
   }
 }
 
-bool ObjectHandler::EndObject(rapidjson::SizeType) {
+bool ObjectHandler::end_object() {
   switch (state_) {
   case State::ExpectKeyOrEndObject:
-    stack_.top()->setLineNumberEnd(stream_.getLineNumber());
+    stack_.top()->setLineNumberEnd(line_number_);
     stack_.pop();
 
     if (stack_.empty()) {
@@ -581,10 +582,10 @@ bool ObjectHandler::EndObject(rapidjson::SizeType) {
   }
 }
 
-bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
+bool ObjectHandler::key(std::string& val) {
   switch (state_) {
   case State::ExpectKeyOrEndObject:
-    key_ = std::string(value, size);
+    key_ = val;
     state_ = State::ExpectValueOrStartObjectArray;
     return true;
   default:
@@ -592,9 +593,9 @@ bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
   }
 }
 
-bool ObjectHandler::StartArray() {
+bool ObjectHandler::start_array(std::size_t) {
   FieldSharedPtr array = Field::createArray();
-  array->setLineNumberStart(stream_.getLineNumber());
+  array->setLineNumberStart(line_number_);
 
   switch (state_) {
   case State::ExpectValueOrStartObjectArray:
@@ -616,10 +617,10 @@ bool ObjectHandler::StartArray() {
   }
 }
 
-bool ObjectHandler::EndArray(rapidjson::SizeType) {
+bool ObjectHandler::end_array() {
   switch (state_) {
   case State::ExpectArrayValueOrEndArray:
-    stack_.top()->setLineNumberEnd(stream_.getLineNumber());
+    stack_.top()->setLineNumberEnd(line_number_);
     stack_.pop();
 
     if (stack_.empty()) {
@@ -636,37 +637,8 @@ bool ObjectHandler::EndArray(rapidjson::SizeType) {
   }
 }
 
-// Value handlers
-bool ObjectHandler::Bool(bool value) { return handleValueEvent(Field::createValue(value)); }
-bool ObjectHandler::Double(double value) { return handleValueEvent(Field::createValue(value)); }
-bool ObjectHandler::Int(int value) {
-  return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
-}
-bool ObjectHandler::Uint(unsigned value) {
-  return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
-}
-bool ObjectHandler::Int64(int64_t value) { return handleValueEvent(Field::createValue(value)); }
-bool ObjectHandler::Uint64(uint64_t value) {
-  if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-    throw Exception(fmt::format("JSON value from line {} is larger than int64_t (not supported)",
-                                stream_.getLineNumber()));
-  }
-  return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
-}
-
-bool ObjectHandler::Null() { return handleValueEvent(Field::createNull()); }
-
-bool ObjectHandler::String(const char* value, rapidjson::SizeType size, bool) {
-  return handleValueEvent(Field::createValue(std::string(value, size)));
-}
-
-bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
-  // Only called if kParseNumbersAsStrings is set as a parse flag, which it is not.
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
 bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
-  ptr->setLineNumberStart(stream_.getLineNumber());
+  ptr->setLineNumberStart(line_number_);
 
   switch (state_) {
   case State::ExpectValueOrStartObjectArray:
@@ -677,28 +649,25 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
     stack_.top()->append(ptr);
     return true;
   default:
-    return false;
+    return true;
   }
 }
 
 } // namespace
 
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
-  LineCountingStringStream json_stream(json.c_str());
+  ObjectHandler handler;
+  auto json_container = JsonContainer(json.data(), &handler);
 
-  ObjectHandler handler(json_stream);
-  rapidjson::Reader reader;
-  reader.Parse(json_stream, handler);
+  nlohmann::json::sax_parse(json_container, &handler);
 
-  if (reader.HasParseError()) {
-    throw Exception(fmt::format("JSON supplied is not valid. Error(offset {}, line {}): {}\n",
-                                reader.GetErrorOffset(), json_stream.getLineNumber(),
-                                GetParseError_En(reader.GetParseErrorCode())));
+  if (handler.hasParseError()) {
+    throw Exception(fmt::format("JSON supplied is not valid. Error({}): {}\n",
+                                handler.getErrorPosition(), handler.getParseError()));
   }
-
   return handler.getRoot();
 }
 
-} // namespace RapidJson
+} // namespace Nlohmann
 } // namespace Json
 } // namespace Envoy

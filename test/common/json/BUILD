@@ -23,14 +23,23 @@ envoy_cc_fuzz_test(
     ],
 )
 
+JSON_TEST_DEPS = [
+    "//source/common/json:json_loader_lib",
+    "//source/common/stats:isolated_store_lib",
+    "//test/test_common:utility_lib",
+]
+
 envoy_cc_test(
     name = "json_loader_test",
     srcs = ["json_loader_test.cc"],
-    deps = [
-        "//source/common/json:json_loader_lib",
-        "//source/common/stats:isolated_store_lib",
-        "//test/test_common:utility_lib",
-    ],
+    deps = JSON_TEST_DEPS,
+)
+
+envoy_cc_test(
+    name = "json_loader_legacy_test",
+    srcs = ["json_loader_test.cc"],
+    args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_rapidjson"],
+    deps = JSON_TEST_DEPS,
 )
 
 envoy_cc_benchmark_binary(
