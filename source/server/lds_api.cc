@@ -31,7 +31,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
   const auto resource_name = getResourceName();
   if (lds_resources_locator == nullptr) {
     subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, false);
   } else {
     subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
         *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_);

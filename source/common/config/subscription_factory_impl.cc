@@ -12,7 +12,6 @@
 #include "common/config/xds_resource.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
-#include "common/protobuf/type_util.h"
 
 namespace Envoy {
 namespace Config {
@@ -26,8 +25,8 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-    Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder) {
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    bool use_namespace_matching) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
@@ -69,7 +68,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
-          /*is_aggregated*/ false);
+          /*is_aggregated*/ false, use_namespace_matching);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
@@ -80,7 +79,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
               local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), false);
+          Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false,
+          use_namespace_matching);
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -89,7 +89,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
         cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
-        Utility::configSourceInitialFetchTimeout(config), true);
+        Utility::configSourceInitialFetchTimeout(config), true, use_namespace_matching);
   }
   default:
     throw EnvoyException(
@@ -126,8 +126,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
       return std::make_unique<GrpcCollectionSubscriptionImpl>(
-          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats,
-          dispatcher_, Utility::configSourceInitialFetchTimeout(config), false);
+          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
+          Utility::configSourceInitialFetchTimeout(config), false);
     }
     default:
       throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",

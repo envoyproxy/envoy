@@ -8,10 +8,11 @@ namespace Envoy {
 namespace Config {
 
 MockSubscriptionFactory::MockSubscriptionFactory() {
-  ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _))
-      .WillByDefault(testing::Invoke(
-          [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-                 SubscriptionCallbacks& callbacks, OpaqueResourceDecoder&) -> SubscriptionPtr {
+  ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillByDefault(
+          testing::Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                 Stats::Scope&, SubscriptionCallbacks& callbacks,
+                                 OpaqueResourceDecoder&, bool) -> SubscriptionPtr {
             auto ret = std::make_unique<testing::NiceMock<MockSubscription>>();
             subscription_ = ret.get();
             callbacks_ = &callbacks;
