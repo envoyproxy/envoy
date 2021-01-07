@@ -269,7 +269,7 @@ TEST_F(CompressorFilterTest, CompressRequestNoContentLengthRuntimeDisabled) {
 )EOF");
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_compression_without_chunked_header", "false"}});
+      {{"envoy.reloadable_features.enable_compression_without_content_length_header", "false"}});
   doRequestNoCompression({{":method", "post"}});
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseNoCompression(headers);
@@ -307,7 +307,7 @@ TEST_F(CompressorFilterTest, CompressResponseNoContentLengthRuntimeDisabled) {
 )EOF");
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_compression_without_chunked_header", "false"}});
+      {{"envoy.reloadable_features.enable_compression_without_content_length_header", "false"}});
   response_stats_prefix_ = "response.";
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
@@ -633,10 +633,6 @@ INSTANTIATE_TEST_SUITE_P(
     IsMinimumContentLengthTestSuite, IsMinimumContentLengthTest,
     testing::Values(std::make_tuple("content-length", "31", "", true),
                     std::make_tuple("content-length", "29", "", false),
-                    std::make_tuple("transfer-encoding", "chunked", "", true),
-                    std::make_tuple("transfer-encoding", "Chunked", "", true),
-                    std::make_tuple("transfer-encoding", "chunked", "\"content_length\": 500,",
-                                    true),
                     std::make_tuple("", "", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "501", "\"content_length\": 500,", true),
                     std::make_tuple("content-length", "499", "\"content_length\": 500,", false)));
@@ -664,34 +660,6 @@ TEST_P(IsMinimumContentLengthTest, Validate) {
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {header_name, header_value}};
   doResponse(headers, is_compression_expected, false);
   EXPECT_EQ(is_compression_expected, headers.has("vary"));
-}
-
-class IsTransferEncodingAllowedTest
-    : public CompressorFilterTest,
-      public testing::WithParamInterface<std::tuple<std::string, std::string, bool>> {};
-
-INSTANTIATE_TEST_SUITE_P(
-    IsTransferEncodingAllowedSuite, IsTransferEncodingAllowedTest,
-    testing::Values(std::make_tuple("transfer-encoding", "chunked", true),
-                    std::make_tuple("transfer-encoding", "Chunked", true),
-                    std::make_tuple("transfer-encoding", "deflate", false),
-                    std::make_tuple("transfer-encoding", "Deflate", false),
-                    std::make_tuple("transfer-encoding", "test", false),
-                    std::make_tuple("transfer-encoding", "chunked, test", false),
-                    std::make_tuple("transfer-encoding", "test, chunked", false),
-                    std::make_tuple("transfer-encoding", "test\t, chunked\t", false),
-                    std::make_tuple("x-garbage", "no_value", true)));
-
-TEST_P(IsTransferEncodingAllowedTest, Validate) {
-  const std::string& header_name = std::get<0>(GetParam());
-  const std::string& header_value = std::get<1>(GetParam());
-  const bool is_compression_expected = std::get<2>(GetParam());
-
-  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
-  Http::TestResponseHeaderMapImpl headers{
-      {":method", "get"}, {"content-length", "256"}, {header_name, header_value}};
-  doResponse(headers, is_compression_expected, false);
-  EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
 }
 
 class InsertVaryHeaderTest

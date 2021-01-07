@@ -47,6 +47,25 @@ envoy_cc_benchmark_binary(
     ],
 )
 
+envoy_cc_test(
+    name = "websocket_with_compressor_integration_test",
+    srcs = [
+        "websocket_with_compressor_integration_test.cc",
+        "websocket_with_compressor_integration_test.h",
+    ],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/compression/gzip/compressor:config",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/compressor:config",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_benchmark_test(
     name = "compressor_filter_speed_test_benchmark_test",
     benchmark_binary = "compressor_filter_speed_test",
