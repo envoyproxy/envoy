@@ -76,37 +76,6 @@ getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
   return nullptr;
 }
 
-// TODO(alyssawilk) move this to the new config library in a follow-up.
-uint64_t
-parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
-  uint64_t features = 0;
-
-  if (options) {
-    if (options->use_http2_) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (options->use_downstream_protocol_) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-  } else {
-    if (config.has_http2_protocol_options()) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (config.protocol_selection() ==
-        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-  }
-  if (config.close_connections_on_host_health_failure()) {
-    features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
-  }
-  if (options->use_alpn_) {
-    features |= ClusterInfoImpl::Features::USE_ALPN;
-  }
-  return features;
-}
-
 Network::TcpKeepaliveConfig
 parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
   const envoy::config::core::v3::TcpKeepalive& options =
@@ -758,7 +727,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                                   ? std::make_unique<OptionalClusterStats>(
                                         config, *stats_scope_, factory_context.clusterManager())
                                   : nullptr),
-      features_(parseFeatures(config, http_protocol_options_)),
+      features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
+          config, http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
