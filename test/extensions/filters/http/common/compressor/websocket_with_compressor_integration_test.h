@@ -8,12 +8,6 @@
 
 namespace Envoy {
 
-struct WebsocketWithCompressorProtocolTestParams {
-  Network::Address::IpVersion version;
-  Http::CodecClient::Type downstream_protocol;
-  FakeHttpConnection::Type upstream_protocol;
-};
-
 class WebsocketWithCompressorIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override;
