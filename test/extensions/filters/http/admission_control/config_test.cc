@@ -50,7 +50,7 @@ protected:
 
 // Ensure the filter ingest throws an exception if it is passed a config with a default value of 0
 // for sr_threshold If exception was not thrown, a default value of 0 for sr_threshold induces a
-// divide by zero error
+// divide by zero error.
 TEST_F(AdmissionControlConfigTest, ZeroSuccessRateThreshold) {
   AdmissionControlFilterFactory admission_control_filter_factory;
   const std::string yaml = R"EOF(
@@ -75,7 +75,34 @@ success_criteria:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(admission_control_filter_factory.createFilterFactoryFromProtoTyped(
                                 proto, "whatever", factory_context),
-                            EnvoyException, "Success Rate Threshold cannot be zero percent");
+                            EnvoyException, "Success Rate Threshold cannot be less than one.");
+}
+
+TEST_F(AdmissionControlConfigTest, SmallSuccessRateThreshold) {
+  AdmissionControlFilterFactory admission_control_filter_factory;
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: false
+  runtime_key: "foo.enabled"
+sampling_window: 1337s
+sr_threshold:
+  default_value:
+    value: 1.22e-22
+  runtime_key: "foo.sr_threshold"
+aggression:
+  default_value: 4.2
+  runtime_key: "foo.aggression"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+)EOF";
+
+  AdmissionControlProto proto;
+  TestUtility::loadFromYamlAndValidate(yaml, proto);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(admission_control_filter_factory.createFilterFactoryFromProtoTyped(
+                                proto, "whatever", factory_context),
+                            EnvoyException, "Success Rate Threshold cannot be less than one.");
 }
 
 // Verify the configuration when all fields are set.
