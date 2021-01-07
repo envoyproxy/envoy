@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/type_util.h"
 
@@ -8,7 +9,6 @@
 
 namespace Envoy {
 namespace Config {
-extern std::set<absl::string_view> exclude_v2_protos;
 
 class ApiTypeOracle {
 public:
