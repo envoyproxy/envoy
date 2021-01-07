@@ -24,10 +24,12 @@ Minor Behavior Changes
 * jwt_authn filter: added support of Jwt time constraint verification with a clock skew (default to 60 seconds) and added a filter config field :ref:`clock_skew_seconds <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.clock_skew_seconds>` to configure it.
 * kill_request: enable a way to configure kill header name in KillRequest proto.
 * listener: injection of the :ref:`TLS inspector <config_listener_filters_tls_inspector>` has been disabled by default. This feature is controlled by the runtime guard `envoy.reloadable_features.disable_tls_inspector_injection`.
+* lua: add `always_wrap_body` argument to `body()` API to always return a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>` even if the body is empty.
 * memory: enable new tcmalloc with restartable sequences for aarch64 builds.
 * mongo proxy metrics: swapped network connection remote and local closed counters previously set reversed (`cx_destroy_local_with_active_rq` and `cx_destroy_remote_with_active_rq`).
 * outlier detection: added :ref:`max_ejection_time <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` to limit ejection time growth when a node stays unhealthy for extended period of time. By default :ref:`max_ejection_time <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>` limits ejection time to 5 minutes. Additionally, when the node stays healthy, ejection time decreases. See :ref:`ejection algorithm<arch_overview_outlier_detection_algorithm>` for more info. Previously, ejection time could grow without limit and never decreased.
 * performance: improve performance when handling large HTTP/1 bodies.
+* tcp_proxy: now waits for HTTP tunnel to be established before start streaming the downstream data, the runtime guard `envoy.reloadable_features.http_upstream_wait_connect_response` can be set to "false" to disable this behavior.
 * tls: removed RSA key transport and SHA-1 cipher suites from the client-side defaults.
 * watchdog: the watchdog action :ref:`abort_action <envoy_v3_api_msg_watchdog.v3alpha.AbortActionConfig>` is now the default action to terminate the process if watchdog kill / multikill is enabled.
 * xds: to support TTLs, heartbeating has been added to xDS. As a result, responses that contain empty resources without updating the version will no longer be propagated to the
@@ -69,7 +71,9 @@ New Features
 * compression: the :ref:`compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>` filter adds support for compressing request payloads. Its configuration is unified with the :ref:`decompressor <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor>` filter with two new fields for different directions - :ref:`requests <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.request_direction_config>` and :ref:`responses <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.response_direction_config>`. The latter deprecates the old response-specific fields and, if used, roots the response-specific stats in `<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.response.*` instead of `<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*`.
 * config: added ability to flush stats when the admin's :ref:`/stats endpoint <operations_admin_interface_stats>` is hit instead of on a timer via :ref:`stats_flush_on_admin <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_on_admin>`.
 * config: added new runtime feature `envoy.features.enable_all_deprecated_features` that allows the use of all deprecated features.
+* crash support: added the ability to dump L4 connection data on crash.
 * formatter: added new :ref:`text_format_source <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format_source>` field to support format strings both inline and from a file.
+* formatter: added support for custom date formatting to :ref:`%DOWNSTREAM_PEER_CERT_V_START% <config_access_log_format_downstream_peer_cert_v_start>` and :ref:`%DOWNSTREAM_PEER_CERT_V_END% <config_access_log_format_downstream_peer_cert_v_end>`, similar to :ref:`%START_TIME% <config_access_log_format_start_time>`.
 * grpc: implemented header value syntax support when defining :ref:`initial metadata <envoy_v3_api_field_config.core.v3.GrpcService.initial_metadata>` for gRPC-based `ext_authz` :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>` and :ref:`network <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.grpc_service>` filters, and :ref:`ratelimit <envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.grpc_service>` filters.
 * grpc-json: added support for configuring :ref:`unescaping behavior <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.url_unescape_spec>` for path components.
 * hds: added support for delta updates in the :ref:`HealthCheckSpecifier <envoy_v3_api_msg_service.health.v3.HealthCheckSpecifier>`, making only the Endpoints and Health Checkers that changed be reconstructed on receiving a new message, rather than the entire HDS.
@@ -79,9 +83,11 @@ New Features
 * http: added :ref:`stripping any port from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_any_host_port>` support.
 * http: clusters now support selecting HTTP/1 or HTTP/2 based on ALPN, configurable via :ref:`alpn_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>` in the :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` message.
 * jwt_authn: added support for :ref:`per-route config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.PerRouteConfig>`.
+* jwt_authn: changed config field :ref:`issuer <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.issuer>` to be optional to comply with JWT `RFC <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ requirements.
 * kill_request: added new :ref:`HTTP kill request filter <config_http_filters_kill_request>`.
 * listener: added an optional :ref:`default filter chain <envoy_v3_api_field_config.listener.v3.Listener.default_filter_chain>`. If this field is supplied, and none of the :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` matches, this default filter chain is used to serve the connection.
 * listener: added back the :ref:`use_original_dst field <envoy_v3_api_field_config.listener.v3.Listener.use_original_dst>`.
+* listener: added the :ref:`Listener.bind_to_port field <envoy_v3_api_field_config.listener.v3.Listener.bind_to_port>`.
 * log: added a new custom flag ``%_`` to the log pattern to print the actual message to log, but with escaped newlines.
 * lua: added `downstreamDirectRemoteAddress()` and `downstreamLocalAddress()` APIs to :ref:`streamInfo() <config_http_filters_lua_stream_info_wrapper>`.
 * mongo_proxy: the list of commands to produce metrics for is now :ref:`configurable <envoy_v3_api_field_extensions.filters.network.mongo_proxy.v3.MongoProxy.commands>`.
@@ -90,6 +96,7 @@ New Features
 * ratelimit: added support for use of various :ref:`metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>` as a ratelimit action.
 * ratelimit: added :ref:`disable_x_envoy_ratelimited_header <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>` option to disable `X-Envoy-RateLimited` header.
 * ratelimit: added :ref:`body <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.raw_body>` field to support custom response bodies for non-OK responses from the external ratelimit service.
+* ratelimit: added :ref:`dynamic_metadata <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field to support setting dynamic metadata from the ratelimit service.
 * router: added support for regex rewrites during HTTP redirects using :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RedirectAction.regex_rewrite>`.
 * sds: improved support for atomic :ref:`key rotations <xds_certificate_rotation>` and added configurable rotation triggers for
   :ref:`TlsCertificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.watched_directory>` and

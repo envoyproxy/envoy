@@ -43,8 +43,8 @@ void truncate(std::string& str, absl::optional<uint32_t> max_length) {
   str = str.substr(0, max_length.value());
 }
 
-// Matches newline pattern in a StartTimeFormatter format string.
-const std::regex& getStartTimeNewlinePattern() {
+// Matches newline pattern in a system time format string (e.g. start time)
+const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
@@ -691,37 +691,37 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
+          return stream_info.downstreamAddressProvider().localAddress();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
         [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
+          return stream_info.downstreamAddressProvider().localAddress();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
     field_extractor_ = StreamInfoAddressFieldExtractor::justPort(
         [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
+          return stream_info.downstreamAddressProvider().localAddress();
         });
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamRemoteAddress();
+          return stream_info.downstreamAddressProvider().remoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamRemoteAddress();
+          return stream_info.downstreamAddressProvider().remoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamDirectRemoteAddress();
+          return stream_info.downstreamAddressProvider().directRemoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamDirectRemoteAddress();
+          return stream_info.downstreamAddressProvider().directRemoteAddress();
         });
   } else if (field_name == "CONNECTION_ID") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
@@ -802,26 +802,6 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
         [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.urlEncodedPemEncodedPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          absl::optional<SystemTime> time = connection_info.validFromPeerCertificate();
-          absl::optional<std::string> result;
-          if (time.has_value()) {
-            result = AccessLogDateTimeFormatter::fromTime(time.value());
-          }
-          return result;
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          absl::optional<SystemTime> time = connection_info.expirationPeerCertificate();
-          absl::optional<std::string> result;
-          if (time.has_value()) {
-            result = AccessLogDateTimeFormatter::fromTime(time.value());
-          }
-          return result;
         });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
@@ -1164,20 +1144,72 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   return val;
 }
 
-StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
-
-absl::optional<std::string> StartTimeFormatter::format(const Http::RequestHeaderMap&,
-                                                       const Http::ResponseHeaderMap&,
-                                                       const Http::ResponseTrailerMap&,
-                                                       const StreamInfo::StreamInfo& stream_info,
-                                                       absl::string_view) const {
-  if (date_formatter_.formatString().empty()) {
-    return AccessLogDateTimeFormatter::fromTime(stream_info.startTime());
-  }
-  return date_formatter_.fromTime(stream_info.startTime());
+// Given a token, extract the command string between parenthesis if it exists.
+std::string SystemTimeFormatter::parseFormat(const std::string& token, size_t parameters_start) {
+  const size_t parameters_length = token.length() - (parameters_start + 1);
+  return token[parameters_start - 1] == '(' ? token.substr(parameters_start, parameters_length)
+                                            : "";
 }
 
-ProtobufWkt::Value StartTimeFormatter::formatValue(
+// A SystemTime formatter that extracts the startTime from StreamInfo. Must be provided
+// an access log token that starts with `START_TIME`.
+StartTimeFormatter::StartTimeFormatter(const std::string& token)
+    : SystemTimeFormatter(
+          parseFormat(token, sizeof("START_TIME(") - 1),
+          std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                return stream_info.startTime();
+              })) {}
+
+// A SystemTime formatter that optionally extracts the start date from the downstream peer's
+// certificate. Must be provided an access log token that starts with `DOWNSTREAM_PEER_CERT_V_START`
+DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::string& token)
+    : SystemTimeFormatter(
+          parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_START(") - 1),
+          std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                const auto connection_info = stream_info.downstreamSslConnection();
+                return connection_info != nullptr ? connection_info->validFromPeerCertificate()
+                                                  : absl::optional<SystemTime>();
+              })) {}
+
+// A SystemTime formatter that optionally extracts the end date from the downstream peer's
+// certificate. Must be provided an access log token that starts with `DOWNSTREAM_PEER_CERT_V_END`
+DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::string& token)
+    : SystemTimeFormatter(
+          parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_END(") - 1),
+          std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+              [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                const auto connection_info = stream_info.downstreamSslConnection();
+                return connection_info != nullptr ? connection_info->expirationPeerCertificate()
+                                                  : absl::optional<SystemTime>();
+              })) {}
+
+SystemTimeFormatter::SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f)
+    : date_formatter_(format), time_field_extractor_(std::move(f)) {
+  // Validate the input specifier here. The formatted string may be destined for a header, and
+  // should not contain invalid characters {NUL, LR, CF}.
+  if (std::regex_search(format, getSystemTimeFormatNewlinePattern())) {
+    throw EnvoyException("Invalid header configuration. Format string contains newline.");
+  }
+}
+
+absl::optional<std::string> SystemTimeFormatter::format(const Http::RequestHeaderMap&,
+                                                        const Http::ResponseHeaderMap&,
+                                                        const Http::ResponseTrailerMap&,
+                                                        const StreamInfo::StreamInfo& stream_info,
+                                                        absl::string_view) const {
+  const auto time_field = (*time_field_extractor_)(stream_info);
+  if (!time_field.has_value()) {
+    return absl::nullopt;
+  }
+  if (date_formatter_.formatString().empty()) {
+    return AccessLogDateTimeFormatter::fromTime(time_field.value());
+  }
+  return date_formatter_.fromTime(time_field.value());
+}
+
+ProtobufWkt::Value SystemTimeFormatter::formatValue(
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
     absl::string_view local_reply_body) const {

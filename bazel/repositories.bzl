@@ -746,12 +746,23 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _upb():
-    external_http_archive(
-        name = "upb",
-        patches = ["@envoy//bazel:upb.patch"],
-        patch_args = ["-p1"],
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
+
+    native.bind(
+        name = "upb_lib_descriptor",
+        actual = "@upb//:descriptor_upb_proto",
+    )
+
+    native.bind(
+        name = "upb_textformat_lib",
+        actual = "@upb//:textformat",
+    )
+
+def _upb():
+    external_http_archive(name = "upb")
 
     native.bind(
         name = "upb_lib",
