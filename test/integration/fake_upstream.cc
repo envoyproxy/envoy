@@ -736,9 +736,13 @@ FakeRawConnection::~FakeRawConnection() {
 }
 
 testing::AssertionResult FakeRawConnection::initialize() {
-  ASSERT(shared_connection_.connection().dispatcher().isThreadSafe());
   Network::ReadFilterSharedPtr filter{new ReadFilter(*this)};
   read_filter_ = filter;
+  if (!shared_connection_.connected()) {
+    VERIFY_ASSERTION(FakeConnectionBase::initialize());
+    return AssertionFailure() << "initialize failed, connection is disconnected.";
+  }
+  ASSERT(shared_connection_.connection().dispatcher().isThreadSafe());
   if (shared_connection_.connection().dispatcher().isThreadSafe()) {
     shared_connection_.connection().addReadFilter(filter);
   } else {
