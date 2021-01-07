@@ -657,11 +657,8 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      auto itr = exclude_v2_protos.find(any_full_name);
-      if (itr == exclude_v2_protos.end()) {
-        MessageUtil::onVersionUpgradeDeprecation(any_full_name);
-        return;
-      }
+      MessageUtil::onVersionUpgradeDeprecation(any_full_name);
+      return;
     }
   }
   // Otherwise, just unpack to the message. Type URL mismatches will be signaled

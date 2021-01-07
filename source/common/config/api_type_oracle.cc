@@ -6,13 +6,15 @@ namespace Envoy {
 namespace Config {
 
 // To exclude rejecting below v2 protos.
-std::set<absl::string_view> exclude_v2_protos = {
-    "envoy.config.health_checker.redis.v2",
-    "envoy.config.filter.thrift.router.v2alpha1",
-    "envoy.config.resource_monitor.fixed_heap.v2alpha",
-    "envoy.config.resource_monitor.injected_resource.v2alpha",
-    "envoy.config.retry.omit_canary_hosts.v2",
-    "envoy.config.retry.previous_hosts.v2"};
+using Exclude_v2_protosSet = std::set<absl::string_view>;
+static const Exclude_v2_protosSet& exclude_v2_protosSet() {
+  CONSTRUCT_ON_FIRST_USE(
+      Exclude_v2_protosSet,
+      {"envoy.config.health_checker.redis.v2", "envoy.config.filter.thrift.router.v2alpha1",
+       "envoy.config.resource_monitor.fixed_heap.v2alpha",
+       "envoy.config.resource_monitor.injected_resource.v2alpha",
+       "envoy.config.retry.omit_canary_hosts.v2", "envoy.config.retry.previous_hosts.v2"});
+}
 
 const Protobuf::Descriptor*
 ApiTypeOracle::getEarlierVersionDescriptor(const std::string& message_type) {
@@ -21,6 +23,10 @@ ApiTypeOracle::getEarlierVersionDescriptor(const std::string& message_type) {
     const Protobuf::Descriptor* earlier_desc =
         Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
             previous_message_string.value());
+    auto itr = exclude_v2_protosSet().find(earlier_desc->full_name());
+    if (itr != exclude_v2_protosSet().end()) {
+      return nullptr;
+    }
     return earlier_desc;
   } else {
     return nullptr;
