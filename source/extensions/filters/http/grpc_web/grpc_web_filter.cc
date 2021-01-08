@@ -31,7 +31,9 @@ std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance*
   }
 
   if (last) {
-    buffer.add(*last);
+    if (buffer.length() < MAX_GRPC_MESSAGE_LENGTH) {
+      buffer.add(*last);
+    }
     last->drain(last->length());
   }
 
