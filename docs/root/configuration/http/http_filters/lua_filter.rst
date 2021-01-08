@@ -17,11 +17,9 @@ and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Beca
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
 <https://luajit.org/extensions.html>`_ for more details.
 
-.. note::
-
-  `moonjit <https://github.com/moonjit/moonjit/>`_ is a continuation of LuaJIT development, which
-  supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
-  by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
+The filter only supports loading Lua code in-line in the configuration. If local filesystem code
+is desired, a trivial in-line script can be used to load the rest of the code from the local
+environment.
 
 The design of the filter and Lua support at a high level is as follows:
 
