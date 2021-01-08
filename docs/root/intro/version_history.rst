@@ -5,6 +5,7 @@ Version history
 ================
 Changes
 -------
+* http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
 
 1.13.7 (December 7, 2020)
 =========================
