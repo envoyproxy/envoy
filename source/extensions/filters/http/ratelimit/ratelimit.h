@@ -148,7 +148,9 @@ public:
   void complete(Filters::Common::RateLimit::LimitStatus status,
                 Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                Http::RequestHeaderMapPtr&& request_headers_to_add) override;
+                Http::RequestHeaderMapPtr&& request_headers_to_add,
+                const std::string& response_body,
+                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
@@ -156,7 +158,7 @@ private:
                                     std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
                                     const Http::HeaderMap& headers) const;
-  void populateResponseHeaders(Http::HeaderMap& response_headers);
+  void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
 

@@ -4,7 +4,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/network/raw_buffer_socket.h"
 #include "common/router/context_impl.h"
+
+#include "extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"
@@ -160,20 +163,43 @@ static_resources:
   return parseBootstrapFromV3Yaml(yaml);
 }
 
-TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
+class AlpnSocketFactory : public Network::RawBufferSocketFactory {
+public:
+  bool supportsAlpn() const override { return true; }
+};
+
+class AlpnTestConfigFactory
+    : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
+public:
+  std::string name() const override { return "envoy.transport_sockets.alpn"; }
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message&,
+                               Server::Configuration::TransportSocketFactoryContext&) override {
+    return std::make_unique<AlpnSocketFactory>();
+  }
+};
+
+TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
+  AlpnTestConfigFactory alpn_factory;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registered_factory(alpn_factory);
+
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
     - name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
-      http_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          auto_config:
+            http2_protocol_options: {}
+            http_protocol_options: {}
+      transport_socket:
+        name: envoy.transport_sockets.alpn
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
-      "'protocol_selection' values");
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
@@ -276,7 +302,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "invalid value \"foo\" for type TYPE_ENUM");
+                          "invalid value \"foo\"");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -749,9 +775,7 @@ public:
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
     create(parseBootstrapFromV3Json(json));
 
-    EXPECT_EQ(
-        nullptr,
-        cluster_manager_->getThreadLocalCluster("cluster_0")->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
 
     cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
         makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
@@ -1902,15 +1926,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
-
-  // Test for no hosts returning the correct values before we have hosts.
-  const auto thread_local_cluster = cluster_manager_->getThreadLocalCluster("cluster_1");
-  EXPECT_EQ(nullptr, thread_local_cluster->httpConnPool(ResourcePriority::Default,
-                                                        Http::Protocol::Http11, nullptr));
-  EXPECT_EQ(nullptr, thread_local_cluster->tcpConnPool(ResourcePriority::Default, nullptr));
-  EXPECT_EQ(nullptr, thread_local_cluster->tcpConn(nullptr).connection_);
-  EXPECT_EQ(3UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
+  const auto all_clusters = cluster_manager_->clusters();
+  EXPECT_TRUE(all_clusters.warming_clusters_.empty());
+  EXPECT_EQ(all_clusters.active_clusters_.size(), 1);
+  EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
   // Set up for an initialize callback.
   ReadyWatcher initialized;
@@ -2052,7 +2072,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
+  const auto all_clusters = cluster_manager_->clusters();
+  EXPECT_TRUE(all_clusters.warming_clusters_.empty());
+  EXPECT_EQ(all_clusters.active_clusters_.size(), 1);
+  EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
   NiceMock<MockLoadBalancerContext> example_com_context;
   ON_CALL(example_com_context, upstreamTransportSocketOptions())
@@ -2071,23 +2095,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   NiceMock<MockLoadBalancerContext> ibm_com_context;
   ON_CALL(ibm_com_context, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>("ibm.com")));
-
-  // Test for no hosts returning the correct values before we have hosts.
-  const auto thread_local_cluster = cluster_manager_->getThreadLocalCluster("cluster_1");
-  EXPECT_EQ(nullptr, thread_local_cluster->httpConnPool(ResourcePriority::Default,
-                                                        Http::Protocol::Http11, nullptr));
-  EXPECT_EQ(nullptr, thread_local_cluster->tcpConnPool(ResourcePriority::Default, nullptr));
-  EXPECT_EQ(nullptr, thread_local_cluster->tcpConn(nullptr).connection_);
-
-  EXPECT_EQ(nullptr,
-            thread_local_cluster->tcpConnPool(ResourcePriority::Default, &example_com_context));
-  EXPECT_EQ(nullptr, thread_local_cluster->tcpConn(&ibm_com_context).connection_);
-
-  EXPECT_EQ(nullptr,
-            thread_local_cluster->tcpConnPool(ResourcePriority::Default, &ibm_com_context));
-  EXPECT_EQ(nullptr, thread_local_cluster->tcpConn(&ibm_com_context).connection_);
-
-  EXPECT_EQ(7UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
 
   // Set up for an initialize callback.
   ReadyWatcher initialized;
@@ -2393,7 +2400,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
+  const auto all_clusters = cluster_manager_->clusters();
+  EXPECT_TRUE(all_clusters.warming_clusters_.empty());
+  EXPECT_EQ(all_clusters.active_clusters_.size(), 1);
+  EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
@@ -2475,7 +2486,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
   create(parseBootstrapFromV3Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
+  const auto all_clusters = cluster_manager_->clusters();
+  EXPECT_TRUE(all_clusters.warming_clusters_.empty());
+  EXPECT_EQ(all_clusters.active_clusters_.size(), 1);
+  EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_1"));
 
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
@@ -2531,8 +2546,10 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
 
   // Set up for an initialize callback.
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
-
-  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
+  const auto all_clusters = cluster_manager_->clusters();
+  EXPECT_TRUE(all_clusters.warming_clusters_.empty());
+  EXPECT_EQ(all_clusters.active_clusters_.size(), 1);
+  EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
   EXPECT_EQ(nullptr,
@@ -3867,7 +3884,10 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   ClusterUpdateCallbacksHandlePtr cb =
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
-  EXPECT_FALSE(cluster_manager_->getThreadLocalCluster("cluster_1")->info()->addedViaApi());
+  const auto all_clusters = cluster_manager_->clusters();
+  EXPECT_TRUE(all_clusters.warming_clusters_.empty());
+  EXPECT_EQ(all_clusters.active_clusters_.size(), 1);
+  EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
 
   // Verify that we get no hosts when the HostSet is empty.
   EXPECT_EQ(nullptr,
@@ -4159,7 +4179,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
                 ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &lb_context));
 }
 
-class PrefetchTest : public ClusterManagerImplTest {
+class PreconnectTest : public ClusterManagerImplTest {
 public:
   void initialize(float ratio) {
     const std::string yaml = R"EOF(
@@ -4177,8 +4197,8 @@ public:
     if (ratio != 0) {
       config.mutable_static_resources()
           ->mutable_clusters(0)
-          ->mutable_prefetch_policy()
-          ->mutable_predictive_prefetch_ratio()
+          ->mutable_preconnect_policy()
+          ->mutable_predictive_preconnect_ratio()
           ->set_value(ratio);
     }
     create(config);
@@ -4211,8 +4231,8 @@ public:
   HostSharedPtr host2_;
 };
 
-TEST_F(PrefetchTest, PrefetchOff) {
-  // With prefetch set to 0, each request for a connection pool will only
+TEST_F(PreconnectTest, PreconnectOff) {
+  // With preconnect set to 0, each request for a connection pool will only
   // allocate that conn pool.
   initialize(0);
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
@@ -4228,9 +4248,9 @@ TEST_F(PrefetchTest, PrefetchOff) {
       ->tcpConnPool(ResourcePriority::Default, nullptr);
 }
 
-TEST_F(PrefetchTest, PrefetchOn) {
-  // With prefetch set to 1.1, each request for a connection pool will kick off
-  // prefetching, so create the pool for both the current connection and the
+TEST_F(PreconnectTest, PreconnectOn) {
+  // With preconnect set to 1.1, each request for a connection pool will kick off
+  // preconnecting, so create the pool for both the current connection and the
   // anticipated one.
   initialize(1.1);
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))

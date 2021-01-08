@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/utility.h"
 #include "common/http/utility.h"
@@ -22,6 +24,9 @@ getHttpOptions(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions
   if (options.has_use_downstream_protocol_config()) {
     return options.use_downstream_protocol_config().http_protocol_options();
   }
+  if (options.has_auto_config()) {
+    return options.auto_config().http_protocol_options();
+  }
   return options.explicit_http_config().http_protocol_options();
 }
 
@@ -30,10 +35,43 @@ getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
   if (options.has_use_downstream_protocol_config()) {
     return options.use_downstream_protocol_config().http2_protocol_options();
   }
+  if (options.has_auto_config()) {
+    return options.auto_config().http2_protocol_options();
+  }
   return options.explicit_http_config().http2_protocol_options();
 }
 
 } // namespace
+
+uint64_t
+ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
+                                         std::shared_ptr<const ProtocolOptionsConfigImpl> options) {
+  uint64_t features = 0;
+
+  if (options) {
+    if (options->use_http2_) {
+      features |= Upstream::ClusterInfo::Features::HTTP2;
+    }
+    if (options->use_downstream_protocol_) {
+      features |= Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL;
+    }
+  } else {
+    if (config.has_http2_protocol_options()) {
+      features |= Upstream::ClusterInfo::Features::HTTP2;
+    }
+    if (config.protocol_selection() ==
+        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
+      features |= Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL;
+    }
+  }
+  if (config.close_connections_on_host_health_failure()) {
+    features |= Upstream::ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
+  }
+  if (options->use_alpn_) {
+    features |= Upstream::ClusterInfo::Features::USE_ALPN;
+  }
+  return features;
+}
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options)
@@ -55,7 +93,12 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     }
     use_downstream_protocol_ = true;
   }
+  if (options.has_auto_config()) {
+    use_http2_ = true;
+    use_alpn_ = true;
+  }
 }
+
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,

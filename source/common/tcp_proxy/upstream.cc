@@ -7,6 +7,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -116,6 +117,12 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_down
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
   request_encoder_ = nullptr;
+  // If we did not receive a valid CONNECT response yet we treat this as a pool
+  // failure, otherwise we forward the event downstream.
+  if (conn_pool_callbacks_ != nullptr) {
+    conn_pool_callbacks_->onFailure();
+    return;
+  }
   if (inform_downstream) {
     upstream_callbacks_.onEvent(event);
   }
@@ -135,17 +142,11 @@ void HttpUpstream::doneWriting() {
   }
 }
 
-TcpConnPool::TcpConnPool(const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
     : upstream_callbacks_(upstream_callbacks) {
-  // TODO(mattklein123): Pass thread local cluster into this function, removing an additional
-  // map lookup and moving the error handling closer to the source (where it is likely already
-  // done).
-  const auto thread_local_cluster = cluster_manager.getThreadLocalCluster(cluster_name);
-  if (thread_local_cluster != nullptr) {
-    conn_pool_ = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, context);
-  }
+  conn_pool_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
 }
 
 TcpConnPool::~TcpConnPool() {
@@ -181,24 +182,17 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 
   auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
   callbacks_->onGenericPoolReady(&connection.streamInfo(), std::move(upstream), host,
-                                 latched_data->connection().localAddress(),
+                                 latched_data->connection().addressProvider().localAddress(),
                                  latched_data->connection().streamInfo().downstreamSslConnection());
 }
 
-HttpConnPool::HttpConnPool(const std::string& cluster_name,
-                           Upstream::ClusterManager& cluster_manager,
+HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                            Http::CodecClient::Type type)
     : hostname_(config.hostname()), type_(type), upstream_callbacks_(upstream_callbacks) {
-  // TODO(mattklein123): Pass thread local cluster into this function, removing an additional
-  // map lookup and moving the error handling closer to the source (where it is likely already
-  // done).
-  const auto thread_local_cluster = cluster_manager.getThreadLocalCluster(cluster_name);
-  if (thread_local_cluster != nullptr) {
-    conn_pool_ = thread_local_cluster->httpConnPool(Upstream::ResourcePriority::Default,
-                                                    absl::nullopt, context);
-  }
+  conn_pool_ = thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, absl::nullopt,
+                                                 context);
 }
 
 HttpConnPool::~HttpConnPool() {
@@ -236,9 +230,22 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   Http::RequestEncoder* latched_encoder = &request_encoder;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
-                                 latched_encoder->getStream().connectionLocalAddress(),
-                                 info.downstreamSslConnection());
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_upstream_wait_connect_response")) {
+    upstream_->setConnPoolCallbacks(
+        std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamSslConnection()));
+  } else {
+    callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
+                                   latched_encoder->getStream().connectionLocalAddress(),
+                                   info.downstreamSslConnection());
+  }
+}
+
+void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
+                                      const Network::Address::InstanceConstSharedPtr& local_address,
+                                      Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, local_address, ssl_info);
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,

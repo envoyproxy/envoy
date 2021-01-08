@@ -42,9 +42,10 @@ name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
-    text_format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
-    %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
-    %UPSTREAM_LOCAL_ADDRESS% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
+    text_format_source:
+      inline_string: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
+      %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
+      %UPSTREAM_LOCAL_ADDRESS% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
   path: "/dev/null"
   )EOF";
 
@@ -106,9 +107,10 @@ public:
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(upstream_locality_));
-    router_->downstream_connection_.local_address_ = host_address_;
-    router_->downstream_connection_.remote_address_ =
-        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
+    router_->downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        host_address_);
+    router_->downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
   }
 
   void expectResponseTimerCreate() {
@@ -147,7 +149,6 @@ public:
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
-    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_));
     router_->decodeHeaders(headers, true);
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -190,7 +191,6 @@ public:
                                            {"x-envoy-internal", "true"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
-    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(2);
     router_->decodeHeaders(headers, true);
 
     router_->retry_state_->expectResetRetry();
@@ -296,8 +296,9 @@ name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   log_format:
-    text_format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%
-    %DURATION% %RESPONSE_DURATION% %REQUEST_DURATION%"
+    text_format_source:
+      inline_string: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%
+      %DURATION% %RESPONSE_DURATION% %REQUEST_DURATION%"
   path: "/dev/null"
   )EOF";
 

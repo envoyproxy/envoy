@@ -47,6 +47,8 @@ public:
 
     friend class HeaderUtility;
   };
+  static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap::GetResult& header,
+                                                             absl::string_view separator = ",");
   static GetAllOfHeaderAsStringResult getAllOfHeaderAsString(const HeaderMap& headers,
                                                              const Http::LowerCaseString& key,
                                                              absl::string_view separator = ",");
@@ -172,9 +174,10 @@ public:
                                     const RequestOrResponseHeaderMap& headers);
 
   /**
-   * @brief Remove the port part from host/authority header if it is equal to provided port
+   * @brief Remove the port part from host/authority header if it is equal to provided port.
+   * If port is not passed, port part from host/authority header is removed.
    */
-  static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
+  static void stripPortFromHost(RequestHeaderMap& headers, absl::optional<uint32_t> listener_port);
 
   /* Does a common header check ensuring required headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/filter/http/grpc_http1_bridge/v2/config.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -66,7 +67,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
     socket_option->set_level(10000);     // Invalid level.
@@ -88,7 +89,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
     socket_option->set_level(10000);     // Invalid level.
@@ -417,6 +418,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
+
+const ::envoy::config::filter::http::grpc_http1_bridge::v2::Config _grpc_http1_bridge_dummy;
 
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
@@ -1137,8 +1140,11 @@ TEST_P(IntegrationTest, TestBind) {
                                          1024);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_NE(fake_upstream_connection_, nullptr);
-  std::string address =
-      fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
+  std::string address = fake_upstream_connection_->connection()
+                            .addressProvider()
+                            .remoteAddress()
+                            ->ip()
+                            ->addressAsString();
   EXPECT_EQ(address, address_string);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_NE(upstream_request_, nullptr);
@@ -1548,6 +1554,38 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
+}
+
+// Expect that if an upgrade was not expected, the HCM correctly removes upgrade headers from the
+// response and the response encoder does not drop trailers.
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: websocket\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n"
+                                              "trailer1:t2\r\n"
+                                              "\r\n",
+                                              false));
+
+  // Expect that upgrade headers are dropped and trailers are sent.
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  EXPECT_NE(response->trailers(), nullptr);
 }
 
 TEST_P(IntegrationTest, ConnectWithNoBody) {
