@@ -1583,6 +1583,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "command_formatter_extension_integration_test",
+    srcs = [
+        "command_formatter_extension_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/formatter:command_extension_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "health_check_integration_test",
     srcs = ["health_check_integration_test.cc"],
     deps = [

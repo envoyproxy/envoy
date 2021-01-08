@@ -2,6 +2,7 @@
 
 #include "common/formatter/substitution_format_string.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -98,46 +99,6 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   }
 }
 
-class TestFormatter : public FormatterProvider {
-public:
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override {
-    return "TestFormatter";
-  }
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override {
-    return ValueUtil::stringValue("");
-  }
-};
-
-class TestCommandParser : public CommandParser {
-public:
-  TestCommandParser() = default;
-
-  FormatterProviderPtr parse(const std::string& token, size_t, int) const override {
-    if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
-      return std::make_unique<TestFormatter>();
-    }
-
-    return nullptr;
-  }
-};
-
-class TestCommandFactory : public CommandParserFactory {
-public:
-  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override {
-    return std::make_unique<TestCommandParser>();
-  }
-  std::string configType() override { return "google.protobuf.StringValue"; }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
-  }
-  std::string name() const override { return "envoy.formatter.TestFormatter"; }
-};
-
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension) {
   TestCommandFactory factory;
   Registry::InjectFactory<CommandParserFactory> command_register(factory);
@@ -164,7 +125,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionU
   formatters:
     - name: envoy.formatter.TestFormatterUnknown
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
+        "@type": type.googleapis.com/google.protobuf.Any
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
