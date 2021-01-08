@@ -15,22 +15,10 @@ proto_library(
     deps = [
         "//tools/testdata/protoxform/external:external_protos",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_google_googleapis//google/api:annotations_proto",
+        "@com_google_protobuf//:any_proto",
         "@envoy_api//envoy/annotations:pkg",
         "@envoy_api//envoy/api/v2:pkg",
-    ],
-)
-
-proto_library(
-    name = "freeze_protos",
-    srcs = [
-        "active_non_terminal.proto",
-        "active_terminal.proto",
-        "frozen.proto",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
-        "@envoy_api//envoy/annotations:pkg",
-        "@envoy_api//envoy/api/v2:pkg",
+        "@envoy_api//envoy/api/v2/core:pkg",
     ],
 )
