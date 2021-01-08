@@ -69,6 +69,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.enable_dns_cache_circuit_breakers",
     "envoy.reloadable_features.fix_upgrade_response",
     "envoy.reloadable_features.fix_wildcard_matching",
+    "envoy.reloadable_features.grpc_web_fix_non_grpc_response_handling",
     "envoy.reloadable_features.fixed_connection_close",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.http_default_alpn",

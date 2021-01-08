@@ -14,6 +14,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -203,18 +204,60 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl data1("start");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data1, false));
-  Buffer::OwnedImpl data2("hello");
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data2, false));
-  Buffer::OwnedImpl data3("end");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data3, true));
+  Buffer::OwnedImpl data("hello");
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(buffer.get()));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
-  // We only get the last frame here.
-  EXPECT_EQ("end", response_headers.get_(Http::Headers::get().GrpcMessage));
+  buffer->add(data);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
+
+  TestUtility::feedBufferWithRandomCharacters(data, 1024);
+  const std::string expected_grpc_message =
+      absl::StrCat("hellohello", data.toString()).substr(0, 1024);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
+  EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
+}
+
+TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText}, {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data("hello");
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(buffer.get()));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
+
+  buffer->add(data);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+
+  EXPECT_EQ("hellohello", response_headers.get_(Http::Headers::get().GrpcMessage));
+}
+
+TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextSkipTransformation) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.grpc_web_fix_non_grpc_response_handling", "false"}});
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText},
+      {"accept", Http::Headers::get().ContentTypeValues.GrpcWebText},
+      {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data("hello");
+  // Since the client expects grpc-web-text and the upstream response does not contain gRPC frames,
+  // the iteration is paused.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data, false));
 }
 
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {

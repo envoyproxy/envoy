@@ -13,11 +13,35 @@
 #include "common/grpc/context_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
+
+namespace {
+
+constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 1024;
+
+std::string buildGrpcMessage(const Buffer::Instance* buffered, const Buffer::Instance* last) {
+  Buffer::OwnedImpl buffer;
+  if (buffered) {
+    buffer.add(*buffered);
+  }
+
+  if (last) {
+    buffer.add(*last);
+  }
+
+  uint64_t length = std::min(buffer.length(), MAX_GRPC_MESSAGE_LENGTH);
+  std::string message(length, 0);
+  buffer.copyOut(0, length, message.data());
+
+  return Http::Utility::PercentEncoding::encode(message);
+}
+
+} // namespace
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     accept_handle(Http::CustomHeaders::get().Accept);
@@ -64,12 +88,14 @@ bool GrpcWebFilter::hasGrpcWebContentType(const Http::RequestOrResponseHeaderMap
   return false;
 }
 
-// Valid response headers contain gRPC or gRPC-Web response headers.
-bool GrpcWebFilter::isValidResponseHeaders(Http::ResponseHeaderMap& headers,
-                                           bool end_stream) const {
-  return Grpc::Common::isGrpcResponseHeaders(headers, end_stream) ||
-         (Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
-          hasGrpcWebContentType(headers));
+// If response headers do not contain gRPC or gRPC-Web response headers, it needs transformation.
+bool GrpcWebFilter::needsResponseTransformation(Http::ResponseHeaderMap& headers,
+                                                bool end_stream) const {
+  return Runtime::runtimeFeatureEnabled(
+             "envoy.reloadable_features.grpc_web_fix_non_grpc_response_handling") &&
+         !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
+         !(Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
+           hasGrpcWebContentType(headers));
 }
 
 // Implements StreamDecoderFilter.
@@ -171,7 +197,7 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
     chargeStat(headers);
   }
 
-  const bool valid_response = isValidResponseHeaders(headers, end_stream);
+  needs_response_transformation_ = needsResponseTransformation(headers, end_stream);
 
   if (is_text_response_) {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
@@ -179,12 +205,10 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
 
-  if (end_stream || valid_response) {
+  if (end_stream || !needs_response_transformation_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  ENVOY_LOG(debug, "received invalid response headers since the upstream response or local reply "
-                   "is not a gRPC or gRPC-Web response");
   response_headers_ = &headers;
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -197,22 +221,29 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   // When the upstream response (this is also relevant for local reply, since gRPC-Web request is
   // not a gRPC request which makes the local reply's is_grpc_request set to false) is not a gRPC
   // response, we set the "grpc-message" header with the upstream body content.
-  if (response_headers_ != nullptr) {
+  if (needs_response_transformation_) {
+    auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
     if (!end_stream) {
+      if (encoding_buffer == nullptr || encoding_buffer->length() < MAX_GRPC_MESSAGE_LENGTH) {
+        return Http::FilterDataStatus::StopIterationAndBuffer;
+      }
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    // Take the last frame as the grpc-message value, but the size of it is limited by
-    // max_grpc_message_length.
-    constexpr uint64_t max_grpc_message_length = 1024;
-    const uint64_t message_size = std::min(max_grpc_message_length, data.length());
-    std::string message(message_size, 0);
-    data.copyOut(0, message_size, message.data());
+    ASSERT(response_headers_ != nullptr);
+    needs_response_transformation_ = false;
+
+    const auto message = buildGrpcMessage(encoding_buffer, &data);
     data.drain(data.length());
+
+    if (encoding_buffer != nullptr) {
+      encoder_callbacks_->modifyEncodingBuffer(
+          [](Buffer::Instance& buffer) { buffer.drain(buffer.length()); });
+    }
 
     response_headers_->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(
         enumToInt(Http::Utility::getResponseStatus(*response_headers_))));
-    response_headers_->setGrpcMessage(Http::Utility::PercentEncoding::encode(message));
+    response_headers_->setGrpcMessage(message);
     response_headers_->setContentLength(0);
     return Http::FilterDataStatus::Continue;
   }
@@ -253,6 +284,20 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
 
   if (doStatTracking()) {
     chargeStat(trailers);
+  }
+
+  if (needs_response_transformation_) {
+    const auto message = buildGrpcMessage(encoder_callbacks_->encodingBuffer(), nullptr);
+    if (encoder_callbacks_->encodingBuffer() != nullptr) {
+      encoder_callbacks_->modifyEncodingBuffer(
+          [](Buffer::Instance& buffer) { buffer.drain(buffer.length()); });
+    }
+
+    response_headers_->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(
+        enumToInt(Http::Utility::getResponseStatus(*response_headers_))));
+    response_headers_->setGrpcMessage(message);
+    response_headers_->setContentLength(0);
+    return Http::FilterTrailersStatus::Continue;
   }
 
   // Trailers are expected to come all in once, and will be encoded into one single trailers frame.
