@@ -108,7 +108,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
 
       .. note::
 
-         This feature is still in an Experimental state.
+         This feature is still in Experimental state.
 
       You can start Envoy as Windows Service that is managed under `Windows Service Control Manager <https://docs.microsoft.com/en-us/windows/win32/services/using-services/>`_. 
 
@@ -147,7 +147,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
       
       .. tip::
 
-         The output of``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``.
+         The output of ``sc query envoyproxy`` contains the exit code of Envoy Proxy. In case the arguments are invalid we set it to ``E_INVALIDARG``.
 
 Check Envoy is proxying on http://localhost:10000.
 
