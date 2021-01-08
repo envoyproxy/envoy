@@ -35,7 +35,7 @@ bool isModifyMethod(const Http::HeaderMap& headers) {
 absl::string_view hostAndPort(const Http::HeaderEntry* header) {
   Http::Utility::Url absolute_url;
   if (header != nullptr && !header->value().empty()) {
-    if (absolute_url.initialize(header->value().getStringView())) {
+    if (absolute_url.initialize(header->value().getStringView(), false)) {
       return absolute_url.host_and_port();
     }
     return header->value().getStringView();
