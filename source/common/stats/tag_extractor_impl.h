@@ -4,9 +4,12 @@
 #include <regex>
 #include <string>
 
+#ifdef ENVOY_PERF_ANNOTATION
+#include <fmt/core.h>
+#endif
+
 #include "envoy/stats/tag_extractor.h"
 
-#include "common/common/logger.h"
 #include "common/common/regex.h"
 
 #include "absl/strings/string_view.h"
@@ -15,7 +18,40 @@
 namespace Envoy {
 namespace Stats {
 
-class TagExtractorImplBase : public TagExtractor, protected Logger::Loggable<Logger::Id::stats> {
+// To check if a tag extractor is actually used you can run
+// bazel test //test/... --test_output=streamed --define=perf_annotation=enabled
+#ifdef ENVOY_PERF_ANNOTATION
+
+struct Counters {
+  uint32_t skipped_{};
+  uint32_t matched_{};
+  uint32_t missed_{};
+};
+
+#define PERF_TAG_COUNTERS(var)                                                                     \
+  ~TagExtractorImplBase() override {                                                               \
+    std::cout << fmt::format("Stats for {} tag extractor: skipped {}, matched {}, missing {}",     \
+                             name_, var->skipped_, var->matched_, var->missed_)                    \
+              << std::endl;                                                                        \
+  }                                                                                                \
+  std::unique_ptr<Counters> var
+
+#define PERF_TAG_COUNTERS_INIT(var) var = std::make_unique<Counters>()
+#define PERF_TAG_SKIPPED_INC(var) var->skipped_++
+#define PERF_TAG_MISSED_INC(var) var->missed_++
+#define PERF_TAG_MATCHED_INC(var) var->matched_++
+
+#else
+
+#define PERF_TAG_COUNTERS(var)
+#define PERF_TAG_COUNTERS_INIT(var)
+#define PERF_TAG_SKIPPED_INC(var)
+#define PERF_TAG_MISSED_INC(var)
+#define PERF_TAG_MATCHED_INC(var)
+
+#endif
+
+class TagExtractorImplBase : public TagExtractor {
 public:
   /**
    * Creates a tag extractor from the regex provided. name and regex must be non-empty.
@@ -33,7 +69,6 @@ public:
 
   TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                        absl::string_view substr = "");
-  virtual ~TagExtractorImplBase();
   std::string name() const override { return name_; }
   absl::string_view prefixToken() const override { return prefix_; }
 
@@ -64,12 +99,8 @@ protected:
   const std::string name_;
   const std::string prefix_;
   const std::string substr_;
-  struct counters {
-    uint32_t skipped_{};
-    uint32_t matched_{};
-    uint32_t missed_{};
-  };
-  const std::unique_ptr<counters> counters_;
+
+  PERF_TAG_COUNTERS(counters_);
 };
 
 class TagExtractorStdRegexImpl : public TagExtractorImplBase {
