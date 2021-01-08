@@ -53,10 +53,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers:96.3"
 "source/extensions/tracers/opencensus:90.1"
 "source/extensions/tracers/xray:95.3"
-"source/extensions/transport_sockets:94.8"
+"source/extensions/transport_sockets:94.6"
 "source/extensions/transport_sockets/raw_buffer:90.9"
 "source/extensions/transport_sockets/tap:95.6"
-"source/extensions/transport_sockets/tls:94.2"
+"source/extensions/transport_sockets/tls:93.8"
 "source/extensions/transport_sockets/tls/private_key:76.9"
 )
 
