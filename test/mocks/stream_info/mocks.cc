@@ -103,7 +103,7 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
-  ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(*filter_state_));
+  ON_CALL(Const(*this), filterState()).WillByDefault(Invoke([this]() { return *filter_state_; }));
   ON_CALL(*this, upstreamFilterState()).WillByDefault(ReturnRef(upstream_filter_state_));
   ON_CALL(*this, setUpstreamFilterState(_))
       .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
