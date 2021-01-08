@@ -1039,7 +1039,7 @@ bool ConfigHelper::setAccessLog(
   if (!format.empty()) {
     auto* log_format = access_log_config.mutable_log_format();
     log_format->mutable_text_format_source()->set_inline_string(absl::StrCat(format, "\n"));
-    if (formatters.size() > 0) {
+    if (!formatters.empty()) {
       for (const auto& formatter : formatters) {
         auto* added_formatter = log_format->add_formatters();
         added_formatter->set_name(formatter.name());
