@@ -18,26 +18,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-// The value of a TokenCache entry.
-struct TokenCacheData {
-  // jwt parsing status
-  Status jwt_status_;
-  // parsed JWT
-  std::unique_ptr<::google::jwt_verify::Jwt> jwt_;
-  // If valid, the  verification status
-  absl::optional<Status> sig_status_;
-};
-
 // The key of the cache is a JWT,
-// and the value is of type TokenCacheData.
-class TokenCache : public SimpleLRUCache<std::string, TokenCacheData> {
+// and the value is of type parsed JWT.
+
+// The default number of entries in JWT cache is 100.
+class TokenCache : public SimpleLRUCache<std::string, ::google::jwt_verify::Jwt> {
 public:
-  TokenCache();
+  TokenCache(int cache_size = 100);
   ~TokenCache();
-  void addTokenCacheData(const std::string& token, ::google::jwt_verify::Jwt& jwt,
-                         uint64_t token_exp, Status& status);
-  bool lookupTokenCacheData(const std::string& token, ::google::jwt_verify::Jwt& jwt,
-                            Status& status);
+  void addTokenCache(const std::string& token, ::google::jwt_verify::Jwt& jwt, uint64_t token_exp);
+  bool lookupTokenCache(const std::string& token, ::google::jwt_verify::Jwt& jwt);
 };
 
 } // namespace JwtAuthn

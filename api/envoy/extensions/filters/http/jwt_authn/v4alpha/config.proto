@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtProvider";
@@ -203,6 +203,9 @@ message JwtProvider {
 
   // Specify token cache duration, default to 5 minutes.
   google.protobuf.Duration token_cache_duration = 12;
+
+  // Specify token cache size, default to 100.
+  uint32 token_cache_size = 13;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

@@ -46,6 +46,9 @@ public:
                   inline_jwks);
         jwks_obj_.reset(nullptr);
       }
+      if (jwt_provider_.token_cache_size() > 0) {
+        token_cache_ = std::make_unique<TokenCache>(jwt_provider_.token_cache_size());
+      }
     }
   }
 
@@ -62,6 +65,8 @@ public:
   const ::google::jwt_verify::Jwks* setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) override {
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
+
+  const std::unique_ptr<TokenCache>& getTokenCache() override { return token_cache_; }
 
 private:
   // Get the expiration time for a remote Jwks
@@ -92,6 +97,8 @@ private:
   TimeSource& time_source_;
   // The pubkey expiration time.
   MonotonicTime expiration_time_;
+  // The TokenCache object
+  std::unique_ptr<TokenCache> token_cache_{std::make_unique<TokenCache>()};
 };
 
 class JwksCacheImpl : public JwksCache {

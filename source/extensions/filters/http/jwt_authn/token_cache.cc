@@ -6,34 +6,27 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-// The number of entries in JWT cache.
-const int kJwtCacheSize = 100;
 
-TokenCache::TokenCache() : SimpleLRUCache<std::string, TokenCacheData>(kJwtCacheSize) {}
+TokenCache::TokenCache(int cache_size)
+    : SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>(cache_size) {}
 
 TokenCache::~TokenCache() { clear(); }
 
-void TokenCache::addTokenCacheData(const std::string& token, ::google::jwt_verify::Jwt& jwt,
-                                   uint64_t token_exp, Status& status) {
-  TokenCacheData* token_cache_data = new TokenCacheData();
-  token_cache_data->jwt_status_ = status;
+void TokenCache::addTokenCache(const std::string& token, ::google::jwt_verify::Jwt& jwt,
+                               uint64_t token_exp) {
   jwt.exp_ = std::min(jwt.exp_, token_exp);
-  token_cache_data->jwt_.reset(&jwt);
-  this->insert(token, token_cache_data, 1);
+  this->insert(token, &jwt, 1);
 }
 
-bool TokenCache::lookupTokenCacheData(const std::string& token, ::google::jwt_verify::Jwt& jwt,
-                                      Status& status) {
+bool TokenCache::lookupTokenCache(const std::string& token, ::google::jwt_verify::Jwt& jwt) {
   TokenCache::ScopedLookup lookup(this, token);
   if (lookup.found()) {
-    TokenCacheData* token_cache_data = lookup.value();
-    if (token_cache_data->jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now())) ==
-        Status::JwtExpired) {
+    ::google::jwt_verify::Jwt* jwt_cache = lookup.value();
+    if (jwt_cache->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now())) == Status::JwtExpired) {
       this->remove(token);
       return false;
     }
-    jwt = *token_cache_data->jwt_;
-    status = token_cache_data->jwt_status_;
+    jwt = *jwt_cache;
     return true;
   }
   return false;

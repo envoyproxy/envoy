@@ -82,8 +82,6 @@ private:
   std::unique_ptr<::google::jwt_verify::Jwt> jwt_;
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
-  // The TokenCache object
-  std::unique_ptr<TokenCache> token_cache_{std::make_unique<TokenCache>()};
   // The HTTP request headers
   Http::HeaderMap* headers_{};
   // The active span for the request
@@ -131,6 +129,14 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
     return;
   }
 
+  // If token found in cache skip startVerify()
+  if (jwks_data_->getTokenCache()->lookupTokenCache(tokens_.back()->token(), *jwt_)) {
+    ENVOY_LOG(debug, "{}: verified token with cache hit: tokens size {}", name(), tokens_.size());
+    doneWithStatus(Status::Ok);
+    tokens_.pop_back();
+    return;
+  }
+
   startVerify();
 }
 
@@ -142,20 +148,7 @@ void AuthenticatorImpl::startVerify() {
 
   jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
   ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-  Status status;
-
-  if (!token_cache_->lookupTokenCacheData(curr_token_->token(), *jwt_, status)) {
-    status = jwt_->parseFromString(curr_token_->token());
-    if (status == Status::Ok) {
-      // Default token cache expiration time is jwt->exp_
-      auto token_exp = absl::ToUnixSeconds(absl::Now());
-      if (jwks_data_->getJwtProvider().has_token_cache_duration()) {
-        token_exp +=
-            DurationUtil::durationToSeconds(jwks_data_->getJwtProvider().token_cache_duration());
-      }
-      token_cache_->addTokenCacheData(curr_token_->token(), *jwt_, token_exp, status);
-    }
-  }
+  Status status = jwt_->parseFromString(curr_token_->token());
 
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -281,6 +274,15 @@ void AuthenticatorImpl::verifyKey() {
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
+
+  if (status == Status::Ok) {
+    auto token_exp = absl::ToUnixSeconds(absl::Now());
+    if (jwks_data_->getJwtProvider().has_token_cache_duration()) {
+      token_exp +=
+          DurationUtil::durationToSeconds(jwks_data_->getJwtProvider().token_cache_duration());
+    }
+    jwks_data_->getTokenCache()->addTokenCache(curr_token_->token(), *jwt_, token_exp);
+  }
 
   // If a request has multiple tokens, all of them must be valid. Otherwise it may have
   // following security hole: a request has a good token and a bad one, it will pass
