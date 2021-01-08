@@ -2323,9 +2323,9 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem"
@@ -2335,16 +2335,15 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
-  Stats::TestUtil::TestStore server_stats_store;
+  Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  Network::MockTcpListenerCallbacks listener_callbacks;
+  Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, true);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -2355,7 +2354,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
-  Stats::TestUtil::TestStore client_stats_store;
+  Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
@@ -2372,8 +2371,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2412,9 +2410,9 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem"
@@ -2424,16 +2422,15 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
-  Stats::TestUtil::TestStore server_stats_store;
+  Stats::IsolatedStoreImpl server_stats_store;
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, std::vector<std::string>{});
 
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  Network::MockTcpListenerCallbacks listener_callbacks;
+  Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, true);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
   std::shared_ptr<Network::MockReadFilter> client_read_filter(new Network::MockReadFilter());
 
@@ -2444,7 +2441,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
-  Stats::TestUtil::TestStore client_stats_store;
+  Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
@@ -2461,8 +2458,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2473,10 +2469,9 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
         server_connection->write(data, false);
         EXPECT_EQ(data.length(), 0);
         // Close without sending close_notify alert.
-        const SslHandshakerImpl* ssl_socket =
-            dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
-        EXPECT_EQ(ssl_socket->state(), Ssl::SocketState::HandshakeComplete);
-        SSL_set_quiet_shutdown(ssl_socket->ssl(), 1);
+        const SslSocketInfo* ssl_socket =
+            dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
+        SSL_set_quiet_shutdown(ssl_socket->rawSslForTest(), 1);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
       }));
 
