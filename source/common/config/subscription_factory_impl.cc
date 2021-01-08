@@ -130,13 +130,15 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           Utility::configSourceInitialFetchTimeout(config), false);
     }
     default:
+      // TODO(htuch): Add support for non-aggregated delta gRPC, but there will always be options,
+      // e.g. v2 REST, that don't make sense for xdstp:// ResourceLocators.
       throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
                                        api_config_source.DebugString()));
     }
   }
   default:
-    throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",
-                                     XdsResourceIdentifier::encodeUrl(collection_locator)));
+    // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
