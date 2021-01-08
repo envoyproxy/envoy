@@ -6,6 +6,7 @@
 
 #include "envoy/stats/tag_extractor.h"
 
+#include "common/common/logger.h"
 #include "common/common/regex.h"
 
 #include "absl/strings/string_view.h"
@@ -14,7 +15,7 @@
 namespace Envoy {
 namespace Stats {
 
-class TagExtractorImplBase : public TagExtractor {
+class TagExtractorImplBase : public TagExtractor, protected Logger::Loggable<Logger::Id::stats> {
 public:
   /**
    * Creates a tag extractor from the regex provided. name and regex must be non-empty.
@@ -32,6 +33,7 @@ public:
 
   TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                        absl::string_view substr = "");
+  virtual ~TagExtractorImplBase();
   std::string name() const override { return name_; }
   absl::string_view prefixToken() const override { return prefix_; }
 
@@ -62,6 +64,12 @@ protected:
   const std::string name_;
   const std::string prefix_;
   const std::string substr_;
+  struct counters {
+    uint32_t skipped_{};
+    uint32_t matched_{};
+    uint32_t missed_{};
+  };
+  const std::unique_ptr<counters> counters_;
 };
 
 class TagExtractorStdRegexImpl : public TagExtractorImplBase {

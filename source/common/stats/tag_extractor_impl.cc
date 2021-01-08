@@ -26,7 +26,8 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 TagExtractorImplBase::TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                                            absl::string_view substr)
-    : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr) {}
+    : name_(name), prefix_(std::string(extractRegexPrefix(regex))),
+      substr_(substr), counters_{new counters} {}
 
 std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
   std::string prefix;
@@ -45,6 +46,11 @@ std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
     }
   }
   return prefix;
+}
+
+TagExtractorImplBase::~TagExtractorImplBase() {
+  ENVOY_LOG(trace, "Stats for {} tag extractor: skipped {}, matched {}, missing {}", name_,
+            counters_->skipped_, counters_->matched_, counters_->missed_);
 }
 
 TagExtractorPtr TagExtractorImplBase::createTagExtractor(absl::string_view name,
@@ -90,6 +96,7 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
 
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re-skip", name_);
+    counters_->skipped_++;
     return false;
   }
 
@@ -113,9 +120,11 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
     std::string::size_type end = remove_subexpr.second - stat_name.begin();
     remove_characters.insert(start, end);
     PERF_RECORD(perf, "re-match", name_);
+    counters_->matched_++;
     return true;
   }
   PERF_RECORD(perf, "re-miss", name_);
+  counters_->missed_++;
   return false;
 }
 
@@ -129,6 +138,7 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
 
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re2-skip", name_);
+    counters_->skipped_++;
     return false;
   }
 
@@ -155,9 +165,11 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
     remove_characters.insert(start, end);
 
     PERF_RECORD(perf, "re2-match", name_);
+    counters_->matched_++;
     return true;
   }
   PERF_RECORD(perf, "re2-miss", name_);
+  counters_->missed_++;
   return false;
 }
 
