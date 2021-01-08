@@ -1,25 +1,22 @@
 .. _config_http_filters_decompressor:
 
-Decompressor
+解压缩器
 ============
-Decompressor is an HTTP filter which enables Envoy to bidirectionally decompress data.
+解压缩器是一个 HTTP 过滤器，它可以使 Envoy 支持双向解压缩数据。
 
 
-Configuration
+配置
 -------------
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor>`
 
-How it works
-------------
-When the decompressor filter is enabled, headers are inspected to
-determine whether or not the content should be decompressed. The content is
-decompressed and passed on to the rest of the filter chain. Note that decompression happens
-independently for request and responses based on the rules described below.
+它是如何工作的
+---------------
+当启用解压缩过滤器时，会检查头部，以确定是否应该对内容进行解压缩。这个内容将会被解压缩，并继续传输到剩余的其他过滤链。需要注意的是，解压缩会根据以下描述的规则分别对请求和响应进行独立工作。
 
-Currently the filter supports :ref:`gzip compression <envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
-only. Other compression libraries can be supported as extensions.
+当前过滤器只支持 :ref:`gzip 压缩 <envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
+。可以支持其他压缩库作为扩展。
 
-An example configuration of the filter may look like the following:
+过滤器的示例配置如下所示：
 
 .. code-block:: yaml
 
@@ -33,36 +30,31 @@ An example configuration of the filter may look like the following:
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip
             window_bits: 10
 
-By *default* decompression will be *skipped* when:
+*默认情况* 下当发生如下情况，解压会 *被跳过* ：
 
-- A request/response does NOT contain *content-encoding* header.
-- A request/response includes *content-encoding* header, but it does not contain the configured
-  decompressor's content-encoding.
-- A request/response contains a *cache-control* header whose value includes "no-transform".
+- 请求/响应头部不包含 *content-encoding* 。
+- 请求/响应头部包含 *content-encoding* ，但是不包含配置的解压缩器的内容编码。
+- 请求/响应头部包含 *cache-control* ，该头的值包含 "no-transform"。
 
-When decompression is *applied*:
+当解压缩被应用的时候，会发生如下情况：
 
-- The *content-length* is removed from headers.
+- *content-length* 会被从头部移除。
 
   .. note::
 
-    If an updated *content-length* header is desired, the buffer filter can be installed as part
-    of the filter chain to buffer decompressed frames, and ultimately update the header. Due to
-    :ref:`filter ordering <arch_overview_http_filters_ordering>` a buffer filter needs to be
-    installed after the decompressor for requests and prior to the decompressor for responses.
+    如果需要更新头部的内容长度 *content-length* ，则可以将缓冲过滤器作为过滤链的一部分，以缓冲解压缩的帧，并最终更新头部。由于过滤器排序
+    :ref:`filter ordering <arch_overview_http_filters_ordering>` ，缓冲过滤器需要在请求中安装在解压缩过滤器之后，以及在响应中安装在解压器过滤器之前。
 
-- The *content-encoding* header is modified to remove the decompression that was applied.
+- 头部中内容编码 *content-encoding* 会被修改以删除已应用的解压缩。
 
-- *x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes* trailers are added to
-  the request/response to relay information about decompression.
+- *x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes* 尾部会被添加到请求/响应中以传达有关解压缩的信息。
 
 .. _decompressor-statistics:
 
-Using different decompressors for requests and responses
+对请求和响应使用不同的解压缩器
 --------------------------------------------------------
 
-If different compression libraries are desired for requests and responses, it is possible to install
-multiple decompressor filters enabled only for requests or responses. For instance:
+如果请求和响应需要不同的压缩库，则可以安装不同的解压缩过滤器仅针对请求或者响应启用。例如：
 
 .. code-block:: yaml
 
@@ -98,21 +90,18 @@ multiple decompressor filters enabled only for requests or responses. For instan
             default_value: false
             runtime_key: request_decompressor_enabled
 
-Statistics
+统计
 ----------
 
-Every configured Deompressor filter has statistics rooted at
-<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.<request/response>*
-with the following:
+每一个配置的解压缩过滤器都有一个以<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.<request/response>* 为根的统计，具有以下内容：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  decompressed, Counter, Number of request/responses compressed.
-  not_decompressed, Counter, Number of request/responses not compressed.
-  total_uncompressed_bytes, Counter, The total uncompressed bytes of all the request/responses that were marked for decompression.
-  total_compressed_bytes, Counter, The total compressed bytes of all the request/responses that were marked for decompression.
+  decompressed, Counter, 压缩的请求/响应数。
+  not_decompressed, Counter, 未压缩的请求/响应数。
+  total_uncompressed_bytes, Counter, 所有标记为解压缩的请求/响应的未压缩字节总数。
+  total_compressed_bytes, Counter, 标记为解压缩的所有请求/响应的总压缩字节。
 
-Additional stats for the decompressor library are rooted at
-<stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.decompressor_library.
+解压缩库的其他统计参考以根为 <stat_prefix>.decompressor.<decompressor_library.name>.<decompressor_library_stat_prefix>.decompressor_library 的统计。
