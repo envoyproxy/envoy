@@ -320,9 +320,8 @@ HostSetImplPtr ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::createHostS
   ASSERT(!overprovisioning_factor.has_value() ||
          overprovisioning_factor.value() == host_set->overprovisioningFactor());
 
-  auto x = new HostSubsetImpl(*host_set);
   return HostSetImplPtr{
-    x
+    new HostSubsetImpl(*host_set)
   };
 
 }
