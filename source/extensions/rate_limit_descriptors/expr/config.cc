@@ -55,6 +55,8 @@ private:
 
 } // namespace
 
+std::string ExprDescriptorFactory::name() const { return "envoy.rate_limit_descriptors.expr"; }
+
 ProtobufTypes::MessagePtr ExprDescriptorFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor>();
 }
@@ -80,7 +82,6 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  return nullptr;
 }
 
 Filters::Common::Expr::Builder& ExprDescriptorFactory::getOrCreateBuilder() {

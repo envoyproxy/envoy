@@ -16,7 +16,7 @@ namespace Expr {
  */
 class ExprDescriptorFactory : public RateLimit::DescriptorProducerFactory {
 public:
-  std::string name() const override { return "envoy.rate_limit_descriptors.expr"; }
+  std::string name() const override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   RateLimit::DescriptorProducerPtr
   createDescriptorProducerFromProto(const Protobuf::Message& message,
