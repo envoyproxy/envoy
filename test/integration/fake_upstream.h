@@ -585,7 +585,9 @@ public:
   testing::AssertionResult waitForAndConsumeDisconnectedConnection(
       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
+  Network::Address::InstanceConstSharedPtr localAddress() const {
+    return socket_->addressProvider().localAddress();
+  }
 
   // Wait for one of the upstreams to receive a connection
   ABSL_MUST_USE_RESULT
@@ -655,7 +657,7 @@ private:
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->localAddress();
+      return socket_->addressProvider().localAddress();
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
