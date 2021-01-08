@@ -19,6 +19,20 @@ enum class SubscriptionType {
   Http,
   Filesystem,
 };
+void PrintTo(const SubscriptionType sub, std::ostream* os) {
+  (*os) << ([sub]() -> absl::string_view {
+    switch (sub) {
+    case SubscriptionType::Grpc:
+      return "Grpc";
+    case SubscriptionType::DeltaGrpc:
+      return "DeltaGrpc";
+    case SubscriptionType::Http:
+      return "Http";
+    case SubscriptionType::Filesystem:
+      return "Filesystem";
+    }
+  })();
+}
 
 class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
 public:
