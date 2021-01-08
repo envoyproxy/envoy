@@ -326,10 +326,14 @@ void DispatcherImpl::touchWatchdog() {
 }
 
 void DispatcherImpl::pushTrackedObject(const ScopeTrackedObject* object) {
+  ASSERT(isThreadSafe());
+  ASSERT(object != nullptr);
   tracked_object_stack_.push_back(object);
 }
 
 void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object) {
+  ASSERT(isThreadSafe());
+  ASSERT(expected_object != nullptr);
   if (tracked_object_stack_.empty()) {
     ASSERT(!expected_object,
            "Tracked object stack is empty yet we expected a non-null tracked object on the top.");

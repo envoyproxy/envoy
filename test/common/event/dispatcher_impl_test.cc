@@ -537,14 +537,12 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
 }
 
 TEST_F(DispatcherImplTest, ShouldDumpNothingIfNoTrackedObjects) {
-  // Check that there are no tracked objects.
-  dispatcher_->popTrackedObject(nullptr);
-
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
 
   // Call on FatalError to trigger dumps of tracked objects.
   dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
     static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
     work_finished_ = true;
     cv_.notifyOne();
@@ -569,22 +567,21 @@ private:
 };
 
 TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
-  // Check that there are no tracked objects.
-  dispatcher_->popTrackedObject(nullptr);
-
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
 
-  // Add several tracked objects to the dispatcher
-  MessageTrackedObject first{"first"};
-  ScopeTrackerScopeState first_state{&first, *dispatcher_};
-  MessageTrackedObject second{"second"};
-  ScopeTrackerScopeState second_state{&second, *dispatcher_};
-  MessageTrackedObject third{"third"};
-  ScopeTrackerScopeState third_state{&third, *dispatcher_};
-
   // Call on FatalError to trigger dumps of tracked objects.
   dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
+
+    // Add several tracked objects to the dispatcher
+    MessageTrackedObject first{"first"};
+    ScopeTrackerScopeState first_state{&first, *dispatcher_};
+    MessageTrackedObject second{"second"};
+    ScopeTrackerScopeState second_state{&second, *dispatcher_};
+    MessageTrackedObject third{"third"};
+    ScopeTrackerScopeState third_state{&third, *dispatcher_};
+
     static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
     work_finished_ = true;
     cv_.notifyOne();

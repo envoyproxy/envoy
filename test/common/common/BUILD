@@ -368,6 +368,7 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/common:scope_tracker",
+        "//source/common/event:dispatcher_lib",
         "//test/mocks:common_lib",
         "//test/test_common:utility_lib",
     ],

@@ -1,7 +1,8 @@
-#include "envoy/event/dispatcher.h"
+#include <iostream>
 
 #include "common/api/api_impl.h"
 #include "common/common/scope_tracker.h"
+#include "common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/utility.h"
@@ -12,25 +13,24 @@
 namespace Envoy {
 namespace {
 
+using testing::_;
+
 TEST(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
-  Api::ApiPtr api_(Api::createApiForTest());
-  Event::DispatcherPtr dispatcher_(api_->allocateDispatcher("test_thread"));
+  Api::ApiPtr api(Api::createApiForTest());
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   MockScopedTrackedObject tracked_object;
-
-  // Nothing should be tracked so far.
-  dispatcher_->popTrackedObject(nullptr);
-
   {
-    ScopeTrackerScopeState scope(&tracked_object, *dispatcher_);
+    ScopeTrackerScopeState scope(&tracked_object, *dispatcher);
     // Check that the tracked_object is on the tracked object stack
-    dispatcher_->popTrackedObject(&tracked_object);
+    dispatcher->popTrackedObject(&tracked_object);
 
     // Restore it to the top, it should be removed in the dtor of scope.
-    dispatcher_->pushTrackedObject(&tracked_object);
+    dispatcher->pushTrackedObject(&tracked_object);
   }
 
-  // Nothing should be tracked now.
-  dispatcher_->popTrackedObject(nullptr);
+  // Check nothing is tracked now.
+  EXPECT_CALL(tracked_object, dumpState(_, _)).Times(0);
+  static_cast<Event::DispatcherImpl*>(dispatcher.get())->onFatalError(std::cerr);
 }
 
 } // namespace
