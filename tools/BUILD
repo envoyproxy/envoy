@@ -42,6 +42,8 @@ envoy_cc_binary(
         "//source/common/common:assert_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/common:random_generator_lib",
+        "//test/test_common:test_version_linkstamp",
         "//source/common/stats:isolated_store_lib",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
