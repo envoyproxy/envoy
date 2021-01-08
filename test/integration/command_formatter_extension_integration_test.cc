@@ -1,5 +1,6 @@
 #include "test/common/formatter/command_extension.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,9 +16,9 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
 };
 
-REGISTER_FACTORY(TestCommandFactory, CommandParserFactory);
-
 TEST_F(CommandFormatterExtensionIntegrationTest, BasicExtension) {
+  TestCommandFactory factory;
+  Registry::InjectFactory<CommandParserFactory> command_register(factory);
   std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters;
   envoy::config::core::v3::TypedExtensionConfig typed_config;
   ProtobufWkt::StringValue config;
