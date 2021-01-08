@@ -41,7 +41,5 @@ ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
 
 std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
 
-REGISTER_FACTORY(TestCommandFactory, CommandParserFactory);
-
 } // namespace Formatter
 } // namespace Envoy

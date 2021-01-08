@@ -15,6 +15,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
 };
 
+REGISTER_FACTORY(TestCommandFactory, CommandParserFactory);
+
 TEST_F(CommandFormatterExtensionIntegrationTest, BasicExtension) {
   std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters;
   envoy::config::core::v3::TypedExtensionConfig typed_config;
