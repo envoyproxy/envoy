@@ -30,6 +30,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
+        "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/ratelimit/v3:pkg_cc_proto",
     ],
 )

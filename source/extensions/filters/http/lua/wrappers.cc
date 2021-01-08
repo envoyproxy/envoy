@@ -130,12 +130,14 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
-  lua_pushstring(state, stream_info_.downstreamLocalAddress()->asString().c_str());
+  lua_pushstring(state,
+                 stream_info_.downstreamAddressProvider().localAddress()->asString().c_str());
   return 1;
 }
 
 int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
-  lua_pushstring(state, stream_info_.downstreamDirectRemoteAddress()->asString().c_str());
+  lua_pushstring(
+      state, stream_info_.downstreamAddressProvider().directRemoteAddress()->asString().c_str());
   return 1;
 }
 

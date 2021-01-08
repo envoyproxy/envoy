@@ -220,7 +220,7 @@ protected:
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-      return parent_.connection_.localAddress();
+      return parent_.connection_.addressProvider().localAddress();
     }
     absl::string_view responseDetails() override { return details_; }
     void setFlushTimeout(std::chrono::milliseconds timeout) override {

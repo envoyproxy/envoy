@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/network/socket.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
@@ -136,7 +137,7 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::Address::InstanceConstSharedPtr local_address_;
+    Network::SocketAddressProviderSharedPtr local_address_provider_;
     bool expect_reset_{};
     bool reuse_connection_ = false;
     bool request_in_flight_ = false;

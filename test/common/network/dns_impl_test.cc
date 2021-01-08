@@ -271,7 +271,7 @@ private:
 class TestDnsServer : public TcpListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher)
-      : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource()) {}
+      : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource(), nullptr) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
@@ -441,7 +441,8 @@ public:
     listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
 
     if (setResolverInConstructor()) {
-      resolver_ = dispatcher_->createDnsResolver({socket_->localAddress()}, useTcpForDnsLookups());
+      resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
+                                                 useTcpForDnsLookups());
     } else {
       resolver_ = dispatcher_->createDnsResolver({}, useTcpForDnsLookups());
     }
@@ -451,7 +452,8 @@ public:
     if (tcpOnly()) {
       peer_->resetChannelTcpOnly(zeroTimeout());
     }
-    ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+    ares_set_servers_ports_csv(peer_->channel(),
+                               socket_->addressProvider().localAddress()->asString().c_str());
   }
 
   void TearDown() override {
@@ -585,7 +587,8 @@ TEST_P(DnsImplTest, DestructCallback) {
   // This simulates destruction thanks to another query setting the dirty_channel_ bit, thus causing
   // a subsequent result to call ares_destroy.
   peer_->resetChannelTcpOnly(zeroTimeout());
-  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+  ares_set_servers_ports_csv(peer_->channel(),
+                             socket_->addressProvider().localAddress()->asString().c_str());
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -712,7 +715,8 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   if (tcpOnly()) {
     peer_->resetChannelTcpOnly(zeroTimeout());
   }
-  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+  ares_set_servers_ports_csv(peer_->channel(),
+                             socket_->addressProvider().localAddress()->asString().c_str());
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,

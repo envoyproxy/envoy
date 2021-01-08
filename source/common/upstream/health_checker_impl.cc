@@ -18,6 +18,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_impl.h"
+#include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
@@ -214,7 +216,9 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
     : ActiveHealthCheckSession(parent, host), parent_(parent),
       hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
-      local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
+      local_address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(
+          Network::Utility::getCanonicalIpv4LoopbackAddress(),
+          Network::Utility::getCanonicalIpv4LoopbackAddress())) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
@@ -272,9 +276,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
        {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}});
   Router::FilterUtility::setUpstreamScheme(
       *request_headers, host_->transportSocketFactory().implementsSecureTransport());
-  StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource());
-  stream_info.setDownstreamLocalAddress(local_address_);
-  stream_info.setDownstreamRemoteAddress(local_address_);
+  StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
+                                         local_address_provider_);
   stream_info.onUpstreamHostSelected(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);
