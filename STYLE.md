@@ -110,8 +110,8 @@ A few general notes on our error handling philosophy:
   - Raised by the Envoy process environment and are *likely* to happen
   - Third party dependency return codes
 * Examples of likely environnmental errors include any type of network error, disk IO error, bad
-  data returned by an API call, bad data read from runtime files, etc. This includes configuration
-  updates after startup.
+  data returned by an API call, bad data read from runtime files, etc. This includes loading
+  configuration at runtime.
 * Third party dependency return codes should be checked and gracefully handled. Examples include
   HTTP/2 or JSON parsers. Some return codes may be handled by continuing, for example, in case of an
   out of process RPC failure.
@@ -131,6 +131,9 @@ A few general notes on our error handling philosophy:
   philosophy that the engineering costs of properly handling these cases are not worth it. Time is
   better spent designing proper system controls that shed load if resource usage becomes too high,
   etc.
+* Testing should cover any serious cases that may result in infinite loops, crashes, or serious
+  errors. Non-trivial invariants are also encouraged to have testing. Internal, localized invariants
+  may not need testing.
 * The "less is more" error handling philosophy described in the previous two points is primarily
   based on the fact that restarts are designed to be fast, reliable and cheap.
 * Although we strongly recommend that any type of startup error leads to a fatal error, since this
@@ -165,24 +168,29 @@ A few general notes on our error handling philosophy:
     debug-only builds) program invariants.
   - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
     should be used where it may be useful to detect if an efficient condition is violated in
-    production (and check in debug-only builds).
+    production (and fatal check in debug-only builds).
 
 * Sub-macros alias the macros above and can be used to annotate specific situations:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
-  detectability on probable or changing invariants.
+  detectability on probable conditions or invariants.
 
 * Per above it's acceptable to turn failures into crash semantics via `RELEASE_ASSERT(condition)` or
-  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios.
-* Only `RELEASE_ASSERT(condition)` should be used to validate conditions that might be imposed by
-  the external environment.
-* Annotate macro usage with comments on belief (probable or provable condition).
-* Use `ASSERT` and `ENVOY_BUG` liberally, but do not use it for things that will crash in an obvious
+  `PANIC(message)` if there is no other sensible behavior, e.g. in OOM (memory/FD) scenarios. 
+* Do not `ASSERT` on conditions imposed by the external environment. Either add error handling
+  (potentially with an `ENVOY_BUG` for detectability) or `RELEASE_ASSERT` if the condition indicates
+  that the process is unrecoverable.
+* Use `ASSERT` and `ENVOY_BUG` liberally, but do not use them for things that will crash in an obvious
   way in a subsequent line. E.g., do not do `ASSERT(foo != nullptr); foo->doSomething();`.
+* Use `ASSERT`s for true invariants and well-defined conditions that are useful for tests,
+  debug-only checks and documentation. They may be `ENVOY_BUG`s if performance allows, see point
+  below.
 * `ENVOY_BUG`s provide detectability and more confidence than an `ASSERT`. They are useful for
   non-trivial conditions, those with complex control flow, and rapidly changing protocols. Testing
   should be added to ensure that Envoy can continue to operate even if an `ENVOY_BUG` condition is
   violated.
-* `ASSERT`s should be understandable to a reader. Add comments if not. They should be robust to
+* Annotate conditions with comments on belief or reasoning, for example `Condition is guaranteed by
+  caller foo` or `Condition is likely to hold after processing through external library foo`.
+* Macro usage should be understandable to a reader. Add comments if not. They should be robust to
   future changes.
 * Note that there is a gray line between external environment failures and program invariant
   violations. For example, memory corruption due to a security issue (a bug, deliberate buffer
@@ -190,7 +198,14 @@ A few general notes on our error handling philosophy:
   the external environment (e.g. some library returning a highly unexpected error code or buffer
   contents). Unfortunately no rule can cleanly cover when to use `RELEASE_ASSERT` vs. `ASSERT`. In
   general we view `ASSERT` as the common case and `RELEASE_ASSERT` as the uncommon case, but
-  experience and judgment may dictate a particular approach depending on the situation.
+  experience and judgment may dictate a particular approach depending on the situation. The risk of
+  process death from `RELEASE_ASSERT` should be justified with the severity and possibility of the
+  condition to avoid unintentional crashes. You may use the following guide:
+      - If a violation is high risk (will cause a crash in subsequent data processing or indicates a
+        failure state beyond recovery), use `RELEASE_ASSERT`.
+      - If a violation is medium or low risk (Envoy can continue safely) and is not expensive,
+        consider `ENVOY_BUG`.
+      - Otherwise (if a condition is expensive or test-only), use `ASSERT`.
 
 Below is a guideline for macro usage. The left side of the table has invariants and the right side
 has error conditions that can be triggered and should be gracefully handled. `ENVOY_BUG` represents
