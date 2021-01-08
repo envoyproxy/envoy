@@ -39,8 +39,8 @@ envoy_cc_test_library(
     srcs = ["command_extension.cc"],
     hdrs = ["command_extension.h"],
     deps = [
-        "//source/common/protobuf:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
