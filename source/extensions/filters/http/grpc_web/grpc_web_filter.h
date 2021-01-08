@@ -60,6 +60,7 @@ private:
   bool isGrpcWebRequest(const Http::RequestHeaderMap& headers);
   bool hasGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const;
   bool needsResponseTransformation(Http::ResponseHeaderMap& headers, bool end_stream) const;
+  void setTransformedResponseHeaders(Buffer::Instance* data);
 
   static const uint8_t GRPC_WEB_TRAILER;
   const absl::flat_hash_set<std::string>& gRpcWebContentTypes() const;
