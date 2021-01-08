@@ -5,8 +5,8 @@ Version history
 ================
 Changes
 -------
-* tls: fix detection of the upstream connection close event.
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+* tls: fix detection of the upstream connection close event.
 
 1.14.6 (December 7, 2020)
 =========================
