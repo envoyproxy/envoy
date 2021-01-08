@@ -174,7 +174,7 @@ struct MainThread {
   bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
   static void init() { MainThreadSingleton::initialize(new MainThread()); }
   static void clear() {
-    free(MainThreadSingleton::getExisting());
+    delete MainThreadSingleton::getExisting();
     MainThreadSingleton::clear();
   }
   static bool isMainThread() { return MainThreadSingleton::get().inMainThread(); }
