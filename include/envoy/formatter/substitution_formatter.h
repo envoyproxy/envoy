@@ -93,6 +93,15 @@ public:
    * @param token the token to parse
    * @param pos current position in the entire format string
    * @param command_end_position position at the end of the command token
+   *
+   * Given the following format line using an extension called %CMD()%:
+   *
+   * %CMD()% %START_TIME(%Y/%m/%d)% ...
+   *
+   * The call to parse() for that extension would look like this:
+   *
+   *  parse("CMD()", 1, 5)
+   *
    * @return FormattterProviderPtr substitution provider for the parsed command
    */
   virtual FormatterProviderPtr parse(const std::string& token, size_t pos,
