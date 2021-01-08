@@ -39,6 +39,7 @@ TEST(MutationUtils, TestBuildHeaders) {
 
 TEST(MutationUtils, TestApplyMutations) {
   Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
       {":method", "GET"},
       {":path", "/foo/the/bar?size=123"},
       {"host", "localhost:1000"},
@@ -92,12 +93,16 @@ TEST(MutationUtils, TestApplyMutations) {
   s->mutable_header()->set_key(":method");
   s->mutable_header()->set_value("PATCH");
   s = mutation.add_set_headers();
+  s->mutable_header()->set_key(":scheme");
+  s->mutable_header()->set_value("http");
+  s = mutation.add_set_headers();
   s->mutable_header()->set_key("X-Envoy-StrangeThing");
   s->mutable_header()->set_value("Yes");
 
   MutationUtils::applyHeaderMutations(mutation, headers);
 
   Http::TestRequestHeaderMapImpl expected_headers{
+      {":scheme", "https"},
       {":method", "GET"},
       {":path", "/foo/the/bar?size=123"},
       {"host", "localhost:1000"},

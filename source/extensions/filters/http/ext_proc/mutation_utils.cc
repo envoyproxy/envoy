@@ -54,10 +54,12 @@ void MutationUtils::applyHeaderMutations(
 // We may re-enable some of these after further testing. This logic is specific
 // to the ext_proc filter so it is not shared with HeaderUtils.
 bool MutationUtils::isSettableHeader(absl::string_view key) {
-  return !absl::EqualsIgnoreCase(key, Headers::get().HostLegacy.get()) &&
-         !absl::EqualsIgnoreCase(key, Headers::get().Host.get()) &&
-         !absl::EqualsIgnoreCase(key, Headers::get().Method.get()) &&
-         !absl::StartsWithIgnoreCase(key, "x-envoy");
+  const auto& headers = Headers::get();
+  return !absl::EqualsIgnoreCase(key, headers.HostLegacy.get()) &&
+         !absl::EqualsIgnoreCase(key, headers.Host.get()) &&
+         !absl::EqualsIgnoreCase(key, headers.Method.get()) &&
+         !absl::EqualsIgnoreCase(key, headers.Scheme.get()) &&
+         !absl::StartsWithIgnoreCase(key, headers.prefix());
 }
 
 } // namespace ExternalProcessing

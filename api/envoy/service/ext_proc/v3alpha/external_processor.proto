@@ -290,7 +290,7 @@ message GrpcStatus {
 message HeaderMutation {
   // Add or replace HTTP headers. Attempts to set the value of
   // any "x-envoy" header, and attempts to set the ":method",
-  // ":authority", or "host" headers will be ignored.
+  // ":authority", ":scheme", or "host" headers will be ignored.
   repeated config.core.v3.HeaderValueOption set_headers = 1;
 
   // Remove these HTTP headers. Attempts to remove system headers --
