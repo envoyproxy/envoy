@@ -18,9 +18,9 @@ envoy_cc_library(
     deps = [
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:c_smart_ptr_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
-        "//source/common/common:c_smart_ptr_lib",
         "//source/common/protobuf",
     ],
 )
