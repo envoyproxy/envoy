@@ -80,7 +80,7 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:
     return std::make_unique<ExpressionDescriptor>(config, getOrCreateBuilder(), config.parsed());
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 }
 

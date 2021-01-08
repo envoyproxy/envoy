@@ -52,6 +52,20 @@ actions:
                           "Rate limit descriptor extension not found: .*");
 }
 
+TEST_F(RateLimitPolicyEntryTest, ExpressionUnset) {
+  const std::string yaml = R"EOF(
+actions:
+- extension:
+    name: custom_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+      descriptor_key: my_descriptor_name
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setupTest(yaml), EnvoyException,
+                          "Rate limit descriptor extension failed: .*");
+}
+
 #if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, ExpressionText) {
   const std::string yaml = R"EOF(

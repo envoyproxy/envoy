@@ -194,7 +194,14 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
           action.extension().typed_config(), validator, *factory);
-      actions_.emplace_back(factory->createDescriptorProducerFromProto(*message, validator));
+      RateLimit::DescriptorProducerPtr producer =
+          factory->createDescriptorProducerFromProto(*message, validator);
+      if (producer) {
+        actions_.emplace_back(std::move(producer));
+      } else {
+        throw EnvoyException(
+            absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
+      }
       break;
     }
     default:
