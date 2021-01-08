@@ -75,7 +75,7 @@ success_criteria:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(admission_control_filter_factory.createFilterFactoryFromProtoTyped(
                                 proto, "whatever", factory_context),
-                            EnvoyException, "Success Rate Threshold cannot be less than one.");
+                            EnvoyException, "Success rate threshold cannot be less than 1.0%.");
 }
 
 TEST_F(AdmissionControlConfigTest, SmallSuccessRateThreshold) {
@@ -102,7 +102,7 @@ success_criteria:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(admission_control_filter_factory.createFilterFactoryFromProtoTyped(
                                 proto, "whatever", factory_context),
-                            EnvoyException, "Success Rate Threshold cannot be less than one.");
+                            EnvoyException, "Success rate threshold cannot be less than 1.0%.");
 }
 
 // Verify the configuration when all fields are set.
