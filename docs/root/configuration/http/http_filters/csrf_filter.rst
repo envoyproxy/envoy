@@ -3,104 +3,80 @@
 CSRF
 ====
 
-This is a filter which prevents Cross-Site Request Forgery based on a route or virtual host settings.
-At it's simplest, CSRF is an attack that occurs when a malicious third-party
-exploits a vulnerability that allows them to submit an undesired request on the
-user's behalf.
+此过滤器可以用来防止基于路由或虚拟主机设置的跨站点请求伪造。简单来说，CSRF 是这样一种攻击方式：恶意的第三方利用漏洞，使得他们可以仿冒用户提交非正常的请求。
 
-A real-life example is cited in section 1 of `Robust Defenses for Cross-Site Request Forgery <https://seclab.stanford.edu/websec/csrf/csrf.pdf>`_:
+在章节 1 的 `对跨站点请求伪造的强大防御 <https://seclab.stanford.edu/websec/csrf/csrf.pdf>`_ 中有一个真实的例子：
 
-    "For example, in late 2007 [42], Gmail had a CSRF vulnerability. When a Gmail user visited
-    a malicious site, the malicious site could generate a request to Gmail that Gmail treated
-    as part of its ongoing session with the victim. In November 2007, a web attacker exploited
-    this CSRF vulnerability to inject an email filter into David Airey’s Gmail account [1]."
+    “例如，在 2007 年末[42]，Gmail 有一个 CSRF 漏洞。当 Gmail 用户访问恶意站点时，恶意站点能够为 Gmail 生成一个请求，
+    Gmail 将其视为与受害者进行持续会话的一部分。在 2007 年 11 月，一位网站攻击者利用此 CSRF 漏洞向 David Airey 的
+    Gmail 账号[1]中注入了电子邮箱过滤器。”
 
-There are many ways to mitigate CSRF, some of which have been outlined in the
-`OWASP Prevention Cheat Sheet <https://github.com/OWASP/CheatSheetSeries/blob/5a1044e38778b42a19c6adbb4dfef7a0fb071099/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.md>`_.
-This filter employs a stateless mitigation pattern known as origin verification.
+有很多种方法来减轻 CSRF 攻击，有一些已经在 `OWASP 预防备忘单 <https://github.com/OWASP/CheatSheetSeries/blob/5a1044e38778b42a19c6adbb4dfef7a0fb071099/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.md>`_ 罗列出来了。
+此过滤器采用了一种称之为来源验证的无状态减轻攻击模式。
 
-This pattern relies on two pieces of information used in determining if
-a request originated from the same host.
-* The origin that caused the user agent to issue the request (source origin).
-* The origin that the request is going to (target origin).
+此种模式依赖以下两条用于确定请求是否来自同一个主机的信息：
+* 导致用户代理发布请求的源（请求源）。
+* 请求将要发送到的源（目的源）。
 
-When the filter is evaluating a request, it ensures both pieces of information are present
-and compares their values. If the source origin is missing or the origins do not match
-the request is rejected. The exception to this being if the source origin has been
-added to the policy as valid. Because CSRF attacks specifically target state-changing
-requests, the filter only acts on HTTP requests that have a state-changing method
-(POST, PUT, etc.).
+当过滤器评估一个请求时，必须确保上述信息都是存在的，且要比较它们的值。如果请求源缺失或者来源不匹配，则请求被拒绝。例外的情况是，如果请求源被视为有效且已经被添加到了策略中。因为 CSRF 攻击专门针对状态改变的请求，因此过滤器仅对具有状态改变方法（POST、PUT 等）的 HTTP 请求起作用。
 
   .. note::
-    Due to differing functionality between browsers this filter will determine
-    a request's source origin from the Origin header. If that is not present it will
-    fall back to the host and port value from the requests Referer header.
+    由于各浏览器之间的功能不尽相同，此过滤器将通过信息头部来决定请求的来源，如果这些信息不存在，它将会返回请求头部引用中主机和端口的值。
 
 
-For more information on CSRF please refer to the pages below.
+关于 CSRF 的更多信息，可参与下面页内容。
 
 * https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29
 * https://seclab.stanford.edu/websec/csrf/csrf.pdf
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
 
   .. note::
 
-    This filter should be configured with the name *envoy.filters.http.csrf*.
+    此过滤器的名称应该配置为 *envoy.filters.http.csrf*。
 
 .. _csrf-configuration:
 
-Configuration
--------------
+配置
+-------
 
-The CSRF filter supports the ability to extend the source origins it will consider
-valid. The reason it is able to do this while still mitigating cross-site request
-forgery attempts is because the target origin has already been reached by the time
-front-envoy is applying the filter. This means that while endpoints may support
-cross-origin requests they are still protected from malicious third-parties who
-have not been allowlisted.
+CSRF 过滤器支持扩展能力，用来扩展它认为有效的请求源。它之所以能够做到这一点，且同时又能减轻了跨站点
+请求伪造的企图的原因，在于 front-envoy 应用过滤器时已经达到了目的源。这就意味着虽然端点可能支持跨源请求，
+但它们依旧受到保护，以避免那些不被允许的恶意的第三方的攻击。
 
-It's important to note that requests should generally originate from the same
-origin as the target but there are use cases where that may not be possible.
-For example, if you are hosting a static site on a third-party vendor but need
-to make requests for tracking purposes.
+需要注意的是，请求通常应该来自与目标相同的来源，但有些用例可能做到这一点。比如，你正在第三方供应商上托管了一个静态网站，但是又需要因追踪目的发出一些请求。
 
 .. warning::
 
-  Additional origins can be either an exact string, regex pattern, prefix string,
-  or suffix string. It's advised to be cautious when adding regex, prefix, or suffix
-  origins since an ambiguous origin can pose a security vulnerability.
+  其他的来源可以是精确的字符串、正则表达式、前缀字符串或者后缀字符串。当添加正则表达式、前缀或后缀来源时，
+  建议谨慎行事，因为不明确的来源可能会造成安全漏洞。
 
 .. _csrf-runtime:
 
-Runtime
--------
+运行时
+--------
 
-The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
-<envoy_v3_api_field_extensions.filters.http.csrf.v3.CsrfPolicy.filter_enabled>` field.
+可以通过 :ref:`filter_enabled
+<envoy_v3_api_field_extensions.filters.http.csrf.v3.CsrfPolicy.filter_enabled>` 字段中的 :ref:`runtime_key
+<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` 值来配置启用过滤器的请求占比。
 
-The fraction of requests for which the filter is enabled in shadow-only mode can be configured via
-the :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the
-:ref:`shadow_enabled <envoy_v3_api_field_extensions.filters.http.csrf.v3.CsrfPolicy.shadow_enabled>` field.
-When enabled in shadow-only mode, the filter will evaluate the request's *Origin* and *Destination*
-to determine if it's valid but will not enforce any policies.
+可以通过 :ref:`shadow_enabled <envoy_v3_api_field_extensions.filters.http.csrf.v3.CsrfPolicy.shadow_enabled>` 字段中的
+:ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` 值来配置仅在影子模式下启用过滤器的请求占比。仅当在影子模式下，过滤器将评估请求的 *Origin* 和 *Destination* 来决定它是否是有效的，但是不会强制执行任何策略。
 
 .. note::
 
-  If both ``filter_enabled`` and ``shadow_enabled`` are on, the ``filter_enabled``
-  flag will take precedence.
+  如果同时开启了 ``filter_enabled`` 和 ``shadow_enabled``，则 ``filter_enabled`` 标记位会优先起作用。
 
 .. _csrf-statistics:
 
-Statistics
-----------
+统计
+-----
 
-The CSRF filter outputs statistics in the <stat_prefix>.csrf.* namespace.
+CSRF 过滤器输出的统计信息在 <stat_prefix>.csrf.* 命名空间下。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  missing_source_origin, Counter, Number of requests that are missing a source origin header.
-  request_invalid, Counter, Number of requests whose source and target origins do not match.
-  request_valid, Counter, Number of requests whose source and target origins match.
+  missing_source_origin, Counter, 请求源头部缺失的请求总数。
+  request_invalid, Counter, 请求源和目的源不匹配的请求总数。
+  request_valid, Counter, 请求源和目的源匹配的请求总数。
