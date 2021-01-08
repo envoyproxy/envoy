@@ -121,12 +121,12 @@ public:
   /**
    * @return number of hosts per shard.
    */
-  virtual uint32_t shard_size() const PURE;
+  virtual uint32_t shardSize() const PURE;
 
   /**
    * @return cache capacity.
    */
-  virtual uint32_t cache_capacity() const PURE;
+  virtual uint32_t cacheCapacity() const PURE;
 };
 
 } // namespace Upstream

@@ -923,6 +923,5 @@ SubsetSelectorImpl::SubsetSelectorImpl(
     throw EnvoyException("fallback_keys_subset cannot be equal to keys");
   }
 }
-
 } // namespace Upstream
 } // namespace Envoy

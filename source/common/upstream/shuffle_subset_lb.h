@@ -61,7 +61,7 @@ private:
   // Represents a subset of an original PrioritySet.
   class PriorityShuffleSubsetImpl : public PrioritySetImpl {
   public:
-    PriorityShuffleSubsetImpl(const ShuffleSubsetLoadBalancer& subset_lb, std::vector<uint32_t> * set);//,
+    PriorityShuffleSubsetImpl(const ShuffleSubsetLoadBalancer& subset_lb, std::vector<uint32_t> * set);
 
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
@@ -87,21 +87,16 @@ private:
   private:
     const PrioritySet& original_priority_set_;
     const HostPredicate predicate_;
-  // private:
   };
 
-  // using HostSubsetImplPtr = std::shared_ptr<HostSubsetImpl>;
   using PriorityShuffleSubsetImplPtr = std::shared_ptr<PriorityShuffleSubsetImpl>;
 
   std::vector<uint32_t> * combo(uint32_t i, uint32_t n, uint32_t k);
 
-  void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
-
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
-  const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-      least_request_config_;
+  const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
   Stats::Scope& scope_;
@@ -118,7 +113,6 @@ private:
   quic::QuicLinkedHashMap<uint32_t, PriorityShuffleSubsetImplPtr> cache_;
   uint32_t num_hosts_;
   uint32_t num_indices_;
-  // PriorityShuffleSubsetImplPtr priority_subset_;
 
   friend class ShuffleSubsetLoadBalancerDescribeMetadataTester;
 };

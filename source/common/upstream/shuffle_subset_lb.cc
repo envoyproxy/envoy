@@ -34,7 +34,7 @@ ShuffleSubsetLoadBalancer::ShuffleSubsetLoadBalancer(
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       lb_maglev_config_(lb_maglev_config), least_request_config_(least_request_config),
       common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
-      random_(random), shard_size_(shuffle.shard_size()), cache_capacity_(shuffle.cache_capacity()), original_priority_set_(priority_set),
+      random_(random), shard_size_(shuffle.shardSize()), cache_capacity_(shuffle.cacheCapacity()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set)
    {
   ENVOY_LOG(info, "### ShuffleSubsetLoadBalancer::ShuffleSubsetLoadBalancer");
@@ -50,17 +50,12 @@ ShuffleSubsetLoadBalancer::ShuffleSubsetLoadBalancer(
           }
         } else {
           ENVOY_LOG(info, "### priority-update - DONT");
-          const auto& host_sets = original_priority_set_.hostSetsPerPriority();
-          update(priority, host_sets[priority]->hosts(), {});
+          const auto& hosts = original_priority_set_.hostSetsPerPriority()[priority]->hosts();
+          for (const auto &entry : cache_) {
+            entry.second->update(priority, hosts, {});
+          }
         }
       });
-}
-
-void ShuffleSubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
-  ENVOY_LOG(info, "### ShuffleSubsetLoadBalancer::update");
-  for (const auto &entry : cache_) {
-    entry.second->update(priority, hosts_added, hosts_removed);
-  }
 }
 
 ShuffleSubsetLoadBalancer::~ShuffleSubsetLoadBalancer() {
@@ -68,7 +63,6 @@ ShuffleSubsetLoadBalancer::~ShuffleSubsetLoadBalancer() {
 }
 
 std::vector<uint32_t> * ShuffleSubsetLoadBalancer::combo(uint32_t i, uint32_t n, uint32_t k) {
-    // https://stackoverflow.com/questions/1776442/nth-combination
     // This returns a list of elements for a given combinatoric index
     // e.g. combo(1, 3, 2) = [0, 2]
     ENVOY_LOG(info, "### ShuffleSubsetLoadBalancer::combo " + std::to_string(i) + " " + std::to_string(n) + " " + std::to_string(k) + " " );
@@ -359,7 +353,6 @@ void ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::updateSubset(uint32_t
 
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
-
 
 } // namespace Upstream
 } // namespace Envoy

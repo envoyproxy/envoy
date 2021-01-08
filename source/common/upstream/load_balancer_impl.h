@@ -666,11 +666,11 @@ public:
 
   bool isEnabled() const override { return shard_size_ > 0; }
 
-  uint32_t shard_size() const override {
+  uint32_t shardSize() const override {
     return shard_size_;
   }
 
-  uint32_t cache_capacity() const override {
+  uint32_t cacheCapacity() const override {
     return cache_capacity_;
   }
 

@@ -49,6 +49,15 @@ public:
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };
 
+class MockLoadBalancerShuffleSubsetInfo : public LoadBalancerShuffleSubsetInfo {
+public:
+  MockLoadBalancerShuffleSubsetInfo();
+  ~MockLoadBalancerShuffleSubsetInfo() override;
+
+  MOCK_METHOD(bool, isEnabled, (), (const));
+  MOCK_METHOD(uint32_t, shard_size, (), (const));
+  MOCK_METHOD(uint32_t, cache_capacity, (), (const));
+};
 // While this mock class doesn't have any direct use in public Envoy tests, it's
 // useful for constructing tests of downstream private filters that use
 // ClusterTypedMetadata.
@@ -130,6 +139,7 @@ public:
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
+  MOCK_METHOD(const LoadBalancerShuffleSubsetInfo&, lbShuffleSubsetInfo, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
@@ -179,6 +189,7 @@ public:
       envoy::config::cluster::v3::Cluster::STRICT_DNS};
   absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
+  NiceMock<MockLoadBalancerShuffleSubsetInfo> lb_shuffle_subset_;
   absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
