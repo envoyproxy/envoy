@@ -391,7 +391,7 @@ SubstitutionFormatParser::parse(const std::string& format,
     const std::string match = m.str(0);
     const std::string token = match.substr(1, match.length() - 2);
     pos += 1;
-    const int command_end_position = pos + token.length();
+    const size_t command_end_position = pos + token.length();
 
     auto formatter = parseBuiltinCommand(token);
     if (formatter) {

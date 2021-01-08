@@ -21,7 +21,7 @@ ProtobufWkt::Value TestFormatter::formatValue(const Http::RequestHeaderMap&,
   return ValueUtil::stringValue("");
 }
 
-FormatterProviderPtr TestCommandParser::parse(const std::string& token, size_t, int) const {
+FormatterProviderPtr TestCommandParser::parse(const std::string& token, size_t, size_t) const {
   if (absl::StartsWith(token, "COMMAND_EXTENSION")) {
     return std::make_unique<TestFormatter>();
   }
