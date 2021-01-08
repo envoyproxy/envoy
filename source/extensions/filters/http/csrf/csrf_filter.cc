@@ -36,7 +36,7 @@ absl::string_view hostAndPort(const Http::HeaderEntry* header) {
   Http::Utility::Url absolute_url;
   if (header != nullptr && !header->value().empty()) {
     if (absolute_url.initialize(header->value().getStringView(), false)) {
-      return absolute_url.host_and_port();
+      return absolute_url.hostAndPort();
     }
     return header->value().getStringView();
   }

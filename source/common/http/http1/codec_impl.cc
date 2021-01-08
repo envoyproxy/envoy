@@ -779,9 +779,9 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   // request-target. A proxy that forwards such a request MUST generate a
   // new Host field-value based on the received request-target rather than
   // forward the received Host field-value.
-  headers.setHost(absolute_url.host_and_port());
+  headers.setHost(absolute_url.hostAndPort());
 
-  headers.setPath(absolute_url.path_and_query_params());
+  headers.setPath(absolute_url.pathAndQueryParams());
   active_request.request_url_.clear();
 }
 

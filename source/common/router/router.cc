@@ -105,8 +105,8 @@ bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream
 
   // Replace the original host, scheme and path.
   downstream_headers.setScheme(absolute_url.scheme());
-  downstream_headers.setHost(absolute_url.host_and_port());
-  downstream_headers.setPath(absolute_url.path_and_query_params());
+  downstream_headers.setHost(absolute_url.hostAndPort());
+  downstream_headers.setPath(absolute_url.pathAndQueryParams());
 
   return true;
 }

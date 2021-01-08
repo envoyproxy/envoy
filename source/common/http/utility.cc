@@ -240,9 +240,9 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with. Determine if there's a non-zero path, and if so determine
   // the length of the path, query params etc.
-  uint64_t path_etc_len = absolute_url.length() - (authority_beginning + host_and_port().length());
+  uint64_t path_etc_len = absolute_url.length() - (authority_beginning + hostAndPort().length());
   if (path_etc_len > 0) {
-    uint64_t path_beginning = authority_beginning + host_and_port().length();
+    uint64_t path_beginning = authority_beginning + hostAndPort().length();
     path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_etc_len);
   } else if (!is_connect) {
     ASSERT((u.field_set & (1 << UF_PATH)) == 0);

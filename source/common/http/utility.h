@@ -103,8 +103,8 @@ class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect);
   absl::string_view scheme() { return scheme_; }
-  absl::string_view host_and_port() { return host_and_port_; }
-  absl::string_view path_and_query_params() { return path_and_query_params_; }
+  absl::string_view hostAndPort() { return host_and_port_; }
+  absl::string_view pathAndQueryParams() { return path_and_query_params_; }
 
 private:
   absl::string_view scheme_;
