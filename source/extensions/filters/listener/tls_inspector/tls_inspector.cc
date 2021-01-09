@@ -211,9 +211,10 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
   // This should never succeed because an error is always returned from the SNI callback.
   ASSERT(ret <= 0);
   int err = SSL_get_error(ssl_.get(), ret);
+#ifndef BORINGSSL_FIPS
   ENVOY_LOG(trace, "tls inspector error while client hello parsing: {}",
             SSL_error_description(err));
-
+#endif
   switch (err) {
   case SSL_ERROR_WANT_READ:
     if (read_ == config_->maxClientHelloSize()) {

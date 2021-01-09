@@ -137,8 +137,10 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
       if (result.error_.has_value()) {
         keep_reading = false;
         int err = SSL_get_error(rawSsl(), result.error_.value());
+#ifndef BORINGSSL_FIPS
         ENVOY_CONN_LOG(trace, "ssl error occurred while read: {}", callbacks_->connection(),
                        SSL_error_description(err));
+#endif
         switch (err) {
         case SSL_ERROR_WANT_READ:
           break;
@@ -265,8 +267,10 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
     } else {
       int err = SSL_get_error(rawSsl(), rc);
+#ifndef BORINGSSL_FIPS
       ENVOY_CONN_LOG(trace, "ssl error occurred while write: {}", callbacks_->connection(),
                      SSL_error_description(err));
+#endif
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
