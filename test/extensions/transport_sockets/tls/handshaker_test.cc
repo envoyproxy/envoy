@@ -153,10 +153,10 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   BIO* bio = BIO_new(BIO_s_socket());
   SSL_set_bio(client_ssl_.get(), bio, bio);
 
-  StrictMock<MockHandshakeCallbacks> handshake_callbacks;
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
   NiceMock<Network::MockConnection> mock_connection;
 
-  EXPECT_CALL(handshake_callbacks, connection).WillOnce(ReturnRef(mock_connection));
+  ON_CALL(handshake_callbacks, connection).WillByDefault(ReturnRef(mock_connection));
   EXPECT_CALL(handshake_callbacks, onFailure);
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
