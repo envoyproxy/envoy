@@ -647,6 +647,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
 testing::AssertionResult
 FakeUpstream::waitForAndConsumeDisconnectedConnection(std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
+  ENVOY_LOG_MISC(critical, "waitForAndConsumeDisconnectedConnection");
   const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return !new_connections_.empty();
   };

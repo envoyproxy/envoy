@@ -291,6 +291,7 @@ public:
                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     absl::MutexLock lock(&lock_);
     if (!time_system.waitFor(lock_, absl::Condition(&disconnected_), timeout)) {
+      ENVOY_LOG_MISC(critical, "timeout");
       return AssertionFailure() << "Timed out waiting for disconnect";
     }
     return AssertionSuccess();
