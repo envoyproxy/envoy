@@ -89,6 +89,13 @@ SystemTime getExpirationTime(const X509& cert);
  */
 absl::optional<std::string> getLastCryptoError();
 
+/**
+ * Returns error string corresponding error code derived from OpenSSL.
+ * @param err error code
+ * @return string message corresponding error code.
+ */
+std::string getErrorDescription(int err);
+
 } // namespace Utility
 } // namespace Tls
 } // namespace TransportSockets

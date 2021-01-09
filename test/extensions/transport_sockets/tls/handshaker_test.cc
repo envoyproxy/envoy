@@ -154,6 +154,9 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   SSL_set_bio(client_ssl_.get(), bio, bio);
 
   StrictMock<MockHandshakeCallbacks> handshake_callbacks;
+  NiceMock<Network::MockConnection> mock_connection;
+
+  EXPECT_CALL(handshake_callbacks, connection).WillOnce(ReturnRef(mock_connection));
   EXPECT_CALL(handshake_callbacks, onFailure);
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);

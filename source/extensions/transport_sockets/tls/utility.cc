@@ -1,6 +1,7 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/network/address_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -212,6 +213,49 @@ absl::optional<std::string> Utility::getLastCryptoError() {
   }
 
   return absl::nullopt;
+}
+
+std::string Utility::getErrorDescription(int err) {
+  switch (err) {
+  case SSL_ERROR_NONE:
+    return "NONE";
+  case SSL_ERROR_SSL:
+    return "SSL";
+  case SSL_ERROR_WANT_READ:
+    return "WANT_READ";
+  case SSL_ERROR_WANT_WRITE:
+    return "WANT_WRITE";
+  case SSL_ERROR_WANT_X509_LOOKUP:
+    return "WANT_X509_LOOKUP";
+  case SSL_ERROR_SYSCALL:
+    return "SYSCALL";
+  case SSL_ERROR_ZERO_RETURN:
+    return "ZERO_RETURN";
+  case SSL_ERROR_WANT_CONNECT:
+    return "WANT_CONNECT";
+  case SSL_ERROR_WANT_ACCEPT:
+    return "WANT_ACCEPT";
+  case SSL_ERROR_WANT_CHANNEL_ID_LOOKUP:
+    return "WANT_CHANNEL_ID_LOOKUP";
+  case SSL_ERROR_PENDING_SESSION:
+    return "PENDING_SESSION";
+  case SSL_ERROR_PENDING_CERTIFICATE:
+    return "PENDING_CERTIFICATE";
+  case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+    return "WANT_PRIVATE_KEY_OPERATION";
+  case SSL_ERROR_PENDING_TICKET:
+    return "PENDING_TICKET";
+  case SSL_ERROR_EARLY_DATA_REJECTED:
+    return "EARLY_DATA_REJECTED";
+  case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
+    return "WANT_CERTIFICATE_VERIFY";
+  case SSL_ERROR_HANDOFF:
+    return "HANDOFF";
+  case SSL_ERROR_HANDBACK:
+    return "HANDBACK";
+  default:
+    return EMPTY_STRING;
+  }
 }
 
 } // namespace Tls
