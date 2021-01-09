@@ -45,7 +45,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/common/redis:96.2"
 "source/extensions/filters/network/dubbo_proxy:96.1"
 "source/extensions/filters/network/dubbo_proxy/router:95.1"
-"source/extensions/filters/network/mongo_proxy:94.1"
+"source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/sni_cluster:90.3"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:90.9"
 "source/extensions/health_checkers:95.9"
