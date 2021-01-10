@@ -1645,10 +1645,13 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"));
-  // The response will be rejected because chunked headers are not allowed with CONNECT upgrades.
-  // Envoy will send a local reply due to the invalid upstream response.
-  tcp_client->waitForDisconnect(false);
-  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 503 Service Unavailable\r\n"));
+  tcp_client->waitForData("\r\n\r\n", false);
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n")) << tcp_client->data();
+  // Make sure the following payload is proxied without chunks or any other modifications.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\npayload"), &data));
+
+  tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
