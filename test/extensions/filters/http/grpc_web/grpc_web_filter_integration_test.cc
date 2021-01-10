@@ -38,7 +38,7 @@ public:
   }
 
   void testBadUpstreamResponse(const std::string& start, const std::string& end,
-                               const std::string& expected) {
+                               const std::string& expected, bool remove_content_type = false) {
     const auto downstream_protocol = std::get<1>(GetParam());
     const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
     const ContentType& content_type = std::get<3>(GetParam());
@@ -72,7 +72,12 @@ public:
     codec_client_->sendTrailers(*request_encoder_, request_trailers);
     waitForNextUpstreamRequest();
     // Sending back non gRPC-Web response.
-    default_response_headers_.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+    if (remove_content_type) {
+      default_response_headers_.removeContentType();
+    } else {
+      default_response_headers_.setReferenceContentType(
+          Http::Headers::get().ContentTypeValues.Json);
+    }
     upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
     upstream_request_->encodeData(start, /*end_stream=*/false);
     upstream_request_->encodeData(end, /*end_stream=*/true);
@@ -230,10 +235,22 @@ TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponse) {
                           /*expected=*/"{\"percentage\": \"100%25\"}");
 }
 
-TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLarge) {
+TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseWithoutContentType) {
+  testBadUpstreamResponse("{", "\"percentage\": \"100%\"}",
+                          /*expected=*/"{\"percentage\": \"100%25\"}",
+                          /*remove_content_type=*/true);
+}
+
+TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLargeEnd) {
   const std::string start(1024, 'a');
   const std::string end(1024, 'b');
   testBadUpstreamResponse(start, end, /*expected=*/start);
+}
+
+TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLargeFirst) {
+  const std::string start(2048, 'a');
+  const std::string end(1024, 'b');
+  testBadUpstreamResponse(start, end, /*expected=*/start.substr(0, 1024));
 }
 
 } // namespace
