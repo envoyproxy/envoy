@@ -1,7 +1,7 @@
 .. _operations:
 
-Operations and administration
-=============================
+操作和管理
+============
 
 .. toctree::
   :maxdepth: 2
