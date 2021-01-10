@@ -216,6 +216,47 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
   const std::string expected_grpc_message =
       absl::StrCat("hellohello", data.toString()).substr(0, 1024);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
+  EXPECT_EQ(1024, response_headers.get_(Http::Headers::get().GrpcMessage).length());
+  EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
+}
+
+TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeEncodingBuffer) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText}, {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data;
+  TestUtility::feedBufferWithRandomCharacters(data, 2048);
+  // The buffered length is limited to 1024.
+  const std::string expected_grpc_message = data.toString().substr(1024);
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl(expected_grpc_message));
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(buffer.get()));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
+  EXPECT_EQ(1024, response_headers.get_(Http::Headers::get().GrpcMessage).length());
+  EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
+}
+
+TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeLastData) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText}, {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl data;
+  TestUtility::feedBufferWithRandomCharacters(data, 2048);
+  // The buffered length is limited to 1024.
+  const std::string expected_grpc_message = data.toString().substr(1024);
+  Buffer::InstancePtr buffer(new Buffer::OwnedImpl(expected_grpc_message));
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(buffer.get()));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
+  EXPECT_EQ(1024, response_headers.get_(Http::Headers::get().GrpcMessage).length());
   EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
 }
 

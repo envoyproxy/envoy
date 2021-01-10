@@ -26,20 +26,25 @@ constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 1024;
 
 std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance* last) {
   Buffer::OwnedImpl buffer;
-  if (buffered) {
+  if (buffered != nullptr) {
+    ASSERT(buffered->length() <= MAX_GRPC_MESSAGE_LENGTH);
     buffer.add(*buffered);
   }
 
-  if (last) {
-    if (buffer.length() < MAX_GRPC_MESSAGE_LENGTH) {
-      buffer.add(*last);
+  if (last != nullptr) {
+    uint64_t needed = last->length();
+    if ((buffer.length() + needed) >= MAX_GRPC_MESSAGE_LENGTH) {
+      needed = std::min(needed, MAX_GRPC_MESSAGE_LENGTH - buffer.length());
     }
+    buffer.move(*last, needed);
     last->drain(last->length());
   }
 
-  uint64_t length = std::min(buffer.length(), MAX_GRPC_MESSAGE_LENGTH);
-  std::string message(length, 0);
-  buffer.copyOut(0, length, message.data());
+  ASSERT(buffer.length() <= MAX_GRPC_MESSAGE_LENGTH);
+
+  const uint64_t message_length = buffer.length();
+  std::string message(message_length, 0);
+  buffer.copyOut(0, message_length, message.data());
 
   return Http::Utility::PercentEncoding::encode(message);
 }
@@ -103,11 +108,21 @@ bool GrpcWebFilter::needsResponseTransformation(Http::ResponseHeaderMap& headers
 
 void GrpcWebFilter::setTransformedResponseHeaders(Buffer::Instance* data) {
   const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
+
+  if (encoding_buffer != nullptr && encoding_buffer->length() > MAX_GRPC_MESSAGE_LENGTH) {
+    encoder_callbacks_->modifyEncodingBuffer([](Buffer::Instance& buffered) {
+      Buffer::OwnedImpl needed_buffer;
+      needed_buffer.move(buffered, MAX_GRPC_MESSAGE_LENGTH);
+      buffered.drain(buffered.length());
+      buffered.move(needed_buffer);
+    });
+  }
+
   const auto message = buildGrpcMessage(encoding_buffer, data);
 
   if (encoding_buffer != nullptr) {
     encoder_callbacks_->modifyEncodingBuffer(
-        [](Buffer::Instance& buffer) { buffer.drain(buffer.length()); });
+        [](Buffer::Instance& buffered) { buffered.drain(buffered.length()); });
   }
 
   response_headers_->setGrpcStatus(Grpc::Utility::httpToGrpcStatus(
@@ -240,17 +255,16 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   // not a gRPC request which makes the local reply's is_grpc_request set to false) is not a gRPC
   // response, we set the "grpc-message" header with the upstream body content.
   if (needs_response_transformation_) {
-    auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
+    const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
     if (!end_stream) {
-      if (encoding_buffer == nullptr || encoding_buffer->length() < MAX_GRPC_MESSAGE_LENGTH) {
-        return Http::FilterDataStatus::StopIterationAndBuffer;
+      if (encoding_buffer != nullptr && encoding_buffer->length() >= MAX_GRPC_MESSAGE_LENGTH) {
+        return Http::FilterDataStatus::StopIterationNoBuffer;
       }
-      return Http::FilterDataStatus::StopIterationNoBuffer;
+      return Http::FilterDataStatus::StopIterationAndBuffer;
     }
 
     ASSERT(response_headers_ != nullptr);
     needs_response_transformation_ = false;
-
     setTransformedResponseHeaders(&data);
     return Http::FilterDataStatus::Continue;
   }

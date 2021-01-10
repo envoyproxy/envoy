@@ -37,6 +37,55 @@ public:
         http2_skip_encoding_empty_trailers ? "true" : "false");
   }
 
+  void testBadUpstreamResponse(const std::string& start, const std::string& end,
+                               const std::string& expected) {
+    const auto downstream_protocol = std::get<1>(GetParam());
+    const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
+    const ContentType& content_type = std::get<3>(GetParam());
+    const Accept& accept = std::get<4>(GetParam());
+
+    if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
+      config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    } else {
+      skipEncodingEmptyTrailers(http2_skip_encoding_empty_trailers);
+    }
+
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+
+    Http::TestRequestTrailerMapImpl request_trailers{{"request1", "trailer1"},
+                                                     {"request2", "trailer2"}};
+    Http::TestResponseTrailerMapImpl response_trailers{{"response1", "trailer1"},
+                                                       {"response2", "trailer2"}};
+
+    initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto encoder_decoder =
+        codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {"content-type", content_type},
+                                                                   {"accept", accept},
+                                                                   {":authority", "host"}});
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendData(*request_encoder_, 1, false);
+    codec_client_->sendTrailers(*request_encoder_, request_trailers);
+    waitForNextUpstreamRequest();
+    // Sending back non gRPC-Web response.
+    default_response_headers_.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+    upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
+    upstream_request_->encodeData(start, /*end_stream=*/false);
+    upstream_request_->encodeData(end, /*end_stream=*/true);
+    response->waitForEndStream();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ(expected, response->headers().getGrpcMessageValue());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(absl::StrCat(accept, "+proto"), response->headers().getContentTypeValue());
+    EXPECT_EQ(0U, response->body().length());
+    codec_client_->close();
+  }
+
   static std::string testParamsToString(const testing::TestParamInfo<TestParams> params) {
     return fmt::format(
         "{}_{}_{}_{}_{}",
@@ -177,52 +226,14 @@ TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
 }
 
 TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponse) {
-  const auto downstream_protocol = std::get<1>(GetParam());
-  const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
-  const ContentType& content_type = std::get<3>(GetParam());
-  const Accept& accept = std::get<4>(GetParam());
+  testBadUpstreamResponse("{", "\"percentage\": \"100%\"}",
+                          /*expected=*/"{\"percentage\": \"100%25\"}");
+}
 
-  if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
-    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
-  } else {
-    skipEncodingEmptyTrailers(http2_skip_encoding_empty_trailers);
-  }
-
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-
-  Http::TestRequestTrailerMapImpl request_trailers{{"request1", "trailer1"},
-                                                   {"request2", "trailer2"}};
-  Http::TestResponseTrailerMapImpl response_trailers{{"response1", "trailer1"},
-                                                     {"response2", "trailer2"}};
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {"content-type", content_type},
-                                                                 {"accept", accept},
-                                                                 {":authority", "host"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(*request_encoder_, 1, false);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
-  waitForNextUpstreamRequest();
-  // Sending back non gRPC-Web response.
-  default_response_headers_.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
-  upstream_request_->encodeData("{", /*end_stream=*/false);
-  const std::string message = "\"percentage\": \"100%\"}";
-  upstream_request_->encodeData(message, /*end_stream=*/true);
-  response->waitForEndStream();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("{\"percentage\": \"100%25\"}", response->headers().getGrpcMessageValue());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(absl::StrCat(accept, "+proto"), response->headers().getContentTypeValue());
-  EXPECT_EQ(0U, response->body().length());
-  codec_client_->close();
+TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLarge) {
+  const std::string start(1024, 'a');
+  const std::string end(1024, 'b');
+  testBadUpstreamResponse(start, end, /*expected=*/start);
 }
 
 } // namespace
