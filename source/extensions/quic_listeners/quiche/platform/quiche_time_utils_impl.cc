@@ -9,7 +9,7 @@
 namespace quiche {
 
 namespace {
-QuicheOptional<int64_t> quicheUtcDateTimeToUnixSecondsInner(int year, int month, int day, int hour,
+absl::optional<int64_t> quicheUtcDateTimeToUnixSecondsInner(int year, int month, int day, int hour,
                                                             int minute, int second) {
   const absl::CivilSecond civil_time(year, month, day, hour, minute, second);
   if (second != 60 && (civil_time.year() != year || civil_time.month() != month ||
@@ -24,7 +24,7 @@ QuicheOptional<int64_t> quicheUtcDateTimeToUnixSecondsInner(int year, int month,
 } // namespace
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-QuicheOptional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
+absl::optional<int64_t> QuicheUtcDateTimeToUnixSecondsImpl(int year, int month, int day, int hour,
                                                            int minute, int second) {
   // Handle leap seconds without letting any other irregularities happen.
   if (second == 60) {

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # For this test we use a slightly modiified test binary, based on
-# source/exe/enovy-static. If this starts failing to run or build, ensure that
+# source/exe/envoy-static. If this starts failing to run or build, ensure that
 # source/exe/main.cc and ./hotrestart_main.cc have not diverged except for
 # adding the new gauge.
 export ENVOY_BIN="${TEST_SRCDIR}"/envoy/test/integration/hotrestart_main
@@ -78,18 +78,18 @@ echo "Hot restart test using dynamic base id"
 
 TEST_INDEX=0
 function run_testsuite() {
-  local BASE_ID BASE_ID_PATH HOT_RESTART_JSON="$1" FAKE_SYMBOL_TABLE="$2"
+  local BASE_ID BASE_ID_PATH HOT_RESTART_JSON="$1"
   local SOCKET_PATH=@envoy_domain_socket
   local SOCKET_MODE=0
-  if [ -n "$3" ] &&  [ -n "$4" ]
+  if [ -n "$2" ] &&  [ -n "$3" ]
   then
-     SOCKET_PATH="$3"
-     SOCKET_MODE="$4"
+     SOCKET_PATH="$2"
+     SOCKET_MODE="$3"
   fi
 
   start_test validation
   check "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" --mode validate --service-cluster cluster \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --service-node node --disable-hot-restart
+      --service-node node --disable-hot-restart
 
   BASE_ID_PATH=$(mktemp 'envoy_test_base_id.XXXXXX')
   echo "Selected dynamic base id path ${BASE_ID_PATH}"
@@ -101,8 +101,7 @@ function run_testsuite() {
   ADMIN_ADDRESS_PATH_0="${TEST_TMPDIR}"/admin.0."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0  --use-dynamic-base-id --base-id-path "${BASE_ID_PATH}" \
-      --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_0}" \
+      --service-cluster cluster --service-node node --admin-address-path "${ADMIN_ADDRESS_PATH_0}" \
       --socket-path "${SOCKET_PATH}" --socket-mode "${SOCKET_MODE}"
 
   BASE_ID=$(cat "${BASE_ID_PATH}")
@@ -140,22 +139,13 @@ function run_testsuite() {
   echo "The Envoy's hot restart version is ${CLI_HOT_RESTART_VERSION}"
   echo "Now checking that the above version is what we expected."
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
-
-  start_test "Checking for consistency of /hot_restart_version with --use-fake-symbol-table ${FAKE_SYMBOL_TABLE}"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
-    --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" 2>&1)
-  CLI_HOT_RESTART_VERSION=$(strip_fake_symbol_table_warning "$CLI_HOT_RESTART_VERSION" "$FAKE_SYMBOL_TABLE")
-  EXPECTED_CLI_HOT_RESTART_VERSION="11.${SHARED_MEMORY_SIZE}"
-  check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
-
+ 
   start_test "Checking for match of --hot-restart-version and admin /hot_restart_version"
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
   echo "fetching hot restart version from http://${ADMIN_ADDRESS_0}/hot_restart_version ..."
   ADMIN_HOT_RESTART_VERSION=$(curl -sg "http://${ADMIN_ADDRESS_0}/hot_restart_version")
   echo "Fetched ADMIN_HOT_RESTART_VERSION is ${ADMIN_HOT_RESTART_VERSION}"
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
-    --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" 2>&1)
-  CLI_HOT_RESTART_VERSION=$(strip_fake_symbol_table_warning "$CLI_HOT_RESTART_VERSION" "$FAKE_SYMBOL_TABLE")
+  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
   start_test "Checking server.hot_restart_generation 1"
@@ -175,7 +165,7 @@ function run_testsuite() {
   ADMIN_ADDRESS_PATH_1="${TEST_TMPDIR}"/admin.1."${TEST_INDEX}".address
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 1 --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_1}" \
+      --admin-address-path "${ADMIN_ADDRESS_PATH_1}" \
       --socket-path "${SOCKET_PATH}" --socket-mode "${SOCKET_MODE}"
 
   SERVER_1_PID=$BACKGROUND_PID
@@ -216,7 +206,7 @@ function run_testsuite() {
   start_test "Starting epoch 2"
   run_in_background_saving_pid "${ENVOY_BIN}" -c "${UPDATED_HOT_RESTART_JSON}" \
       --restart-epoch 2  --base-id "${BASE_ID}" --service-cluster cluster --service-node node \
-      --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" --admin-address-path "${ADMIN_ADDRESS_PATH_2}" \
+      --admin-address-path "${ADMIN_ADDRESS_PATH_2}" \
       --parent-shutdown-time-s 3 \
       --socket-path "${SOCKET_PATH}" --socket-mode "${SOCKET_MODE}"
 
@@ -267,37 +257,14 @@ function run_testsuite() {
   wait "${SERVER_2_PID}"
 }
 
-# TODO(#13399): remove this helper function and the references to it, as long as
-# the references to $FAKE_SYMBOL_TABLE.
-function strip_fake_symbol_table_warning() {
-  local INPUT="$1"
-  local FAKE_SYMBOL_TABLE="$2"
-  if [ "$FAKE_SYMBOL_TABLE" = "1" ]; then
-    echo "$INPUT" | grep -v "Fake symbol tables have been removed"
-  else
-    echo "$INPUT"
-  fi
-}
-
 # Hotrestart in abstract namespace
 for HOT_RESTART_JSON in "${JSON_TEST_ARRAY[@]}"
 do
-  # Run one of the tests with real symbol tables. No need to do all of them.
-  if [ "$TEST_INDEX" = "0" ]; then
-    run_testsuite "$HOT_RESTART_JSON" "0" || exit 1
-  fi
-
-  run_testsuite "$HOT_RESTART_JSON" "1" || exit 1
+  run_testsuite "$HOT_RESTART_JSON" || exit 1
 done
 
 # Hotrestart in specified UDS
-# Real symbol tables are the default, so I had run just one with fake symbol tables
-# (Switch the "0" and "1" in the second arg in the two run_testsuite calls below).
-if [ "$TEST_INDEX" = "0" ]; then
-  run_testsuite "${HOT_RESTART_JSON_V4}" "0" "${SOCKET_DIR}/envoy_domain_socket" "600" || exit 1
-fi
-
-run_testsuite "${HOT_RESTART_JSON_V4}" "1" "${SOCKET_DIR}/envoy_domain_socket" "600" || exit 1
+run_testsuite "${HOT_RESTART_JSON_V4}" "${SOCKET_DIR}/envoy_domain_socket" "600" || exit 1
 
 start_test "disabling hot_restart by command line."
 CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)
@@ -308,8 +275,7 @@ start_test socket-mode for socket path
 run_in_background_saving_pid "${ENVOY_BIN}" -c "${HOT_RESTART_JSON}" \
       --restart-epoch 0  --base-id 0 --base-id-path "${BASE_ID_PATH}" \
       --socket-path "${SOCKET_DIR}"/envoy_domain_socket --socket-mode 644 \
-      --service-cluster cluster --service-node node --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" \
-      --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
+      --service-cluster cluster --service-node node --admin-address-path "${ADMIN_ADDRESS_PATH_0}"
 sleep 3
 EXPECTED_SOCKET_MODE=$(stat -c '%a' "${SOCKET_DIR}"/envoy_domain_socket_parent_0)
 check [ "644" = "${EXPECTED_SOCKET_MODE}" ]

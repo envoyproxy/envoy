@@ -124,8 +124,9 @@ follow:
 
 .. code-block:: yaml
 
-  per_filter_config:
+  typed_per_filter_config:
     envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       disabled: true
 
 We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
@@ -133,8 +134,9 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
 
 .. code-block:: yaml
 
-  per_filter_config:
+  typed_per_filter_config:
     envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       name: hello.lua
 
 .. attention::
@@ -148,8 +150,9 @@ Lua script as follows:
 
 .. code-block:: yaml
 
-  per_filter_config:
+  typed_per_filter_config:
     envoy.filters.http.lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       source_code:
         inline_string: |
           function envoy_on_response(response_handle)
@@ -324,12 +327,16 @@ body()
 
 .. code-block:: lua
 
-  local body = handle:body()
+  local body = handle:body(always_wrap_body)
 
 Returns the stream's body. This call will cause Envoy to suspend execution of the script until
 the entire body has been received in a buffer. Note that all buffering must adhere to the
 flow-control policies in place. Envoy will not buffer more data than is allowed by the connection
 manager.
+
+An optional boolean argument `always_wrap_body` can be used to require Envoy always returns a
+`body` object even if the body is empty. Therefore we can modify the body regardless of whether the
+original body exists or not.
 
 Returns a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
 
@@ -642,6 +649,26 @@ protocol()
 
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
+
+downstreamLocalAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamLocalAddress()
+
+Returns the string representation of :repo:`downstream remote address <include/envoy/stream_info/stream_info.h>`
+used by the current request.
+
+downstreamDirectRemoteAddress()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamDirectRemoteAddress()
+
+Returns the string representation of :repo:`downstream directly connected address <include/envoy/stream_info/stream_info.h>`
+used by the current request. This is equivalent to the address of the physical connection.
 
 dynamicMetadata()
 ^^^^^^^^^^^^^^^^^

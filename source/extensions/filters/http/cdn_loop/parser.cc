@@ -118,7 +118,7 @@ StatusOr<ParseContext> parseQuotedString(const ParseContext& input) {
       continue;
     } else if (context.peek() == '\\') {
       if (StatusOr<ParseContext> quoted_pair_context = parseQuotedPair(context);
-          !quoted_pair_context) {
+          !quoted_pair_context.ok()) {
         return quoted_pair_context.status();
       } else {
         context.setNext(*quoted_pair_context);
@@ -222,13 +222,13 @@ StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input) {
   // Optimization: dispatch on the next character to avoid the StrFormat in the
   // error path of an IPv6 parser when the value has a token (and vice versa).
   if (context.peek() == '[') {
-    if (StatusOr<ParseContext> ipv6 = parsePlausibleIpV6(context); !ipv6) {
+    if (StatusOr<ParseContext> ipv6 = parsePlausibleIpV6(context); !ipv6.ok()) {
       return ipv6.status();
     } else {
       context.setNext(*ipv6);
     }
   } else {
-    if (StatusOr<ParseContext> token = parseToken(context); !token) {
+    if (StatusOr<ParseContext> token = parseToken(context); !token.ok()) {
       return token.status();
     } else {
       context.setNext(*token);
@@ -260,7 +260,7 @@ StatusOr<ParsedCdnId> parseCdnId(const ParseContext& input) {
 StatusOr<ParseContext> parseParameter(const ParseContext& input) {
   ParseContext context = input;
 
-  if (StatusOr<ParseContext> parsed_token = parseToken(context); !parsed_token) {
+  if (StatusOr<ParseContext> parsed_token = parseToken(context); !parsed_token.ok()) {
     return parsed_token.status();
   } else {
     context.setNext(*parsed_token);
@@ -286,13 +286,13 @@ StatusOr<ParseContext> parseParameter(const ParseContext& input) {
   // error path of an quoted string parser when the next item is a token (and
   // vice versa).
   if (context.peek() == '"') {
-    if (StatusOr<ParseContext> value_quote = parseQuotedString(context); !value_quote) {
+    if (StatusOr<ParseContext> value_quote = parseQuotedString(context); !value_quote.ok()) {
       return value_quote.status();
     } else {
       return *value_quote;
     }
   } else {
-    if (StatusOr<ParseContext> value_token = parseToken(context); !value_token) {
+    if (StatusOr<ParseContext> value_token = parseToken(context); !value_token.ok()) {
       return value_token.status();
     } else {
       return *value_token;
@@ -303,7 +303,7 @@ StatusOr<ParseContext> parseParameter(const ParseContext& input) {
 StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
   absl::string_view cdn_id;
   ParseContext context = input;
-  if (StatusOr<ParsedCdnId> parsed_id = parseCdnId(input); !parsed_id) {
+  if (StatusOr<ParsedCdnId> parsed_id = parseCdnId(input); !parsed_id.ok()) {
     return parsed_id.status();
   } else {
     context.setNext(parsed_id->context());
@@ -320,7 +320,7 @@ StatusOr<ParsedCdnInfo> parseCdnInfo(const ParseContext& input) {
 
     context.setNext(skipOptionalWhitespace(context));
 
-    if (StatusOr<ParseContext> parameter = parseParameter(context); !parameter) {
+    if (StatusOr<ParseContext> parameter = parseParameter(context); !parameter.ok()) {
       return parameter.status();
     } else {
       context.setNext(*parameter);
@@ -348,7 +348,7 @@ StatusOr<ParsedCdnInfoList> parseCdnInfoList(const ParseContext& input) {
       continue;
     }
 
-    if (StatusOr<ParsedCdnInfo> parsed_cdn_info = parseCdnInfo(context); !parsed_cdn_info) {
+    if (StatusOr<ParsedCdnInfo> parsed_cdn_info = parseCdnInfo(context); !parsed_cdn_info.ok()) {
       return parsed_cdn_info.status();
     } else {
       cdn_infos.push_back(parsed_cdn_info->cdnId());

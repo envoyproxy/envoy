@@ -1,0 +1,31 @@
+# Add support for compiling to WebAssembly using Emscripten.
+# https://github.com/zlib-ng/zlib-ng/pull/794
+diff --git a/cmake/detect-arch.c b/cmake/detect-arch.c
+index 5715535..2137691 100644
+--- a/cmake/detect-arch.c
++++ b/cmake/detect-arch.c
+@@ -93,6 +93,10 @@
+ #elif defined(__THW_RS6000)
+     #error archfound rs6000
+
++// Emscripten (WebAssembly)
++#elif defined(__EMSCRIPTEN__)
++    #error archfound wasm32
++
+ // return 'unrecognized' if we do not know what architecture this is
+ #else
+     #error archfound unrecognized
+diff --git a/cmake/detect-arch.cmake b/cmake/detect-arch.cmake
+index b80d666..c6cc214 100644
+--- a/cmake/detect-arch.cmake
++++ b/cmake/detect-arch.cmake
+@@ -85,6 +85,9 @@ elseif("${ARCH}" MATCHES "parisc")
+ elseif("${ARCH}" MATCHES "rs6000")
+     set(BASEARCH "rs6000")
+     set(BASEARCH_RS6000_FOUND TRUE)
++elseif("${ARCH}" MATCHES "wasm32")
++    set(BASEARCH "wasm32")
++    set(BASEARCH_WASM32_FOUND TRUE)
+ else()
+     set(BASEARCH "x86")
+     set(BASEARCH_X86_FOUND TRUE)

@@ -20,6 +20,7 @@
 #include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_ip_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/unittest_cert_info.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/secret/mocks.h"
@@ -250,7 +251,7 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
   EXPECT_THROW_WITH_MESSAGE(
-      manager_.createSslClientContext(store_, cfg), EnvoyException,
+      manager_.createSslClientContext(store_, cfg, nullptr), EnvoyException,
       "Failed to initialize cipher suites "
       "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
       "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
@@ -261,23 +262,21 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
  )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
 
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
 
-  // This is a total hack, but right now we generate the cert and it expires in 15 days only in the
-  // first second that it's valid. This can become invalid and then cause slower tests to fail.
-  // Optimally we would make the cert valid for 15 days and 23 hours, but that is not easy to do
-  // with the command line so we have this for now. Good enough.
-  EXPECT_TRUE(15 == context->daysUntilFirstCertExpires() ||
-              14 == context->daysUntilFirstCertExpires());
+  // Calculate the days until test cert expires
+  auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
+  EXPECT_EQ(context->daysUntilFirstCertExpires(), days_until_expiry);
 }
 
 TEST_F(SslContextImplTest, TestExpiredCert) {
@@ -293,8 +292,59 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
+}
+
+// Validate that when the context is updated, the daysUntilFirstCertExpires returns the current
+// context value.
+TEST_F(SslContextImplTest, TestContextUpdate) {
+  const std::string expired_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_key.pem"
+)EOF";
+
+  // Validate that daysUntilFirstCertExpires returns correctly when single context is available.
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(expired_yaml), tls_context);
+  ClientContextConfigImpl cfg(tls_context, factory_context_);
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), 0U);
+
+  const std::string expiring_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+ )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext expiring_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(expiring_yaml), expiring_context);
+
+  ClientContextConfigImpl expiring_cfg(expiring_context, factory_context_);
+
+  Envoy::Ssl::ClientContextSharedPtr new_context(
+      manager_.createSslClientContext(store_, expiring_cfg, context));
+
+  // Validate that when the context is updated, daysUntilFirstCertExpires reflects the current
+  // context expiry.
+  auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
+  EXPECT_EQ(new_context->daysUntilFirstCertExpires(), days_until_expiry);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), days_until_expiry);
+
+  // Update the context again and validate daysUntilFirstCertExpires still reflects the current
+  // expiry.
+  Envoy::Ssl::ClientContextSharedPtr updated_context(
+      manager_.createSslClientContext(store_, cfg, new_context));
+  EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), 0U);
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires(), 0U);
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {
@@ -302,9 +352,9 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
@@ -314,7 +364,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
   // days only in the first second that it's valid. We will partially match for up until Days until
   // Expiration: 1.
@@ -330,7 +380,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 )EOF");
 
   std::string cert_chain_json = R"EOF({
- "path": "{{ test_tmpdir }}/unittestcert.pem",
+ "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem",
  }
 )EOF";
 
@@ -364,7 +414,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   std::string ca_cert_json = absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem",
  "serial_number": ")EOF",
@@ -418,7 +468,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   std::string ca_cert_json = absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem",
  "serial_number": ")EOF",
@@ -476,7 +526,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   ClientContextConfigImpl cfg(tls_context, factory_context_);
 
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   std::string ca_cert_json =
       absl::StrCat(R"EOF({
  "path": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem",
@@ -506,7 +556,7 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
 TEST_F(SslContextImplTest, TestNoCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
   ClientContextConfigImpl cfg(config, factory_context_);
-  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
+  Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg, nullptr));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
   EXPECT_TRUE(context->getCertChainInformation().empty());
 }
@@ -528,9 +578,9 @@ TEST_F(SslContextImplTest, AtMostOneRsaCert) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException,
-                          "at most one certificate of a given type may be specified");
+  EXPECT_THROW_WITH_REGEX(
+      manager_.createSslServerContext(store_, server_context_config, {}, nullptr), EnvoyException,
+      "at most one certificate of a given type may be specified");
 }
 
 // Multiple ECDSA certificates are rejected.
@@ -550,9 +600,9 @@ TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException,
-                          "at most one certificate of a given type may be specified");
+  EXPECT_THROW_WITH_REGEX(
+      manager_.createSslServerContext(store_, server_context_config, {}, nullptr), EnvoyException,
+      "at most one certificate of a given type may be specified");
 }
 
 // Certificates with no subject CN and no SANs are rejected.
@@ -568,14 +618,15 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException, "has neither subject CN nor SAN names");
+  EXPECT_THROW_WITH_REGEX(
+      manager_.createSslServerContext(store_, server_context_config, {}, nullptr), EnvoyException,
+      "has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
 public:
   Envoy::Ssl::ServerContextSharedPtr loadConfig(ServerContextConfigImpl& cfg) {
-    return manager_.createSslServerContext(store_, cfg, std::vector<std::string>{});
+    return manager_.createSslServerContext(store_, cfg, std::vector<std::string>{}, nullptr);
   }
 
   Envoy::Ssl::ServerContextSharedPtr loadConfigYaml(const std::string& yaml) {
@@ -591,27 +642,27 @@ TEST_F(SslServerContextImplOcspTest, TestFilenameOcspStapleConfigLoads) {
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_key.pem"
       ocsp_staple:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp.der"
   ocsp_staple_policy: must_staple
   )EOF";
   loadConfigYaml(tls_context_yaml);
 }
 
 TEST_F(SslServerContextImplOcspTest, TestInlineBytesOcspStapleConfigLoads) {
-  auto der_response = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"));
+  auto der_response = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp.der"));
   auto base64_response = Base64::encode(der_response.c_str(), der_response.length(), true);
   const std::string tls_context_yaml = fmt::format(R"EOF(
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_cert.pem"
+        filename: "{{{{ test_rundir }}}}/test/extensions/transport_sockets/tls/ocsp/test_data/good_cert.pem"
       private_key:
-        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
+        filename: "{{{{ test_rundir }}}}/test/extensions/transport_sockets/tls/ocsp/test_data/good_key.pem"
       ocsp_staple:
        inline_bytes: "{}"
   ocsp_staple_policy: must_staple
@@ -626,9 +677,9 @@ TEST_F(SslServerContextImplOcspTest, TestInlineStringOcspStapleConfigFails) {
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_key.pem"
       ocsp_staple:
        inline_string: "abcd"
   ocsp_staple_policy: must_staple
@@ -643,11 +694,11 @@ TEST_F(SslServerContextImplOcspTest, TestMismatchedOcspStapleConfigFails) {
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_key.pem"
       ocsp_staple:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp.der"
   ocsp_staple_policy: must_staple
   )EOF";
 
@@ -660,9 +711,9 @@ TEST_F(SslServerContextImplOcspTest, TestStaplingRequiredWithoutStapleConfigFail
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_key.pem"
   ocsp_staple_policy: must_staple
   )EOF";
 
@@ -684,9 +735,9 @@ TEST_F(SslServerContextImplOcspTest, TestUnsuccessfulOcspResponseConfigFails) {
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_cert.pem"
+        filename: "{{{{ test_rundir }}}}/test/extensions/transport_sockets/tls/ocsp/test_data/good_cert.pem"
       private_key:
-        filename: "{{{{ test_tmpdir }}}}/ocsp_test_data/good_key.pem"
+        filename: "{{{{ test_rundir }}}}/test/extensions/transport_sockets/tls/ocsp/test_data/good_key.pem"
       ocsp_staple:
        inline_bytes: "{}"
   ocsp_staple_policy: must_staple
@@ -702,9 +753,9 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleConfigFails)
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_key.pem"
   ocsp_staple_policy: lenient_stapling
   )EOF";
 
@@ -717,9 +768,9 @@ TEST_F(SslServerContextImplOcspTest, TestMustStapleCertWithoutStapleFeatureFlagO
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/revoked_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/revoked_key.pem"
   ocsp_staple_policy: lenient_stapling
   )EOF";
 
@@ -734,11 +785,11 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_key.pem"
       ocsp_staple:
-        filename: "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp.der"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp.der"
 )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -748,12 +799,13 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   constexpr absl::string_view this_update = "This Update: ";
   constexpr absl::string_view next_update = "Next Update: ";
 
-  auto ocsp_text_details =
-      absl::StrSplit(TestEnvironment::readFileToStringForTest(
-                         TestEnvironment::substitute(
-                             "{{ test_tmpdir }}/ocsp_test_data/good_ocsp_resp_details.txt"),
-                         true),
-                     '\n');
+  auto ocsp_text_details = absl::StrSplit(
+      TestEnvironment::readFileToStringForTest(
+          TestEnvironment::substitute(
+              "{{ test_rundir "
+              "}}/test/extensions/transport_sockets/tls/ocsp/test_data/good_ocsp_resp_details.txt"),
+          true),
+      '\n');
   std::string valid_from, expiration;
   for (const auto& detail : ocsp_text_details) {
     std::string::size_type pos = detail.find(this_update);
@@ -790,17 +842,17 @@ class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
     Envoy::Ssl::ServerContextSharedPtr server_ctx(
-        manager_.createSslServerContext(store_, cfg, std::vector<std::string>{}));
+        manager_.createSslServerContext(store_, cfg, std::vector<std::string>{}, nullptr));
   }
 
   void loadConfigV2(envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& cfg) {
     // Must add a certificate for the config to be considered valid.
     envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
         cfg.mutable_common_tls_context()->add_tls_certificates();
-    server_cert->mutable_certificate_chain()->set_filename(
-        TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
-    server_cert->mutable_private_key()->set_filename(
-        TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+    server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"));
+    server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"));
 
     ServerContextConfigImpl server_context_config(cfg, factory_context_);
     loadConfig(server_context_config);
@@ -821,9 +873,9 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   session_ticket_keys:
     keys:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
@@ -838,9 +890,9 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   session_ticket_keys:
     keys:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
@@ -854,9 +906,9 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidCannotRead) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   session_ticket_keys:
     keys:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/this_file_does_not_exist"
@@ -1045,9 +1097,9 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledByDefaul
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
 
@@ -1061,9 +1113,9 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionExplicitlyEnabl
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   disable_stateless_session_resumption: false
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
@@ -1078,9 +1130,9 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionDisabled) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   disable_stateless_session_resumption: true
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
@@ -1095,9 +1147,9 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledWhenKeyI
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
       private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
   session_ticket_keys:
     keys:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
@@ -1138,7 +1190,7 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateHash) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException, "Invalid hex-encoded SHA-256 .*");
 }
 
@@ -1154,7 +1206,7 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateSpki) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
@@ -1173,7 +1225,7 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  manager.createSslClientContext(store, client_context_config);
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
 // Validate that 1024-bit RSA certificates are rejected.
@@ -1195,12 +1247,12 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   std::string error_msg(
       "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
 #ifdef BORINGSSL_FIPS
-      "with 2048-bit or 3072-bit keys are supported in FIPS mode"
+      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
 #else
       "with 2048-bit or larger keys are supported"
 #endif
   );
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException, error_msg);
 }
 
@@ -1219,11 +1271,10 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  manager.createSslClientContext(store, client_context_config);
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
-// Validate that 4096-bit RSA certificates load successfully in non-FIPS builds, but are rejected
-// in FIPS builds.
+// Validate that 4096-bit RSA certificates load successfully.
 TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
@@ -1238,14 +1289,7 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-#ifdef BORINGSSL_FIPS
-  EXPECT_THROW_WITH_REGEX(
-      manager.createSslClientContext(store, client_context_config), EnvoyException,
-      "Failed to load certificate chain from .*selfsigned_rsa_4096_cert.pem, only RSA certificates "
-      "with 2048-bit or 3072-bit keys are supported in FIPS mode");
-#else
-  manager.createSslClientContext(store, client_context_config);
-#endif
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
 // Validate that P256 ECDSA certs load.
@@ -1263,7 +1307,7 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  manager.createSslClientContext(store, client_context_config);
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
 // Validate that non-P256 ECDSA certs are rejected.
@@ -1281,7 +1325,7 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException,
                           "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
                           "only P-256 ECDSA certificates are supported");
@@ -1487,7 +1531,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException,
                           absl::StrCat("Failed to load private key from ", private_key_path));
 }
@@ -1729,8 +1773,8 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(
-          manager.createSslServerContext(store, client_context_config, std::vector<std::string>{})),
+      Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
+          store, client_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Server TlsCertificates must have a certificate specified");
 }
 
@@ -1750,10 +1794,10 @@ TEST_F(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
 
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
-  server_cert->mutable_certificate_chain()->set_filename(
-      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
-  server_cert->mutable_private_key()->set_filename(
-      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"));
 
   server_validation_ctx->set_allow_expired_certificate(false);
 
@@ -1827,8 +1871,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
   EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(
-          manager.createSslServerContext(store, server_context_config, std::vector<std::string>{})),
+      Envoy::Ssl::ServerContextSharedPtr server_ctx(manager.createSslServerContext(
+          store, server_context_config, std::vector<std::string>{}, nullptr)),
       EnvoyException, "Failed to get BoringSSL private key method from provider");
 }
 
@@ -1888,6 +1932,73 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
       "Certificate configuration can't have both private_key and private_key_provider");
+}
+
+// Subclass ContextImpl so we can instantiate directly from tests, despite the
+// constructor being protected.
+class TestContextImpl : public ContextImpl {
+public:
+  TestContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+                  TimeSource& time_source)
+      : ContextImpl(scope, config, time_source), pool_(scope.symbolTable()),
+        fallback_(pool_.add("fallback")) {}
+
+  void incCounter(absl::string_view name, absl::string_view value) {
+    ContextImpl::incCounter(pool_.add(name), value, fallback_);
+  }
+
+  Stats::StatNamePool pool_;
+  const Stats::StatName fallback_;
+};
+
+class SslContextStatsTest : public SslContextImplTest {
+protected:
+  SslContextStatsTest() {
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context_);
+    client_context_config_ =
+        std::make_unique<ClientContextConfigImpl>(tls_context_, factory_context_);
+    context_ = std::make_unique<TestContextImpl>(store_, *client_context_config_, time_system_);
+  }
+
+  Stats::TestUtil::TestStore store_;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
+  std::unique_ptr<ClientContextConfigImpl> client_context_config_;
+  std::unique_ptr<TestContextImpl> context_;
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+  )EOF";
+};
+
+TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
+  // Incrementing a value for a cipher that is part of the configuration works, and
+  // we'll be able to find the value in the stats store.
+  context_->incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
+  Stats::CounterOptConstRef cipher =
+      store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
+  ASSERT_TRUE(cipher.has_value());
+  EXPECT_EQ(1, cipher->get().value());
+
+  // Incrementing a stat for a random unknown cipher does not work. A
+  // rate-limited error log message will also be generated but that is hard to
+  // test as it is dependent on timing and test-ordering.
+  EXPECT_DEBUG_DEATH(context_->incCounter("ssl.ciphers", "unexpected"),
+                     "Unexpected ssl.ciphers value: unexpected");
+  EXPECT_FALSE(store_.findCounterByString("ssl.ciphers.unexpected"));
+
+  // We will account for the 'unexpected' cipher as "fallback", however in debug
+  // mode that will not work as the ENVOY_BUG macro will assert first, thus the
+  // fallback registration does not occur. So we test for the fallback only in
+  // release builds.
+#ifdef NDEBUG
+  cipher = store_.findCounterByString("ssl.ciphers.fallback");
+  ASSERT_TRUE(cipher.has_value());
+  EXPECT_EQ(1, cipher->get().value());
+#endif
 }
 
 } // namespace Tls

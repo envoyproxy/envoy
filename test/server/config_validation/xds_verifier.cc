@@ -20,7 +20,7 @@ XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta so
  */
 std::string XdsVerifier::getRoute(const envoy::config::listener::v3::Listener& listener) {
   envoy::config::listener::v3::Filter filter0 = listener.filter_chains()[0].filters()[0];
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager conn_man;
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager conn_man;
   filter0.typed_config().UnpackTo(&conn_man);
   return conn_man.rds().route_config_name();
 }

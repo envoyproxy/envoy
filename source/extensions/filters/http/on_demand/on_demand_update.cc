@@ -61,7 +61,7 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   if (route_exists &&                  // route can be resolved after an on-demand
                                        // VHDS update
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
-      callbacks_->recreateStream()) {
+      callbacks_->recreateStream(/*headers=*/nullptr)) {
     return;
   }
 

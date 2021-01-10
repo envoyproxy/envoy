@@ -159,6 +159,7 @@ public:
     return default_scope_->counterFromString(name);
   }
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
@@ -321,7 +322,7 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -337,6 +338,10 @@ private:
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
+    }
+    ScopePtr scopeFromStatName(StatName name) override {
+      SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+      return parent_.scopeFromStatName(StatName(joined.get()));
     }
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
@@ -477,10 +482,12 @@ private:
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
   bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
+  TlsCache& tlsCache() { return **tls_cache_; }
 
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  ThreadLocal::SlotPtr tls_;
+  using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
+  ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
   absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
   ScopePtr default_scope_;

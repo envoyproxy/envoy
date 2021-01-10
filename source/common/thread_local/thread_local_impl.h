@@ -19,7 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
-  InstanceImpl() : main_thread_id_(std::this_thread::get_id()) {}
+  InstanceImpl() { Thread::MainThread::init(); }
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -36,14 +36,15 @@ private:
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint32_t index);
     ~SlotImpl() override { parent_.removeSlot(index_); }
-    Event::PostCb wrapCallback(Event::PostCb&& cb);
+    Event::PostCb wrapCallback(const Event::PostCb& cb);
+    Event::PostCb dataCallback(const UpdateCb& cb);
     static bool currentThreadRegisteredWorker(uint32_t index);
     static ThreadLocalObjectSharedPtr getWorker(uint32_t index);
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
     void runOnAllThreads(const UpdateCb& cb) override;
-    void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) override;
+    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
 
@@ -80,7 +81,6 @@ private:
   // A list of index of freed slots.
   std::list<uint32_t> free_slot_indexes_;
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
-  std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
 

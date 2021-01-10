@@ -14,6 +14,7 @@
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "benchmark/benchmark.h"
 
@@ -21,7 +22,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class BaseTester {
+class BaseTester : public Event::TestUsingSimulatedTime {
 public:
   static constexpr absl::string_view metadata_key = "key";
   // We weight the first weighted_subset_percent of hosts with weight.
@@ -41,9 +42,9 @@ public:
             (*metadata.mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB];
         (*map.mutable_fields())[std::string(metadata_key)] = value;
 
-        hosts.push_back(makeTestHost(info_, url, metadata, effective_weight));
+        hosts.push_back(makeTestHost(info_, url, metadata, simTime(), effective_weight));
       } else {
-        hosts.push_back(makeTestHost(info_, url, effective_weight));
+        hosts.push_back(makeTestHost(info_, url, simTime(), effective_weight));
       }
     }
 
@@ -65,7 +66,8 @@ public:
   PrioritySetImpl priority_set_;
   PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
+  ClusterStatNames stat_names_{stats_store_.symbolTable()};
+  ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_, stat_names_)};
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;

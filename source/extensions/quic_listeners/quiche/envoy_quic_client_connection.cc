@@ -42,11 +42,11 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
     Network::ConnectionSocketPtr&& connection_socket)
-    : EnvoyQuicConnection(
-          server_connection_id,
-          envoyIpAddressToQuicSocketAddress(connection_socket->remoteAddress()->ip()), helper,
-          alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
-          std::move(connection_socket)),
+    : EnvoyQuicConnection(server_connection_id, quic::QuicSocketAddress(),
+                          envoyIpAddressToQuicSocketAddress(
+                              connection_socket->addressProvider().remoteAddress()->ip()),
+                          helper, alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT,
+                          supported_versions, std::move(connection_socket)),
       dispatcher_(dispatcher) {}
 
 void EnvoyQuicClientConnection::processPacket(
@@ -62,9 +62,9 @@ void EnvoyQuicClientConnection::processPacket(
           std::chrono::duration_cast<std::chrono::microseconds>(receive_time.time_since_epoch())
               .count());
   ASSERT(buffer->getRawSlices().size() == 1);
-  Buffer::RawSliceVector slices = buffer->getRawSlices(/*max_slices=*/1);
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slices[0].mem_), slices[0].len_,
-                                  timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+  Buffer::RawSlice slice = buffer->frontSlice();
+  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
+                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   ProcessUdpPacket(envoyIpAddressToQuicSocketAddress(local_address->ip()),
@@ -78,7 +78,7 @@ uint64_t EnvoyQuicClientConnection::maxPacketSize() const {
 
 void EnvoyQuicClientConnection::setUpConnectionSocket() {
   if (connectionSocket()->ioHandle().isOpen()) {
-    file_event_ = connectionSocket()->ioHandle().createFileEvent(
+    connectionSocket()->ioHandle().initializeFileEvent(
         dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); },
         Event::PlatformDefaultTriggerType,
         Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -99,9 +99,6 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
-  // Destroy the old file_event before closing the old socket. Otherwise the socket might be picked
-  // up by another socket() call while file_event is still operating on it.
-  file_event_.reset();
   // The old socket is closed in this call.
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket();
@@ -120,8 +117,8 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   // event processing.
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
-        connectionSocket()->ioHandle(), *connectionSocket()->localAddress(), *this,
-        dispatcher_.timeSource(), packets_dropped_);
+        connectionSocket()->ioHandle(), *connectionSocket()->addressProvider().localAddress(),
+        *this, dispatcher_.timeSource(), packets_dropped_);
     // TODO(danzh): Handle no error when we limit the number of packets read.
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),

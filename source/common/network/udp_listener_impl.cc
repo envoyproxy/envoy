@@ -31,31 +31,27 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
-  file_event_ = socket_->ioHandle().createFileEvent(
+  socket_->ioHandle().initializeFileEvent(
       dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
-  ASSERT(file_event_);
-
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
-    throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
-                                              socket_->localAddress()->asString()));
+    throw CreateListenerException(
+        fmt::format("cannot set post-bound socket option on socket: {}",
+                    socket_->addressProvider().localAddress()->asString()));
   }
 }
 
-UdpListenerImpl::~UdpListenerImpl() {
-  disableEvent();
-  file_event_.reset();
-}
+UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
 
 void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
-  file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+  socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-void UdpListenerImpl::disableEvent() { file_event_->setEnabled(0); }
+void UdpListenerImpl::disableEvent() { socket_->ioHandle().enableFileEvents(0); }
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
@@ -74,7 +70,8 @@ void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
-      socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
+      socket_->ioHandle(), *socket_->addressProvider().localAddress(), *this, time_source_,
+      packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     // TODO(mattklein123): When rate limited logging is implemented log this at error level
@@ -104,7 +101,7 @@ void UdpListenerImpl::handleWriteCallback() {
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 
 const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
-  return socket_->localAddress();
+  return socket_->addressProvider().localAddress();
 }
 
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
@@ -125,7 +122,9 @@ Api::IoCallUint64Result UdpListenerImpl::flush() {
   return cb_.udpPacketWriter().flush();
 }
 
-void UdpListenerImpl::activateRead() { file_event_->activate(Event::FileReadyType::Read); }
+void UdpListenerImpl::activateRead() {
+  socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+}
 
 UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
     : workers_(concurrency) {}

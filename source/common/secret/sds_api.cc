@@ -12,6 +12,10 @@
 namespace Envoy {
 namespace Secret {
 
+SdsApiStats SdsApi::generateStats(Stats::Scope& scope) {
+  return {ALL_SDS_API_STATS(POOL_COUNTER(scope))};
+}
+
 SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
                Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
@@ -19,21 +23,59 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
     : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
           sds_config.resource_api_version(), validation_visitor, "name"),
       init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
-      stats_(stats), sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
-      secret_hash_(0), clean_up_(std::move(destructor_cb)),
+      dispatcher_(dispatcher), api_(api),
+      scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
+      sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
+      sds_config_name_(sds_config_name), secret_hash_(0), clean_up_(std::move(destructor_cb)),
       subscription_factory_(subscription_factory),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
-                                              time_source_.systemTime()},
-      dispatcher_(dispatcher), api_(api) {
+                                              time_source_.systemTime()} {
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this, resource_decoder_);
+      sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+}
 
-  // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
-  // can be chained together to behave as one init_manager. In that way, we let
-  // two listeners which share same SdsApi to register at separate init managers, and
-  // each init manager has a chance to initialize its targets.
+void SdsApi::resolveDataSource(const FileContentMap& files,
+                               envoy::config::core::v3::DataSource& data_source) {
+  if (data_source.specifier_case() ==
+      envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
+    const std::string& content = files.at(data_source.filename());
+    data_source.set_inline_bytes(content);
+  }
+}
+
+void SdsApi::onWatchUpdate() {
+  // Filesystem reads and update callbacks can fail if the key material is missing or bad. We're not
+  // under an onConfigUpdate() context, so we need to catch these cases explicitly here.
+  try {
+    // Obtain a stable set of files. If a rotation happens while we're reading,
+    // then we need to try again.
+    uint64_t prev_hash = 0;
+    FileContentMap files = loadFiles();
+    uint64_t next_hash = getHashForFiles(files);
+    const uint64_t MaxBoundedRetries = 5;
+    for (uint64_t bounded_retries = MaxBoundedRetries;
+         next_hash != prev_hash && bounded_retries > 0; --bounded_retries) {
+      files = loadFiles();
+      prev_hash = next_hash;
+      next_hash = getHashForFiles(files);
+    }
+    if (next_hash != prev_hash) {
+      ENVOY_LOG_MISC(
+          warn, "Unable to atomically refresh secrets due to > {} non-atomic rotations observed",
+          MaxBoundedRetries);
+    }
+    const uint64_t new_hash = next_hash;
+    if (new_hash != files_hash_) {
+      resolveSecret(files);
+      update_callback_manager_.runCallbacks();
+      files_hash_ = new_hash;
+    }
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(warn, fmt::format("Failed to reload certificates: {}", e.what()));
+    sds_api_stats_.key_rotation_failed_.inc();
+  }
 }
 
 void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -47,35 +89,40 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
         fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
   }
 
-  uint64_t new_hash = MessageUtil::hash(secret);
+  const uint64_t new_hash = MessageUtil::hash(secret);
 
   if (new_hash != secret_hash_) {
     validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
+    const auto files = loadFiles();
+    files_hash_ = getHashForFiles(files);
+    resolveSecret(files);
     update_callback_manager_.runCallbacks();
 
-    // List DataSources that refer to files
-    auto files = getDataSourceFilenames();
-    if (!files.empty()) {
-      // Create new watch, also destroys the old watch if any.
-      watcher_ = dispatcher_.createFilesystemWatcher();
-      files_hash_ = getHashForFiles();
-      for (auto const& filename : files) {
-        // Watch for directory instead of file. This allows users to do atomic renames
-        // on directory level (e.g. Kubernetes secret update).
-        const auto result = api_.fileSystem().splitPathFromFilename(filename);
-        watcher_->addWatch(absl::StrCat(result.directory_, "/"),
-                           Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-                             uint64_t new_hash = getHashForFiles();
-                             if (new_hash != files_hash_) {
-                               update_callback_manager_.runCallbacks();
-                               files_hash_ = new_hash;
-                             }
-                           });
-      }
+    auto* watched_directory = getWatchedDirectory();
+    // Either we have a watched path and can defer the watch monitoring to a
+    // WatchedDirectory object, or we need to implement per-file watches in the else
+    // clause.
+    if (watched_directory != nullptr) {
+      watched_directory->setCallback([this]() { onWatchUpdate(); });
     } else {
-      watcher_.reset(); // Destroy the old watch if any
+      // List DataSources that refer to files
+      auto files = getDataSourceFilenames();
+      if (!files.empty()) {
+        // Create new watch, also destroys the old watch if any.
+        watcher_ = dispatcher_.createFilesystemWatcher();
+        for (auto const& filename : files) {
+          // Watch for directory instead of file. This allows users to do atomic renames
+          // on directory level (e.g. Kubernetes secret update).
+          const auto result = api_.fileSystem().splitPathFromFilename(filename);
+          watcher_->addWatch(absl::StrCat(result.directory_, "/"),
+                             Filesystem::Watcher::Events::MovedTo,
+                             [this](uint32_t) { onWatchUpdate(); });
+        }
+      } else {
+        watcher_.reset(); // Destroy the old watch if any
+      }
     }
   }
   secret_data_.last_updated_ = time_source_.systemTime();
@@ -114,36 +161,44 @@ void SdsApi::initialize() {
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }
 
-uint64_t SdsApi::getHashForFiles() {
-  uint64_t hash = 0;
+SdsApi::FileContentMap SdsApi::loadFiles() {
+  FileContentMap files;
   for (auto const& filename : getDataSourceFilenames()) {
-    hash = HashUtil::xxHash64(api_.fileSystem().fileReadToEnd(filename), hash);
+    files[filename] = api_.fileSystem().fileReadToEnd(filename);
+  }
+  return files;
+}
+
+uint64_t SdsApi::getHashForFiles(const FileContentMap& files) {
+  uint64_t hash = 0;
+  for (const auto& it : files) {
+    hash = HashUtil::xxHash64(it.second, hash);
   }
   return hash;
 }
 
 std::vector<std::string> TlsCertificateSdsApi::getDataSourceFilenames() {
   std::vector<std::string> files;
-  if (tls_certificate_secrets_ && tls_certificate_secrets_->has_certificate_chain() &&
-      tls_certificate_secrets_->certificate_chain().specifier_case() ==
+  if (sds_tls_certificate_secrets_ && sds_tls_certificate_secrets_->has_certificate_chain() &&
+      sds_tls_certificate_secrets_->certificate_chain().specifier_case() ==
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-    files.push_back(tls_certificate_secrets_->certificate_chain().filename());
+    files.push_back(sds_tls_certificate_secrets_->certificate_chain().filename());
   }
-  if (tls_certificate_secrets_ && tls_certificate_secrets_->has_private_key() &&
-      tls_certificate_secrets_->private_key().specifier_case() ==
+  if (sds_tls_certificate_secrets_ && sds_tls_certificate_secrets_->has_private_key() &&
+      sds_tls_certificate_secrets_->private_key().specifier_case() ==
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-    files.push_back(tls_certificate_secrets_->private_key().filename());
+    files.push_back(sds_tls_certificate_secrets_->private_key().filename());
   }
   return files;
 }
 
 std::vector<std::string> CertificateValidationContextSdsApi::getDataSourceFilenames() {
   std::vector<std::string> files;
-  if (certificate_validation_context_secrets_ &&
-      certificate_validation_context_secrets_->has_trusted_ca() &&
-      certificate_validation_context_secrets_->trusted_ca().specifier_case() ==
+  if (sds_certificate_validation_context_secrets_ &&
+      sds_certificate_validation_context_secrets_->has_trusted_ca() &&
+      sds_certificate_validation_context_secrets_->trusted_ca().specifier_case() ==
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-    files.push_back(certificate_validation_context_secrets_->trusted_ca().filename());
+    files.push_back(sds_certificate_validation_context_secrets_->trusted_ca().filename());
   }
   return files;
 }

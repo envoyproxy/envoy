@@ -64,7 +64,6 @@ private:
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
   static const size_t TrailParamStart{sizeof("TRAILER(") - 1};
-  static const size_t StartTimeParamStart{sizeof("START_TIME(") - 1};
 };
 
 /**
@@ -107,12 +106,47 @@ private:
   std::vector<FormatterProviderPtr> providers_;
 };
 
+/**
+ * An formatter for structured log formats, which returns a Struct proto that
+ * can be converted easily into multiple formats.
+ */
+class StructFormatter {
+public:
+  StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                  bool omit_empty_values)
+      : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+        struct_output_format_(toFormatMap(format_mapping)) {}
+
+  ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
+                             const Http::ResponseHeaderMap& response_headers,
+                             const Http::ResponseTrailerMap& response_trailers,
+                             const StreamInfo::StreamInfo& stream_info,
+                             absl::string_view local_reply_body) const;
+
+private:
+  struct StructFormatMapWrapper;
+  using StructFormatMapValue =
+      absl::variant<const std::vector<FormatterProviderPtr>, const StructFormatMapWrapper>;
+  // Although not required for Struct/JSON, it is nice to have the order of
+  // properties preserved between the format and the log entry, thus std::map.
+  using StructFormatMap = std::map<std::string, StructFormatMapValue>;
+  using StructFormatMapPtr = std::unique_ptr<StructFormatMap>;
+  struct StructFormatMapWrapper {
+    StructFormatMapPtr value_;
+  };
+
+  StructFormatMapWrapper toFormatMap(const ProtobufWkt::Struct& struct_format) const;
+
+  const bool omit_empty_values_;
+  const bool preserve_types_;
+  const StructFormatMapWrapper struct_output_format_;
+};
+
 class JsonFormatterImpl : public Formatter {
 public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                     bool omit_empty_values)
-      : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
-        json_output_format_(toFormatMap(format_mapping)) {}
+      : struct_formatter_(format_mapping, preserve_types, omit_empty_values) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -122,27 +156,7 @@ public:
                      absl::string_view local_reply_body) const override;
 
 private:
-  struct JsonFormatMapWrapper;
-  using JsonFormatMapValue =
-      absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMapWrapper>;
-  // Although not required for JSON, it is nice to have the order of properties
-  // preserved between the format and the log entry, thus std::map.
-  using JsonFormatMap = std::map<std::string, JsonFormatMapValue>;
-  using JsonFormatMapPtr = std::unique_ptr<JsonFormatMap>;
-  struct JsonFormatMapWrapper {
-    JsonFormatMapPtr value_;
-  };
-
-  bool omit_empty_values_;
-  bool preserve_types_;
-  const JsonFormatMapWrapper json_output_format_;
-
-  ProtobufWkt::Struct toStruct(const Http::RequestHeaderMap& request_headers,
-                               const Http::ResponseHeaderMap& response_headers,
-                               const Http::ResponseTrailerMap& response_trailers,
-                               const StreamInfo::StreamInfo& stream_info,
-                               absl::string_view local_reply_body) const;
-  JsonFormatMapWrapper toFormatMap(const ProtobufWkt::Struct& json_format) const;
+  const StructFormatter struct_formatter_;
 };
 
 /**
@@ -364,11 +378,15 @@ private:
 };
 
 /**
- * FormatterProvider for request start time from StreamInfo.
+ * Base FormatterProvider for system times from StreamInfo.
  */
-class StartTimeFormatter : public FormatterProvider {
+class SystemTimeFormatter : public FormatterProvider {
 public:
-  StartTimeFormatter(const std::string& format);
+  using TimeFieldExtractor =
+      std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
+  using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
+
+  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -378,8 +396,45 @@ public:
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
 
+protected:
+  // Given an access log token, attempt to parse out the format string between parenthesis.
+  //
+  // @param token The access log token, e.g. `START_TIME` or `START_TIME(...)`
+  // @param parameters_start The index of the first character where the parameters parenthesis would
+  //                         begin if it exists. Must not be out of bounds of `token` or its NUL
+  //                         char.
+  // @return The format string between parenthesis, or an empty string if none exists.
+  static std::string parseFormat(const std::string& token, size_t parameters_start);
+
 private:
   const Envoy::DateFormatter date_formatter_;
+  const TimeFieldExtractorPtr time_field_extractor_;
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for request start time from StreamInfo.
+ */
+class StartTimeFormatter : public SystemTimeFormatter {
+public:
+  StartTimeFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for downstream cert start time from the StreamInfo's
+ * ConnectionInfo.
+ */
+class DownstreamPeerCertVStartFormatter : public SystemTimeFormatter {
+public:
+  DownstreamPeerCertVStartFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for downstream cert end time from the StreamInfo's
+ * ConnectionInfo.
+ */
+class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
+public:
+  DownstreamPeerCertVEndFormatter(const std::string& format);
 };
 
 } // namespace Formatter

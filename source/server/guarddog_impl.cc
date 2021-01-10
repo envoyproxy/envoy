@@ -102,11 +102,13 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::step() {
-  {
-    Thread::LockGuard guard(mutex_);
-    if (!run_thread_) {
-      return;
-    }
+  // Hold mutex_ for the duration of the step() function to ensure that watchdog still alive checks
+  // and test interlocks happen in the expected order. Calls to forceCheckForTest() should result in
+  // a full iteration of the step() function to process recent watchdog touches and monotonic time
+  // changes.
+  Thread::LockGuard guard(mutex_);
+  if (!run_thread_) {
+    return;
   }
 
   const auto now = time_source_.monotonicTime();
@@ -123,7 +125,13 @@ void GuardDogImpl::step() {
                  static_cast<size_t>(ceil(multi_kill_fraction_ * watched_dogs_.size())));
 
     for (auto& watched_dog : watched_dogs_) {
-      const auto last_checkin = watched_dog->dog_->lastTouchTime();
+      if (watched_dog->dog_->getTouchedAndReset()) {
+        // Watchdog was touched since the guard dog last checked; update last check-in time.
+        watched_dog->last_checkin_ = now;
+        continue;
+      }
+
+      const auto last_checkin = watched_dog->last_checkin_;
       const auto tid = watched_dog->dog_->threadId();
       const auto delta = now - last_checkin;
       if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < last_checkin) {
@@ -170,29 +178,28 @@ void GuardDogImpl::step() {
     invokeGuardDogActions(WatchDogAction::MISS, miss_threads, now);
   }
 
-  {
-    Thread::LockGuard guard(mutex_);
-    test_interlock_hook_->signalFromImpl(now);
-    if (run_thread_) {
-      loop_timer_->enableTimer(loop_interval_);
-    }
+  test_interlock_hook_->signalFromImpl();
+  if (run_thread_) {
+    loop_timer_->enableTimer(loop_interval_);
   }
 }
 
 WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id,
-                                               const std::string& thread_name) {
+                                               const std::string& thread_name,
+                                               Event::Dispatcher& dispatcher) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
   // accessed out of the locked section below is const (time_source_ has no
   // state).
   const auto wd_interval = loop_interval_ / 2;
-  WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(std::move(thread_id), time_source_, wd_interval);
+  auto new_watchdog = std::make_shared<WatchDogImpl>(std::move(thread_id));
   WatchedDogPtr watched_dog = std::make_unique<WatchedDog>(stats_scope_, thread_name, new_watchdog);
+  new_watchdog->touch();
   {
     Thread::LockGuard guard(wd_lock_);
     watched_dogs_.push_back(std::move(watched_dog));
   }
+  dispatcher.registerWatchdog(new_watchdog, wd_interval);
   new_watchdog->touch();
   return new_watchdog;
 }
@@ -213,8 +220,11 @@ void GuardDogImpl::start(Api::Api& api) {
   // See comments in WorkerImpl::start for the naming convention.
   Thread::Options options{absl::StrCat("dog:", dispatcher_->name())};
   thread_ = api.threadFactory().createThread(
-      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); }, options);
-  loop_timer_->enableTimer(std::chrono::milliseconds(0));
+      [this]() -> void {
+        loop_timer_->enableTimer(std::chrono::milliseconds(0));
+        dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      },
+      options);
 }
 
 void GuardDogImpl::stop() {
@@ -242,7 +252,7 @@ void GuardDogImpl::invokeGuardDogActions(
 }
 
 GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
-                                     const WatchDogSharedPtr& watch_dog)
+                                     const WatchDogImplSharedPtr& watch_dog)
     : dog_(watch_dog),
       miss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_miss", thread_name),

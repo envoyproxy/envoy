@@ -54,6 +54,7 @@ public:
   Event::Dispatcher& dispatcher() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
+  Router::Context& routerContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
@@ -87,13 +88,18 @@ private:
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb>&& filters_factory)
+                  std::vector<Network::FilterFactoryCb>&& filters_factory,
+                  std::chrono::milliseconds transport_socket_connect_timeout)
       : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)) {}
+        filters_factory_(std::move(filters_factory)),
+        transport_socket_connect_timeout_(transport_socket_connect_timeout) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
+  }
+  std::chrono::milliseconds transportSocketConnectTimeout() const override {
+    return transport_socket_connect_timeout_;
   }
   const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
     return filters_factory_;
@@ -110,6 +116,7 @@ private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
+  const std::chrono::milliseconds transport_socket_connect_timeout_;
 };
 
 /**
@@ -126,6 +133,7 @@ public:
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
   Grpc::Context& grpcContext() override;
+  Router::Context& routerContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;

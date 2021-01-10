@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -16,17 +18,14 @@ envoy_cc_test(
         "ssl_socket_test.cc",
     ],
     data = [
-        "gen_unittest_certs.sh",
         # TODO(mattklein123): We should consolidate all of our test certs in a single place as
         # right now we have a bunch of duplication which is confusing.
         "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/ocsp/test_data:certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
-        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
     ],
     external_deps = ["ssl"],
     shard_count = 4,
-    # TODO(wrowe): Diagnose timeout error on Windows (skipped for the moment)
-    tags = ["fails_on_windows"],
     deps = [
         ":test_private_key_method_provider_test_lib",
         "//include/envoy/network:transport_socket_interface",
@@ -57,6 +56,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -74,12 +74,9 @@ envoy_cc_test(
         "ssl_certs_test.h",
     ],
     data = [
-        "gen_unittest_certs.sh",
-        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
+        "//test/extensions/transport_sockets/tls/ocsp/test_data:certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
-    # Fails intermittantly on local build
-    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_test_utils",
         "//source/common/common:base64_lib",
@@ -121,8 +118,6 @@ envoy_cc_test(
         "utility_test.cc",
     ],
     data = [
-        "gen_unittest_certs.sh",
-        "//test/extensions/transport_sockets/tls/ocsp:gen_ocsp_data",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
@@ -171,14 +166,9 @@ envoy_cc_test(
     name = "handshaker_test",
     srcs = ["handshaker_test.cc"],
     data = [
-        "gen_unittest_certs.sh",
-        "//test/config/integration/certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    # TODO(sunjayBhatia): Diagnose openssl DLL load issue on Windows
-    # See: https://github.com/envoyproxy/envoy/pull/13276
-    tags = ["flaky_on_windows"],
     deps = [
         ":ssl_socket_test",
         ":ssl_test_utils",
@@ -191,4 +181,28 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "tls_throughput_benchmark",
+    srcs = ["tls_throughput_benchmark.cc"],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    external_deps = [
+        "benchmark",
+        "ssl",
+    ],
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "tls_throughput_benchmark_test",
+    benchmark_binary = "tls_throughput_benchmark",
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
 )

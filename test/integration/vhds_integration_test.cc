@@ -35,7 +35,11 @@ static_resources:
   clusters:
   - name: xds_cluster
     type: STATIC
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: xds_cluster
       endpoints:
@@ -47,7 +51,11 @@ static_resources:
                 port_value: 0
   - name: my_service
     type: STATIC
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_service
       endpoints:
@@ -67,7 +75,7 @@ static_resources:
     - filters:
       - name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
           - name: envoy.filters.http.on_demand
@@ -76,8 +84,10 @@ static_resources:
           rds:
             route_config_name: my_route
             config_source:
+              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
+                transport_api_version: V3
                 grpc_services:
                   envoy_grpc:
                     cluster_name: xds_cluster
@@ -100,8 +110,10 @@ const char RdsConfig[] = R"EOF(
 name: my_route
 vhds:
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -117,8 +129,10 @@ virtual_hosts:
     route: { cluster: my_service }
 vhds:
   config_source:
+    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -367,8 +381,8 @@ public:
     resource->set_name("my_route/vhost_1");
     resource->set_version("4");
     resource->mutable_resource()->PackFrom(
-        API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first"))));
+        TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first")));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
 

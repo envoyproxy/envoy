@@ -45,7 +45,11 @@ A sample filter configuration for a gRPC authorization server:
   clusters:
     - name: ext-authz
       type: static
-      http2_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
       load_assignment:
         cluster_name: ext-authz
         endpoints:
@@ -165,8 +169,7 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   :widths: 1, 1, 2
 
   ok, Counter, Total responses from the filter.
-  error, Counter, Total errors (including timeouts) contacting the external service.
-  timeout, Counter, Total timeouts contacting the external service (only counted when timeout is measured when check request is created).
+  error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   disabled, Counter, Total requests that are allowed without calling external services due to the filter is disabled.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because

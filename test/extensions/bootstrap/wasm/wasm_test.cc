@@ -3,6 +3,7 @@
 
 #include "extensions/common/wasm/wasm.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -31,7 +32,7 @@ public:
     log_(static_cast<spdlog::level::level_enum>(level), message);
     return proxy_wasm::WasmResult::Ok;
   }
-  MOCK_METHOD2(log_, void(spdlog::level::level_enum level, absl::string_view message));
+  MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message));
 };
 
 class WasmTestBase {
@@ -73,27 +74,14 @@ public:
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
 };
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
 class WasmTest : public WasmTestBase, public testing::TestWithParam<std::string> {
 public:
   void createWasm() { WasmTestBase::createWasm(GetParam()); }
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8"
-#endif
-#if defined(ENVOY_WASM_V8) && defined(ENVOY_WASM_WAVM)
-    ,
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm"
-#endif
-);
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest, testing_values);
-#endif
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest,
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTest);
 
 class WasmNullTest : public WasmTestBase, public testing::TestWithParam<std::string> {
 public:
@@ -109,19 +97,8 @@ public:
   }
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto testing_null_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8",
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm",
-#endif
-    "null");
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, testing_null_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, Envoy::Extensions::Common::Wasm::runtime_values);
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
 class WasmTestMatrix : public WasmTestBase,
                        public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
@@ -141,18 +118,9 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
-                         testing::Combine(testing::Values(
-#if defined(ENVOY_WASM_V8)
-                                              "v8"
-#endif
-#if defined(ENVOY_WASM_V8) && defined(ENVOY_WASM_WAVM)
-                                              ,
-#endif
-#if defined(ENVOY_WASM_WAVM)
-                                              "wavm"
-#endif
-                                              ),
+                         testing::Combine(Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
                                           testing::Values("cpp", "rust")));
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
 TEST_P(WasmTestMatrix, Logging) {
   plugin_configuration_ = "configure-test";
@@ -186,9 +154,7 @@ TEST_P(WasmTestMatrix, Logging) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher_->clearDeferredDeleteList();
 }
-#endif
 
-#if defined(ENVOY_WASM_V8) || defined(ENVOY_WASM_WAVM)
 TEST_P(WasmTest, BadSignature) {
   createWasm();
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -207,7 +173,7 @@ TEST_P(WasmTest, Segv) {
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before badptr")));
   EXPECT_FALSE(wasm_->configure(context, plugin_));
-  wasm_->isFailed();
+  EXPECT_TRUE(wasm_->isFailed());
 }
 
 TEST_P(WasmTest, DivByZero) {
@@ -219,22 +185,7 @@ TEST_P(WasmTest, DivByZero) {
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before div by zero")));
   context->onLog();
-  wasm_->isFailed();
-}
-
-TEST_P(WasmTest, EmscriptenVersion) {
-  createWasm();
-  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
-  EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->initialize(code, false));
-  uint32_t major = 9, minor = 9, abi_major = 9, abi_minor = 9;
-  EXPECT_TRUE(wasm_->getEmscriptenVersion(&major, &minor, &abi_major, &abi_minor));
-  EXPECT_EQ(major, 0);
-  EXPECT_LE(minor, 3);
-  // Up to (at least) emsdk 1.39.6.
-  EXPECT_EQ(abi_major, 0);
-  EXPECT_LE(abi_minor, 20);
+  EXPECT_TRUE(wasm_->isFailed());
 }
 
 TEST_P(WasmTest, IntrinsicGlobals) {
@@ -265,7 +216,6 @@ TEST_P(WasmTest, Asm2Wasm) {
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("out 0 0 0")));
   EXPECT_TRUE(wasm_->configure(context, plugin_));
 }
-#endif
 
 TEST_P(WasmNullTest, Stats) {
   createWasm();

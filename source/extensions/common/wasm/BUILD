@@ -16,6 +16,16 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "wasm_runtime_factory_interface",
+    hdrs = [
+        "wasm_runtime_factory.h",
+    ],
+    deps = [
+        "@proxy_wasm_cpp_host//:include",
+    ],
+)
+
 # NB: Used to break the circular dependency between wasm_lib and null_plugin_lib.
 envoy_cc_library(
     name = "wasm_hdr",
@@ -23,7 +33,6 @@ envoy_cc_library(
         "context.h",
         "wasm.h",
         "wasm_extension.h",
-        "wasm_state.h",
         "wasm_vm.h",
     ],
     visibility = ["//visibility:public"],
@@ -32,36 +41,19 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/server:lifecycle_notifier_interface",
+        "//include/envoy/thread_local:thread_local_object",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stats:stats_lib",
         "//source/common/version:version_includes",
+        "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/http:well_known_names",
         "@com_google_cel_cpp//eval/public:activation",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
         "@proxy_wasm_cpp_host//:include",
         "@proxy_wasm_cpp_sdk//:common_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "wasm_interoperation_lib",
-    srcs = [
-        "wasm_state.cc",
-    ],
-    hdrs = [
-        "wasm_state.h",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//include/envoy/stream_info:filter_state_interface",
-        "//source/common/protobuf",
-        "//source/common/singleton:const_singleton",
-        "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_cel_cpp//eval/public:cel_value",
-        "@com_google_cel_cpp//tools:flatbuffers_backed_impl",
     ],
 )
 
@@ -83,7 +75,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":wasm_hdr",
-        ":wasm_interoperation_lib",
+        ":wasm_runtime_factory_interface",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",
         "//include/envoy/server:lifecycle_notifier_interface",
@@ -96,15 +88,17 @@ envoy_cc_library(
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_null_vm_wasm_api",
         "//source/extensions/filters/common/expr:context_lib",
-        "@com_google_cel_cpp//eval/eval:field_access",
-        "@com_google_cel_cpp//eval/eval:field_backed_list_impl",
-        "@com_google_cel_cpp//eval/eval:field_backed_map_impl",
+        "@com_google_cel_cpp//eval/public/containers:field_access",
+        "@com_google_cel_cpp//eval/public/containers:field_backed_list_impl",
+        "@com_google_cel_cpp//eval/public/containers:field_backed_map_impl",
+        "@com_google_cel_cpp//eval/public/structs:cel_proto_wrapper",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:value_export_util",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
-        "@proxy_wasm_cpp_host//:lib",
+        "@proxy_wasm_cpp_host//:common_lib",
+        "@proxy_wasm_cpp_host//:null_lib",
     ] + select(
         {
             "//bazel:windows_x86_64": [],

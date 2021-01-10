@@ -63,10 +63,20 @@ using BufferingStreamDecoderPtr = std::unique_ptr<BufferingStreamDecoder>;
  */
 class RawConnectionDriver {
 public:
+  // Callback that is executed to write data to connection. The provided buffer
+  // should be populated with the data to write. If the callback returns true,
+  // the connection will be closed after writing.
+  using DoWriteCallback = std::function<bool(Buffer::Instance&)>;
   using ReadCallback = std::function<void(Network::ClientConnection&, const Buffer::Instance&)>;
 
-  RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
-                      Network::Address::IpVersion version, Event::Dispatcher& dispatcher,
+  RawConnectionDriver(uint32_t port, DoWriteCallback write_request_callback,
+                      ReadCallback response_data_callback, Network::Address::IpVersion version,
+                      Event::Dispatcher& dispatcher,
+                      Network::TransportSocketPtr transport_socket = nullptr);
+  // Similar to the constructor above but accepts the request as a constructor argument.
+  RawConnectionDriver(uint32_t port, Buffer::Instance& request_data,
+                      ReadCallback response_data_callback, Network::Address::IpVersion version,
+                      Event::Dispatcher& dispatcher,
                       Network::TransportSocketPtr transport_socket = nullptr);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
@@ -79,41 +89,49 @@ public:
   void waitForConnection();
 
   bool closed() { return callbacks_->closed(); }
+  bool allBytesSent() const;
 
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
     ForwardingFilter(RawConnectionDriver& parent, ReadCallback cb)
-        : parent_(parent), data_callback_(cb) {}
+        : parent_(parent), response_data_callback_(cb) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      data_callback_(*parent_.client_, data);
+      response_data_callback_(*parent_.client_, data);
       data.drain(data.length());
       return Network::FilterStatus::StopIteration;
     }
 
     RawConnectionDriver& parent_;
-    ReadCallback data_callback_;
+    ReadCallback response_data_callback_;
   };
 
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
+    using WriteCb = std::function<void()>;
 
+    ConnectionCallbacks(WriteCb write_cb) : write_cb_(write_cb) {}
     bool connected() const { return connected_; }
     bool closed() const { return closed_; }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
+      if (!connected_ && event == Network::ConnectionEvent::Connected) {
+        write_cb_();
+      }
+
       last_connection_event_ = event;
       closed_ |= (event == Network::ConnectionEvent::RemoteClose ||
                   event == Network::ConnectionEvent::LocalClose);
       connected_ |= (event == Network::ConnectionEvent::Connected);
     }
     void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override { write_cb_(); }
 
     Network::ConnectionEvent last_connection_event_;
 
   private:
+    WriteCb write_cb_;
     bool connected_{false};
     bool closed_{false};
   };
@@ -123,6 +141,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
+  uint64_t remaining_bytes_to_send_;
 };
 
 /**
@@ -172,6 +191,10 @@ class ConnectionStatusCallbacks : public Network::ConnectionCallbacks {
 public:
   bool connected() const { return connected_; }
   bool closed() const { return closed_; }
+  void reset() {
+    connected_ = false;
+    closed_ = false;
+  }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {

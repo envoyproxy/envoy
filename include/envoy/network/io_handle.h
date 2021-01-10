@@ -86,11 +86,12 @@ public:
   virtual Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) PURE;
 
   /**
-   * Write the buffer out to a file descriptor.
-   * @param buffer supplies the buffer to write to.
-   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
-   * written if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be
-   * used.
+   * Write the contents of the buffer out to a file descriptor. Bytes that were successfully written
+   * are drained from the buffer.
+   * @param buffer supplies the buffer to write from.
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = if successful, the number of bytes
+   * written and drained from the buffer, or err_ = some IoError for failure. If call failed, rc_
+   * shouldn't be used.
    */
   virtual Api::IoCallUint64Result write(Buffer::Instance& buffer) PURE;
 
@@ -117,6 +118,9 @@ public:
     unsigned int msg_len_{0};
     // The gso_size, if specified in the transport header
     unsigned int gso_size_{0};
+    // If true indicates a successful syscall, but the packet was dropped due to truncation. We do
+    // not support receiving truncated packets.
+    bool truncated_and_dropped_{false};
   };
 
   /**
@@ -260,16 +264,41 @@ public:
   virtual Address::InstanceConstSharedPtr peerAddress() PURE;
 
   /**
-   * Creates a file event that will signal when the io handle is readable, writable or closed.
+   * Duplicates the handle. This is intended to be used only on listener sockets. (see man dup)
+   * @return a pointer to the new handle.
+   */
+  virtual std::unique_ptr<IoHandle> duplicate() PURE;
+
+  /**
+   * Initializes the internal file event that will signal when the io handle is readable, writable
+   * or closed. Each handle is allowed to have only a single file event. The internal file event is
+   * managed by the handle and it is turned on and off when the socket would block. Calls to this
+   * function must be paired with calls to reset the file event or close the socket.
    * @param dispatcher dispatcher to be used to allocate the file event.
    * @param cb supplies the callback to fire when the handle is ready.
    * @param trigger specifies whether to edge or level trigger.
    * @param events supplies a logical OR of @ref Event::FileReadyType events that the file event
    *               should initially listen on.
-   * @return @ref Event::FileEventPtr
    */
-  virtual Event::FileEventPtr createFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                              Event::FileTriggerType trigger, uint32_t events) PURE;
+  virtual void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                                   Event::FileTriggerType trigger, uint32_t events) PURE;
+
+  /**
+   * Activates file events for the current underlying fd.
+   * @param events events that will be activated.
+   */
+  virtual void activateFileEvents(uint32_t events) PURE;
+
+  /**
+   * Enables file events for the current underlying fd.
+   * @param events events that will be enabled.
+   */
+  virtual void enableFileEvents(uint32_t events) PURE;
+
+  /**
+   * Resets the file event.
+   */
+  virtual void resetFileEvents() PURE;
 
   /**
    * Shut down part of a full-duplex connection (see man 2 shutdown)

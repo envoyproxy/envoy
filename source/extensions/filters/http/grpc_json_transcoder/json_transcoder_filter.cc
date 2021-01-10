@@ -188,6 +188,24 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
   }
 
+  switch (proto_config.url_unescape_spec()) {
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS_EXCEPT_RESERVED:
+    pmb.SetUrlUnescapeSpec(
+        google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptReserved);
+    break;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS_EXCEPT_SLASH:
+    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharactersExceptSlash);
+    break;
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
+      ALL_CHARACTERS:
+    pmb.SetUrlUnescapeSpec(google::grpc::transcoding::UrlUnescapeSpec::kAllCharacters);
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
   path_matcher_ = pmb.Build();
 
   const auto& print_config = proto_config.print_options();
@@ -328,9 +346,16 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
       return status;
     }
 
-    resolved_binding.value = binding.value;
-
-    request_info.variable_bindings.emplace_back(std::move(resolved_binding));
+    // HttpBody fields should be passed as-is and not be parsed as JSON.
+    const bool is_http_body = method_info->request_type_is_http_body_;
+    const bool is_inside_http_body =
+        is_http_body && absl::c_equal(absl::MakeSpan(resolved_binding.field_path)
+                                          .subspan(0, method_info->request_body_field_path.size()),
+                                      method_info->request_body_field_path);
+    if (!is_inside_http_body) {
+      resolved_binding.value = binding.value;
+      request_info.variable_bindings.emplace_back(std::move(resolved_binding));
+    }
   }
 
   RequestMessageTranslatorPtr request_translator;

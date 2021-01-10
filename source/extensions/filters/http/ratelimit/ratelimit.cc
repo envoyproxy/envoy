@@ -115,7 +115,7 @@ Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderM
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  populateResponseHeaders(headers);
+  populateResponseHeaders(headers, /*from_local_reply=*/false);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -143,12 +143,19 @@ void Filter::onDestroy() {
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                      Http::RequestHeaderMapPtr&& request_headers_to_add) {
+                      Http::RequestHeaderMapPtr&& request_headers_to_add,
+                      const std::string& response_body,
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
   Stats::StatName empty_stat_name;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
+
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
+                                                *dynamic_metadata);
+  }
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
@@ -195,8 +202,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
     callbacks_->sendLocalReply(
-        Http::Code::TooManyRequests, "",
-        [this](Http::HeaderMap& headers) { populateResponseHeaders(headers); },
+        Http::Code::TooManyRequests, response_body,
+        [this](Http::HeaderMap& headers) {
+          populateResponseHeaders(headers, /*from_local_reply=*/true);
+        },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
@@ -208,8 +217,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       }
     } else {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
-                                 RcDetails::get().RateLimitError);
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, response_body, nullptr,
+                                 absl::nullopt, RcDetails::get().RateLimitError);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
@@ -230,14 +239,25 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
             fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   headers, *callbacks_->streamInfo().downstreamRemoteAddress(),
-                                   &callbacks_->streamInfo().dynamicMetadata());
+    rate_limit.populateDescriptors(
+        *route_entry, descriptors, config_->localInfo().clusterName(), headers,
+        *callbacks_->streamInfo().downstreamAddressProvider().remoteAddress(),
+        &callbacks_->streamInfo().dynamicMetadata());
   }
 }
 
-void Filter::populateResponseHeaders(Http::HeaderMap& response_headers) {
+void Filter::populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply) {
   if (response_headers_to_add_) {
+    // If the ratelimit service is sending back the content-type header and we're
+    // populating response headers for a local reply, overwrite the existing
+    // content-type header.
+    //
+    // We do this because sendLocalReply initially sets content-type to text/plain
+    // whenever the response body is non-empty, but we want the content-type coming
+    // from the ratelimit service to be authoritative in this case.
+    if (from_local_reply && !response_headers_to_add_->getContentTypeValue().empty()) {
+      response_headers.remove(Http::Headers::get().ContentType);
+    }
     Http::HeaderUtility::addHeaders(response_headers, *response_headers_to_add_);
     response_headers_to_add_ = nullptr;
   }

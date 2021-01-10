@@ -1,5 +1,7 @@
+#include <chrono>
+
 #include "envoy/config/overload/v3/overload.pb.h"
-#include "envoy/server/overload_manager.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
@@ -21,9 +23,14 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::AnyNumber;
+using testing::ByMove;
+using testing::DoubleNear;
 using testing::Invoke;
+using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
+using testing::Return;
 
 namespace Envoy {
 namespace Server {
@@ -99,6 +106,29 @@ public:
   const std::string name_;
 };
 
+class TestOverloadManager : public OverloadManagerImpl {
+public:
+  TestOverloadManager(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
+                      ThreadLocal::SlotAllocator& slot_allocator,
+                      const envoy::config::overload::v3::OverloadManager& config,
+                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+      : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
+                            api) {
+    EXPECT_CALL(*this, createScaledRangeTimerManager)
+        .Times(AnyNumber())
+        .WillRepeatedly(Invoke(this, &TestOverloadManager::createDefaultScaledRangeTimerManager));
+  }
+
+  MOCK_METHOD(Event::ScaledRangeTimerManagerPtr, createScaledRangeTimerManager,
+              (Event::Dispatcher&), (const, override));
+
+private:
+  Event::ScaledRangeTimerManagerPtr
+  createDefaultScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
+    return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher);
+  }
+};
+
 class OverloadManagerImplTest : public testing::Test {
 protected:
   OverloadManagerImplTest()
@@ -123,8 +153,8 @@ protected:
     return proto;
   }
 
-  std::unique_ptr<OverloadManagerImpl> createOverloadManager(const std::string& config) {
-    return std::make_unique<OverloadManagerImpl>(dispatcher_, stats_, thread_local_,
+  std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+    return std::make_unique<TestOverloadManager>(dispatcher_, stats_, thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_);
   }
 
@@ -441,6 +471,119 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   manager->stop();
 }
 
+constexpr char kReducedTimeoutsConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+  actions:
+    - name: envoy.overload_actions.reduce_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 2s
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_scale: { value: 10 }
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+  )YAML";
+
+TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+
+  manager->start();
+
+  // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
+  // a timer scale factor of 0.8 (1 - 0.2).
+  EXPECT_CALL(*scaled_timer_manager, setScaleFactor(DoubleNear(0.8, 0.00001)));
+  factory1_.monitor_->setPressure(0.6);
+
+  timer_cb_();
+}
+
+TEST_F(OverloadManagerImplTest, CreateUnscaledScaledTimer) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+  manager->start();
+
+  auto* mock_scaled_timer = new Event::MockTimer();
+  MockFunction<Event::TimerCb> mock_callback;
+  EXPECT_CALL(*scaled_timer_manager, createTimer_)
+      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
+        // Since this timer was created with the timer type "unscaled", it should use the same value
+        // for the min and max. Test that by checking an arbitrary value.
+        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(55));
+        return mock_scaled_timer;
+      });
+
+  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
+      OverloadTimerType::UnscaledRealTimerForTest, mock_callback.AsStdFunction());
+
+  EXPECT_CALL(*mock_scaled_timer, enableTimer(std::chrono::milliseconds(5 * 1000), _));
+  timer->enableTimer(std::chrono::seconds(5));
+}
+
+TEST_F(OverloadManagerImplTest, CreateScaledTimerWithAbsoluteMinimum) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+  manager->start();
+
+  auto* mock_scaled_timer = new Event::MockTimer();
+  MockFunction<Event::TimerCb> mock_callback;
+  EXPECT_CALL(*scaled_timer_manager, createTimer_)
+      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
+        // This timer was created with an absolute minimum. Test that by checking an arbitrary
+        // value.
+        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(2));
+        return mock_scaled_timer;
+      });
+
+  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
+      OverloadTimerType::HttpDownstreamIdleConnectionTimeout, mock_callback.AsStdFunction());
+  EXPECT_EQ(timer.get(), mock_scaled_timer);
+}
+
+TEST_F(OverloadManagerImplTest, CreateScaledTimerWithProvidedMinimum) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+  manager->start();
+
+  auto* mock_scaled_timer = new Event::MockTimer();
+  MockFunction<Event::TimerCb> mock_callback;
+  EXPECT_CALL(*scaled_timer_manager, createTimer_)
+      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
+        // This timer was created with an absolute minimum. Test that by checking an arbitrary
+        // value.
+        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(3));
+        return mock_scaled_timer;
+      });
+
+  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
+      Event::AbsoluteMinimum(std::chrono::seconds(3)), mock_callback.AsStdFunction());
+  EXPECT_EQ(timer.get(), mock_scaled_timer);
+}
+
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
   const std::string config = R"EOF(
     resource_monitors:
@@ -461,6 +604,52 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           "Duplicate overload action .*");
+}
+
+TEST_F(OverloadManagerImplTest, ActionWithUnexpectedTypedConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.dummy_action"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          ".* unexpected .* typed_config .*");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          ".* constraint validation failed.*");
 }
 
 // A scaled trigger action's thresholds must conform to scaling < saturation.

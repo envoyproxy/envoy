@@ -9,7 +9,6 @@
 #include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/common/wasm/wasm.h"
-#include "extensions/common/wasm/wasm_state.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -37,7 +36,7 @@ namespace Wasm {
     log_(static_cast<spdlog::level::level_enum>(level), message);                                  \
     return proxy_wasm::WasmResult::Ok;                                                             \
   }                                                                                                \
-  MOCK_METHOD2(log_, void(spdlog::level::level_enum level, absl::string_view message))
+  MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message))
 
 class DeferredRunner {
 public:
@@ -80,12 +79,13 @@ public:
         lifecycle_notifier_, remote_data_provider_,
         [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     if (wasm_) {
-      wasm_ = getOrCreateThreadLocalWasm(
+      plugin_handle_ = getOrCreateThreadLocalPlugin(
           wasm_, plugin_, dispatcher_,
           [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
             root_context_ = static_cast<Context*>(create_root(wasm, plugin));
             return root_context_;
           });
+      wasm_ = plugin_handle_->wasmHandleForTest();
     }
   }
 
@@ -101,6 +101,7 @@ public:
   NiceMock<Init::MockManager> init_manager_;
   WasmHandleSharedPtr wasm_;
   PluginSharedPtr plugin_;
+  PluginHandleSharedPtr plugin_handle_;
   NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -114,9 +115,9 @@ public:
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {
 public:
-  template <typename TestFilter> void setupFilterBase(const std::string root_id = "") {
+  template <typename TestFilter> void setupFilterBase() {
     auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
-    int root_context_id = wasm ? wasm->getRootContext(root_id)->id() : 0;
+    int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
     context_ = std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_);
     context_->setDecoderFilterCallbacks(decoder_callbacks_);
     context_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -131,9 +132,9 @@ public:
 template <typename Base = testing::Test>
 class WasmNetworkFilterTestBase : public WasmTestBase<Base> {
 public:
-  template <typename TestFilter> void setupFilterBase(const std::string root_id = "") {
+  template <typename TestFilter> void setupFilterBase() {
     auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
-    int root_context_id = wasm ? wasm->getRootContext(root_id)->id() : 0;
+    int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
     context_ = std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_);
     context_->initializeReadFilterCallbacks(read_filter_callbacks_);
     context_->initializeWriteFilterCallbacks(write_filter_callbacks_);

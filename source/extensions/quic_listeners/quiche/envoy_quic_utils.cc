@@ -65,20 +65,32 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::LocalRefusedStreamReset:
     return quic::QUIC_REFUSED_STREAM;
   case Http::StreamResetReason::ConnectionFailure:
+  case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::LocalReset:
     return quic::QUIC_STREAM_CANCELLED;
-  case Http::StreamResetReason::ConnectionTermination:
-    return quic::QUIC_STREAM_NO_ERROR;
   default:
     return quic::QUIC_BAD_APPLICATION_PAYLOAD;
   }
 }
 
-Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode rst_err) {
+Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamErrorCode rst_err) {
+  switch (rst_err) {
+  case quic::QUIC_REFUSED_STREAM:
+    return Http::StreamResetReason::LocalRefusedStreamReset;
+  case quic::QUIC_STREAM_CONNECTION_ERROR:
+    return Http::StreamResetReason::ConnectionFailure;
+  default:
+    return Http::StreamResetReason::LocalReset;
+  }
+}
+
+Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStreamErrorCode rst_err) {
   switch (rst_err) {
   case quic::QUIC_REFUSED_STREAM:
     return Http::StreamResetReason::RemoteRefusedStreamReset;
+  case quic::QUIC_STREAM_CONNECTION_ERROR:
+    return Http::StreamResetReason::ConnectError;
   default:
     return Http::StreamResetReason::RemoteReset;
   }
@@ -120,7 +132,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   }
   connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
-  local_addr = connection_socket->localAddress();
+  local_addr = connection_socket->addressProvider().localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
@@ -170,9 +182,9 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     ASSERT(rsa_public_key != nullptr);
     const unsigned rsa_key_length = RSA_size(rsa_public_key);
 #ifdef BORINGSSL_FIPS
-    if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
-      *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit or 3072-bit keys "
-                       "are supported in FIPS mode";
+    if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8 && rsa_key_length != 4096 / 8) {
+      *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit, 3072-bit or "
+                       "4096-bit keys are supported in FIPS mode";
       break;
     }
 #else

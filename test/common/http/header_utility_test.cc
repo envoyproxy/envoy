@@ -53,9 +53,18 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
       {"[fc00::1]:80", "[fc00::1]:80"}      // port not matching w/ ipv6
   };
 
+  const std::vector<std::pair<std::string, std::string>> any_host_headers{
+      {"localhost:9999", "localhost"}, // name any port
+  };
+
   for (const auto& host_pair : host_headers) {
     auto& host_header = hostHeaderEntry(host_pair.first);
     HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+  for (const auto& host_pair : any_host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first);
+    HeaderUtility::stripPortFromHost(headers_, absl::nullopt);
     EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
   }
 }
@@ -145,7 +154,8 @@ exact_match: value
   EXPECT_EQ("value", header_data.value_);
 }
 
-TEST(HeaderDataConstructorTest, RegexMatchSpecifier) {
+TEST(HeaderDataConstructorTest, DEPRECATED_FEATURE_TEST(RegexMatchSpecifier)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
 name: test-header
 regex_match: value
@@ -249,7 +259,8 @@ invert_match: true
   EXPECT_EQ(true, header_data.invert_match_);
 }
 
-TEST(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
+TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(MayMatchOneOrMoreRequestHeader)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   TestRequestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
 
   const std::string yaml = R"EOF(
@@ -277,7 +288,6 @@ exact_match: a,b
   // Make sure that an exact match on "a,b" does in fact work.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
 
-  TestScopedRuntime runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http_match_on_all_headers", "false"}});
   // Flipping runtime to false should make "a,b" no longer match because we will match on the first
@@ -370,7 +380,8 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, HeaderRegexMatch) {
+TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(HeaderRegexMatch)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
                                               {"match-header", "123.456"}};
@@ -404,7 +415,8 @@ safe_regex_match:
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, HeaderRegexInverseMatch) {
+TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(HeaderRegexInverseMatch)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   TestRequestHeaderMapImpl matching_headers{{"match-header", "1234"}, {"match-header", "123.456"}};
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
 

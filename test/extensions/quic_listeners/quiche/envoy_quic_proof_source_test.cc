@@ -25,7 +25,7 @@ namespace Quic {
 class TestGetProofCallback : public quic::ProofSource::Callback {
 public:
   TestGetProofCallback(bool& called, bool should_succeed, const std::string& server_config,
-                       quic::QuicTransportVersion& version, quiche::QuicheStringPiece chlo_hash,
+                       quic::QuicTransportVersion& version, absl::string_view chlo_hash,
                        Network::FilterChain& filter_chain)
       : called_(called), should_succeed_(should_succeed), server_config_(server_config),
         version_(version), chlo_hash_(chlo_hash), expected_filter_chain_(filter_chain) {
@@ -100,7 +100,7 @@ private:
   bool should_succeed_;
   const std::string& server_config_;
   const quic::QuicTransportVersion& version_;
-  quiche::QuicheStringPiece chlo_hash_;
+  absl::string_view chlo_hash_;
   Network::FilterChain& expected_filter_chain_;
   NiceMock<Stats::MockStore> store_;
   Event::GlobalTimeSystem time_system_;
@@ -141,9 +141,9 @@ public:
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
         .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                    *connection_socket.localAddress());
+                    *connection_socket.addressProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                    *connection_socket.remoteAddress());
+                    *connection_socket.addressProvider().remoteAddress());
           EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
                     connection_socket.detectedTransportProtocol());
           EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
@@ -178,7 +178,7 @@ protected:
   quic::QuicSocketAddress server_address_;
   quic::QuicSocketAddress client_address_;
   quic::QuicTransportVersion version_{quic::QUIC_VERSION_UNSUPPORTED};
-  quiche::QuicheStringPiece chlo_hash_{"aaaaa"};
+  absl::string_view chlo_hash_{"aaaaa"};
   std::string server_config_{"Server Config"};
   std::string expected_certs_{quic::test::kTestCertificateChainPem};
   std::string pkey_{quic::test::kTestCertificatePrivateKeyPem};

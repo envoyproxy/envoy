@@ -144,6 +144,10 @@ public:
     return *transport_socket_factory_;
   }
 
+  std::chrono::milliseconds transportSocketConnectTimeout() const override {
+    return std::chrono::milliseconds::zero();
+  }
+
   const std::vector<FilterFactoryCb>& networkFilterFactories() const override {
     return empty_network_filter_factory_;
   }
@@ -189,7 +193,9 @@ public:
   void recv(Network::UdpRecvData& datagram);
 
   // Return the local peer's socket address.
-  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+  const Network::Address::InstanceConstSharedPtr& localAddress() {
+    return socket_->addressProvider().localAddress();
+  }
 
 private:
   const Network::SocketPtr socket_;

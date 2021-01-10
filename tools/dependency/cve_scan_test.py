@@ -122,12 +122,12 @@ class CveScanTest(unittest.TestCase):
   def BuildCpe(self, cpe_str):
     return cve_scan.Cpe.FromString(cpe_str)
 
-  def BuildDep(self, cpe_str, version=None, last_updated=None):
-    return {'cpe': cpe_str, 'version': version, 'last_updated': last_updated}
+  def BuildDep(self, cpe_str, version=None, release_date=None):
+    return {'cpe': cpe_str, 'version': version, 'release_date': release_date}
 
-  def CpeMatch(self, cpe_str, dep_cpe_str, version=None, last_updated=None):
+  def CpeMatch(self, cpe_str, dep_cpe_str, version=None, release_date=None):
     return cve_scan.CpeMatch(self.BuildCpe(cpe_str),
-                             self.BuildDep(dep_cpe_str, version=version, last_updated=last_updated))
+                             self.BuildDep(dep_cpe_str, version=version, release_date=release_date))
 
   def test_cpe_match(self):
     # Mismatched part
@@ -147,7 +147,7 @@ class CveScanTest(unittest.TestCase):
     self.assertTrue(
         self.CpeMatch('cpe:2.3:a:foo:bar:2020-03-05',
                       'cpe:2.3:a:foo:bar:*',
-                      last_updated='2020-03-05'))
+                      release_date='2020-03-05'))
     fuzzy_version_matches = [
         ('2020-03-05', '2020-03-05'),
         ('2020-03-05', '20200305'),
@@ -186,9 +186,9 @@ class CveScanTest(unittest.TestCase):
                         published_date=dt.date.fromisoformat(published_date),
                         last_modified_date=None)
 
-  def CveMatch(self, cve_id, cpes, published_date, dep_cpe_str, version=None, last_updated=None):
+  def CveMatch(self, cve_id, cpes, published_date, dep_cpe_str, version=None, release_date=None):
     return cve_scan.CveMatch(self.BuildCve(cve_id, cpes=cpes, published_date=published_date),
-                             self.BuildDep(dep_cpe_str, version=version, last_updated=last_updated))
+                             self.BuildDep(dep_cpe_str, version=version, release_date=release_date))
 
   def test_cve_match(self):
     # Empty CPEs, no match
@@ -199,20 +199,20 @@ class CveScanTest(unittest.TestCase):
                       set([self.BuildCpe('cpe:2.3:a:foo:bar:*')]),
                       '2020-05-03',
                       'cpe:2.3:a:foo:bar:*',
-                      last_updated='2020-05-02'))
+                      release_date='2020-05-02'))
     self.assertTrue(
         self.CveMatch('CVE-2020-123',
                       set([self.BuildCpe('cpe:2.3:a:foo:bar:*')]),
                       '2020-05-03',
                       'cpe:2.3:a:foo:bar:*',
-                      last_updated='2020-05-03'))
+                      release_date='2020-05-03'))
     # Wildcard version, recently updated
     self.assertFalse(
         self.CveMatch('CVE-2020-123',
                       set([self.BuildCpe('cpe:2.3:a:foo:bar:*')]),
                       '2020-05-03',
                       'cpe:2.3:a:foo:bar:*',
-                      last_updated='2020-05-04'))
+                      release_date='2020-05-04'))
     # Version match
     self.assertTrue(
         self.CveMatch('CVE-2020-123',
@@ -227,7 +227,7 @@ class CveScanTest(unittest.TestCase):
                       '2020-05-03',
                       'cpe:2.3:a:foo:bar:*',
                       version='1.2.4',
-                      last_updated='2020-05-02'))
+                      release_date='2020-05-02'))
     # Multiple CPEs, match first, don't match later.
     self.assertTrue(
         self.CveMatch('CVE-2020-123',

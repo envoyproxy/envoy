@@ -6,6 +6,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/socket.h"
 #include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -16,6 +17,7 @@
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/init/manager_impl.h"
+#include "common/network/socket_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
@@ -72,7 +74,9 @@ protected:
     class SyntheticConnection : public Network::Connection {
     public:
       SyntheticConnection(SyntheticReadCallbacks& parent)
-          : parent_(parent), stream_info_(parent_.parent_.factory_context_.timeSource()),
+          : parent_(parent), address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(
+                                 parent.parent_.address_, parent.parent_.address_)),
+            stream_info_(parent_.parent_.factory_context_.timeSource(), address_provider_),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       void raiseConnectionEvent(Network::ConnectionEvent event);
@@ -83,16 +87,23 @@ protected:
       }
       void addFilter(Network::FilterSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void addReadFilter(Network::ReadFilterSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void removeReadFilter(Network::ReadFilterSharedPtr) override {
+        NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      }
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection
       void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.push_back(&cb);
       }
+      void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
+        callbacks_.remove(&cb);
+      }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
       }
       void enableHalfClose(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      bool isHalfCloseEnabled() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void close(Network::ConnectionCloseType) override {}
       Event::Dispatcher& dispatcher() override {
         return parent_.parent_.factory_context_.dispatcher();
@@ -104,27 +115,24 @@ protected:
       void readDisable(bool) override {}
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }
-      const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
-        return parent_.parent_.address();
+      const Network::SocketAddressSetter& addressProvider() const override {
+        return *address_provider_;
       }
-      const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
-        return parent_.parent_.address();
+      Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+        return address_provider_;
       }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
       unixSocketPeerCredentials() const override {
         return absl::nullopt;
       }
-      const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-        return parent_.parent_.address();
-      }
       void setConnectionStats(const Network::Connection::ConnectionStats&) override {}
       Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
       absl::string_view requestedServerName() const override { return EMPTY_STRING; }
       State state() const override { return Network::Connection::State::Open; }
+      bool connecting() const override { return false; }
       void write(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void setBufferLimits(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       uint32_t bufferLimit() const override { return 65000; }
-      bool localAddressRestored() const override { return false; }
       bool aboveHighWatermark() const override { return false; }
       const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
         return options_;
@@ -133,9 +141,11 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
+      bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
 
       SyntheticReadCallbacks& parent_;
+      Network::SocketAddressSetterSharedPtr address_provider_;
       StreamInfo::StreamInfoImpl stream_info_;
       Network::ConnectionSocket::OptionsSharedPtr options_;
       std::list<Network::ConnectionCallbacks*> callbacks_;

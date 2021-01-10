@@ -95,6 +95,25 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
 }
 
 HeaderUtility::GetAllOfHeaderAsStringResult
+HeaderUtility::getAllOfHeaderAsString(const HeaderMap::GetResult& header_value,
+                                      absl::string_view separator) {
+  GetAllOfHeaderAsStringResult result;
+  // In this case we concatenate all found headers using a delimiter before performing the
+  // final match. We use an InlinedVector of absl::string_view to invoke the optimized join
+  // algorithm. This requires a copying phase before we invoke join. The 3 used as the inline
+  // size has been arbitrarily chosen.
+  // TODO(mattklein123): Do we need to normalize any whitespace here?
+  absl::InlinedVector<absl::string_view, 3> string_view_vector;
+  string_view_vector.reserve(header_value.size());
+  for (size_t i = 0; i < header_value.size(); i++) {
+    string_view_vector.push_back(header_value[i]->value().getStringView());
+  }
+  result.result_backing_string_ = absl::StrJoin(string_view_vector, separator);
+
+  return result;
+}
+
+HeaderUtility::GetAllOfHeaderAsStringResult
 HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::LowerCaseString& key,
                                       absl::string_view separator) {
   GetAllOfHeaderAsStringResult result;
@@ -108,17 +127,7 @@ HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::Lowe
                  "envoy.reloadable_features.http_match_on_all_headers")) {
     result.result_ = header_value[0]->value().getStringView();
   } else {
-    // In this case we concatenate all found headers using a delimiter before performing the
-    // final match. We use an InlinedVector of absl::string_view to invoke the optimized join
-    // algorithm. This requires a copying phase before we invoke join. The 3 used as the inline
-    // size has been arbitrarily chosen.
-    // TODO(mattklein123): Do we need to normalize any whitespace here?
-    absl::InlinedVector<absl::string_view, 3> string_view_vector;
-    string_view_vector.reserve(header_value.size());
-    for (size_t i = 0; i < header_value.size(); i++) {
-      string_view_vector.push_back(header_value[i]->value().getStringView());
-    }
-    result.result_backing_string_ = absl::StrJoin(string_view_vector, separator);
+    return getAllOfHeaderAsString(header_value, separator);
   }
 
   return result;
@@ -207,7 +216,8 @@ bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
-void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port) {
+void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
+                                      absl::optional<uint32_t> listener_port) {
 
   if (headers.getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     // According to RFC 2817 Connect method should have port part in host header.
@@ -230,8 +240,9 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
     if (!absl::SimpleAtoi(port_str, &port)) {
       return;
     }
-    if (port != listener_port) {
-      // We would strip ports only if they are the same, as local port of the listener.
+    if (listener_port.has_value() && port != listener_port) {
+      // We would strip ports only if it is specified and they are the same, as local port of the
+      // listener.
       return;
     }
     const absl::string_view host = original_host.substr(0, port_start);
@@ -274,6 +285,28 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
     return true;
   }
   return false;
+}
+
+Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Method()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Method.get()));
+  }
+  bool is_connect = Http::HeaderUtility::isConnect(headers);
+  if (is_connect) {
+    if (!headers.Host()) {
+      // Host header must be present for CONNECT request.
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+    }
+  } else {
+    if (!headers.Path()) {
+      // :path header must be present for non-CONNECT requests.
+      return absl::InvalidArgumentError(
+          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+    }
+  }
+  return Http::okStatus();
 }
 
 } // namespace Http

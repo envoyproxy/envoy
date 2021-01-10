@@ -19,8 +19,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/resource_locator.proto";
-
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -38,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 28]
+// [#next-free-field: 30]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -75,18 +73,18 @@ message Bootstrap {
     // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     core.v4alpha.ConfigSource lds_config = 1;
 
-    // Resource locator for listener collection.
+    // xdstp:// resource locator for listener collection.
     // [#not-implemented-hide:]
-    udpa.core.v1.ResourceLocator lds_resources_locator = 5;
+    string lds_resources_locator = 5;
 
     // All post-bootstrap :ref:`Cluster <envoy_api_msg_config.cluster.v4alpha.Cluster>` definitions are
     // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
     // configuration source.
     core.v4alpha.ConfigSource cds_config = 2;
 
-    // Resource locator for cluster collection.
+    // xdstp:// resource locator for cluster collection.
     // [#not-implemented-hide:]
-    udpa.core.v1.ResourceLocator cds_resources_locator = 6;
+    string cds_resources_locator = 6;
 
     // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
@@ -108,7 +106,7 @@ message Bootstrap {
 
   // A list of :ref:`Node <envoy_v3_api_msg_config.core.v3.Node>` field names
   // that will be included in the context parameters of the effective
-  // *UdpaResourceLocator* that is sent in a discovery request when resource
+  // xdstp:// URL that is sent in a discovery request when resource
   // locators are used for LDS/CDS. Any non-string field will have its JSON
   // encoding set as the context parameter value, with the exception of
   // metadata, which will be flattened (see example below). The supported field
@@ -163,15 +161,23 @@ message Bootstrap {
   // Configuration for internal processing of stats.
   metrics.v4alpha.StatsConfig stats_config = 13;
 
-  // Optional duration between flushes to configured stats sinks. For
-  // performance reasons Envoy latches counters and only flushes counters and
-  // gauges at a periodic interval. If not specified the default is 5000ms (5
-  // seconds).
-  // Duration must be at least 1ms and at most 5 min.
-  google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
-    lt {seconds: 300}
-    gte {nanos: 1000000}
-  }];
+  oneof stats_flush {
+    // Optional duration between flushes to configured stats sinks. For
+    // performance reasons Envoy latches counters and only flushes counters and
+    // gauges at a periodic interval. If not specified the default is 5000ms (5
+    // seconds). Only one of `stats_flush_interval` or `stats_flush_on_admin`
+    // can be set.
+    // Duration must be at least 1ms and at most 5 min.
+    google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
+      lt {seconds: 300}
+      gte {nanos: 1000000}
+    }];
+
+    // Flush stats to sinks only when queried for on the admin interface. If set,
+    // a flush timer is not created. Only one of `stats_flush_on_admin` or
+    // `stats_flush_interval` can be set.
+    bool stats_flush_on_admin = 29 [(validate.rules).bool = {const: true}];
+  }
 
   // Optional watchdogs configuration.
   // This is used for specifying different watchdogs for the different subsystems.
@@ -229,10 +235,14 @@ message Bootstrap {
   // Each item contains extension specific configuration.
   repeated core.v4alpha.TypedExtensionConfig bootstrap_extensions = 21;
 
+  // Specifies optional extensions instantiated at startup time and
+  // invoked during crash time on the request that caused the crash.
+  repeated FatalAction fatal_actions = 28;
+
   // Configuration sources that will participate in
-  // *udpa.core.v1.ResourceLocator* authority resolution. The algorithm is as
+  // xdstp:// URL authority resolution. The algorithm is as
   // follows:
-  // 1. The authority field is taken from the *udpa.core.v1.ResourceLocator*, call
+  // 1. The authority field is taken from the xdstp:// URL, call
   //    this *resource_authority*.
   // 2. *resource_authority* is compared against the authorities in any peer
   //    *ConfigSource*. The peer *ConfigSource* is the configuration source
@@ -248,7 +258,7 @@ message Bootstrap {
   // [#not-implemented-hide:]
   repeated core.v4alpha.ConfigSource config_sources = 22;
 
-  // Default configuration source for *udpa.core.v1.ResourceLocator* if all
+  // Default configuration source for xdstp:// URLs if all
   // other resolution fails.
   // [#not-implemented-hide:]
   core.v4alpha.ConfigSource default_config_source = 23;
@@ -412,6 +422,23 @@ message Watchdog {
   type.v3.Percent multikill_threshold = 5;
 }
 
+// Fatal actions to run while crashing. Actions can be safe (meaning they are
+// async-signal safe) or unsafe. We run all safe actions before we run unsafe actions.
+// If using an unsafe action that could get stuck or deadlock, it important to
+// have an out of band system to terminate the process.
+//
+// The interface for the extension is ``Envoy::Server::Configuration::FatalAction``.
+// *FatalAction* extensions live in the ``envoy.extensions.fatal_actions`` API
+// namespace.
+message FatalAction {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.bootstrap.v3.FatalAction";
+
+  // Extension specific configuration for the action. It's expected to conform
+  // to the ``Envoy::Server::Configuration::FatalAction`` interface.
+  core.v4alpha.TypedExtensionConfig config = 1;
+}
+
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).
 message Runtime {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Runtime";
@@ -484,14 +511,8 @@ message RuntimeLayer {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v3.RuntimeLayer.RtdsLayer";
 
-    oneof name_specifier {
-      // Resource to subscribe to at *rtds_config* for the RTDS layer.
-      string name = 1;
-
-      // Resource locator for RTDS layer. This is mutually exclusive to *name*.
-      // [#not-implemented-hide:]
-      udpa.core.v1.ResourceLocator rtds_resource_locator = 3;
-    }
+    // Resource to subscribe to at *rtds_config* for the RTDS layer.
+    string name = 1;
 
     // RTDS configuration source.
     core.v4alpha.ConfigSource rtds_config = 2;

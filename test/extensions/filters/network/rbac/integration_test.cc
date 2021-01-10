@@ -33,7 +33,7 @@ public:
       filters:
        -  name: rbac
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+            "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
             stat_prefix: tcp.
             rules:
               policies:
@@ -70,7 +70,7 @@ TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
   stat_prefix: tcp.
   rules:
     policies:
@@ -103,7 +103,7 @@ TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
   stat_prefix: tcp.
   rules:
     policies:
@@ -136,7 +136,7 @@ TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction)
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
   stat_prefix: tcp.
   rules:
     action: DENY

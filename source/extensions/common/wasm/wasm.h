@@ -11,7 +11,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
-#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -54,8 +54,8 @@ public:
 
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
-  Context* getRootContext(absl::string_view root_id) {
-    return static_cast<Context*>(WasmBase::getRootContext(root_id));
+  Context* getRootContext(const std::shared_ptr<PluginBase>& plugin, bool allow_closed) {
+    return static_cast<Context*>(WasmBase::getRootContext(plugin, allow_closed));
   }
   void setTimerPeriod(uint32_t root_context_id, std::chrono::milliseconds period) override;
   virtual void tickHandler(uint32_t root_context_id);
@@ -72,12 +72,13 @@ public:
   void getFunctions() override;
 
   // AccessLog::Instance
-  void log(absl::string_view root_id, const Http::RequestHeaderMap* request_headers,
+  void log(const PluginSharedPtr& plugin, const Http::RequestHeaderMap* request_headers,
            const Http::ResponseHeaderMap* response_headers,
            const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info);
 
-  void onStatsUpdate(absl::string_view root_id, Envoy::Stats::MetricSnapshot& snapshot);
+  void onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot);
+
   virtual std::string buildVersion() { return BUILD_VERSION_NUMBER; }
 
   void initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifier);
@@ -136,6 +137,23 @@ private:
   WasmSharedPtr wasm_;
 };
 
+using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
+
+class PluginHandle : public PluginHandleBase, public ThreadLocal::ThreadLocalObject {
+public:
+  explicit PluginHandle(const WasmHandleSharedPtr& wasm_handle, absl::string_view plugin_key)
+      : PluginHandleBase(std::static_pointer_cast<WasmHandleBase>(wasm_handle), plugin_key),
+        wasm_handle_(wasm_handle) {}
+
+  WasmSharedPtr& wasm() { return wasm_handle_->wasm(); }
+  WasmHandleSharedPtr& wasmHandleForTest() { return wasm_handle_; }
+
+private:
+  WasmHandleSharedPtr wasm_handle_;
+};
+
+using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
+
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 
 // Returns false if createWasm failed synchronously. This is necessary because xDS *MUST* report
@@ -150,10 +168,10 @@ bool createWasm(const VmConfig& vm_config, const PluginSharedPtr& plugin,
                 CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 
-WasmHandleSharedPtr
-getOrCreateThreadLocalWasm(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
-                           Event::Dispatcher& dispatcher,
-                           CreateContextFn create_root_context_for_testing = nullptr);
+PluginHandleSharedPtr
+getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
+                             Event::Dispatcher& dispatcher,
+                             CreateContextFn create_root_context_for_testing = nullptr);
 
 void clearCodeCacheForTesting();
 std::string anyToBytes(const ProtobufWkt::Any& any);

@@ -2,12 +2,14 @@
 
 #include <csignal>
 #include <cstdint>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <string>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -18,6 +20,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -28,6 +31,7 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/config/xds_resource.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -38,6 +42,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/signal/fatal_error_handler.h"
 #include "common/singleton/manager_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
@@ -60,7 +65,8 @@ InstanceImpl::InstanceImpl(
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
     ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
+    Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+    Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
@@ -70,7 +76,8 @@ InstanceImpl::InstanceImpl(
       random_generator_(std::move(random_generator)),
       api_(new Api::Impl(thread_factory, store, time_system, file_system, *random_generator_,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
-                                         : absl::nullopt)),
+                                         : absl::nullopt,
+                         watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
@@ -81,8 +88,8 @@ InstanceImpl::InstanceImpl(
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_contexts_(*this) {
+      router_context_(store.symbolTable()), process_context_(std::move(process_context)),
+      hooks_(hooks), server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -147,7 +154,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(live_.load());
 }
 
-MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
+MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
   snapped_counters_ = store.counters();
   counters_.reserve(snapped_counters_.size());
   for (const auto& counter : snapped_counters_) {
@@ -172,15 +179,17 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   for (const auto& text_readout : snapped_text_readouts_) {
     text_readouts_.push_back(*text_readout);
   }
+
+  snapshot_time_ = time_source.systemTime();
 }
 
-void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                       TimeSource& time_source) {
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store);
+  MetricSnapshotImpl snapshot(store, time_source);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -231,14 +240,23 @@ void InstanceImpl::updateServerStats() {
 
 void InstanceImpl::flushStatsInternal() {
   updateServerStats();
-  InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
+  auto& stats_config = config_.statsConfig();
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, timeSource());
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
-    stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+    stat_flush_timer_->enableTimer(stats_config.flushInterval());
   }
 }
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
+
+ProcessContextOptRef InstanceImpl::processContext() {
+  if (process_context_ == nullptr) {
+    return absl::nullopt;
+  }
+
+  return *process_context_;
+}
 
 namespace {
 // Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
@@ -254,7 +272,7 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
     envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
     load_function(bootstrap_v2, false);
     Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
-    MessageUtil::onVersionUpgradeWarn("v2 bootstrap");
+    MessageUtil::onVersionUpgradeDeprecation("v2 bootstrap", false);
   } else {
     throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
   }
@@ -385,10 +403,10 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
-      options.serviceNodeName());
+      stats().symbolTable(), bootstrap_.node(), local_address, options.serviceZone(),
+      options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_);
+  Configuration::InitialImpl initial_config(bootstrap_, options);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
@@ -414,6 +432,26 @@ void InstanceImpl::initialize(const Options& options,
         factory);
     bootstrap_extensions_.push_back(
         factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
+
+  // Register the fatal actions.
+  {
+    FatalAction::FatalActionPtrList safe_actions;
+    FatalAction::FatalActionPtrList unsafe_actions;
+    for (const auto& action_config : bootstrap_.fatal_actions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::FatalActionFactory>(
+              action_config.config());
+      auto action = factory.createFatalActionFromProto(action_config, this);
+
+      if (action->isAsyncSignalSafe()) {
+        safe_actions.push_back(std::move(action));
+      } else {
+        unsafe_actions.push_back(std::move(action));
+      }
+    }
+    Envoy::FatalErrorHandler::registerFatalActions(
+        std::move(safe_actions), std::move(unsafe_actions), api_->threadFactory());
   }
 
   if (!bootstrap_.default_socket_interface().empty()) {
@@ -489,8 +527,8 @@ void InstanceImpl::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
-      *singleton_manager_);
+      messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
+      access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -501,11 +539,15 @@ void InstanceImpl::initialize(const Options& options,
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config() ||
-      bootstrap_.dynamic_resources().has_lds_resources_locator()) {
+      !bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
+    std::unique_ptr<xds::core::v3::ResourceLocator> lds_resources_locator;
+    if (!bootstrap_.dynamic_resources().lds_resources_locator().empty()) {
+      lds_resources_locator =
+          std::make_unique<xds::core::v3::ResourceLocator>(Config::XdsResourceIdentifier::decodeUrl(
+              bootstrap_.dynamic_resources().lds_resources_locator()));
+    }
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config(),
-                                    bootstrap_.dynamic_resources().has_lds_resources_locator()
-                                        ? &bootstrap_.dynamic_resources().lds_resources_locator()
-                                        : nullptr);
+                                    lds_resources_locator.get());
   }
 
   // We have to defer RTDS initialization until after the cluster manager is
@@ -515,14 +557,16 @@ void InstanceImpl::initialize(const Options& options,
   clusterManager().setPrimaryClustersInitializedCb(
       [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
-  for (Stats::SinkPtr& sink : config_.statsSinks()) {
+  auto& stats_config = config_.statsConfig();
+  for (const Stats::SinkPtr& sink : stats_config.sinks()) {
     stats_store_.addSink(*sink);
   }
-
-  // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
-  // Just setup the timer.
-  stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
-  stat_flush_timer_->enableTimer(config_.statsFlushInterval());
+  if (!stats_config.flushOnAdmin()) {
+    // Some of the stat sinks may need dispatcher support so don't flush until the main loop starts.
+    // Just setup the timer.
+    stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
+    stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
@@ -550,10 +594,10 @@ void InstanceImpl::onRuntimeReady() {
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                        stats_store_, false)
             ->create(),
-        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, info_factory_, access_log_manager_,
-        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
-        messageValidationContext().dynamicValidationVisitor(), *api_);
+        Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
+        Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
+        access_log_manager_, *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_,
+        thread_local_, messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 
   // If there is no global limit to the number of active connections, warn on startup.
@@ -567,15 +611,22 @@ void InstanceImpl::onRuntimeReady() {
 }
 
 void InstanceImpl::startWorkers() {
-  listener_manager_->startWorkers(*worker_guard_dog_);
-  initialization_timer_->complete();
-  // Update server stats as soon as initialization is done.
-  updateServerStats();
-  workers_started_ = true;
-  // At this point we are ready to take traffic and all listening ports are up. Notify our parent
-  // if applicable that they can stop listening and drain.
-  restarter_.drainParentListeners();
-  drain_manager_->startParentShutdownSequence();
+  // The callback will be called after workers are started.
+  listener_manager_->startWorkers(*worker_guard_dog_, [this]() {
+    if (isShutdown()) {
+      return;
+    }
+
+    initialization_timer_->complete();
+    // Update server stats as soon as initialization is done.
+    updateServerStats();
+    workers_started_ = true;
+    hooks_.onWorkersStarted();
+    // At this point we are ready to take traffic and all listening ports are up. Notify our
+    // parent if applicable that they can stop listening and drain.
+    restarter_.drainParentListeners();
+    drain_manager_->startParentShutdownSequence();
+  });
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
@@ -609,15 +660,16 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
         }
       }) {
   // Setup signals.
+  // Since signals are not supported on Windows we have an internal definition for `SIGTERM`
+  // On POSIX it resolves as expected to SIGTERM
+  // On Windows we use it internally for all the console events that indicate that we should
+  // terminate the process.
   if (options.signalHandlingEnabled()) {
-// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
-// on Windows.
-#ifndef WIN32
-    sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
-      ENVOY_LOG(warn, "caught SIGTERM");
+    sigterm_ = dispatcher.listenForSignal(ENVOY_SIGTERM, [&instance]() {
+      ENVOY_LOG(warn, "caught ENVOY_SIGTERM");
       instance.shutdown();
     });
-
+#ifndef WIN32
     sigint_ = dispatcher.listenForSignal(SIGINT, [&instance]() {
       ENVOY_LOG(warn, "caught SIGINT");
       instance.shutdown();
@@ -678,8 +730,7 @@ void InstanceImpl::run() {
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
-                                                         "main_thread");
-  watchdog->startWatchdog(*dispatcher_);
+                                                         "main_thread", *dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
@@ -730,6 +781,7 @@ void InstanceImpl::terminate() {
   restarter_.shutdown();
   ENVOY_LOG(info, "exiting");
   ENVOY_FLUSH_LOG();
+  FatalErrorHandler::clearFatalActionsOnTerminate();
 }
 
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
@@ -767,7 +819,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

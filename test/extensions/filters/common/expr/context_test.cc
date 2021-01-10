@@ -1,7 +1,9 @@
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 #include "common/router/string_accessor_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
+#include "extensions/filters/common/expr/cel_state.h"
 #include "extensions/filters/common/expr/context.h"
 
 #include "test/mocks/ssl/mocks.h"
@@ -437,8 +439,8 @@ TEST(Context, ConnectionAttributes) {
   Network::Address::InstanceConstSharedPtr upstream_local_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 1000, false);
   const std::string sni_name = "kittens.com";
-  EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
-  EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
+  info.downstream_address_provider_->setLocalAddress(local);
+  info.downstream_address_provider_->setRemoteAddress(remote);
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
   EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
@@ -448,6 +450,9 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(info, upstreamTransportFailureReason())
       .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
+  const absl::optional<std::string> connection_termination_details = "unauthorized";
+  EXPECT_CALL(info, connectionTerminationDetails())
+      .WillRepeatedly(ReturnRef(connection_termination_details));
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -612,6 +617,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = connection[CelValue::CreateStringView(ConnectionTerminationDetails)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(connection_termination_details.value(), value.value().StringOrDie().value());
+  }
+
+  {
     auto value = upstream[CelValue::CreateStringView(TLSVersion)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
@@ -698,6 +710,23 @@ TEST(Context, FilterStateAttributes) {
     EXPECT_TRUE(value.has_value());
     EXPECT_TRUE(value.value().IsBytes());
     EXPECT_EQ(serialized, value.value().BytesOrDie().value());
+  }
+
+  CelStatePrototype prototype(true, CelStateType::Protobuf,
+                              "type.googleapis.com/google.protobuf.DoubleValue",
+                              StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto cel_state = std::make_shared<CelState>(prototype);
+  ProtobufWkt::DoubleValue v;
+  v.set_value(1.0);
+  cel_state->setValue(v.SerializeAsString());
+  const std::string cel_key = "cel_state_key";
+  filter_state.setData(cel_key, cel_state, StreamInfo::FilterState::StateType::ReadOnly);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(cel_key)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsDouble());
+    EXPECT_EQ(value.value().DoubleOrDie(), 1.0);
   }
 }
 

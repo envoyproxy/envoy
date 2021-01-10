@@ -1,6 +1,6 @@
 #pragma once
 
-#include "third_party/statusor/statusor.h"
+#include "absl/status/statusor.h"
 
 /**
  * Facility for returning either a valid value or an error in a form of Envoy::Status.

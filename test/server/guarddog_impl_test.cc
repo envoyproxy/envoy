@@ -18,6 +18,7 @@
 #include "server/guarddog_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/watchdog_config.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
@@ -48,21 +49,23 @@ const int DISABLE_MEGAMISS = 1000000;
 class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
 public:
   // GuardDogImpl::TestInterlockHook
-  void signalFromImpl(MonotonicTime time) override {
-    impl_reached_ = time;
+  void signalFromImpl() override {
+    waiting_for_signal_ = false;
     impl_.notifyAll();
   }
 
-  void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time) override
+  void waitFromTest(Thread::MutexBasicLockable& mutex) override
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    while (impl_reached_ < time) {
+    ASSERT(!waiting_for_signal_);
+    waiting_for_signal_ = true;
+    while (waiting_for_signal_) {
       impl_.wait(mutex);
     }
   }
 
 private:
   Thread::CondVar impl_;
-  MonotonicTime impl_reached_;
+  bool waiting_for_signal_ = false;
 };
 
 // We want to make sure guard-dog is tested with both simulated time and real
@@ -91,6 +94,7 @@ protected:
   std::unique_ptr<Event::TestTimeSystem> time_system_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
+  NiceMock<Event::MockDispatcher> mock_dispatcher_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
 };
 
@@ -115,10 +119,11 @@ protected:
    * This does everything but the final forceCheckForTest() that should cause
    * death for the single kill case.
    */
-  void SetupForDeath() {
+  void setupForDeath() {
     InSequence s;
     initGuardDog(fakestats_, config_kill_);
-    unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread",
+                                            mock_dispatcher_);
     dogs_.emplace_back(unpet_dog_);
     guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(99)); // 1 ms shy of death.
@@ -128,15 +133,15 @@ protected:
    * This does everything but the final forceCheckForTest() that should cause
    * death for the multiple kill case.
    */
-  void SetupForMultiDeath() {
+  void setupForMultiDeath() {
     InSequence s;
     initGuardDog(fakestats_, config_multikill_);
-    auto unpet_dog_ =
-        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    auto unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                 "test_thread", mock_dispatcher_);
     dogs_.emplace_back(unpet_dog_);
     guard_dog_->forceCheckForTest();
-    auto second_dog_ =
-        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    auto second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                  "test_thread", mock_dispatcher_);
     dogs_.emplace_back(second_dog_);
     guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
@@ -152,7 +157,8 @@ protected:
 
     // Creates 5 watchdogs.
     for (int i = 0; i < 5; ++i) {
-      auto dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+      auto dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread",
+                                            mock_dispatcher_);
       dogs_.emplace_back(dog);
 
       if (i == 0) {
@@ -191,7 +197,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
   auto die_function = [&]() -> void {
-    SetupForDeath();
+    setupForDeath();
     time_system_->advanceTimeWait(std::chrono::milliseconds(401)); // 400 ms past death.
     guard_dog_->forceCheckForTest();
   };
@@ -205,12 +211,12 @@ TEST_P(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
   // This does everything the death test does, except allow enough time to
   // expire to reach the death panic. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
-  SetupForDeath();
+  setupForDeath();
 }
 
 TEST_P(GuardDogDeathTest, MultiKillDeathTest) {
   auto die_function = [&]() -> void {
-    SetupForMultiDeath();
+    setupForMultiDeath();
     time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
     guard_dog_->forceCheckForTest();
   };
@@ -221,7 +227,7 @@ TEST_P(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
   // This does everything the death test does not except the final force check that
   // should actually result in dying. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
-  SetupForMultiDeath();
+  setupForMultiDeath();
 }
 
 TEST_P(GuardDogDeathTest, MultiKillThresholdDeathTest) {
@@ -257,9 +263,10 @@ TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
   // there is no death. The positive case is covered in MultiKillDeathTest.
   InSequence s;
   initGuardDog(fakestats_, config_multikill_);
-  auto unpet_dog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
-  auto pet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                              "test_thread", mock_dispatcher_);
+  auto pet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread",
+                                            mock_dispatcher_);
   // This part "waits" 600 milliseconds while one dog is touched every 100, and
   // the other is not. 600ms is over the threshold of 500ms for multi-kill but
   // only one is nonresponsive, so there should be no kill (single kill
@@ -305,8 +312,9 @@ TEST_P(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
   initGuardDog(stats_store_, config_miss_);
-  auto unpet_dog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                              "test_thread", mock_dispatcher_);
+  guard_dog_->forceCheckForTest();
   // We'd better start at 0:
   checkMiss(0, "MissTest check 1");
   // At 300ms we shouldn't have hit the timeout yet:
@@ -330,8 +338,9 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
   initGuardDog(stats_store_, config_mega_);
-  auto unpet_dog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                              "test_thread", mock_dispatcher_);
+  guard_dog_->forceCheckForTest();
   // We'd better start at 0:
   checkMegaMiss(0, "MegaMissTest check 1");
   // This shouldn't be enough to increment the stat:
@@ -356,8 +365,9 @@ TEST_P(GuardDogMissTest, MissCountTest) {
   // spurious condition_variable wakeup causes the counter to get incremented
   // more than it should be.
   initGuardDog(stats_store_, config_miss_);
-  auto sometimes_pet_dog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  auto sometimes_pet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                      "test_thread", mock_dispatcher_);
+  guard_dog_->forceCheckForTest();
   // These steps are executed once without ever touching the watchdog.
   // Then the last step is to touch the watchdog and repeat the steps.
   // This verifies that the behavior is reset back to baseline after a touch.
@@ -380,9 +390,11 @@ TEST_P(GuardDogMissTest, MissCountTest) {
     // When we finally touch the dog we should get one more increment once the
     // timeout value expires:
     sometimes_pet_dog->touch();
+    guard_dog_->forceCheckForTest();
   }
   time_system_->advanceTimeWait(std::chrono::milliseconds(1000));
   sometimes_pet_dog->touch();
+  guard_dog_->forceCheckForTest();
   // Make sure megamiss still works:
   checkMegaMiss(0UL, "MissCountTest check 5");
   time_system_->advanceTimeWait(std::chrono::milliseconds(1500));
@@ -417,8 +429,8 @@ TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockWatchdog> config(100, 90, 1000, 500, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
-  auto watched_dog =
-      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  auto watched_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
+                                                "test_thread", mock_dispatcher_);
   EXPECT_EQ(watched_dog->threadId().debugString(),
             api_->threadFactory().currentThreadId().debugString());
   guard_dog_->stopWatching(watched_dog);
@@ -583,7 +595,7 @@ protected:
 
   void setupFirstDog(const NiceMock<Configuration::MockWatchdog>& config, Thread::ThreadId tid) {
     initGuardDog(fake_stats_, config);
-    first_dog_ = guard_dog_->createWatchDog(tid, "test_thread");
+    first_dog_ = guard_dog_->createWatchDog(tid, "test_thread", mock_dispatcher_);
     guard_dog_->forceCheckForTest();
   }
 
@@ -605,7 +617,7 @@ TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
   const NiceMock<Configuration::MockWatchdog> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
                                                      DISABLE_MULTIKILL, 0, getActionsConfig());
   setupFirstDog(config, Thread::ThreadId(10));
-  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread", mock_dispatcher_);
   time_system_->advanceTimeWait(std::chrono::milliseconds(50));
   second_dog_->touch();
 
@@ -613,7 +625,19 @@ TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
   // synchronize with the guard dog.
   guard_dog_->forceCheckForTest();
 
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the guard dog timer goes off.
+    second_dog_->touch();
+  }
+
   time_system_->advanceTimeWait(std::chrono::milliseconds(51));
+
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the prior "touch" was consumed.
+    second_dog_->touch();
+  }
   guard_dog_->forceCheckForTest();
 
   EXPECT_THAT(events_, ElementsAre("MISS : 10"));
@@ -623,8 +647,8 @@ TEST_P(GuardDogActionsTest, MissShouldBeAbleToReportMultipleThreads) {
   const NiceMock<Configuration::MockWatchdog> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
                                                      DISABLE_MULTIKILL, 0, getActionsConfig());
   initGuardDog(fake_stats_, config);
-  first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
-  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+  first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread", mock_dispatcher_);
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread", mock_dispatcher_);
 
   first_dog_->touch();
   second_dog_->touch();
@@ -656,6 +680,7 @@ TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
+  guard_dog_->forceCheckForTest();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -666,7 +691,7 @@ TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
   const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, 100, DISABLE_KILL,
                                                      DISABLE_MULTIKILL, 0, getActionsConfig());
   setupFirstDog(config, Thread::ThreadId(10));
-  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread", mock_dispatcher_);
   time_system_->advanceTimeWait(std::chrono::milliseconds(50));
   second_dog_->touch();
 
@@ -674,7 +699,19 @@ TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
   // synchronize with the guard dog.
   guard_dog_->forceCheckForTest();
 
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the guard dog timer goes off.
+    second_dog_->touch();
+  }
+
   time_system_->advanceTimeWait(std::chrono::milliseconds(51));
+
+  if (GetParam() == TimeSystemType::Real) {
+    // Touch the second_dog in case we overslept in the real time system
+    // and the prior "touch" was consumed.
+    second_dog_->touch();
+  }
   guard_dog_->forceCheckForTest();
 
   EXPECT_THAT(events_, ElementsAre("MEGAMISS : 10"));
@@ -684,8 +721,8 @@ TEST_P(GuardDogActionsTest, MegaMissShouldBeAbleToReportMultipleThreads) {
   const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, 100, DISABLE_KILL,
                                                      DISABLE_MULTIKILL, 0, getActionsConfig());
   initGuardDog(fake_stats_, config);
-  first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
-  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+  first_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread", mock_dispatcher_);
+  second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread", mock_dispatcher_);
 
   first_dog_->touch();
   second_dog_->touch();
@@ -718,6 +755,7 @@ TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
 
   // Touch the watchdog, which should allow the event to trigger again.
   first_dog_->touch();
+  guard_dog_->forceCheckForTest();
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -731,8 +769,11 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   auto kill_function = [&]() -> void {
     const NiceMock<Configuration::MockWatchdog> config(100, 100, 100, 100, 0, getActionsConfig());
     initGuardDog(fake_stats_, config);
-    auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
-    auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+    auto first_dog =
+        guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread", mock_dispatcher_);
+    auto second_dog =
+        guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread", mock_dispatcher_);
+    guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };
@@ -745,8 +786,11 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     const NiceMock<Configuration::MockWatchdog> config(100, 100, DISABLE_KILL, 100, 0,
                                                        getActionsConfig());
     initGuardDog(fake_stats_, config);
-    auto first_dog = guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread");
-    auto second_dog = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+    auto first_dog =
+        guard_dog_->createWatchDog(Thread::ThreadId(10), "test_thread", mock_dispatcher_);
+    auto second_dog =
+        guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread", mock_dispatcher_);
+    guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();
   };
@@ -779,7 +823,7 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
     const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
                                                        100, 0, getActionsConfig());
     setupFirstDog(config, Thread::ThreadId(10));
-    second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread");
+    second_dog_ = guard_dog_->createWatchDog(Thread::ThreadId(11), "test_thread", mock_dispatcher_);
     guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(101));
     guard_dog_->forceCheckForTest();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/server/watchdog.h"
 
 namespace Envoy {
@@ -28,9 +29,11 @@ public:
    *
    * @param thread_id a Thread::ThreadId containing the system thread id
    * @param thread_name supplies the name of the thread which is used for per-thread miss stats.
+   * @param dispatcher dispatcher responsible for petting the watchdog.
    */
   virtual WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id,
-                                           const std::string& thread_name) PURE;
+                                           const std::string& thread_name,
+                                           Event::Dispatcher& dispatcher) PURE;
 
   /**
    * Tell the GuardDog to forget about this WatchDog.

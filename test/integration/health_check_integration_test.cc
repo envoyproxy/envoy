@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/http_integration.h"
@@ -75,8 +76,9 @@ public:
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're using dynamic CDS.
     for (auto& cluster : clusters_) {
-      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, upstream_protocol_, version_,
-                                                              timeSystem(), enable_half_close_);
+      auto config = upstreamConfig();
+      config.upstream_protocol_ = upstream_protocol_;
+      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
       cluster.cluster_ = ConfigHelper::buildStaticCluster(
           cluster.name_, cluster.host_upstream_->localAddress()->ip()->port(),
           Network::Test::getLoopbackAddressString(ip_version_));
@@ -328,6 +330,162 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
 
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+class GrpcHealthCheckIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                       public HealthCheckIntegrationTestBase {
+public:
+  GrpcHealthCheckIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
+
+  void TearDown() override {
+    cleanupHostConnections();
+    cleanUpXdsConnection();
+  }
+
+  // Adds a gRPC active health check specifier to the given cluster, and waits for the first health
+  // check probe to be received.
+  void initGrpcHealthCheck(uint32_t cluster_idx) {
+    auto& cluster_data = clusters_[cluster_idx];
+    auto health_check = addHealthCheck(cluster_data.cluster_);
+    health_check->mutable_grpc_health_check();
+
+    // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+
+    // Wait for upstream to receive HC request.
+    grpc::health::v1::HealthCheckRequest request;
+    ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
+        *dispatcher_, cluster_data.host_fake_connection_));
+    ASSERT_TRUE(cluster_data.host_fake_connection_->waitForNewStream(*dispatcher_,
+                                                                     cluster_data.host_stream_));
+    ASSERT_TRUE(cluster_data.host_stream_->waitForGrpcMessage(*dispatcher_, request));
+    ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
+
+    EXPECT_EQ(cluster_data.host_stream_->headers().getPathValue(), "/grpc.health.v1.Health/Check");
+    EXPECT_EQ(cluster_data.host_stream_->headers().getContentTypeValue(),
+              Http::Headers::get().ContentTypeValues.Grpc);
+    EXPECT_EQ(cluster_data.host_stream_->headers().getHostValue(), cluster_data.name_);
+  }
+
+  // Send a gRPC message with the given headers and health check response message.
+  void sendGrpcResponse(uint32_t cluster_idx,
+                        const Http::TestResponseHeaderMapImpl& response_headers,
+                        const grpc::health::v1::HealthCheckResponse& health_check_response) {
+    clusters_[cluster_idx].host_stream_->encodeHeaders(response_headers, false);
+    clusters_[cluster_idx].host_stream_->sendGrpcMessage(health_check_response);
+    clusters_[cluster_idx].host_stream_->finishGrpcStream(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcHealthCheckIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Tests that a healthy endpoint returns a valid gRPC health check response.
+TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointServingGrpc) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initGrpcHealthCheck(cluster_idx);
+
+  // Endpoint responds to the health check
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
+  // Send a grpc response.
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that an unhealthy endpoint returns a valid gRPC health check response.
+TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointNotServingGrpc) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initGrpcHealthCheck(cluster_idx);
+
+  // Endpoint responds to the health check
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  // Send a grpc response.
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that no gRPC health check response results in timeout and unhealthy endpoint.
+TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointTimeoutGrpc) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initGrpcHealthCheck(cluster_idx);
+
+  // Increase time until timeout (30s).
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that a gRPC health check response that returns SERVICE_UNKNOWN is
+// properly handled (see https://github.com/envoyproxy/envoy/issues/10825).
+TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointServiceUnknownGrpc) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initGrpcHealthCheck(cluster_idx);
+
+  // Endpoint responds to the health check
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVICE_UNKNOWN);
+  // Send a grpc response.
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that a gRPC health check response that returns an unknown status
+// response is properly handled.
+TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointUnknownStatusGrpc) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initGrpcHealthCheck(cluster_idx);
+
+  // Endpoint responds to the health check
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(static_cast<grpc::health::v1::HealthCheckResponse::ServingStatus>(123));
+  // Send a grpc response.
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
 
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());

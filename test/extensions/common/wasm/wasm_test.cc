@@ -6,6 +6,7 @@
 
 #include "extensions/common/wasm/wasm.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -19,6 +20,7 @@
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
+#include "zlib.h"
 
 using Envoy::Server::ServerLifecycleNotifier;
 using StageCallbackWithCompletion =
@@ -77,7 +79,7 @@ public:
     Extensions::Common::Wasm::Context::log(static_cast<spdlog::level::level_enum>(level), message);
     return proxy_wasm::WasmResult::Ok;
   }
-  MOCK_METHOD2(log_, void(spdlog::level::level_enum level, absl::string_view message));
+  MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message));
 };
 
 class WasmCommonTest : public testing::TestWithParam<std::string> {
@@ -88,17 +90,7 @@ public:
   }
 };
 
-// NB: this is required by VC++ which can not handle the use of macros in the macro definitions
-// used by INSTANTIATE_TEST_SUITE_P.
-auto test_values = testing::Values(
-#if defined(ENVOY_WASM_V8)
-    "v8",
-#endif
-#if defined(ENVOY_WASM_WAVM)
-    "wavm",
-#endif
-    "null");
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest, test_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest, Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmCommonTest, EnvoyWasm) {
   auto envoy_wasm = std::make_unique<EnvoyWasm>();
@@ -155,9 +147,10 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
 
   delete root_context;
 
-  WasmStatePrototype wasm_state_prototype(true, WasmType::Bytes, "",
-                                          StreamInfo::FilterState::LifeSpan::FilterChain);
-  auto wasm_state = std::make_unique<WasmState>(wasm_state_prototype);
+  Filters::Common::Expr::CelStatePrototype wasm_state_prototype(
+      true, Filters::Common::Expr::CelStateType::Bytes, "",
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto wasm_state = std::make_unique<Filters::Common::Expr::CelState>(wasm_state_prototype);
   Protobuf::Arena arena;
   EXPECT_EQ(wasm_state->exprValue(&arena, true).MessageOrDie(), nullptr);
   wasm_state->setValue("foo");
@@ -233,8 +226,8 @@ TEST_P(WasmCommonTest, Logging) {
   wasm_handle.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   // This will fault on nullptr if wasm has been deleted.
-  plugin->plugin_configuration_ = "done";
-  wasm_weak.lock()->configure(root_context, plugin);
+  wasm_weak.lock()->setTimerPeriod(root_context->id(), std::chrono::milliseconds(10));
+  wasm_weak.lock()->tickHandler(root_context->id());
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher->clearDeferredDeleteList();
 }
@@ -348,44 +341,6 @@ TEST_P(WasmCommonTest, DivByZero) {
   wasm->start(plugin);
 }
 
-TEST_P(WasmCommonTest, EmscriptenVersion) {
-  if (GetParam() != "v8") {
-    return;
-  }
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
-  Upstream::MockClusterManager cluster_manager;
-  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
-  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  auto name = "";
-  auto root_id = "";
-  auto vm_id = "";
-  auto vm_configuration = "";
-  auto plugin_configuration = "";
-  const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
-  EXPECT_FALSE(code.empty());
-  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      name, root_id, vm_id, GetParam(), plugin_configuration, false,
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
-  auto vm_key = proxy_wasm::makeVmKey(vm_id, vm_configuration, code);
-  auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
-  EXPECT_NE(wasm, nullptr);
-  auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
-
-  uint32_t major = 9, minor = 9, abi_major = 9, abi_minor = 9;
-  EXPECT_TRUE(wasm->getEmscriptenVersion(&major, &minor, &abi_major, &abi_minor));
-  EXPECT_EQ(major, 0);
-  EXPECT_LE(minor, 3);
-  // Up to (at least) emsdk 1.39.6.
-  EXPECT_EQ(abi_major, 0);
-  EXPECT_LE(abi_minor, 20);
-}
-
 TEST_P(WasmCommonTest, IntrinsicGlobals) {
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
@@ -492,6 +447,9 @@ TEST_P(WasmCommonTest, Utilities) {
 }
 
 TEST_P(WasmCommonTest, Stats) {
+  // We set logger level to critical here to gain more coverage.
+  Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::critical);
+
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Upstream::MockClusterManager cluster_manager;
@@ -569,8 +527,13 @@ TEST_P(WasmCommonTest, Foreign) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
+#ifdef ZLIBNG_VERSION
+        EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 22")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 22 -> 2000")));
+#else
         EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 23")));
         EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 23 -> 2000")));
+#endif
         return root_context;
       });
   wasm->start(plugin);
@@ -656,8 +619,8 @@ TEST_P(WasmCommonTest, WASI) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
-        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout"))).Times(1);
-        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("WASI write to stderr"))).Times(1);
+        EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("WASI write to stdout")));
+        EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("WASI write to stderr")));
         return root_context;
       });
   wasm->start(plugin);
@@ -677,7 +640,7 @@ TEST_P(WasmCommonTest, VmCache) {
   auto root_id = "";
   auto vm_id = "";
   auto vm_configuration = "vm_cache";
-  auto plugin_configuration = "init";
+  auto plugin_configuration = "done";
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       name, root_id, vm_id, GetParam(), plugin_configuration, false,
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
@@ -721,7 +684,7 @@ TEST_P(WasmCommonTest, VmCache) {
   EXPECT_NE(wasm_handle2, nullptr);
   EXPECT_EQ(wasm_handle, wasm_handle2);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -730,22 +693,24 @@ TEST_P(WasmCommonTest, VmCache) {
             nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
               auto root_context = new TestContext(wasm, plugin);
               EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_vm_start vm_cache")));
-              EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_configuration init")));
               EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_done logging")));
               EXPECT_CALL(*root_context, log_(spdlog::level::info, Eq("on_delete logging")));
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
   wasm_handle2.reset();
 
-  auto wasm = wasm_handle_local->wasm().get();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-
-  plugin->plugin_configuration_ = "done";
   wasm->configure(wasm->getContext(1), plugin);
   plugin.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -797,9 +762,10 @@ TEST_P(WasmCommonTest, RemoteCode) {
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
 
-  EXPECT_CALL(cluster_manager, httpAsyncClientForCluster("example_com"))
-      .WillOnce(ReturnRef(cluster_manager.async_client_));
-  EXPECT_CALL(cluster_manager.async_client_, send_(_, _, _))
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -824,7 +790,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -838,11 +804,17 @@ TEST_P(WasmCommonTest, RemoteCode) {
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
 
-  auto wasm = wasm_handle_local->wasm().get();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
+
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   wasm->configure(wasm->getContext(1), plugin);
   plugin.reset();
@@ -899,9 +871,10 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
 
-  EXPECT_CALL(cluster_manager, httpAsyncClientForCluster("example_com"))
-      .WillRepeatedly(ReturnRef(cluster_manager.async_client_));
-  EXPECT_CALL(cluster_manager.async_client_, send_(_, _, _))
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(Invoke([&, retry = num_retries](
                                  Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                                  const Http::AsyncClient::RequestOptions&) mutable
@@ -934,7 +907,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_NE(wasm_handle, nullptr);
 
-  auto wasm_handle_local = getOrCreateThreadLocalWasm(
+  auto plugin_handle_local = getOrCreateThreadLocalPlugin(
       wasm_handle, plugin,
       [&dispatcher](const WasmHandleBaseSharedPtr& base_wasm) -> WasmHandleBaseSharedPtr {
         auto wasm =
@@ -948,11 +921,16 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
               return root_context;
             });
         return std::make_shared<WasmHandle>(wasm);
+      },
+      [](const WasmHandleBaseSharedPtr& base_wasm,
+         absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+        return std::make_shared<PluginHandle>(std::static_pointer_cast<WasmHandle>(base_wasm),
+                                              plugin_key);
       });
   wasm_handle.reset();
 
-  auto wasm = wasm_handle_local->wasm().get();
-  wasm_handle_local.reset();
+  auto wasm = plugin_handle_local->wasm();
+  plugin_handle_local.reset();
 
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   wasm->configure(wasm->getContext(1), plugin);
@@ -985,7 +963,8 @@ public:
   std::unique_ptr<TestContext> context_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest, test_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
+                         Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmCommonContextTest, OnDnsResolve) {
   std::string code;

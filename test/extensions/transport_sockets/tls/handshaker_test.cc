@@ -51,8 +51,9 @@ public:
 class HandshakerTest : public SslCertsTest {
 protected:
   HandshakerTest()
-      : dispatcher_(api_->allocateDispatcher("test_thread")), stream_info_(api_->timeSource()),
-        client_ctx_(SSL_CTX_new(TLS_method())), server_ctx_(SSL_CTX_new(TLS_method())) {}
+      : dispatcher_(api_->allocateDispatcher("test_thread")),
+        stream_info_(api_->timeSource(), nullptr), client_ctx_(SSL_CTX_new(TLS_method())),
+        server_ctx_(SSL_CTX_new(TLS_method())) {}
 
   void SetUp() override {
     // Set up key and cert, initialize two SSL objects and a pair of BIOs for
@@ -82,8 +83,8 @@ protected:
 
   // Read in key.pem and return a new private key.
   bssl::UniquePtr<EVP_PKEY> makeKey() {
-    std::string file = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"));
     std::string passphrase = "";
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
 
@@ -97,8 +98,8 @@ protected:
 
   // Read in cert.pem and return a certificate.
   bssl::UniquePtr<CRYPTO_BUFFER> makeCert() {
-    std::string file = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"));
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
 
     uint8_t* data = nullptr;
@@ -125,7 +126,7 @@ TEST_F(HandshakerTest, NormalOperation) {
   ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Closed));
 
   NiceMock<MockHandshakeCallbacks> handshake_callbacks;
-  EXPECT_CALL(handshake_callbacks, onSuccess).Times(1);
+  EXPECT_CALL(handshake_callbacks, onSuccess);
   ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
@@ -153,7 +154,7 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   SSL_set_bio(client_ssl_.get(), bio, bio);
 
   StrictMock<MockHandshakeCallbacks> handshake_callbacks;
-  EXPECT_CALL(handshake_callbacks, onFailure).Times(1);
+  EXPECT_CALL(handshake_callbacks, onFailure);
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
 
@@ -222,7 +223,7 @@ TEST_F(HandshakerTest, NormalOperationWithSslHandshakerImplForTest) {
   ::testing::MockFunction<void()> requested_cert_cb;
 
   StrictMock<MockHandshakeCallbacks> handshake_callbacks;
-  EXPECT_CALL(handshake_callbacks, onSuccess).Times(1);
+  EXPECT_CALL(handshake_callbacks, onSuccess);
 
   SslHandshakerImplForTest handshaker(std::move(server_ssl_), &handshake_callbacks,
                                       requested_cert_cb.AsStdFunction());

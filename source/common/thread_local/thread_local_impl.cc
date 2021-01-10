@@ -16,13 +16,14 @@ namespace ThreadLocal {
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
 InstanceImpl::~InstanceImpl() {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(shutdown_);
   thread_local_data_.data_.clear();
+  Thread::MainThread::clear();
 }
 
 SlotPtr InstanceImpl::allocateSlot() {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
@@ -41,9 +42,12 @@ SlotPtr InstanceImpl::allocateSlot() {
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
-Event::PostCb InstanceImpl::SlotImpl::wrapCallback(Event::PostCb&& cb) {
+Event::PostCb InstanceImpl::SlotImpl::wrapCallback(const Event::PostCb& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
   // expired check below.
+  //
+  // Note also that this logic is duplicated below and dataCallback(), rather
+  // than incurring another lambda redirection.
   return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
     if (!still_alive_guard.expired()) {
       cb();
@@ -66,21 +70,29 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
+Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   // See the header file comments for still_alive_guard_ for why we capture index_.
-  parent_.runOnAllThreads(
-      wrapCallback([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); }),
-      complete_cb);
+  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb, index = index_] {
+    // This duplicates logic in wrapCallback() (above). Using wrapCallback also
+    // works, but incurs another indirection of lambda at runtime. As the
+    // duplicated logic is only an if-statement and a bool function, it doesn't
+    // seem worth factoring that out to a helper function.
+    if (!still_alive_guard.expired()) {
+      cb(getWorker(index));
+    }
+  };
+}
+
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
+  parent_.runOnAllThreads(dataCallback(cb), complete_cb);
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
-  // See the header file comments for still_alive_guard_ for why we capture index_.
-  parent_.runOnAllThreads(
-      wrapCallback([cb, index = index_]() { setThreadLocal(index, cb(getWorker(index))); }));
+  parent_.runOnAllThreads(dataCallback(cb));
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
-  ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!parent_.shutdown_);
 
   for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
@@ -94,7 +106,7 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
 }
 
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
 
   if (main_thread) {
@@ -108,7 +120,7 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
 }
 
 void InstanceImpl::removeSlot(uint32_t slot) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
 
   // When shutting down, we do not post slot removals to other threads. This is because the other
   // threads have already shut down and the dispatcher is no longer alive. There is also no reason
@@ -135,7 +147,7 @@ void InstanceImpl::removeSlot(uint32_t slot) {
 }
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
@@ -147,7 +159,7 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
 }
 
 void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
   // Handle main thread first so that when the last worker thread wins, we could just call the
   // all_threads_complete_cb method. Parallelism of main thread execution is being traded off
@@ -174,7 +186,7 @@ void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr obj
 }
 
 void InstanceImpl::shutdownGlobalThreading() {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(Thread::MainThread::isMainThread());
   ASSERT(!shutdown_);
   shutdown_ = true;
 }

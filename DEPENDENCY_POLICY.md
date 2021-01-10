@@ -45,8 +45,11 @@ Dependency declarations must:
   version is being used.
 * Provide accurate entries for `use_category`. Please think carefully about whether there are data
   or control plane implications of the dependency.
-* Reflect the date (YYYY-MM-DD) at which they were last updated in the `last_updated` field. This
-  date is preferably the date at which the PR is created.
+* Reflect the UTC date (YYYY-MM-DD format) for the dependency release. This is when
+  the dependency was updated in its repository. For dependencies that have
+  releases, this is the date of the release. For dependencies without releases
+  or for scenarios where we temporarily need to use a commit, this date should
+  be the date of the commit in UTC.
 * CPEs are compulsory for all dependencies that are not purely build/test.
   [CPEs](https://en.wikipedia.org/wiki/Common_Platform_Enumeration) provide metadata that allow us
   to correlate with related CVEs in dashboards and other tooling, and also provide a machine
@@ -66,24 +69,39 @@ Pure developer tooling and documentation builds may reference Python via standal
 
 ## New external dependencies
 
-* Any new dependency on the Envoy data or control plane that impacts Envoy core (i.e. is not
-  specific to a single non-core extension) must be cleared with the Envoy security team, please file
-  an issue and tag
-  [@envoyproxy/security-team](https://github.com/orgs/envoyproxy/teams/security-team). While policy
-  is still [evolving](robust_to_untrusted_downstream_and_upstream), criteria that will be used in
-  evaluation include:
-  * Does the project have release versions? How often do releases happen?
-  * Does the project have a security vulnerability disclosure process and contact details?
-  * Does the project have effective governance, e.g. multiple maintainers, a governance policy?
-  * Does the project have a code review culture? Are patches reviewed by independent maintainers
-    prior to merge?
-  * Does the project enable mandatory GitHub 2FA for contributors?
-  * Does the project have evidence of high test coverage, fuzzing, static analysis (e.g. CodeQL),
-    etc.?
+Any new dependency on the Envoy data or control plane that impacts Envoy core (i.e. is not
+specific to a single non-core extension) must be cleared with the Envoy dependency shepherds and
+security team, please file an issue and tag both [dependency
+shepherds](https://github.com/orgs/envoyproxy/teams/dependency-shepherds) and
+the [@envoyproxy/security-team](https://github.com/orgs/envoyproxy/teams/security-team).
 
-* Dependencies for extensions that are tagged as `robust_to_untrusted_downstream` or
-  `robust_to_untrusted_downstream_and_upstream` should be sensitive to the same set of concerns
-  as the core data plane.
+The criteria below are used to evaluate new dependencies on the data, control
+and observability plane. They apply to all core dependencies and any extension
+that is robust to untrusted downstream or upstream traffic. The criteria are
+guidelines, exceptions may be granted with solid rationale. Precedent from
+existing extensions does not apply; there are extant extensions in violation of
+this policy which we will be addressing over time, they do not provide grounds
+to ignore policy criteria below.
+
+|Criteria|Requirement|Mnemonic|Weight|Rationale|
+|--------|-----------|--------|------|---------|
+|Cloud Native Computing Foundation (CNCF) [approved license](https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist)|MUST|License|High||
+|Dependencies must not substantially increase the binary size unless they are optional (i.e. confined to specific extensions)|MUST|BinarySize|High|Envoy Mobile is sensitive to binary size. We should pick dependencies that are used in core with this criteria in mind.|
+|No duplication of existing dependencies|MUST|NoDuplication|High|Avoid maintenance cost of multiple JSON parsers etc|
+|Hosted on a git repository and the archive fetch must directly reference this repository. We will NOT support intermediate artifacts built by-hand located on GCS, S3, etc.|MUST|Source|High|Flows based on manual updates are fragile (they are not tested until needed), often suffer from missing documentation and shared exercise, may fail during emergency zero day updates and have no audit trail (i.e. it's unclear how the artifact we depend upon came to be at a later date).|
+|CVE history appears reasonable, no pathological CVE arcs|MUST|SoundCVEs|High|Avoid dependencies that are CVE heavy in the same area (e.g. buffer overflow)
+|Code review (ideally PRs) before merge|MUST|Code-Review|Normal|Consistent code reviews|
+|Security vulnerability process exists, with contact details and reporting/disclosure process|MUST|SecPolicy|High|Lack of a policy implies security bugs are open zero days|
+|> 1 contributor responsible for a non-trivial number of commits|MUST|Contributors|Normal|Avoid bus factor of 1|
+|Tests run in CI|MUST|CI-Tests|Normal|Changes gated on tests|
+|High test coverage (also static/dynamic analysis, fuzzing)|SHOULD|Test-Coverage|Normal|Key dependencies must meet the same quality bar as Envoy|
+|Envoy can obtain advanced notification of vulnerabilities or of security releases|SHOULD|SecPolicy-Compat|High|Coordinated security releases possible, but most dependencies do not feature this.|
+|Do other significant projects have shared fate by using this dependency?|SHOULD|SharedFate|High|Increased likelihood of security community interest, many eyes.|
+|Releases (with release notes)|SHOULD|Releases|Normal|Discrete upgrade points, clear understanding of security implications. We have many counterexamples today (e.g. CEL, re2).|
+|Commits/releases in last 90 days|SHOULD|Active|Normal|Avoid unmaintained deps, not compulsory since some code bases are “done”|
+
+The rationale behind this policy is tracked
+[here](https://docs.google.com/document/d/1HbREo7pv7rgeIIjQn6mNpySzQE5rx2Yv9dXm5NqR2N8/edit#).
 
 ## Maintaining existing dependencies
 

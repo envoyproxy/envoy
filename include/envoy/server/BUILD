@@ -68,6 +68,7 @@ envoy_cc_library(
     name = "guarddog_interface",
     hdrs = ["guarddog.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread:thread_interface",
@@ -111,6 +112,7 @@ envoy_cc_library(
     hdrs = ["instance.h"],
     deps = [
         ":admin_interface",
+        ":configuration_interface",
         ":drain_manager_interface",
         ":hot_restart_interface",
         ":lifecycle_notifier_interface",
@@ -126,7 +128,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
@@ -150,8 +152,8 @@ envoy_cc_library(
     name = "worker_interface",
     hdrs = ["worker.h"],
     deps = [
-        ":overload_manager_interface",
         "//include/envoy/server:guarddog_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
     ],
 )
 
@@ -159,8 +161,6 @@ envoy_cc_library(
     name = "watchdog_interface",
     hdrs = ["watchdog.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:address_interface",
         "//include/envoy/thread:thread_interface",
     ],
 )
@@ -170,6 +170,7 @@ envoy_cc_library(
     hdrs = ["factory_context.h"],
     deps = [
         ":admin_interface",
+        ":configuration_interface",
         ":drain_manager_interface",
         ":lifecycle_notifier_interface",
         ":process_context_interface",
@@ -183,8 +184,9 @@ envoy_cc_library(
         "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
+        "//include/envoy/router:context_interface",
         "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
@@ -208,8 +210,8 @@ envoy_cc_library(
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/server:overload_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
@@ -304,15 +306,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "overload_manager_interface",
-    hdrs = ["overload_manager.h"],
-    deps = [
-        "//include/envoy/thread_local:thread_local_interface",
-        "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
     name = "tracer_config_interface",
     hdrs = ["tracer_config.h"],
     deps = [
@@ -337,5 +330,17 @@ envoy_cc_library(
     deps = [
         ":factory_context_interface",
         "//include/envoy/config:typed_config_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "fatal_action_interface",
+    hdrs = ["fatal_action_config.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//include/envoy/server:instance_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

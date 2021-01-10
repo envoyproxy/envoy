@@ -364,10 +364,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         ASSERT(rsa_public_key != nullptr);
         const unsigned rsa_key_length = RSA_size(rsa_public_key);
 #ifdef BORINGSSL_FIPS
-        if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
+        if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8 &&
+            rsa_key_length != 4096 / 8) {
           throw EnvoyException(
               fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
-                          "2048-bit or 3072-bit keys are supported in FIPS mode",
+                          "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
                           ctx.cert_chain_file_path_));
         }
 #else
@@ -416,9 +417,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                                     !tls_certificate.password().empty()
                                         ? const_cast<char*>(tls_certificate.password().c_str())
                                         : nullptr));
+
         if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
-          throw EnvoyException(
-              absl::StrCat("Failed to load private key from ", tls_certificate.privateKeyPath()));
+          throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}",
+                                           tls_certificate.privateKeyPath(),
+                                           Utility::getLastCryptoError().value_or("unknown")));
         }
 
 #ifdef BORINGSSL_FIPS
@@ -460,25 +463,23 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
-  // To enumerate the required builtin ciphers, curves, algorithms, and
-  // versions, uncomment '#define LOG_BUILTIN_STAT_NAMES' below, and run
-  //  bazel test //test/extensions/transport_sockets/tls/... --test_output=streamed
-  //      | grep " Builtin ssl." | sort | uniq
-  // #define LOG_BUILTIN_STAT_NAMES
-  //
-  // TODO(#8035): improve tooling to find any other built-ins needed to avoid
-  // contention.
+  // Use the SSL library to iterate over the configured ciphers.
+  for (TlsContext& tls_context : tls_contexts_) {
+    for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
+      stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
+    }
+  }
 
-  // Ciphers
-  stat_name_set_->rememberBuiltin("AEAD-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-SHA");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
-  stat_name_set_->rememberBuiltin("TLS_AES_128_GCM_SHA256");
+  // Add hardcoded cipher suites from the TLS 1.3 spec:
+  // https://tools.ietf.org/html/rfc8446
+  stat_name_set_->rememberBuiltins(
+      {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_AES_128_GCM_SHA256"});
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
+  //
+  // Note that if a curve is configured outside this set, we'll issue an ENVOY_BUG so
+  // it will hopefully be caught.
   stat_name_set_->rememberBuiltins(
       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
 
@@ -637,14 +638,10 @@ Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
                              const Stats::StatName fallback) const {
-  Stats::Counter& counter = Stats::Utility::counterFromElements(
-      scope_, {name, stat_name_set_->getBuiltin(value, fallback)});
-  counter.inc();
-
-#ifdef LOG_BUILTIN_STAT_NAMES
-  std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")
-            << std::flush;
-#endif
+  const Stats::StatName value_stat_name = stat_name_set_->getBuiltin(value, fallback);
+  ENVOY_BUG(value_stat_name != fallback,
+            absl::StrCat("Unexpected ", scope_.symbolTable().toString(name), " value: ", value));
+  Stats::Utility::counterFromElements(scope_, {name, value_stat_name}).inc();
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
@@ -962,9 +959,9 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
   }
 
-  if (options && !has_alpn_defined && options->applicationProtocolFallback().has_value()) {
+  if (options && !has_alpn_defined && !options->applicationProtocolFallback().empty()) {
     // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
-    parseAndSetAlpn({*options->applicationProtocolFallback()}, *ssl_con);
+    parseAndSetAlpn(options->applicationProtocolFallback(), *ssl_con);
   }
 
   if (allow_renegotiation_) {

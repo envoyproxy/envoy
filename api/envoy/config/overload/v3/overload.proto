@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.overload.v3;
 
+import "envoy/type/v3/percent.proto";
+
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -80,6 +82,45 @@ message Trigger {
   }
 }
 
+// Typed configuration for the "envoy.overload_actions.reduce_timeouts" action. See
+// :ref:`the docs <config_overload_manager_reducing_timeouts>` for an example of how to configure
+// the action with different timeouts and minimum values.
+message ScaleTimersOverloadActionConfig {
+  enum TimerType {
+    // Unsupported value; users must explicitly specify the timer they want scaled.
+    UNSPECIFIED = 0;
+
+    // Adjusts the idle timer for downstream HTTP connections that takes effect when there are no active streams.
+    // This affects the value of :ref:`HttpConnectionManager.common_http_protocol_options.idle_timeout
+    // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
+    HTTP_DOWNSTREAM_CONNECTION_IDLE = 1;
+
+    // Adjusts the idle timer for HTTP streams initiated by downstream clients.
+    // This affects the value of :ref:`RouteAction.idle_timeout <envoy_v3_api_field_config.route.v3.RouteAction.idle_timeout>` and
+    // :ref:`HttpConnectionManager.stream_idle_timeout
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
+    HTTP_DOWNSTREAM_STREAM_IDLE = 2;
+  }
+
+  message ScaleTimer {
+    // The type of timer this minimum applies to.
+    TimerType timer = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+    oneof overload_adjust {
+      option (validate.required) = true;
+
+      // Sets the minimum duration as an absolute value.
+      google.protobuf.Duration min_timeout = 2;
+
+      // Sets the minimum duration as a percentage of the maximum value.
+      type.v3.Percent min_scale = 3;
+    }
+  }
+
+  // A set of timer scaling rules to be applied.
+  repeated ScaleTimer timer_scale_factors = 1 [(validate.rules).repeated = {min_items: 1}];
+}
+
 message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
@@ -93,6 +134,9 @@ message OverloadAction {
   // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
   // are notified when the overload action changes state.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // Configuration for the action being instantiated.
+  google.protobuf.Any typed_config = 3;
 }
 
 message OverloadManager {

@@ -25,9 +25,10 @@ as a client when
 .. code-block:: yaml
 
     cds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -46,9 +47,10 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     eds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -67,9 +69,10 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     lds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -89,9 +92,10 @@ for the service definition. This is used by Envoy as a client when
 
     route_config_name: some_route_name
     config_source:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -112,10 +116,11 @@ for the service definition. This is used by Envoy as a client when
 
     name: some_scoped_route_name
     scoped_rds:
+      resource_api_version: V3
       config_source:
         api_config_source:
           api_type: GRPC
-          transport_api_version: <V2|V3>
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: some_xds_cluster
@@ -136,9 +141,10 @@ for the service definition. This is used by Envoy as a client when
 
     name: some_secret_name
     config_source:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -157,9 +163,10 @@ for the service definition. This is used by Envoy as a client when
 
     name: some_runtime_layer_name
     config_source:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -180,9 +187,10 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     cds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
@@ -199,9 +207,10 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     eds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`eds_cluster_config
@@ -218,9 +227,10 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     lds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
@@ -238,9 +248,10 @@ for the service definition. This is used by Envoy as a client when
 
     route_config_name: some_route_name
     config_source:
+      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: <V2|V3>
+        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`rds
@@ -295,7 +306,7 @@ for the service definition. This is used by Envoy as a client when
 
     ads_config:
       api_type: GRPC
-      transport_api_version: <V2|V3>
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: some_ads_cluster
@@ -310,8 +321,10 @@ be set to use the ADS channel. For example, a LDS config could be changed from
 .. code-block:: yaml
 
     lds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: REST
+        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 to
@@ -348,3 +361,25 @@ To use delta, simply set the api_type field of your
 That works for both xDS and ADS; for ADS, it's the api_type field of
 :ref:`DynamicResources.ads_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>`,
 as described in the previous section.
+
+
+.. _config_overview_ttl:
+
+xDS TTL
+^^^^^^^
+
+When using xDS, users might find themself wanting to temporarily update certain xDS resources. In order to do
+safely, xDS TTLs can be used to make sure that if the control plane becomes unavailable and is unable to revert
+the xDS change, Envoy will remove the resource after a TTL specified by the server. See the
+:ref:`protocol documentation <xds_protocol_ttl>` for more information.
+
+Currently the behavior when a TTL expires is that the resource is *removed* (as opposed to reverted to the
+previous version). As such, this feature should primarily be used for use cases where the absence of the resource
+is preferred instead of the temporary version, e.g. when using RTDS to apply a temporary runtime override.
+
+The TTL is specified on the :ref:`Resource <envoy_api_msg_Resource>` proto: for Delta xDS this is specified directly
+within the response, while for SotW xDS the server may wrap individual resources listed in the response within a
+:ref:`Resource <envoy_api_msg_Resource>` in order to specify a TTL value.
+
+The server can refresh or modify the TTL by issuing another response for the same version. In this case the resource
+itself does not have to be included.

@@ -21,6 +21,7 @@ use(
       "path": "api/envoy/",
       "label": "api",
       "github_status_label": "any API change",
+      "auto_assign": True,
     },
     {
       "owner": "envoyproxy/api-watchers",
@@ -29,8 +30,9 @@ use(
     {
       "owner": "envoyproxy/dependency-shepherds!",
       "path":
-      "(bazel/.*repos.*\.bzl)|(bazel/dependency_imports\.bzl)|(api/bazel/.*\.bzl)|(.*/requirements\.txt)",
+      "(bazel/.*repos.*\.bzl)|(bazel/dependency_imports\.bzl)|(api/bazel/.*\.bzl)|(.*/requirements\.txt)|(.*\.patch)",
       "label": "deps",
+      "allow_global_approval": False,
       "github_status_label": "any dependency change",
     },
   ],

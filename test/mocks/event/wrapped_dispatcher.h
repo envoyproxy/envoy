@@ -20,6 +20,11 @@ public:
   // Event::Dispatcher
   const std::string& name() override { return impl_.name(); }
 
+  void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                        std::chrono::milliseconds min_touch_interval) override {
+    impl_.registerWatchdog(watchdog, min_touch_interval);
+  }
+
   TimeSource& timeSource() override { return impl_.timeSource(); }
 
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override {
@@ -28,9 +33,10 @@ public:
 
   void clearDeferredDeleteList() override { impl_.clearDeferredDeleteList(); }
 
-  Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                                Network::TransportSocketPtr&& transport_socket,
-                                                StreamInfo::StreamInfo& stream_info) override {
+  Network::ServerConnectionPtr
+  createServerConnection(Network::ConnectionSocketPtr&& socket,
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo& stream_info) override {
     return impl_.createServerConnection(std::move(socket), std::move(transport_socket),
                                         stream_info);
   }
@@ -82,7 +88,7 @@ public:
 
   void exit() override { impl_.exit(); }
 
-  SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override {
+  SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
     return impl_.listenForSignal(signal_num, std::move(cb));
   }
 

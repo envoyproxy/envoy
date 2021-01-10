@@ -271,7 +271,7 @@ private:
 class TestDnsServer : public TcpListenerCallbacks {
 public:
   TestDnsServer(Event::Dispatcher& dispatcher)
-      : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource()) {}
+      : dispatcher_(dispatcher), record_ttl_(0), stream_info_(dispatcher.timeSource(), nullptr) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
@@ -434,20 +434,26 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
-    resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
-
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
 
+    if (setResolverInConstructor()) {
+      resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
+                                                 useTcpForDnsLookups());
+    } else {
+      resolver_ = dispatcher_->createDnsResolver({}, useTcpForDnsLookups());
+    }
+
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
-    if (tcp_only()) {
-      peer_->resetChannelTcpOnly(zero_timeout());
+    if (tcpOnly()) {
+      peer_->resetChannelTcpOnly(zeroTimeout());
     }
-    ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+    ares_set_servers_ports_csv(peer_->channel(),
+                               socket_->addressProvider().localAddress()->asString().c_str());
   }
 
   void TearDown() override {
@@ -539,9 +545,10 @@ public:
 
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
-  virtual bool zero_timeout() const { return false; }
-  virtual bool tcp_only() const { return true; }
-  virtual bool use_tcp_for_dns_lookups() const { return false; }
+  virtual bool zeroTimeout() const { return false; }
+  virtual bool tcpOnly() const { return true; }
+  virtual bool useTcpForDnsLookups() const { return false; }
+  virtual bool setResolverInConstructor() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
@@ -579,8 +586,9 @@ TEST_P(DnsImplTest, DestructCallback) {
 
   // This simulates destruction thanks to another query setting the dirty_channel_ bit, thus causing
   // a subsequent result to call ares_destroy.
-  peer_->resetChannelTcpOnly(zero_timeout());
-  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+  peer_->resetChannelTcpOnly(zeroTimeout());
+  ares_set_servers_ports_csv(peer_->channel(),
+                             socket_->addressProvider().localAddress()->asString().c_str());
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -700,14 +708,15 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // However, the fresh channel initialized by production code does not point to the TestDnsServer.
-  // This means that resolution will return ARES_ENOTFOUND. This should not dirty the channel.
+  // This means that resolution will return `ARES_ENOTFOUND`. This should not dirty the channel.
   EXPECT_FALSE(peer_->isChannelDirty());
 
   // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
-  if (tcp_only()) {
-    peer_->resetChannelTcpOnly(zero_timeout());
+  if (tcpOnly()) {
+    peer_->resetChannelTcpOnly(zeroTimeout());
   }
-  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+  ares_set_servers_ports_csv(peer_->channel(),
+                             socket_->addressProvider().localAddress()->asString().c_str());
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,
@@ -878,7 +887,7 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
 
 class DnsImplZeroTimeoutTest : public DnsImplTest {
 protected:
-  bool zero_timeout() const override { return true; }
+  bool zeroTimeout() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -898,8 +907,8 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
 protected:
-  bool tcp_only() const override { return false; }
-  bool use_tcp_for_dns_lookups() const override { return true; }
+  bool tcpOnly() const override { return false; }
+  bool useTcpForDnsLookups() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -923,7 +932,7 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
 
 class DnsImplAresFlagsForUdpTest : public DnsImplTest {
 protected:
-  bool tcp_only() const override { return false; }
+  bool tcpOnly() const override { return false; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -943,6 +952,48 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
   EXPECT_NE(nullptr,
             resolveWithUnreferencedParameters("root.cnam.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
+}
+
+class DnsImplCustomResolverTest : public DnsImplTest {
+  bool tcpOnly() const override { return false; }
+  bool useTcpForDnsLookups() const override { return true; }
+  bool setResolverInConstructor() const override { return true; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplCustomResolverTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
+  ASSERT_FALSE(peer_->isChannelDirty());
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRefused(true);
+
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // The c-ares channel should be dirty because the TestDnsServer replied with return code REFUSED;
+  // This test, and the way the TestDnsServerQuery is setup, relies on the fact that Envoy's
+  // c-ares channel is configured **without** the ARES_FLAG_NOCHECKRESP flag. This causes c-ares to
+  // discard packets with REFUSED, and thus Envoy receives ARES_ECONNREFUSED due to the code here:
+  // https://github.com/c-ares/c-ares/blob/d7e070e7283f822b1d2787903cce3615536c5610/ares_process.c#L654
+  // If that flag needs to be set, or c-ares changes its handling this test will need to be updated
+  // to create another condition where c-ares invokes onAresGetAddrInfoCallback with status ==
+  // ARES_ECONNREFUSED.
+  EXPECT_TRUE(peer_->isChannelDirty());
+
+  server_->setRefused(false);
+
+  // The next query destroys, and re-initializes the channel. Furthermore, because the test dns
+  // server's address was passed as a custom resolver on construction, the new channel should still
+  // point to the test dns server, and the query should succeed.
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {"201.134.56.7"}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(peer_->isChannelDirty());
 }
 
 } // namespace Network

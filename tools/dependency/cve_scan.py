@@ -34,6 +34,19 @@ IGNORES_CVES = set([
     'CVE-2020-8252',
     # Fixed via the nghttp2 1.41.0 bump in Envoy 8b6ea4.
     'CVE-2020-11080',
+    # Node.js issue rooted in a c-ares bug. Does not appear to affect
+    # http-parser or our use of c-ares, c-ares has been bumped regardless.
+    'CVE-2020-8277',
+    # gRPC issue that only affects Javascript bindings.
+    'CVE-2020-7768',
+    # Node.js issue unrelated to http-parser, see
+    # https://github.com/mhart/StringStream/issues/7.
+    'CVE-2018-21270',
+    # These should not affect Curl 7.74.0, but we see false positives due to the
+    # relative release date and CPE wildcard.
+    'CVE-2020-8169',
+    'CVE-2020-8177',
+    'CVE-2020-8284',
 ])
 
 # Subset of CVE fields that are useful below.
@@ -193,11 +206,9 @@ def CpeMatch(cpe, dep_metadata):
   # An exact version match is a hit.
   if cpe.version == dep_version:
     return True
-  # Allow the 'last_updated' dependency metadata to substitute for date.
-  # TODO(htuch): Make a finer grained distinction between Envoy update date and dependency
-  # release date in 'last_updated'.
+  # Allow the 'release_date' dependency metadata to substitute for date.
   # TODO(htuch): Consider fuzzier date ranges.
-  if cpe.version == dep_metadata['last_updated']:
+  if cpe.version == dep_metadata['release_date']:
     return True
   # Try a fuzzy date match to deal with versions like fips-20190304 in dependency version.
   if RegexGroupsMatch(FUZZY_DATE_RE, dep_version, cpe.version):
@@ -234,7 +245,7 @@ def CveMatch(cve, dep_metadata):
   if wildcard_version_match:
     # If the CVE was published after the dependency was last updated, it's a
     # potential match.
-    last_dep_update = dt.date.fromisoformat(dep_metadata['last_updated'])
+    last_dep_update = dt.date.fromisoformat(dep_metadata['release_date'])
     if last_dep_update <= cve.published_date:
       return True
   return False

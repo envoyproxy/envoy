@@ -64,9 +64,3 @@ static_resources:
               socket_address:
                 address: service2
                 port_value: 8000
-admin:
-  access_log_path: "/dev/null"
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 8001

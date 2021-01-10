@@ -747,7 +747,7 @@ message RouteAction {
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
     string upgrade_type = 1
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
@@ -977,6 +977,10 @@ message RouteAction {
   // fires, the stream is terminated with a 408 Request Timeout error code if no
   // upstream response header has been received, otherwise a stream reset
   // occurs.
+  //
+  // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
+  // is configured, this timeout is scaled according to the value for
+  // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
   google.protobuf.Duration idle_timeout = 24;
 
   // Indicates that the route has a retry policy. Note that if this is set,
@@ -1253,18 +1257,23 @@ message HedgePolicy {
   // [#not-implemented-hide:]
   type.v3.FractionalPercent additional_request_chance = 2;
 
-  // Indicates that a hedged request should be sent when the per-try timeout
-  // is hit. This will only occur if the retry policy also indicates that a
-  // timed out request should be retried.
-  // Once a timed out request is retried due to per try timeout, the router
-  // filter will ensure that it is not retried again even if the returned
-  // response headers would otherwise be retried according the specified
-  // :ref:`RetryPolicy <envoy_api_msg_config.route.v4alpha.RetryPolicy>`.
+  // Indicates that a hedged request should be sent when the per-try timeout is hit.
+  // This means that a retry will be issued without resetting the original request, leaving multiple upstream requests in flight.
+  // The first request to complete successfully will be the one returned to the caller.
+  //
+  // * At any time, a successful response (i.e. not triggering any of the retry-on conditions) would be returned to the client.
+  // * Before per-try timeout, an error response (per retry-on conditions) would be retried immediately or returned ot the client
+  //   if there are no more retries left.
+  // * After per-try timeout, an error response would be discarded, as a retry in the form of a hedged request is already in progress.
+  //
+  // Note: For this to have effect, you must have a :ref:`RetryPolicy <envoy_api_msg_config.route.v4alpha.RetryPolicy>` that retries at least
+  // one error code and specifies a maximum number of retries.
+  //
   // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message RedirectAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.RedirectAction";
@@ -1336,6 +1345,31 @@ message RedirectAction {
     //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_config.route.v4alpha.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Indicates that during redirect, portions of the path that match the
+    // pattern should be rewritten, even allowing the substitution of capture
+    // groups from the pattern into the new path as specified by the rewrite
+    // substitution string. This is useful to allow application paths to be
+    // rewritten in a way that is aware of segments with variable content like
+    // identifiers.
+    //
+    // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
+    //
+    // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution
+    //   string of ``\2/instance/\1`` would transform ``/service/foo/v1/api``
+    //   into ``/v1/api/instance/foo``.
+    //
+    // * The pattern ``one`` paired with a substitution string of ``two`` would
+    //   transform ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/two/zzz``.
+    //
+    // * The pattern ``^(.*?)one(.*)$`` paired with a substitution string of
+    //   ``\1two\2`` would replace only the first occurrence of ``one``,
+    //   transforming path ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/one/zzz``.
+    //
+    // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
+    //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
+    //   ``/aaa/yyy/bbb``.
+    type.matcher.v4alpha.RegexMatchAndSubstitute regex_rewrite = 9;
   }
 
   // The HTTP status code to use in the redirect response. The default response
