@@ -190,10 +190,9 @@ public:
   MOCK_METHOD(uint64_t, stage, (), (const));
   MOCK_METHOD(const std::string&, disableKey, (), (const));
   MOCK_METHOD(void, populateDescriptors,
-              (const RouteEntry& route, std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-               const std::string& local_service_cluster, const Http::HeaderMap& headers,
-               const Network::Address::Instance& remote_address,
-               const envoy::config::core::v3::Metadata* dynamic_metadata),
+              (std::vector<Envoy::RateLimit::Descriptor> & descriptors,
+               const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& info),
               (const));
 
   uint64_t stage_{};

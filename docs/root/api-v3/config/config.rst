@@ -24,3 +24,4 @@ Extensions
   upstream/upstream
   wasm/wasm
   watchdog/watchdog
+  descriptors/descriptors

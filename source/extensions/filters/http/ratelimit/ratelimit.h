@@ -156,8 +156,7 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                     std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                    const Router::RouteEntry* route_entry,
-                                    const Http::HeaderMap& headers) const;
+                                    const Http::RequestHeaderMap& headers) const;
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
