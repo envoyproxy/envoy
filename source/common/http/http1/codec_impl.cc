@@ -1213,13 +1213,12 @@ Envoy::StatusOr<int> ClientConnectionImpl::onHeadersComplete() {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;
 
-      // For responses to connect requests, do not accept the chunked
-      // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
+      // For responses to connect requests, ignore the chunked encoding header:
+      // https://tools.ietf.org/html/rfc7231#section-4.3.6
       if (headers->TransferEncoding() &&
           absl::EqualsIgnoreCase(headers->TransferEncoding()->value().getStringView(),
                                  Headers::get().TransferEncodingValues.Chunked)) {
-        RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));
-        return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
+        ENVOY_CONN_LOG(trace, "ignoring transfer-encoding in CONNECT response.", connection_);
       }
     }
 

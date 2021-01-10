@@ -794,7 +794,7 @@ TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
 
 // TODO(irozzo): temporarily disabled as a protocol error is thrown when
 // transfer-encoding header is received in CONNECT responses.
-TEST_P(TcpTunnelingIntegrationTest, DISABLED_TransferEncodingHeaderIgnoredHttp1) {
+TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     return;
   }
@@ -811,14 +811,17 @@ TEST_P(TcpTunnelingIntegrationTest, DISABLED_TransferEncodingHeaderIgnoredHttp1)
   ASSERT_THAT(data, testing::HasSubstr("CONNECT host.com:80 HTTP/1.1"));
 
   // Send upgrade headers downstream, fully establishing the connection.
-  ASSERT_TRUE(
-      fake_upstream_connection->write("HTTP/1.1 299 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
 
   // Now send some data and close the TCP client.
-  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("hello")));
+
+  // Close connections.
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->close();
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
 TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponseIsReceived) {
