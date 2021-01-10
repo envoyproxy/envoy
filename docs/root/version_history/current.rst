@@ -90,6 +90,8 @@ New Features
 * ratelimit: added support for use of various :ref:`metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.metadata>` as a ratelimit action.
 * ratelimit: added :ref:`disable_x_envoy_ratelimited_header <envoy_v3_api_msg_extensions.filters.http.ratelimit.v3.RateLimit>` option to disable `X-Envoy-RateLimited` header.
 * ratelimit: added :ref:`body <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.raw_body>` field to support custom response bodies for non-OK responses from the external ratelimit service.
+* ratelimit: added :ref:`descriptor extensions <envoy_v3_api_field_config.route.v3.RateLimit.Action.extension>`.
+* ratelimit: added :ref:`computed descriptors <envoy_v3_api_msg_extensions.rate_limit_descriptors.expr.v3.Descriptor>`.
 * ratelimit: added :ref:`dynamic_metadata <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field to support setting dynamic metadata from the ratelimit service.
 * router: added support for regex rewrites during HTTP redirects using :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RedirectAction.regex_rewrite>`.
 * sds: improved support for atomic :ref:`key rotations <xds_certificate_rotation>` and added configurable rotation triggers for

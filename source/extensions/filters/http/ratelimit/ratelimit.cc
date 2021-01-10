@@ -49,7 +49,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
-  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
+  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
 
   VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
 
@@ -58,12 +58,12 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     break;
   case VhRateLimitOptions::Include:
     populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
-                                 route_entry, headers);
+                                 headers);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
       populateRateLimitDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors,
-                                   route_entry, headers);
+                                   headers);
     }
     break;
   default:
@@ -229,8 +229,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
 void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                           std::vector<RateLimit::Descriptor>& descriptors,
-                                          const Router::RouteEntry* route_entry,
-                                          const Http::HeaderMap& headers) const {
+                                          const Http::RequestHeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
     const std::string& disable_key = rate_limit.disableKey();
@@ -239,10 +238,8 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
             fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(
-        *route_entry, descriptors, config_->localInfo().clusterName(), headers,
-        *callbacks_->streamInfo().downstreamAddressProvider().remoteAddress(),
-        &callbacks_->streamInfo().dynamicMetadata());
+    rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
+                                   callbacks_->streamInfo());
   }
 }
 
