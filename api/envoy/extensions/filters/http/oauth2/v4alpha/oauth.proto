@@ -47,7 +47,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message OAuth2Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.oauth2.v3alpha.OAuth2Config";
@@ -80,6 +80,9 @@ message OAuth2Config {
 
   // Any request that matches any of the provided matchers will be passed through without OAuth validation.
   repeated config.route.v4alpha.HeaderMatcher pass_through_matcher = 8;
+
+  // The default lifetime in seconds of the access token, if omitted by the authorization server.
+  google.protobuf.Duration default_expires_in = 9;
 }
 
 // Filter config.

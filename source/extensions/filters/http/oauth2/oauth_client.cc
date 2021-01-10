@@ -88,15 +88,27 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
-  if (!response.has_access_token() || !response.has_expires_in()) {
-    ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken");
+  if (!response.has_access_token()) {
+    ENVOY_LOG(debug, "No access token after asyncGetAccessToken");
     parent_->sendUnauthorizedResponse();
     return;
   }
 
   const std::string access_token{PROTOBUF_GET_WRAPPED_REQUIRED(response, access_token)};
-  const std::chrono::seconds expires_in{PROTOBUF_GET_WRAPPED_REQUIRED(response, expires_in)};
-  parent_->onGetAccessTokenSuccess(access_token, expires_in);
+
+  absl::optional<std::chrono::seconds> expires_in;
+  if (response.has_expires_in()) {
+    expires_in.emplace(response.expires_in().value());
+  } else if (default_expires_in_) {
+    expires_in.emplace(*default_expires_in_);
+  }
+  if (!expires_in) {
+    ENVOY_LOG(debug, "No default or explicit access token expiration after asyncGetAccessToken");
+    parent_->sendUnauthorizedResponse();
+    return;
+  }
+
+  parent_->onGetAccessTokenSuccess(access_token, *expires_in);
 }
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
