@@ -3,6 +3,7 @@
 #include <iostream>
 #include <queue>
 
+#include "envoy/upstream/scheduler.h"
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -23,16 +24,10 @@ namespace Upstream {
 // Each pick from the schedule has the earliest deadline entry selected. Entries have deadlines set
 // at current time + 1 / weight, providing weighted round robin behavior with floating point
 // weights and an O(log n) pick time.
-template <class C> class EdfScheduler {
+template <class C> class EdfScheduler : public Scheduler<C> {
 public:
-  // Each time peekAgain is called, it will return the best-effort subsequent
-  // pick, popping and reinserting the entry as if it had been picked, and
-  // inserting it into the pre-picked queue.
-  // The first time peekAgain is called, it will return the
-  // first item which will be picked, the second time it is called it will
-  // return the second item which will be picked. As picks occur, that window
-  // will shrink.
-  std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) {
+  // See scheduler.h for an explanation of each public method.
+  std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) override {
     if (hasEntry()) {
       prepick_list_.push_back(std::move(queue_.top().entry_));
       std::shared_ptr<C> ret{prepick_list_.back()};
@@ -43,12 +38,7 @@ public:
     return nullptr;
   }
 
-  /**
-   * Pick queue entry with closest deadline and adds it back using the weight
-   *   from calculate_weight.
-   * @return std::shared_ptr<C> to next valid the queue entry if or nullptr if none exists.
-   */
-  std::shared_ptr<C> pickAndAdd(std::function<double(const C&)> calculate_weight) {
+  std::shared_ptr<C> pickAndAdd(std::function<double(const C&)> calculate_weight) override {
     while (!prepick_list_.empty()) {
       // In this case the entry was added back during peekAgain so don't re-add.
       if (prepick_list_.front().expired()) {
@@ -68,12 +58,7 @@ public:
     return nullptr;
   }
 
-  /**
-   * Insert entry into queue with a given weight. The deadline will be current_time_ + 1 / weight.
-   * @param weight floating point weight.
-   * @param entry shared pointer to entry, only a weak reference will be retained.
-   */
-  void add(double weight, std::shared_ptr<C> entry) {
+  void add(double weight, std::shared_ptr<C> entry) override {
     ASSERT(weight > 0);
     const double deadline = current_time_ + 1.0 / weight;
     EDF_TRACE("Insertion {} in queue with deadline {} and weight {}.",
@@ -82,11 +67,7 @@ public:
     ASSERT(queue_.top().deadline_ >= current_time_);
   }
 
-  /**
-   * Implements empty() on the internal queue. Does not attempt to discard expired elements.
-   * @return bool whether or not the internal queue is empty.
-   */
-  bool empty() const { return queue_.empty(); }
+  bool empty() const override { return queue_.empty(); }
 
 private:
   /**

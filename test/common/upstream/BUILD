@@ -81,9 +81,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "wrsq_scheduler_test",
+    srcs = ["wrsq_scheduler_test.cc"],
+    deps = [
+        "//source/common/upstream:scheduler_lib",
+        "//test/mocks:common_lib"
+    ],
+)
+
+envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    deps = ["//source/common/upstream:edf_scheduler_lib"],
+    deps = ["//source/common/upstream:scheduler_lib"],
 )
 
 envoy_cc_test(
