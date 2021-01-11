@@ -30,7 +30,7 @@ struct Counters {
 
 #define PERF_TAG_COUNTERS(var)                                                                     \
   ~TagExtractorImplBase() override {                                                               \
-    std::cout << fmt::format("Stats for {} tag extractor: skipped {}, matched {}, missing {}",     \
+    std::cout << fmt::format("TagStats for {} tag extractor: skipped {}, matched {}, missing {}",  \
                              name_, var->skipped_, var->matched_, var->missed_)                    \
               << std::endl;                                                                        \
   }                                                                                                \
