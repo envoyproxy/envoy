@@ -370,11 +370,19 @@ void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& 
   }
 }
 
+ResponseHeaderMapOptRef ActiveStreamDecoderFilter::continueHeaders() const {
+  return parent_.filter_manager_callbacks_.continueHeaders();
+}
+
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
   parent_.stream_info_.setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
+}
+
+ResponseHeaderMapOptRef ActiveStreamDecoderFilter::responseHeaders() const {
+  return parent_.filter_manager_callbacks_.responseHeaders();
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -385,6 +393,10 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
+}
+
+ResponseTrailerMapOptRef ActiveStreamDecoderFilter::responseTrailers() const {
+  return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
 void ActiveStreamDecoderFilter::encodeMetadata(MetadataMapPtr&& metadata_map_ptr) {
