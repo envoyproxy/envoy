@@ -101,20 +101,34 @@ public:
   }
 };
 
-class HttpRequestHeadersDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+template <class DataInputType, class ProtoType>
+class HttpHeadersDataInputFactoryBase : public Matcher::DataInputFactory<HttpMatchingData> {
 public:
-  std::string name() const override { return "request-headers"; }
+  explicit HttpHeadersDataInputFactoryBase(const std::string& name) : name_(name) {}
+
+  std::string name() const override { return name_; }
+
   Matcher::DataInputPtr<HttpMatchingData>
   createDataInput(const Protobuf::Message& config,
                   ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::type::matcher::v3::HttpRequestHeaderMatchInput&>(config, validation_visitor);
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
 
-    return std::make_unique<HttpRequestHeadersDataInput>(typed_config.header_name());
+    return std::make_unique<DataInputType>(typed_config.header_name());
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::type::matcher::v3::HttpRequestHeaderMatchInput>();
+    return std::make_unique<ProtoType>();
   }
+
+private:
+  const std::string name_;
+};
+
+class HttpRequestHeadersDataInputFactory
+    : public HttpHeadersDataInputFactoryBase<
+          HttpRequestHeadersDataInput, envoy::type::matcher::v3::HttpRequestHeaderMatchInput> {
+public:
+  HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request-headers") {}
 };
 
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
@@ -127,20 +141,11 @@ public:
   }
 };
 
-class HttpResponseHeadersDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+class HttpResponseHeadersDataInputFactory
+    : public HttpHeadersDataInputFactoryBase<
+          HttpResponseHeadersDataInput, envoy::type::matcher::v3::HttpResponseHeaderMatchInput> {
 public:
-  std::string name() const override { return "response-headers"; }
-  Matcher::DataInputPtr<HttpMatchingData>
-  createDataInput(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::type::matcher::v3::HttpRequestHeaderMatchInput&>(config, validation_visitor);
-
-    return std::make_unique<HttpResponseHeadersDataInput>(typed_config.header_name());
-  };
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::type::matcher::v3::HttpResponseHeaderMatchInput>();
-  }
+  HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response-headers") {}
 };
 
 class SkipAction : public Matcher::ActionBase<
