@@ -76,7 +76,7 @@ message LocalRateLimit {
   // .. note::
   //
   //   In the current implementation the descriptor's token bucket :ref:`fill_interval
-  //   <envoy_api_field_type.v3.TokenBucket.fill_interval>` should be a multiple
+  //   <envoy_api_field_type.v3.TokenBucket.fill_interval>` must be a multiple
   //   global :ref:`token bucket's<envoy_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.token_bucket>` fill interval.
   repeated common.ratelimit.v3.LocalRateLimitDescriptor descriptors = 8;
 
