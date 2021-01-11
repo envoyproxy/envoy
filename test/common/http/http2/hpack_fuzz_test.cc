@@ -2,7 +2,6 @@
 // TODO(asraa): Speed up by using raw byte input and separators rather than protobuf input.
 
 #include <algorithm>
-#include <ostream>
 
 #include "test/common/http/http2/hpack_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
