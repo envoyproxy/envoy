@@ -179,7 +179,9 @@ struct MainThread {
   }
   static bool isMainThread() { 
     // If threading is off, only main thread is running. 
-    if (MainThreadSingleton::getExisting() == nullptr) return true;
+    if (MainThreadSingleton::getExisting() == nullptr) {
+      return true;
+    }
     // When threading is on, compare thread id with main thread id.
     return MainThreadSingleton::get().inMainThread(); 
   }
