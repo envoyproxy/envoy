@@ -611,7 +611,6 @@ public:
 
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-    ASSERT(overridden_downstream_remote_address_ == nullptr);
     overridden_downstream_remote_address_ = downstream_remote_address;
   }
 
