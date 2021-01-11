@@ -82,6 +82,8 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
       .WillRepeatedly(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                                  const Http::AsyncClient::RequestOptions&)
                                  -> Http::AsyncClient::Request* {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post,
+                  message->headers().Method()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().ContentTypeValues.FormUrlEncoded,
                   message->headers().ContentType()->value().getStringView());
         EXPECT_TRUE(
