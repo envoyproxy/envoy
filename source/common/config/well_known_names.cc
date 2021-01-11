@@ -7,7 +7,9 @@ namespace Config {
 
 namespace {
 
-// Replaces regex placeholders with actual regexes.
+// To allow for more readable regular expressions to be declared below, and to
+// reduce duplication, define a few common pattern substitutions for regex
+// segments.
 std::string expandRegex(const std::string& regex) {
   return absl::StrReplaceAll(
       regex, {// Regex to look for either IPv4 or IPv6 addresses.
