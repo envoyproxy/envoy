@@ -21,8 +21,8 @@ MockThreadLocalOverloadState::MockThreadLocalOverloadState()
   ON_CALL(*this, createScaledMinimumTimer_).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
 }
 
-Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(OverloadTimerType timer_type,
-                                                                Event::TimerCb callback) {
+Event::TimerPtr MockThreadLocalOverloadState::createScaledTimer(
+    Event::ScaledRangeTimerManager::TimerType timer_type, Event::TimerCb callback) {
   return Event::TimerPtr{createScaledTypedTimer_(timer_type, std::move(callback))};
 }
 

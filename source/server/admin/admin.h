@@ -256,7 +256,8 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
-      Event::TimerPtr createScaledTimer(OverloadTimerType, Event::TimerCb callback) override {
+      Event::TimerPtr createScaledTimer(Event::ScaledRangeTimerManager::TimerType,
+                                        Event::TimerCb callback) override {
         return dispatcher_.createTimer(callback);
       }
       Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum,

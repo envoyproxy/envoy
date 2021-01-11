@@ -184,7 +184,11 @@ public:
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
     return TimerPtr{createTimer_(minimum, std::move(callback))};
   }
+  TimerPtr createTimer(ScaledRangeTimerManager::TimerType timer_type, TimerCb callback) override {
+    return TimerPtr{createTypedTimer_(timer_type, std::move(callback))};
+  }
   MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
+  MOCK_METHOD(Timer*, createTypedTimer_, (ScaledRangeTimerManager::TimerType, TimerCb));
   MOCK_METHOD(void, setScaleFactor, (double), (override));
 };
 

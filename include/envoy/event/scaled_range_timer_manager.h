@@ -18,6 +18,17 @@ namespace Event {
  */
 class ScaledRangeTimerManager {
 public:
+  enum class TimerType {
+    // Timers created with this type will never be scaled. This should only be used for testing.
+    UnscaledRealTimerForTest,
+    // The amount of time an HTTP connection to a downstream client can remain idle (no streams).
+    // This corresponds to the HTTP_DOWNSTREAM_CONNECTION_IDLE TimerType in overload.proto.
+    HttpDownstreamIdleConnectionTimeout,
+    // The amount of time an HTTP stream from a downstream client can remain idle. This corresponds
+    // to the HTTP_DOWNSTREAM_STREAM_IDLE TimerType in overload.proto.
+    HttpDownstreamIdleStreamTimeout,
+  };
+
   virtual ~ScaledRangeTimerManager() = default;
 
   /**
@@ -27,6 +38,12 @@ public:
    * the min to the duration y.
    */
   virtual TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) PURE;
+
+  /**
+   * Creates a new timer backed by the manager using the provided timer type to
+   * determine the minimum.
+   */
+  virtual TimerPtr createTimer(TimerType timer_type, TimerCb callback) PURE;
 
   /**
    * Sets the scale factor for all timers created through this manager. The value should be between

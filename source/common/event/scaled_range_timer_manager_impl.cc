@@ -137,13 +137,26 @@ private:
   const ScopeTrackedObject* scope_;
 };
 
-ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), scale_factor_(1.0) {}
+ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(
+    Dispatcher& dispatcher, const TimerTypeMapConstSharedPtr& timer_minimums)
+    : dispatcher_(dispatcher),
+      timer_minimums_(timer_minimums != nullptr ? timer_minimums
+                                                : std::make_shared<TimerTypeMap>()),
+      scale_factor_(1.0) {}
 
 ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   // Scaled timers created by the manager shouldn't outlive it. This is
   // necessary but not sufficient to guarantee that.
   ASSERT(queues_.empty());
+}
+
+TimerPtr ScaledRangeTimerManagerImpl::createTimer(TimerType timer_type, TimerCb callback) {
+  const auto minimum_it = timer_minimums_->find(timer_type);
+  const Event::ScaledTimerMinimum minimum =
+      minimum_it != timer_minimums_->end()
+          ? minimum_it->second
+          : Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat::max()));
+  return createTimer(minimum, std::move(callback));
 }
 
 TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerMinimum minimum, TimerCb callback) {

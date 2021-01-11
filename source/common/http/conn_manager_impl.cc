@@ -10,6 +10,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/drain_decision.h"
@@ -122,7 +123,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   if (config_.idleTimeout()) {
     connection_idle_timer_ = overload_state_.createScaledTimer(
-        Server::OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
+        Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleConnectionTimeout,
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
@@ -628,7 +629,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
-        Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
+        Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleStreamTimeout,
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
@@ -1052,7 +1053,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
-              Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
+              Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleStreamTimeout,
               [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {

@@ -15,6 +15,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -170,7 +171,7 @@ private:
   absl::node_hash_map<std::string, Resource> resources_;
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
-  absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum> timer_minimums_;
+  Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr timer_minimums_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;
