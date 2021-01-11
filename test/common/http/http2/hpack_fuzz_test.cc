@@ -8,6 +8,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/escaping.h"
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
@@ -56,18 +57,18 @@ Buffer::OwnedImpl encodeHeaders(nghttp2_hd_deflater* deflater,
   return payload;
 }
 
-std::vector<nghttp2_nv> decodeHeaders(nghttp2_hd_inflater* inflater,
-                                      const Buffer::OwnedImpl& payload, bool end_headers) {
+std::vector<std::pair<std::string, std::string>>
+decodeHeaders(nghttp2_hd_inflater* inflater, const Buffer::OwnedImpl& payload, bool end_headers) {
   // Decode using nghttp2
   Buffer::RawSliceVector slices = payload.getRawSlices();
   const int num_slices = slices.size();
   ASSERT(num_slices == 1, absl::StrCat("number of slices ", num_slices));
 
-  std::vector<nghttp2_nv> decoded_headers;
+  std::vector<std::pair<std::string, std::string>> decoded_headers;
   int inflate_flags = 0;
-  nghttp2_nv decoded_nv;
+  nghttp2_nv nv;
   while (slices[0].len_ > 0) {
-    ssize_t result = nghttp2_hd_inflate_hd2(inflater, &decoded_nv, &inflate_flags,
+    ssize_t result = nghttp2_hd_inflate_hd2(inflater, &nv, &inflate_flags,
                                             reinterpret_cast<uint8_t*>(slices[0].mem_),
                                             slices[0].len_, end_headers);
     // Decoding should not fail and data should not be left in slice.
@@ -78,7 +79,8 @@ std::vector<nghttp2_nv> decodeHeaders(nghttp2_hd_inflater* inflater,
 
     if (inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
       // One header key value pair has been successfully decoded.
-      decoded_headers.push_back(decoded_nv);
+      decoded_headers.push_back({std::string(reinterpret_cast<char*>(nv.name), nv.namelen),
+                                 std::string(reinterpret_cast<char*>(nv.value), nv.valuelen)});
     }
   }
 
@@ -90,9 +92,9 @@ std::vector<nghttp2_nv> decodeHeaders(nghttp2_hd_inflater* inflater,
 }
 
 struct NvComparator {
-  inline bool operator()(const nghttp2_nv& a, const nghttp2_nv& b) {
-    absl::string_view a_str(reinterpret_cast<char*>(a.name), a.namelen);
-    absl::string_view b_str(reinterpret_cast<char*>(b.name), b.namelen);
+  inline bool operator()(const nghttp2_nv& a, const nghttp2_nv& b) const {
+    std::string a_str(reinterpret_cast<char*>(a.name), a.namelen);
+    std::string b_str(reinterpret_cast<char*>(b.name), b.namelen);
     return a_str.compare(b_str);
   }
 };
@@ -108,8 +110,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
 
   // Create name value pairs from headers.
   std::vector<nghttp2_nv> input_nv = createNameValueArray(input.headers());
-  // Skip encoding empty headers. nghttp2 will throw a nullptr error on runtime if it receives a
-  // nullptr input.
+  // Skip encoding an empty header map. nghttp2 will throw a nullptr error on runtime if it receives
+  // a nullptr input.
   if (!input_nv.data()) {
     return;
   }
@@ -127,20 +129,22 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
   ASSERT(!payload.getRawSlices().empty());
 
   // Decode headers with nghttp2
-  std::vector<nghttp2_nv> output_nv = decodeHeaders(inflater, payload, input.end_headers());
+  std::vector<std::pair<std::string, std::string>> output_nv =
+      decodeHeaders(inflater, payload, input.end_headers());
 
   // Verify that decoded == encoded.
   ASSERT(input_nv.size() == output_nv.size());
   std::sort(input_nv.begin(), input_nv.end(), NvComparator());
-  std::sort(output_nv.begin(), output_nv.end(), NvComparator());
+  std::sort(output_nv.begin(), output_nv.end());
   for (size_t i = 0; i < input_nv.size(); i++) {
-    absl::string_view in_name = {reinterpret_cast<char*>(input_nv[i].name), input_nv[i].namelen};
-    absl::string_view out_name = {reinterpret_cast<char*>(output_nv[i].name), output_nv[i].namelen};
-    absl::string_view in_val = {reinterpret_cast<char*>(input_nv[i].value), input_nv[i].valuelen};
-    absl::string_view out_val = {reinterpret_cast<char*>(output_nv[i].value),
-                                 output_nv[i].valuelen};
-    ASSERT(in_name == out_name);
-    ASSERT(in_val == out_val);
+    std::string in_name = {reinterpret_cast<char*>(input_nv[i].name), input_nv[i].namelen};
+    std::string out_name = output_nv[i].first;
+    std::string in_val = {reinterpret_cast<char*>(input_nv[i].value), input_nv[i].valuelen};
+    std::string out_val = output_nv[i].second;
+    ASSERT(in_name == out_name,
+           absl::StrCat("in", absl::CEscape(in_name), "out", absl::CEscape(out_name)));
+    ASSERT(in_val == out_val,
+           absl::StrCat("in [", absl::CEscape(in_val), "] out [", absl::CEscape(out_val), "]"));
   }
 
   // Delete inflater
