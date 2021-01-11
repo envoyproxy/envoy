@@ -69,8 +69,8 @@ public:
 
   void prepareCheck() {
     ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+    connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
@@ -231,8 +231,8 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -270,8 +270,8 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -310,8 +310,8 @@ TEST_F(HttpFilterTest, ErrorOpen) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -344,8 +344,8 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -402,8 +402,6 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_));
-  EXPECT_CALL(connection_, remoteAddress()).Times(0);
-  EXPECT_CALL(connection_, localAddress()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -435,8 +433,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -477,8 +475,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
 
   // The check call should only be called once.
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
@@ -533,8 +531,8 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -1576,8 +1574,6 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   // When filter is not disabled, setDecoderBufferLimit is called.
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_));
-  EXPECT_CALL(connection_, remoteAddress()).Times(0);
-  EXPECT_CALL(connection_, localAddress()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -2091,8 +2087,6 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   // When request body buffering is not skipped, setDecoderBufferLimit is called.
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_));
-  EXPECT_CALL(connection_, remoteAddress()).Times(0);
-  EXPECT_CALL(connection_, localAddress()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -2101,8 +2095,8 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   test_disable_request_body_buffering(true);
   // When request body buffering is skipped, setDecoderBufferLimit is not called.
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));

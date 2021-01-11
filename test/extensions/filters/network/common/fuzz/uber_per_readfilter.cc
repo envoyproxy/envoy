@@ -87,11 +87,15 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
@@ -116,8 +120,10 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        pipe_addr_);
   }
 }
 
