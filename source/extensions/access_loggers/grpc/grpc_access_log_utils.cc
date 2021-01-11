@@ -135,19 +135,19 @@ void Utility::extractCommonAccessLogProperties(
     const StreamInfo::StreamInfo& stream_info,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
   // TODO(mattklein123): Populate sample_rate field.
-  if (stream_info.downstreamRemoteAddress() != nullptr) {
+  if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *stream_info.downstreamRemoteAddress(),
+        *stream_info.downstreamAddressProvider().remoteAddress(),
         *common_access_log.mutable_downstream_remote_address());
   }
-  if (stream_info.downstreamDirectRemoteAddress() != nullptr) {
+  if (stream_info.downstreamAddressProvider().directRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *stream_info.downstreamDirectRemoteAddress(),
+        *stream_info.downstreamAddressProvider().directRemoteAddress(),
         *common_access_log.mutable_downstream_direct_remote_address());
   }
-  if (stream_info.downstreamLocalAddress() != nullptr) {
+  if (stream_info.downstreamAddressProvider().localAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
-        *stream_info.downstreamLocalAddress(),
+        *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
   if (stream_info.downstreamSslConnection() != nullptr) {

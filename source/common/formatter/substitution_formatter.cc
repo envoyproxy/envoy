@@ -651,37 +651,37 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
+          return stream_info.downstreamAddressProvider().localAddress();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
         [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
+          return stream_info.downstreamAddressProvider().localAddress();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
     field_extractor_ = StreamInfoAddressFieldExtractor::justPort(
         [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
+          return stream_info.downstreamAddressProvider().localAddress();
         });
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamRemoteAddress();
+          return stream_info.downstreamAddressProvider().remoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamRemoteAddress();
+          return stream_info.downstreamAddressProvider().remoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamDirectRemoteAddress();
+          return stream_info.downstreamAddressProvider().directRemoteAddress();
         });
   } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamDirectRemoteAddress();
+          return stream_info.downstreamAddressProvider().directRemoteAddress();
         });
   } else if (field_name == "CONNECTION_ID") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
