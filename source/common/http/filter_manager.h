@@ -611,6 +611,10 @@ public:
 
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    // TODO(rgs1): we should assert overridden_downstream_remote_address_ is nullptr,
+    // but we are currently relaxing this as a workaround to:
+    //
+    // https://github.com/envoyproxy/envoy/pull/14432#issuecomment-758167614
     overridden_downstream_remote_address_ = downstream_remote_address;
   }
 
