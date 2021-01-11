@@ -43,9 +43,8 @@ getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
 
 } // namespace
 
-uint64_t
-ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-                                         const ProtocolOptionsConfigImpl& options) {
+uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
+                                                  const ProtocolOptionsConfigImpl& options) {
   uint64_t features = 0;
 
   if (options.use_http2_) {
