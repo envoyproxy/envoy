@@ -2,6 +2,7 @@
 // TODO(asraa): Speed up by using raw byte input and separators rather than protobuf input.
 
 #include <algorithm>
+#include <ostream>
 
 #include "test/common/http/http2/hpack_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -26,6 +27,8 @@ std::vector<nghttp2_nv> createNameValueArray(const test::fuzz::Headers& input) {
   for (const auto& header : input.headers()) {
     // TODO(asraa): Consider adding flags in fuzzed input.
     const uint8_t flags = 0;
+    ENVOY_LOG_MISC(trace, "encoding: {} {}", absl::CEscape(header.key()),
+                   absl::CEscape(header.value()));
     nva[i++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.key().data())),
                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.value().data())),
                 header.key().size(), header.value().size(), flags};
@@ -81,6 +84,8 @@ decodeHeaders(nghttp2_hd_inflater* inflater, const Buffer::OwnedImpl& payload, b
       // One header key value pair has been successfully decoded.
       decoded_headers.push_back({std::string(reinterpret_cast<char*>(nv.name), nv.namelen),
                                  std::string(reinterpret_cast<char*>(nv.value), nv.valuelen)});
+      ENVOY_LOG_MISC(trace, "decoded: {}, {}", absl::CEscape(decoded_headers.back().first),
+                     absl::CEscape(decoded_headers.back().second));
     }
   }
 
@@ -93,9 +98,14 @@ decodeHeaders(nghttp2_hd_inflater* inflater, const Buffer::OwnedImpl& payload, b
 
 struct NvComparator {
   inline bool operator()(const nghttp2_nv& a, const nghttp2_nv& b) const {
-    std::string a_str(reinterpret_cast<char*>(a.name), a.namelen);
-    std::string b_str(reinterpret_cast<char*>(b.name), b.namelen);
-    return a_str.compare(b_str);
+    absl::string_view a_name(reinterpret_cast<char*>(a.name), a.namelen);
+    absl::string_view b_name(reinterpret_cast<char*>(b.name), b.namelen);
+    if (a_name != b_name) {
+      return a_name < b_name;
+    }
+    absl::string_view a_val(reinterpret_cast<char*>(a.value), a.valuelen);
+    absl::string_view b_val(reinterpret_cast<char*>(b.value), b.valuelen);
+    return b_val > a_val;
   }
 };
 
@@ -136,15 +146,14 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
   ASSERT(input_nv.size() == output_nv.size());
   std::sort(input_nv.begin(), input_nv.end(), NvComparator());
   std::sort(output_nv.begin(), output_nv.end());
+
   for (size_t i = 0; i < input_nv.size(); i++) {
     std::string in_name = {reinterpret_cast<char*>(input_nv[i].name), input_nv[i].namelen};
     std::string out_name = output_nv[i].first;
     std::string in_val = {reinterpret_cast<char*>(input_nv[i].value), input_nv[i].valuelen};
     std::string out_val = output_nv[i].second;
-    ASSERT(in_name == out_name,
-           absl::StrCat("in", absl::CEscape(in_name), "out", absl::CEscape(out_name)));
-    ASSERT(in_val == out_val,
-           absl::StrCat("in [", absl::CEscape(in_val), "] out [", absl::CEscape(out_val), "]"));
+    ASSERT(in_name == out_name);
+    ASSERT(in_val == out_val);
   }
 
   // Delete inflater
