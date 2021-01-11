@@ -6,10 +6,9 @@ namespace Envoy {
 namespace Config {
 
 // To exclude rejecting below v2 protos.
-using Exclude_v2_protosSet = std::set<absl::string_view>;
-static const Exclude_v2_protosSet& exclude_v2_protosSet() {
+static const std::set<absl::string_view>& excludeV2ProtoSet() {
   CONSTRUCT_ON_FIRST_USE(
-      Exclude_v2_protosSet,
+      std::set<absl::string_view>,
       {"envoy.config.health_checker.redis.v2", "envoy.config.filter.thrift.router.v2alpha1",
        "envoy.config.resource_monitor.fixed_heap.v2alpha",
        "envoy.config.resource_monitor.injected_resource.v2alpha",
@@ -23,8 +22,8 @@ ApiTypeOracle::getEarlierVersionDescriptor(const std::string& message_type) {
     const Protobuf::Descriptor* earlier_desc =
         Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
             previous_message_string.value());
-    auto itr = exclude_v2_protosSet().find(earlier_desc->full_name());
-    if (itr != exclude_v2_protosSet().end()) {
+    auto itr = excludeV2ProtoSet().find(earlier_desc->full_name());
+    if (itr != excludeV2ProtoSet().end()) {
       return nullptr;
     }
     return earlier_desc;
