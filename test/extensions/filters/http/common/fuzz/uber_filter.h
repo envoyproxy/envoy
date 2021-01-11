@@ -4,6 +4,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +40,9 @@ private:
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
+  envoy::config::core::v3::Metadata listener_metadata_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  TestScopedRuntime scoped_runtime_;
 
   // Filter constructed from the config.
   Http::StreamDecoderFilterSharedPtr decoder_filter_;

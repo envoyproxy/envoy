@@ -8,6 +8,7 @@
 #include "envoy/thread/thread.h"
 
 #include "common/common/non_copyable.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -166,6 +167,20 @@ public:
    * @return The new or already-existing T*, possibly nullptr if make_object returns nullptr.
    */
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
+};
+
+struct MainThread {
+  using MainThreadSingleton = InjectableSingleton<MainThread>;
+  bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
+  static void init() { MainThreadSingleton::initialize(new MainThread()); }
+  static void clear() {
+    delete MainThreadSingleton::getExisting();
+    MainThreadSingleton::clear();
+  }
+  static bool isMainThread() { return MainThreadSingleton::get().inMainThread(); }
+
+private:
+  std::thread::id main_thread_id_{std::this_thread::get_id()};
 };
 
 } // namespace Thread

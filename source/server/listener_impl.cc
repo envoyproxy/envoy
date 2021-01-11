@@ -73,6 +73,11 @@ bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
       config.filter_chains().empty() ? config.default_filter_chain() : config.filter_chains()[0],
       use_proxy_proto, false);
 }
+
+bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bind_to_port, true) &&
+         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true);
+}
 } // namespace
 
 ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& factory,
@@ -109,7 +114,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
   }
 
   if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
-    local_address_ = socket_->localAddress();
+    local_address_ = socket_->addressProvider().localAddress();
   }
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
             local_address_->asString());
@@ -246,7 +251,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+      bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -324,8 +329,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
-    : parent_(parent), address_(origin.address_),
-      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+    : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(

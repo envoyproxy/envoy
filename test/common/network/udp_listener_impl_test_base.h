@@ -38,11 +38,13 @@ public:
 protected:
   Address::Instance* getServerLoopbackAddress() {
     if (version_ == Address::IpVersion::v4) {
-      return new Address::Ipv4Instance(Network::Test::getLoopbackAddressString(version_),
-                                       server_socket_->localAddress()->ip()->port());
+      return new Address::Ipv4Instance(
+          Network::Test::getLoopbackAddressString(version_),
+          server_socket_->addressProvider().localAddress()->ip()->port());
     }
-    return new Address::Ipv6Instance(Network::Test::getLoopbackAddressString(version_),
-                                     server_socket_->localAddress()->ip()->port());
+    return new Address::Ipv6Instance(
+        Network::Test::getLoopbackAddressString(version_),
+        server_socket_->addressProvider().localAddress()->ip()->port());
   }
 
   SocketSharedPtr createServerSocket(bool bind) {
@@ -64,7 +66,7 @@ protected:
     if (version_ == Address::IpVersion::v4) {
       // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
       send_from_addr = std::make_shared<Address::Ipv4Instance>(
-          "127.0.0.1", server_socket_->localAddress()->ip()->port());
+          "127.0.0.1", server_socket_->addressProvider().localAddress()->ip()->port());
     } else {
       // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
       // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
@@ -76,7 +78,7 @@ protected:
 #else
           "::1",
 #endif
-          server_socket_->localAddress()->ip()->port());
+          server_socket_->addressProvider().localAddress()->ip()->port());
     }
     return send_from_addr;
   }
