@@ -18,7 +18,7 @@ namespace PostgresProxy {
 class PostgresBaseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public BaseIntegrationTest {
 
-  std::string postgresConfig(bool terminate_ssl, bool addStartTlsTransportSocket) {
+  std::string postgresConfig(bool terminate_ssl, bool add_start_tls_transport_socket) {
     std::string main_config = fmt::format(
         TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
             "test/extensions/filters/network/postgres_proxy/postgres_test_config.yaml")),
@@ -26,7 +26,7 @@ class PostgresBaseIntegrationTest : public testing::TestWithParam<Network::Addre
         Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getAnyAddressString(GetParam()), terminate_ssl ? "true" : "false");
 
-    if (addStartTlsTransportSocket) {
+    if (add_start_tls_transport_socket) {
       main_config +=
           fmt::format(R"EOF(
         transport_socket:
