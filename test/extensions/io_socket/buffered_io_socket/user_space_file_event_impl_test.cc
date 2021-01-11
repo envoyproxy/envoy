@@ -33,14 +33,13 @@ public:
 class MockUserspaceIoHandle : public UserspaceIoHandle {
 public:
   MOCK_METHOD(void, setWriteEnd, ());
-  MOCK_METHOD(bool, isWriteEndSet, ());
+  MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
   MOCK_METHOD(void, onPeerDestroy, ());
   MOCK_METHOD(void, setNewDataAvailable, ());
   MOCK_METHOD(Buffer::Instance*, getWriteBuffer, ());
   MOCK_METHOD(bool, isWritable, (), (const));
   MOCK_METHOD(bool, isPeerWritable, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
-  MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
   MOCK_METHOD(bool, isReadable, (), (const));
 };
 
@@ -51,7 +50,10 @@ public:
 
   void setWritable() { EXPECT_CALL(io_source_, isPeerWritable()).WillRepeatedly(Return(true)); }
   void setReadable() { EXPECT_CALL(io_source_, isReadable()).WillRepeatedly(Return(true)); }
-  void clearReadWrite() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
+  void setWriteEnd() {
+    EXPECT_CALL(io_source_, isPeerShutDownWrite()).WillRepeatedly(Return(true));
+  }
+  void clearEventExpectation() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
 
 protected:
   NiceMock<MockUserspaceIoHandle> io_source_;
@@ -65,7 +67,7 @@ TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
   for (const auto current_event : {Event::FileReadyType::Read, Event::FileReadyType::Write,
                                    Event::FileReadyType::Read | Event::FileReadyType::Write}) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
-    clearReadWrite();
+    clearEventExpectation();
     if (current_event & Event::FileReadyType::Read) {
       setReadable();
     }
@@ -211,6 +213,7 @@ TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   // Ensure both events are pending so that any enabled event will be immediately delivered.
   setWritable();
   setReadable();
+  setWriteEnd();
   // The enabled event are delivered but not the other.
   {
     user_file_event_->activate(Event::FileReadyType::Read);
@@ -227,7 +230,7 @@ TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   // No event is delivered since it's either user disabled or io_handle doesn't provide pending
   // data.
   {
-    clearReadWrite();
+    clearEventExpectation();
     setReadable();
     user_file_event_->activate(Event::FileReadyType::Read);
     user_file_event_->setEnabled(Event::FileReadyType::Write);
@@ -235,7 +238,7 @@ TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
-    clearReadWrite();
+    clearEventExpectation();
     setWritable();
     user_file_event_->activate(Event::FileReadyType::Write);
     user_file_event_->setEnabled(Event::FileReadyType::Read);
@@ -248,7 +251,17 @@ TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, EventClosedIsNotTriggeredUnlessManullyActivated) {
+TEST_F(UserSpaceFileEventImplTest, EventClosedIsTriggeredBySetWriteEnd) {
+  setWriteEnd();
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
+      Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);
+
+  EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Closed));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(UserSpaceFileEventImplTest, EventClosedIsTriggeredByManullyActivate) {
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);

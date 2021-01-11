@@ -54,6 +54,9 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   if ((events & Event::FileReadyType::Write) && io_source_.isPeerWritable()) {
     events_to_notify |= Event::FileReadyType::Write;
   }
+  if ((events & Event::FileReadyType::Closed) && io_source_.isPeerShutDownWrite()) {
+    events_to_notify |= Event::FileReadyType::Closed;
+  }
   if (events_to_notify != 0) {
     activate(events_to_notify);
   } else {

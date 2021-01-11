@@ -19,10 +19,11 @@ public:
    * Set the flag to indicate no further write from peer.
    */
   virtual void setWriteEnd() PURE;
+
   /**
    * @return true if the peer promise no more write.
    */
-  virtual bool isWriteEndSet() PURE;
+  virtual bool isPeerShutDownWrite() const PURE;
 
   /**
    * Raised when peer is destroyed. No further write to peer is allowed.
@@ -62,11 +63,6 @@ public:
 class UserspaceIoHandle : public WritablePeer {
 public:
   ~UserspaceIoHandle() override = default;
-
-  /**
-   * Read the flag to indicate no further write. Used by early close detection.
-   */
-  virtual bool isPeerShutDownWrite() const PURE;
 
   /**
    * @return true if the pending receive buffer is not empty or read_end is set.

@@ -98,7 +98,6 @@ public:
     receive_data_end_stream_ = true;
     setNewDataAvailable();
   }
-  bool isWriteEndSet() override { return receive_data_end_stream_; }
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
@@ -115,14 +114,14 @@ public:
     }
   }
   bool isWritable() const override { return !pending_received_data_.highWatermarkTriggered(); }
+  bool isPeerShutDownWrite() const override { return receive_data_end_stream_; }
   bool isPeerWritable() const override {
-    return writable_peer_ != nullptr && !writable_peer_->isWriteEndSet() &&
+    return writable_peer_ != nullptr && !writable_peer_->isPeerShutDownWrite() &&
            writable_peer_->isWritable();
   }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
   // `UserspaceIoHandle`
-  bool isPeerShutDownWrite() const override { return receive_data_end_stream_; }
   bool isReadable() const override {
     return isPeerShutDownWrite() || pending_received_data_.length() > 0;
   }

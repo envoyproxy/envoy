@@ -130,7 +130,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
                                Network::IoSocketError::deleteIoError)};
   }
   // Error: write after close.
-  if (writable_peer_->isWriteEndSet()) {
+  if (writable_peer_->isPeerShutDownWrite()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
@@ -170,7 +170,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
                                Network::IoSocketError::deleteIoError)};
   }
   // Error: write after close.
-  if (writable_peer_->isWriteEndSet()) {
+  if (writable_peer_->isPeerShutDownWrite()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
