@@ -12,7 +12,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -43,7 +42,7 @@ public:
     uri.set_uri("auth.com/oauth/token");
     uri.mutable_timeout()->set_seconds(1);
     cm_.initializeThreadLocalClusters({"auth"});
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, std::nullopt);
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, 0s);
   }
 
   ABSL_MUST_USE_RESULT

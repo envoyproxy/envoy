@@ -23,7 +23,6 @@
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a MissingFieldException.
-
 #define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
   ([](const auto& msg) {                                                                           \
     if (!msg.has_##field_name()) {                                                                 \
@@ -31,6 +30,7 @@
     }                                                                                              \
     return msg.field_name().value();                                                               \
   }((message)))
+
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
 // default value.
 #define PROTOBUF_GET_MS_OR_DEFAULT(message, field_name, default_value)                             \
@@ -59,12 +59,11 @@
     return DurationUtil::durationToMilliseconds(msg.field_name());                                 \
   }((message)))
 
-// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, return
-// absl::nullopt.
-#define PROTOBUF_GET_OPTIONAL_SECONDS(message, field_name)                                         \
-  ((message).has_##field_name() ? absl::optional<std::chrono::seconds>(                            \
-                                      DurationUtil::durationToSeconds((message).field_name()))     \
-                                : absl::nullopt)
+// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
+// default value.
+#define PROTOBUF_GET_SECONDS_OR_DEFAULT(message, field_name, default_value)                        \
+  ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
+                                : (default_value))
 
 // Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.

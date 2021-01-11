@@ -15,6 +15,8 @@
 
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
+using namespace std::chrono_literals;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -96,19 +98,17 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
   const std::string access_token{PROTOBUF_GET_WRAPPED_REQUIRED(response, access_token)};
 
-  absl::optional<std::chrono::seconds> expires_in;
+  std::chrono::seconds expires_in = default_expires_in_;
   if (response.has_expires_in()) {
-    expires_in.emplace(response.expires_in().value());
-  } else if (default_expires_in_) {
-    expires_in.emplace(*default_expires_in_);
+    expires_in = std::chrono::seconds{response.expires_in().value()};
   }
-  if (!expires_in) {
+  if (expires_in <= 0s) {
     ENVOY_LOG(debug, "No default or explicit access token expiration after asyncGetAccessToken");
     parent_->sendUnauthorizedResponse();
     return;
   }
 
-  parent_->onGetAccessTokenSuccess(access_token, *expires_in);
+  parent_->onGetAccessTokenSuccess(access_token, expires_in);
 }
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
