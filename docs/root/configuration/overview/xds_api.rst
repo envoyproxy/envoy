@@ -1,26 +1,21 @@
 .. _config_overview_management_server:
 
-xDS API endpoints
+xDS API 端点
 -----------------
 
-An xDS management server will implement the below endpoints as required for
-gRPC and/or REST serving. In both streaming gRPC and
-REST-JSON cases, a :ref:`DiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest>` is sent and a
-:ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` received following the
-:ref:`xDS protocol <xds_protocol>`.
+xDS 管理服务器将根据 gRPC 和/或 REST 服务的要求实现以下端点。在 gRPC 流和 REST-JSON 两种情况下，都按照 :ref:`xDS 协议 <xds_protocol>` 发送 :ref:`DiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest>` 并接收 :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` 。
 
-Below we describe endpoints for the v2 and v3 transport API versions.
+下面我们描述了 v2 和 v3 传输 API 版本的端点。
 
 .. _v2_grpc_streaming_endpoints:
 
-gRPC streaming endpoints
+gRPC 流端点
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. http:post:: /envoy.api.v2.ClusterDiscoveryService/StreamClusters
 .. http:post:: /envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters
 
-See :repo:`cds.proto <api/service/cluster/v3/cds.proto>` for the service definition. This is used by Envoy
-as a client when
+有关服务定义，请参见 :repo:`cds.proto <api/service/cluster/v3/cds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -32,16 +27,14 @@ as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set in the :ref:`dynamic_resources
-<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
+在 :ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` 配置的 :ref:`dynamic_resources
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` 中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /envoy.api.v2.EndpointDiscoveryService/StreamEndpoints
 .. http:post:: /envoy.service.endpoint.v3.EndpointDiscoveryService/StreamEndpoints
 
-See :repo:`eds.proto
-<api/envoy/service/endpoint/v3/eds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`eds.proto
+<api/envoy/service/endpoint/v3/eds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -53,16 +46,14 @@ for the service definition. This is used by Envoy as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set in the :ref:`eds_cluster_config
-<envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` field of the :ref:`Cluster
-<envoy_v3_api_msg_config.cluster.v3.Cluster>` config.
+在 :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` 配置的 :ref:`eds_cluster_config
+<envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` 字段中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /envoy.api.v2.ListenerDiscoveryService/StreamListeners
 .. http:post:: /envoy.service.listener.v3.ListenerDiscoveryService/StreamListeners
 
-See :repo:`lds.proto
-<api/envoy/service/listener/v3/lds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`lds.proto
+<api/envoy/service/listener/v3/lds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -74,16 +65,14 @@ for the service definition. This is used by Envoy as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set in the :ref:`dynamic_resources
-<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
+在 :ref:`Bootstrap <envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` 配置的 :ref:`dynamic_resources
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` 中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /envoy.api.v2.RouteDiscoveryService/StreamRoutes
 .. http:post:: /envoy.service.route.v3.RouteDiscoveryService/StreamRoutes
 
-See :repo:`rds.proto
-<api/envoy/service/route/v3/rds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`rds.proto
+<api/envoy/service/route/v3/rds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -96,17 +85,15 @@ for the service definition. This is used by Envoy as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set in the :ref:`rds
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>` field
-of the :ref:`HttpConnectionManager
-<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
+在 :ref:`HttpConnectionManager
+<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` 配置的 :ref:`rds
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>` 字段中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /envoy.api.v2.ScopedRoutesDiscoveryService/StreamScopedRoutes
 .. http:post:: /envoy.service.route.v3.ScopedRoutesDiscoveryService/StreamScopedRoutes
 
-See :repo:`srds.proto
-<api/envoy/service/route/v3/srds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`srds.proto
+<api/envoy/service/route/v3/srds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -120,17 +107,14 @@ for the service definition. This is used by Envoy as a client when
             envoy_grpc:
               cluster_name: some_xds_cluster
 
-is set in the :ref:`scoped_routes
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scoped_routes>`
-field of the :ref:`HttpConnectionManager
-<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
+在 :ref:`HttpConnectionManager
+<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` 配置的 :ref:`scoped_routes <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scoped_routes>` 字段中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets
 .. http:post:: /envoy.service.secret.v3.SecretDiscoveryService/StreamSecrets
 
-See :repo:`sds.proto
-<api/envoy/service/secret/v3/sds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`sds.proto
+<api/envoy/service/secret/v3/sds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -143,15 +127,13 @@ for the service definition. This is used by Envoy as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set inside a :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` message. This message
-is used in various places such as the :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`.
+在 :ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` 消息中设置时， Envoy 会将其用作客户端。这种消息在各种地方都使用，如 :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>` 。
 
 .. http:post:: /envoy.service.discovery.v2.RuntimeDiscoveryService/StreamRuntime
 .. http:post:: /envoy.service.runtime.v3.RuntimeDiscoveryService/StreamRuntime
 
-See :repo:`rtds.proto
-<api/envoy/service/runtime/v3/rtds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`rtds.proto
+<api/envoy/service/runtime/v3/rtds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -164,18 +146,17 @@ for the service definition. This is used by Envoy as a client when
           envoy_grpc:
             cluster_name: some_xds_cluster
 
-is set inside the :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
-field.
+在 :ref:`rtds_layer <envoy_v3_api_field_config.bootstrap.v3.RuntimeLayer.rtds_layer>`
+字段中设置时，Envoy 会将其用作客户端。
 
-REST endpoints
+REST 端点
 ^^^^^^^^^^^^^^
 
 .. http:post:: /v2/discovery:clusters
 .. http:post:: /v3/discovery:clusters
 
-See :repo:`cds.proto
-<api/envoy/service/cluster/v3/cds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`cds.proto
+<api/envoy/service/cluster/v3/cds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -185,16 +166,15 @@ for the service definition. This is used by Envoy as a client when
         transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
-is set in the :ref:`dynamic_resources
-<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
+在 :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` 配置的 :ref:`dynamic_resources
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` 中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /v2/discovery:endpoints
 .. http:post:: /v3/discovery:endpoints
 
-See :repo:`eds.proto
-<api/envoy/service/endpoint/v3/eds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`eds.proto
+<api/envoy/service/endpoint/v3/eds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -204,16 +184,15 @@ for the service definition. This is used by Envoy as a client when
         transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
-is set in the :ref:`eds_cluster_config
-<envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` field of the :ref:`Cluster
-<envoy_v3_api_msg_config.cluster.v3.Cluster>` config.
+在 :ref:`Cluster
+<envoy_v3_api_msg_config.cluster.v3.Cluster>` 配置的 :ref:`eds_cluster_config
+<envoy_v3_api_field_config.cluster.v3.Cluster.eds_cluster_config>` 字段中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /v2/discovery:listeners
 .. http:post:: /v3/discovery:listeners
 
-See :repo:`lds.proto
-<api/envoy/service/listener/v3/lds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`lds.proto
+<api/envoy/service/listener/v3/lds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -223,16 +202,15 @@ for the service definition. This is used by Envoy as a client when
         transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
-is set in the :ref:`dynamic_resources
-<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
+在 :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` 配置的 :ref:`dynamic_resources
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` 中设置时，Envoy 会将其用作客户端。
 
 .. http:post:: /v2/discovery:routes
 .. http:post:: /v3/discovery:routes
 
-See :repo:`rds.proto
-<api/envoy/service/route/v3/rds.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`rds.proto
+<api/envoy/service/route/v3/rds.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -243,53 +221,33 @@ for the service definition. This is used by Envoy as a client when
         transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
-is set in the :ref:`rds
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
-<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` config.
+在 :ref:`HttpConnectionManager
+<envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` 配置的 :ref:`rds
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>` 字段中设置时，Envoy 会将其用作客户端。
 
 .. note::
 
-    The management server responding to these endpoints must respond with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
-    along with a HTTP status of 200. Additionally, if the configuration that would be supplied has not changed (as indicated by the version
-    supplied by the Envoy client) then the management server can respond with an empty body and a HTTP status of 304.
+    响应这些端点的管理服务器必须以 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+    和 HTTP 状态 200 进行响应。此外，如果提供的配置未更改（如 Envoy 客户端提供的版本所示），则管理服务器可以响应具有空的正文，HTTP 状态为 304。
 
 .. _config_overview_ads:
 
-Aggregated Discovery Service
+聚合发现服务
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-While Envoy fundamentally employs an eventual consistency model, ADS provides an
-opportunity to sequence API update pushes and ensure affinity of a single
-management server for an Envoy node for API updates. ADS allows one or more APIs
-and their resources to be delivered on a single, bidirectional gRPC stream by
-the management server. Without this, some APIs such as RDS and EDS may require
-the management of multiple streams and connections to distinct management
-servers.
+尽管 Envoy 从根本上采用了最终的一致性模型，但 ADS 提供了对 API 更新推送进行排序的机会，并确保单个管理服务器对 Envoy 节点的 API 更新具有亲和力。ADS 允许管理服务器在单个，双向 gRPC 流上交付一个或多个 API 及其资源。否则，某些 API（例如 RDS 和 EDS）可能需要管理多个流以及与不同管理服务器的连接。
 
-ADS will allow for hitless updates of configuration by appropriate sequencing.
-For example, suppose *foo.com* was mapped to cluster *X*. We wish to change the
-mapping in the route table to point *foo.com* at cluster *Y*. In order to do
-this, a CDS/EDS update must first be delivered containing both clusters *X* and
-*Y*.
+ADS 将允许通过适当的顺序进行无中断的配置更新。例如，假设 *foo.com* 被映射到集群 *X*。我们希望在路由表来改变 *foo.com* 映射到集群 *Y*。为此，必须首先交付包含集群 *X* 和集群 *Y* 的 CDS/EDS 更新。
 
-Without ADS, the CDS/EDS/RDS streams may point at distinct management servers,
-or when on the same management server at distinct gRPC streams/connections that
-require coordination. The EDS resource requests may be split across two distinct
-streams, one for *X* and one for *Y*. ADS allows these to be coalesced to a
-single stream to a single management server, avoiding the need for distributed
-synchronization to correctly sequence the update. With ADS, the management
-server would deliver the CDS, EDS and then RDS updates on a single stream.
+如果没有ADS，CDS/EDS/RDS 流可能指向不同的管理服务器，或者指向同一管理服务器上需要协调的不同 gRPC 流/连接。EDS 资源请求可以分为两个不同的流，一个用于 *X*，另一个用于 *Y*。ADS 允许将它们合并到单个管理服务器的单个流中，而无需进行分布式同步来正确地对更新进行排序。如果有 ADS，管理服务器将在单个流上交付 CDS，EDS 和 RDS 的更新。
 
-ADS is only available for gRPC streaming (not REST) and is described more fully
-in :ref:`xDS <xds_protocol_ads>`
-document. The gRPC endpoint is:
+ADS 仅可用于 gRPC 流式传输（不适用于 REST），并且在 :ref:`xDS <xds_protocol_ads>` 文档中有更完整的描述。gRPC 端点是：
 
 .. http:post:: /envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources
 .. http:post:: /envoy.service.discovery.v3.AggregatedDiscoveryService/StreamAggregatedResources
 
-See :repo:`discovery.proto
-<api/envoy/service/discovery/v3/discovery.proto>`
-for the service definition. This is used by Envoy as a client when
+有关服务定义，请参见 :repo:`discovery.proto
+<api/envoy/service/discovery/v3/discovery.proto>` 。当以下内容
 
 .. code-block:: yaml
 
@@ -300,12 +258,11 @@ for the service definition. This is used by Envoy as a client when
         envoy_grpc:
           cluster_name: some_ads_cluster
 
-is set in the :ref:`dynamic_resources
-<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
-<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` config.
+在 :ref:`Bootstrap
+<envoy_v3_api_msg_config.bootstrap.v3.Bootstrap>` 配置的 :ref:`dynamic_resources
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` 中设置时，Envoy 会将其用作客户端。
 
-When this is set, any of the configuration sources :ref:`above <v2_grpc_streaming_endpoints>` can
-be set to use the ADS channel. For example, a LDS config could be changed from
+设置此选项后，可以将 :ref:`以上 <v2_grpc_streaming_endpoints>` 任何配置源设置为使用 ADS 通道。例如，可以将 LDS 配置从
 
 .. code-block:: yaml
 
@@ -314,37 +271,21 @@ be set to use the ADS channel. For example, a LDS config could be changed from
         api_type: REST
         cluster_names: [some_xds_cluster]
 
-to
+改为
 
 .. code-block:: yaml
 
     lds_config: {ads: {}}
 
-with the effect that the LDS stream will be directed to *some_ads_cluster* over
-the shared ADS channel.
+结果是 LDS 流将通过共享的 ADS 通道定向到 *some_ads_cluster*。
 
 .. _config_overview_delta:
 
-Delta endpoints
+Delta 端点
 ^^^^^^^^^^^^^^^
 
-The REST, filesystem, and original gRPC xDS implementations all deliver "state of the world" updates:
-every CDS update must contain every cluster, with the absence of a cluster from an update implying
-that the cluster is gone. For Envoy deployments with huge amounts of resources and even a trickle of
-churn, these state-of-the-world updates can be cumbersome.
+REST，文件系统和原始 gRPC xDS 实现都提供全量更新：每个 CDS 更新都必须包含每个集群，更新中没有集群意味着集群已消失。对于具有大量资源甚至是少量流失的 Envoy 部署，这些最新状态的更新可能很麻烦。
 
-As of 1.12.0, Envoy supports a "delta" variant of xDS (including ADS), where updates only contain
-resources added/changed/removed. Delta xDS is a gRPC (only) protocol. Delta uses different
-request/response protos than SotW (DeltaDiscovery{Request,Response}); see
-:repo:`discovery.proto <api/envoy/service/discovery/v3/discovery.proto>`. Conceptually, delta should be viewed as
-a new xDS transport type: there is static, filesystem, REST, gRPC-SotW, and now gRPC-delta.
-(Envoy's implementation of the gRPC-SotW/delta client happens to share most of its code between the
-two, and something similar is likely possible on the server side. However, they are in fact
-incompatible protocols.
-:ref:`The specification of the delta xDS protocol's behavior is here <xds_protocol_delta>`.)
+从 1.12.0 版开始, Envoy 支持 xDS（包括 ADS）的“delta”变体, 其中更新仅包含添加/更改/删除的资源。Delta xDS 是 gRPC (仅) 协议。Delta 使用与 SotW（DeltaDiscovery {Request，Response}）不同的请求/响应 proto；请参阅 :repo:`discovery.proto <api/envoy/service/discovery/v3/discovery.proto>` 。从概念上讲，应将 delta 视为一种新的 xDS 传输类型：存在静态，文件系统，REST，gRPC-SotW 和现在的 gRPC-delta。（Envoy 的 gRPC-SotW/delta 客户端实现恰好在两者之间共享了大部分代码，并且在服务器端可能有类似的可能。但是，它们实际上是不兼容的协议。:ref:`delta xDS 协议行为的规范在这里 <xds_protocol_delta>`。）
 
-To use delta, simply set the api_type field of your
-:ref:`ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>` proto(s) to DELTA_GRPC.
-That works for both xDS and ADS; for ADS, it's the api_type field of
-:ref:`DynamicResources.ads_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>`,
-as described in the previous section.
+要使用 delta，只需将你 :ref:`ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>` 上原始 api_type 字段设置为 DELTA_GRPC。这对 xDS 和 ADS 都适用；对于 ADS，它是 :ref:`DynamicResources.ads_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` 的 api_type 字段 ，如上一节所述。
