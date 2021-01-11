@@ -416,9 +416,9 @@ TEST_F(SquashFilterTest, InvalidResponseWithNoBody) {
 
   auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
-  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "0"}}}));
-  popPendingCallback()->onSuccess(request_, std::move(msg));
+  Http::MessagePtr msg(new Http::ResponseMessageImpl(Http::HeaderMapPtr{
+      new Http::TestHeaderMapImpl{{":status", "200"}, {"content-length", "0"}}}));
+  popPendingCallback()->onSuccess(std::move(msg));
 }
 
 TEST_F(SquashFilterTest, DestroyedInFlight) {
