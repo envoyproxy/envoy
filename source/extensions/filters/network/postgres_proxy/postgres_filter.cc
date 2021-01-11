@@ -193,6 +193,8 @@ bool PostgresFilter::onSSLRequest() {
     return true;
   }
   // Send single bytes 'S' to indicate switch to TLS.
+  // Refer to official documentation for protocol details:
+  // https://www.postgresql.org/docs/current/protocol-flow.html
   Buffer::OwnedImpl buf;
   buf.add("S");
   // Add callback to be notified when the reply message has been
