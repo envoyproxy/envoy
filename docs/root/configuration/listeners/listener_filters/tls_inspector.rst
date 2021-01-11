@@ -18,7 +18,7 @@ of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatc
 * :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.ListenerFilter.name>`
 * This filter may be configured with the name *envoy.filters.listener.tls_inspector* or
   *type.googleapis.com/envoy.extensions.listeners.tls_inspector.v3.TlsInspector* as the
-  `type_url <https://github.com/protocolbuffers/protobuf/blob/9647a7c2356a9529754c07235a2877ee676c2fd0/src/google/protobuf/any.proto#L154>`_.
+  `type_url <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Any.FIELDS.string.google.protobuf.Any.type_url>`_.
 
 Example
 -------
@@ -31,7 +31,7 @@ A sample filter configuration could be:
   - name: "envoy.filters.listener.tls_inspector"
     typed_config: {}
 
-Or by specifying the `type_url <https://github.com/protocolbuffers/protobuf/blob/9647a7c2356a9529754c07235a2877ee676c2fd0/src/google/protobuf/any.proto#L154>`_.
+Or by specifying the `type_url <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Any.FIELDS.string.google.protobuf.Any.type_url>`_.
 of the *typed_config*:
 
 .. code-block:: yaml
