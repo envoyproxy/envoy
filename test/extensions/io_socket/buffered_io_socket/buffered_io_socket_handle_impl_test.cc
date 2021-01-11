@@ -854,32 +854,44 @@ TEST_F(BufferedIoSocketHandleTest, ReadAfterShutdownWrite) {
   io_handle_->resetFileEvents();
 }
 
-TEST_F(BufferedIoSocketHandleTest, NotififyWritableAfterShutdownWrite) {
+TEST_F(BufferedIoSocketHandleTest, NotifyWritableAfterShutdownWrite) {
   io_handle_peer_->setWatermarks(128);
 
   Buffer::OwnedImpl buf(std::string(256, 'a'));
   io_handle_->write(buf);
   EXPECT_FALSE(io_handle_peer_->isWritable());
 
-  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
-  FANCY_LOG(debug, "after {} shutdown write", static_cast<void*>(io_handle_peer_.get()));
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  FANCY_LOG(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
 
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
-  io_handle_->initializeFileEvent(
+  io_handle_peer_->initializeFileEvent(
       dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read);
   EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
   schedulable_cb->invokeCallback();
   EXPECT_FALSE(schedulable_cb->enabled_);
 
-  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(0);
   auto result = io_handle_peer_->recv(buf_.data(), buf_.size(), 0);
   EXPECT_EQ(256, result.rc_);
-  EXPECT_TRUE(schedulable_cb->enabled_);
+  // Readable event is not activated due to edge trigger type.
+  EXPECT_FALSE(schedulable_cb->enabled_);
 
-  io_handle_->close();
+  // The `end of stream` is delivered.
+  auto result_at_eof = io_handle_peer_->recv(buf_.data(), buf_.size(), 0);
+  EXPECT_EQ(0, result_at_eof.rc_);
+
+  // Also confirm `EOS` can triggered read ready event.
+  EXPECT_CALL(*schedulable_cb, enabled());
+  EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
+  io_handle_peer_->enableFileEvents(Event::FileReadyType::Read);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
+  schedulable_cb->invokeCallback();
+
+  io_handle_peer_->close();
 }
 
 TEST_F(BufferedIoSocketHandleTest, NotSupportingMmsg) { EXPECT_FALSE(io_handle_->supportsMmsg()); }

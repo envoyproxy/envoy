@@ -101,7 +101,7 @@ public:
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
-      user_file_event_->activate(Event::FileReadyType::Read);
+      user_file_event_->poll(Event::FileReadyType::Read);
     }
   }
   void onPeerDestroy() override {
@@ -110,7 +110,7 @@ public:
   }
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
-      user_file_event_->activate(Event::FileReadyType::Write);
+      user_file_event_->poll(Event::FileReadyType::Write);
     }
   }
   bool isWritable() const override { return !pending_received_data_.highWatermarkTriggered(); }

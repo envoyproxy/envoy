@@ -32,6 +32,10 @@ void EventListenerImpl::onEventActivated(uint32_t activated_events) {
   ephemeral_events_ |= activated_events;
 }
 
+void EventListenerImpl::setEnabledEvents(uint32_t enabled_events) {
+  enabled_events_ = enabled_events;
+}
+
 void UserSpaceFileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
@@ -45,6 +49,7 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
   event_listener_.clearEphemeralEvents();
+  event_listener_.setEnabledEvents(events);
   bool was_enabled = schedulable_->enabled();
   // Recalculate activated events.
   uint32_t events_to_notify = 0;
@@ -66,6 +71,17 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
       trace,
       "User space file event {} set enabled events {} and events {} is active. Will {} reschedule.",
       static_cast<void*>(this), events, was_enabled ? "not " : "");
+}
+
+void UserSpaceFileEventImpl::poll(uint32_t events) {
+  ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
+                    Event::FileReadyType::Closed)) == events);
+  // filtered out disabled events.
+  uint32_t filter_enabled = events & event_listener_.getEnabledEvents();
+  if (filter_enabled == 0) {
+    return;
+  }
+  activate(filter_enabled);
 }
 } // namespace BufferedIoSocket
 } // namespace IoSocket

@@ -15,14 +15,16 @@ namespace Extensions {
 namespace IoSocket {
 namespace BufferedIoSocket {
 
-// Return the enabled events except EV_CLOSED. This implementation is generally good since only
-// epoll supports EV_CLOSED but the entire envoy code base supports another poller. The event owner
-// must assume EV_CLOSED is never activated. Also event owner must tolerate that OS could notify
-// events which are not actually triggered.
-// TODO(lambdai): Add support of delivering EV_CLOSED.
+// This class maintains the ephemeral events and enabled events.
+// getAndClearEphemeralEvents
 class EventListenerImpl {
 public:
   ~EventListenerImpl() = default;
+
+  // Reset the enabled events. The caller must refresh the triggered events.
+  void setEnabledEvents(uint32_t enabled_events);
+  // Return the enabled events.
+  uint32_t getEnabledEvents() { return enabled_events_; }
 
   void clearEphemeralEvents();
   void onEventActivated(uint32_t activated_events);
@@ -32,6 +34,8 @@ public:
 private:
   // The events set by activate() and will be cleared after the io callback.
   uint32_t ephemeral_events_{};
+  // The events set by setEnabled(). The new value replaces the old value.
+  uint32_t enabled_events_{};
 };
 
 // A FileEvent implementation which is used to drive BufferedIoSocketHandle.
@@ -49,6 +53,10 @@ public:
   // edge triggered. The event owner on windows platform should not emulate edge events.
   void unregisterEventIfEmulatedEdge(uint32_t) override {}
   void registerEventIfEmulatedEdge(uint32_t) override {}
+
+  // Notify events. Unlike activate() method, this method activates the given events only if the
+  // events are enabled.
+  void poll(uint32_t events);
 
 private:
   // Used to populate the event operations of enable and activate.
