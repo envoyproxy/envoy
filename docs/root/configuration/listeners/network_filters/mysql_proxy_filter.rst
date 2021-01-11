@@ -1,32 +1,24 @@
 .. _config_network_filters_mysql_proxy:
 
-MySQL proxy
+MySQL 代理
 ===========
 
-The MySQL proxy filter decodes the wire protocol between the MySQL client
-and server. It decodes the SQL queries in the payload (SQL99 format only).
-The decoded info is emitted as dynamic metadata that can be combined with
-access log filters to get detailed information on tables accessed as well
-as operations performed on each table.
+MySQL 代理过滤器解码 MySQL 客户端与服务端之间的有线协议。它解码负载中的 SQL 查询（仅 SQL99 格式）。解码后的信息以动态元数据的形式发出，可以与访问日志过滤器相结合，以获得所访问表的详细信息，以及对每个表执行的操作。
 
 .. attention::
 
-   The mysql_proxy filter is experimental and is currently under active
-   development. Capabilities will be expanded over time and the
-   configuration structures are likely to change.
+   mysql_proxy 过滤器目前在积极开发中，处于试验阶段。随着时间推移，功能将会得到扩展，同时配置结构也有可能会改变。
 
 .. warning::
 
-   The mysql_proxy filter was tested with MySQL v5.5. The filter may not work
-   with other versions of MySQL due to differences in the protocol implementation.
+   mysql_proxy 过滤器使用 MySQL v5.5 版本进行测试。由于协议实现的不同，该过滤器可能不能与其他 MySQL 版本一起使用。
 
 .. _config_network_filters_mysql_proxy_config:
 
-Configuration
+配置
 -------------
 
-The MySQL proxy filter should be chained with the TCP proxy filter as shown
-in the configuration snippet below:
+MySQL 代理过滤器应该与 TCP 代理过滤器链接，如下配置片段所示：
 
 .. code-block:: yaml
 
@@ -45,50 +37,46 @@ in the configuration snippet below:
 
 .. _config_network_filters_mysql_proxy_stats:
 
-Statistics
+统计信息
 ----------
 
-Every configured MySQL proxy filter has statistics rooted at *mysql.<stat_prefix>.* with the
-following statistics:
+每个配置的 MySQL 代理过滤器都有以 *mysql.<stat_prefix>.* 为根，如下所示的统计信息：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  auth_switch_request, Counter, Number of times the upstream server requested clients to switch to a different authentication method
-  decoder_errors, Counter, Number of MySQL protocol decoding errors
-  login_attempts, Counter, Number of login attempts
-  login_failures, Counter, Number of login failures
-  protocol_errors, Counter, Number of out of sequence protocol messages encountered in a session
-  queries_parse_error, Counter, Number of MySQL queries parsed with errors
-  queries_parsed, Counter, Number of MySQL queries successfully parsed
-  sessions, Counter, Number of MySQL sessions since start
-  upgraded_to_ssl, Counter, Number of sessions/connections that were upgraded to SSL
+  auth_switch_request, Counter, 上游服务器请求客户端更换其他认证方法的次数
+  decoder_errors, Counter, MySQL 协议解码异常数
+  login_attempts, Counter, 登陆尝试次数
+  login_failures, Counter, 登录失败次数
+  protocol_errors, Counter, 会话中遇到的无序协议消息数
+  queries_parse_error, Counter, MySQL 解析失败的查询数
+  queries_parsed, Counter, MySQL 解析成功的查询数
+  sessions, Counter, 自启动以来的 MySQL 会话数
+  upgraded_to_ssl, Counter, 升级为 SSL 的会话/连接数
 
 .. _config_network_filters_mysql_proxy_dynamic_metadata:
 
-Dynamic Metadata
+动态元数据
 ----------------
 
-The MySQL filter emits the following dynamic metadata for each SQL query parsed:
+MySQL 过滤器为每个解析的 SQL 查询发出以下动态元数据：
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  <table.db>, string, The resource name in *table.db* format. The resource name defaults to the table being accessed if the database cannot be inferred.
-  [], list, A list of strings representing the operations executed on the resource. Operations can be one of insert/update/select/drop/delete/create/alter/show.
+  <table.db>, string, 资源名称使用 *table.db* 格式。如果无法连接数据库，则资源名称默认使用正在访问的表。
+  [], list, 字符串列表表示可以对资源执行的操作。操作可以是插入、更新、查询、删除、创建、更新、展示其中之一。
 
 .. _config_network_filters_mysql_proxy_rbac:
 
-RBAC Enforcement on Table Accesses
+对表实施 RBAC 访问
 ----------------------------------
 
-The dynamic metadata emitted by the MySQL filter can be used in conjunction
-with the RBAC filter to control accesses to individual tables in a
-database. The following configuration snippet shows an example RBAC filter
-configuration that denies SQL queries with _update_ statements to the
-_catalog_ table in the _productdb_ database.
+MySQL 过滤器发出的动态元数据可以与 RBAC 过滤器一起使用，用于控制对数据库的单个表的访问。
+下面的配置片段展示了一个 RBAC 过滤器配置的示例，该配置拒绝在 _productdb_ 数据库中的 _catalog_ 表上使用 _update_ 语句的 SQL 查询。
 
 .. code-block:: yaml
 
