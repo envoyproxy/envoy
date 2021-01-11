@@ -33,7 +33,8 @@ class UpstreamRequest;
 /**
  * Interface to allow for switching between new and old UpstreamRequest implementation.
  */
-class RouterUpstreamRequest : public LinkedObject<RouterUpstreamRequest> {
+class RouterUpstreamRequest : public LinkedObject<RouterUpstreamRequest>,
+                              public UpstreamToDownstream {
 public:
   virtual ~RouterUpstreamRequest() = default;
 
@@ -66,7 +67,6 @@ public:
 // The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public RouterUpstreamRequest,
-                        public UpstreamToDownstream,
                         public GenericConnectionPoolCallbacks {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
