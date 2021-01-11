@@ -41,5 +41,9 @@ ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
 }
 
+ScopePtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
+  return std::make_unique<ScopePrefixer>(name, *this);
+}
+
 } // namespace Stats
 } // namespace Envoy

@@ -209,7 +209,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  virtual void setEndStream(bool end) EXCLUSIVE_LOCKS_REQUIRED(lock_) { end_stream_ = end; }
+  virtual void setEndStream(bool end) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { end_stream_ = end; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -222,9 +222,9 @@ protected:
   absl::Mutex lock_;
   Http::RequestHeaderMapPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
+  FakeHttpConnection& parent_;
 
 private:
-  FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
@@ -471,6 +471,7 @@ public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : FakeConnectionBase(shared_connection, time_system) {}
   using ValidatorFunction = const std::function<bool(const std::string&)>;
+  ~FakeRawConnection() override;
 
   // Writes to data. If data is nullptr, discards the received data.
   ABSL_MUST_USE_RESULT
@@ -493,16 +494,7 @@ public:
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult initialize() override {
-    testing::AssertionResult result =
-        shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-          connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
-        });
-    if (!result) {
-      return result;
-    }
-    return FakeConnectionBase::initialize();
-  }
+  testing::AssertionResult initialize() override;
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contained in the incoming data string. Unlike many of Envoy waitFor functions,
@@ -530,9 +522,19 @@ private:
   };
 
   std::string data_ ABSL_GUARDED_BY(lock_);
+  std::weak_ptr<Network::ReadFilter> read_filter_;
 };
 
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
+
+struct FakeUpstreamConfig {
+  FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {}
+
+  Event::TestTimeSystem& time_system_;
+  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  bool enable_half_close_{};
+  bool udp_fake_upstream_{};
+};
 
 /**
  * Provides a fake upstream server for integration testing.
@@ -542,19 +544,23 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
                      public Network::FilterChainFactory {
 public:
   // Creates a fake upstream bound to the specified unix domain socket path.
-  FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
-               Event::TestTimeSystem& time_system);
+  FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
+
+  // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+               const Network::Address::InstanceConstSharedPtr& address,
+               const FakeUpstreamConfig& config);
+
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-               FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
-               bool enable_half_close = false, bool udp_fake_upstream = false);
+               const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
-  FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system, bool enable_half_close = false);
+  FakeUpstream(uint32_t port, Network::Address::IpVersion version,
+               const FakeUpstreamConfig& config);
+
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
-               FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               Event::TestTimeSystem& time_system);
+               Network::Address::IpVersion version, const FakeUpstreamConfig& config);
   ~FakeUpstream() override;
 
   FakeHttpConnection::Type httpType() { return http_type_; }
@@ -573,7 +579,9 @@ public:
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
+  Network::Address::InstanceConstSharedPtr localAddress() const {
+    return socket_->addressProvider().localAddress();
+  }
 
   // Wait for one of the upstreams to receive a connection
   ABSL_MUST_USE_RESULT
@@ -633,8 +641,7 @@ protected:
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-               Network::SocketPtr&& connection, FakeHttpConnection::Type type,
-               Event::TestTimeSystem& time_system, bool enable_half_close);
+               Network::SocketPtr&& connection, const FakeUpstreamConfig& config);
 
   class FakeListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -644,7 +651,7 @@ private:
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->localAddress();
+      return socket_->addressProvider().localAddress();
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }

@@ -190,10 +190,9 @@ public:
   MOCK_METHOD(uint64_t, stage, (), (const));
   MOCK_METHOD(const std::string&, disableKey, (), (const));
   MOCK_METHOD(void, populateDescriptors,
-              (const RouteEntry& route, std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-               const std::string& local_service_cluster, const Http::HeaderMap& headers,
-               const Network::Address::Instance& remote_address,
-               const envoy::config::core::v3::Metadata* dynamic_metadata),
+              (std::vector<Envoy::RateLimit::Descriptor> & descriptors,
+               const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& info),
               (const));
 
   uint64_t stage_{};
@@ -253,10 +252,11 @@ public:
   Stats::StatName statName() const override { return stat_name_.statName(); }
   VirtualClusterStats& stats() const override { return stats_; }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
-  mutable VirtualClusterStats stats_{generateStats(stats_store_)};
+  VirtualClusterStatNames stat_names_{stats_store_.symbolTable()};
+  mutable VirtualClusterStats stats_{generateStats(stats_store_, stat_names_)};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -281,7 +281,7 @@ public:
     return stat_name_->statName();
   }
 
-  mutable Stats::TestSymbolTable symbol_table_;
+  mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   std::string name_{"fake_vhost"};
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
@@ -569,7 +569,7 @@ public:
               (std::unique_ptr<GenericUpstream> && upstream,
                Upstream::HostDescriptionConstSharedPtr host,
                const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               const StreamInfo::StreamInfo& info));
+               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;

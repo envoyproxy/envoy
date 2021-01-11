@@ -30,6 +30,8 @@ DSR
 HEXDIG
 HEXDIGIT
 OWS
+Preconnecting
+STATNAME
 SkyWalking
 TIDs
 ceil
@@ -315,6 +317,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TP
 TPM
 TSAN
 TSI
@@ -895,6 +898,10 @@ precompile
 precompiled
 precompute
 precomputed
+preconnect
+preconnected
+preconnecting
+preconnects
 predeclared
 prefetch
 prefetched
@@ -1218,6 +1225,7 @@ workspace
 writev
 xDS
 xDSes
+xdstp
 xeon
 xform
 xhtml

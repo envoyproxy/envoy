@@ -679,7 +679,7 @@ public:
 class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
 
 TEST_F(LookupWithStatNameTest, All) {
-  ScopePtr scope1 = store_->createScope("scope1.");
+  ScopePtr scope1 = store_->scopeFromStatName(makeStatName("scope1"));
   Counter& c1 = store_->Store::counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
@@ -712,10 +712,11 @@ TEST_F(LookupWithStatNameTest, All) {
   h1.recordValue(200);
   h2.recordValue(200);
 
-  ScopePtr scope2 = scope1->createScope("foo.");
+  ScopePtr scope2 = scope1->scopeFromStatName(makeStatName("foo"));
   EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
 
-  // Validate that we sanitize away bad characters in the stats prefix.
+  // Validate that we sanitize away bad characters in the stats prefix. This happens only
+  // when constructing a stat from a string, not from a stat name.
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 

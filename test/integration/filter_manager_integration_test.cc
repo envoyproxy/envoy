@@ -492,7 +492,7 @@ INSTANTIATE_TEST_SUITE_P(
     InjectDataToFilterChainIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShouldBeUnnoticeable) {
-  enable_half_close_ = true;
+  enableHalfClose(true);
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));

@@ -14,7 +14,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api),
+                             added_via_api, factory_context.dispatcher().timeSource()),
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -134,7 +134,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
                 lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
-                lb_endpoint_.health_status()));
+                lb_endpoint_.health_status(), parent_.time_source_));
 
             ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
           }

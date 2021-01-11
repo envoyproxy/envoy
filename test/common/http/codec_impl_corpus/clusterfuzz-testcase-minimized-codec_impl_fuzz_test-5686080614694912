@@ -1,0 +1,94 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: ",ttp"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+      headers {
+        key: "connection"
+        value: "upgrade"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 54
+    }
+    dispatching_action {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+        headers {
+          key: "connection"
+          value: "upgrade"
+        }
+        headers {
+          key: "upgrade"
+          value: "WebSocket"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      trailers {
+        headers {
+          key: ":method"
+          value: "GET"
+        }
+        headers {
+          key: ":path"
+          value: "/"
+        }
+        headers {
+          key: ":scheme"
+          value: "http"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      trailers {
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+    }
+  }
+}

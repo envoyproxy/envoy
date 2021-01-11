@@ -164,12 +164,14 @@ def envoy_cc_test(
         tags = [],
         args = [],
         copts = [],
+        condition = None,
         shard_count = None,
         coverage = True,
         local = False,
         size = "medium",
         flaky = False):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
+
     cc_test(
         name = name,
         srcs = srcs,
@@ -207,10 +209,6 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    deps = deps + [
-        repository + "//test/test_common:printers_includes",
-    ]
-
     _envoy_cc_test_infrastructure_library(
         name,
         srcs,

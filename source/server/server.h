@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -32,6 +33,7 @@
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/router/context_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
@@ -172,11 +174,10 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
+  Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return server_.statsFlushInterval();
-  }
+  Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
@@ -215,7 +216,8 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context);
+               std::unique_ptr<ProcessContext> process_context,
+               Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   ~InstanceImpl() override;
 
@@ -251,20 +253,19 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  ProcessContextOptRef processContext() override { return *process_context_; }
+  Router::Context& routerContext() override { return router_context_; }
+  ProcessContextOptRef processContext() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
 
+  Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
 
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
-  }
-
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return config_.statsFlushInterval();
   }
 
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -358,12 +359,13 @@ private:
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
-  const std::thread::id main_thread_id_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
+  ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
 

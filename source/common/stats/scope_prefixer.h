@@ -13,12 +13,11 @@ public:
   ScopePrefixer(StatName prefix, Scope& scope);
   ~ScopePrefixer() override;
 
-  ScopePtr createScopeFromStatName(StatName name);
-
   // Scope
   ScopePtr createScope(const std::string& name) override;
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                       Mode mode) override;
+  ScopePtr scopeFromStatName(StatName name) override;
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode, Mode mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,

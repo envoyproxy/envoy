@@ -45,7 +45,7 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               GrpcCommon::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
+               Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -59,9 +59,9 @@ public:
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   GrpcCommon::GrpcAccessLoggerType logger_type, Stats::Scope&) {
+                   Common::GrpcAccessLoggerType logger_type, Stats::Scope&) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
-              EXPECT_EQ(GrpcCommon::GrpcAccessLoggerType::HTTP, logger_type);
+              EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
@@ -146,7 +146,8 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.start_time_ = SystemTime(1h);
     stream_info.start_time_monotonic_ = MonotonicTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
-    stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
+    stream_info.downstream_address_provider_->setLocalAddress(
+        std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),

@@ -658,17 +658,30 @@ The following optional features can be enabled on the Bazel build command-line:
 * Envoy can be linked to [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of
   [`zlib`](https://zlib.net) with `--define zlib=ng`.
 
-## Disabling extensions
+## Enabling and disabling extensions
 
 Envoy uses a modular build which allows extensions to be removed if they are not needed or desired.
 Extensions that can be removed are contained in
-[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl). Use the following
-procedure to customize the extensions for your build:
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+
+The extensions disabled by default can be enabled by adding the following parameter to Bazel, for example to enable
+`envoy.filters.http.kill_request` extension, add `--//source/extensions/filters/http/kill_request:enabled`.
+The extensions enabled by default can be disabled by adding the following parameter to Bazel, for example to disable
+`envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
+Note not all extensions can be disabled.
+
+If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
+`--@envoy//source/extensions/filters/http/kill_request:enabled`.
+
+You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
+
+## Customize extension build config
+
+You can also use the following procedure to customize the extensions for your build:
 
 * The Envoy build assumes that a Bazel repository named `@envoy_build_config` exists which
   contains the file `@envoy_build_config//:extensions_build_config.bzl`. In the default build,
   a synthetic repository is created containing [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
-  Thus, the default build has all extensions.
 * Start by creating a new Bazel workspace somewhere in the filesystem that your build can access.
   This workspace should contain:
   * Empty WORKSPACE file.
@@ -683,7 +696,7 @@ To have your local build use your overridden configuration repository there are 
 2. Use the following snippet in your WORKSPACE before you load the Envoy repository. E.g.,
 
 ```
-workspace(name = "envoy")
+workspace(name = "envoy_filter_example")
 
 local_repository(
     name = "envoy_build_config",

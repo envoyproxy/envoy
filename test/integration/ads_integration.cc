@@ -20,16 +20,18 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-AdsIntegrationTest::AdsIntegrationTest(const envoy::config::core::v3::ApiVersion api_version)
-    : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, ipVersion(),
-          ConfigHelper::adsBootstrap(
-              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC", api_version)) {
+AdsIntegrationTest::AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
+                                       envoy::config::core::v3::ApiVersion transport_api_version)
+    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                          ConfigHelper::adsBootstrap(
+                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                              resource_api_version, transport_api_version)) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
-  api_version_ = api_version;
+  api_version_ = resource_api_version;
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 }
 
 void AdsIntegrationTest::TearDown() { cleanUpXdsConnection(); }
@@ -127,7 +129,6 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
     ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
   });
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   if (api_version_ == envoy::config::core::v3::ApiVersion::V2 && !fatal_by_default_v2_override_) {
     config_helper_.enableDeprecatedV2Api();
   }

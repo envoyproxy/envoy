@@ -45,7 +45,7 @@ using ::testing::ReturnRef;
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : api_(Api::createApiForTest(stats_store_)),
+    : api_(Api::createApiForTest(stats_store_, time_system_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher("test_thread",
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
@@ -65,11 +65,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
-#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
-  ENVOY_LOG_MISC(debug, "Using new codecs");
-  setNewCodecs();
-#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -92,7 +87,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
 
-  connection->enableHalfClose(enable_half_close_);
+  connection->enableHalfClose(enableHalfClose());
   return connection;
 }
 
@@ -106,15 +101,44 @@ void BaseIntegrationTest::initialize() {
   createEnvoy();
 }
 
+Network::TransportSocketFactoryPtr BaseIntegrationTest::createUpstreamTlsContext() {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string yaml = absl::StrFormat(
+      R"EOF(
+common_tls_context:
+  tls_certificates:
+  - certificate_chain: { filename: "%s" }
+    private_key: { filename: "%s" }
+  validation_context:
+    trusted_ca: { filename: "%s" }
+)EOF",
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  TestUtility::loadFromYaml(yaml, tls_context);
+  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
+  }
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context_);
+  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+}
+
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    Network::TransportSocketFactoryPtr factory =
+        upstream_tls_ ? createUpstreamTlsContext() : Network::Test::createRawBufferSocketFactory();
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(new AutonomousUpstream(
-          endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
+          std::move(factory), endpoint, upstreamConfig(), autonomous_allow_incomplete_streams_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
-                                                    enable_half_close_, udp_fake_upstream_));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(std::move(factory), endpoint, upstreamConfig()));
     }
   }
 }
@@ -133,6 +157,8 @@ void BaseIntegrationTest::createEnvoy() {
     std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     config_helper_.addConfigModifier(
         [lds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_resource_api_version(
+              envoy::config::core::v3::V3);
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
         });
   }
@@ -175,16 +201,26 @@ void BaseIntegrationTest::createEnvoy() {
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
-  upstream_protocol_ = protocol;
-  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  upstream_config_.upstream_protocol_ = protocol;
+  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          cluster->mutable_http2_protocol_options();
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   } else {
     RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
   }
 }
 
@@ -193,7 +229,7 @@ BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                                        Network::Address::InstanceConstSharedPtr source_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_, options, source_address);
+                                                enableHalfClose(), options, source_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -240,7 +276,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       registerPort(*port_it, listen_addr->ip()->port());
     }
   }
-  const auto admin_addr = test_server_->server().admin().socket().localAddress();
+  const auto admin_addr = test_server_->server().admin().socket().addressProvider().localAddress();
   if (admin_addr->type() == Network::Address::Type::Ip) {
     registerPort("admin", admin_addr->ip()->port());
   }
@@ -259,7 +295,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, use_real_stats_, v2_bootstrap_);
+      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
+      v2_bootstrap_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -384,7 +421,7 @@ void BaseIntegrationTest::createXdsUpstream() {
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
     addFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2);
   }
-  xds_upstream_ = fake_upstreams_[1].get();
+  xds_upstream_ = fake_upstreams_.back().get();
 }
 
 void BaseIntegrationTest::createXdsConnection() {

@@ -66,6 +66,16 @@ struct ElementVisitor {
 
 } // namespace
 
+ScopePtr Utility::scopeFromElements(Scope& scope, const ElementVec& elements) {
+  ElementVisitor visitor(scope.symbolTable(), elements);
+  return scope.scopeFromStatName(visitor.statName());
+}
+
+ScopePtr Utility::scopeFromStatNames(Scope& scope, const StatNameVec& elements) {
+  SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
+  return scope.scopeFromStatName(StatName(joined.get()));
+}
+
 Counter& Utility::counterFromElements(Scope& scope, const ElementVec& elements,
                                       StatNameTagVectorOptConstRef tags, Mode mode) {
   ElementVisitor visitor(scope.symbolTable(), elements);

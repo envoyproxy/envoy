@@ -23,6 +23,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -44,7 +45,7 @@ envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::stri
   return access_log;
 }
 
-class AccessLogImplTest : public testing::Test {
+class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AccessLogImplTest() : file_(new MockAccessLogFile()) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
@@ -101,7 +102,8 @@ typed_config:
   EXPECT_CALL(*file_, write(_));
 
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
+  stream_info_.upstream_host_ =
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime());
   stream_info_.response_flags_ = StreamInfo::ResponseFlag::DownstreamConnectionTermination;
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -117,7 +119,8 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   log_format:
-    text_format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+    text_format_source:
+      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -176,7 +179,8 @@ typed_config:
 
 TEST_F(AccessLogImplTest, UpstreamHost) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  stream_info_.upstream_host_ = Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234");
+  stream_info_.upstream_host_ =
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime());
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -1059,7 +1063,8 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   log_format:
-    text_format: "%GRPC_STATUS%\n"
+    text_format_source:
+      inline_string: "%GRPC_STATUS%\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -1132,7 +1137,7 @@ typed_config:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-                          EnvoyException, ".*\"NOT_A_VALID_CODE\" for type TYPE_ENUM.*");
+                          EnvoyException, "NOT_A_VALID_CODE");
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {
@@ -1308,7 +1313,7 @@ typed_config:
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
   fields_c["c"].set_bool_value(false);
@@ -1394,7 +1399,7 @@ typed_config:
 
   const InstanceSharedPtr default_true_log =
       AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_true_yaml), context_);
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
 
   default_true_log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }

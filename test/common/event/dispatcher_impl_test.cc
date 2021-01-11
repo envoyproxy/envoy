@@ -28,6 +28,15 @@ namespace Envoy {
 namespace Event {
 namespace {
 
+class RunOnDelete {
+public:
+  RunOnDelete(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
+  ~RunOnDelete() { on_destroy_(); }
+
+private:
+  std::function<void()> on_destroy_;
+};
+
 void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
   // `arg` contains the ReadyWatcher passed in from evwatch_prepare_new.
   auto watcher = static_cast<ReadyWatcher*>(arg);
@@ -277,6 +286,24 @@ TEST(DeferredTaskTest, DeferredTask) {
   dispatcher->clearDeferredDeleteList();
 }
 
+TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
+  InSequence s;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  ReadyWatcher post_watcher;
+  ReadyWatcher delete_watcher;
+
+  // DeferredDelete should always run before post callbacks.
+  EXPECT_CALL(delete_watcher, ready());
+  EXPECT_CALL(post_watcher, ready());
+
+  dispatcher->post([&]() { post_watcher.ready(); });
+  dispatcher->deferredDelete(
+      std::make_unique<TestDeferredDeletable>([&]() -> void { delete_watcher.ready(); }));
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+}
+
 class DispatcherImplTest : public testing::Test {
 protected:
   DispatcherImplTest()
@@ -298,27 +325,29 @@ protected:
   }
 
   void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
+    {
+      Thread::LockGuard lock(mu_);
+      work_finished_ = false;
+    }
     TimerPtr timer;
-    dispatcher_->post([this, &timer]() {
+    dispatcher_->post([this, &timer, enable_timer_delegate]() {
       {
         Thread::LockGuard lock(mu_);
         timer = dispatcher_->createTimer([this]() {
           {
             Thread::LockGuard lock(mu_);
+            ASSERT(!work_finished_);
             work_finished_ = true;
           }
           cv_.notifyOne();
         });
         EXPECT_FALSE(timer->enabled());
+        enable_timer_delegate(*timer);
+        EXPECT_TRUE(timer->enabled());
       }
-      cv_.notifyOne();
     });
 
     Thread::LockGuard lock(mu_);
-    while (timer == nullptr) {
-      cv_.wait(mu_);
-    }
-    enable_timer_delegate(*timer);
     while (!work_finished_) {
       cv_.wait(mu_);
     }
@@ -349,9 +378,56 @@ TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
     {
       Thread::LockGuard lock(mu_);
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
+TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
+  ReadyWatcher parent_watcher;
+  ReadyWatcher deferred_delete_watcher;
+  ReadyWatcher run_watcher1;
+  ReadyWatcher delete_watcher1;
+  ReadyWatcher run_watcher2;
+  ReadyWatcher delete_watcher2;
+
+  // Expect the following events to happen in order. The destructor of the post callback should run
+  // before execution of the next post callback starts. The post callback runner should yield after
+  // running each group of callbacks in a chain, so the deferred deletion should run before the
+  // post callbacks that are also scheduled by the parent post callback.
+  InSequence s;
+  EXPECT_CALL(parent_watcher, ready());
+  EXPECT_CALL(deferred_delete_watcher, ready());
+  EXPECT_CALL(run_watcher1, ready());
+  EXPECT_CALL(delete_watcher1, ready());
+  EXPECT_CALL(run_watcher2, ready());
+  EXPECT_CALL(delete_watcher2, ready());
+
+  dispatcher_->post([&]() {
+    parent_watcher.ready();
+    auto on_delete_task1 =
+        std::make_shared<RunOnDelete>([&delete_watcher1]() { delete_watcher1.ready(); });
+    dispatcher_->post([&run_watcher1, on_delete_task1]() { run_watcher1.ready(); });
+    auto on_delete_task2 =
+        std::make_shared<RunOnDelete>([&delete_watcher2]() { delete_watcher2.ready(); });
+    dispatcher_->post([&run_watcher2, on_delete_task2]() { run_watcher2.ready(); });
+    dispatcher_->post([this]() {
+      {
+        Thread::LockGuard lock(mu_);
+        ASSERT(!work_finished_);
+        work_finished_ = true;
+      }
+      cv_.notifyOne();
+    });
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
+        [&deferred_delete_watcher]() -> void { deferred_delete_watcher.ready(); }));
   });
 
   Thread::LockGuard lock(mu_);
@@ -387,6 +463,7 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
     dispatcher_->post([this]() {
       {
         Thread::LockGuard lock(mu_);
+        ASSERT(!work_finished_);
         work_finished_ = true;
       }
       cv_.notifyOne();
@@ -419,21 +496,18 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
         {
           Thread::LockGuard lock(mu_);
           static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(std::cerr);
+          ASSERT(!work_finished_);
           work_finished_ = true;
         }
         cv_.notifyOne();
       });
       EXPECT_FALSE(timer->enabled());
+      timer->enableTimer(std::chrono::milliseconds(50), &scope);
+      EXPECT_TRUE(timer->enabled());
     }
-    cv_.notifyOne();
   });
 
   Thread::LockGuard lock(mu_);
-  while (timer == nullptr) {
-    cv_.wait(mu_);
-  }
-  timer->enableTimer(std::chrono::milliseconds(50), &scope);
-
   while (!work_finished_) {
     cv_.wait(mu_);
   }
@@ -445,6 +519,7 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
       Thread::LockGuard lock(mu_);
       // Thread safe because it is called within the dispatcher thread's context.
       EXPECT_TRUE(dispatcher_->isThreadSafe());
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
@@ -490,6 +565,7 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
     {
       Thread::LockGuard lock(mu_);
       static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+      ASSERT(!work_finished_);
       work_finished_ = true;
     }
     cv_.notifyOne();
@@ -1220,6 +1296,41 @@ TEST_F(DispatcherWithWatchdogTest, PeriodicTouchTimer) {
   // Advance by min_touch_interval_ again, verify that watchdog_ is touched.
   EXPECT_CALL(*watchdog_, touch());
   time_system_.advanceTimeAndRun(min_touch_interval_, *dispatcher_, Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeEachPostCallback) {
+  ReadyWatcher watcher1;
+  ReadyWatcher watcher2;
+  ReadyWatcher watcher3;
+  dispatcher_->post([&]() { watcher1.ready(); });
+  dispatcher_->post([&]() { watcher2.ready(); });
+  dispatcher_->post([&]() { watcher3.ready(); });
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+}
+
+TEST_F(DispatcherWithWatchdogTest, TouchBeforeDeferredDelete) {
+  ReadyWatcher watcher1;
+  ReadyWatcher watcher2;
+  ReadyWatcher watcher3;
+
+  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher1]() -> void { watcher1.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher2]() -> void { watcher2.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher3]() -> void { watcher3.ready(); });
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeSchedulableCallback) {

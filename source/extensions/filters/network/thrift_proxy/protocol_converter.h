@@ -25,6 +25,11 @@ public:
   }
 
   // DecoderEventHandler
+  FilterStatus passthroughData(Buffer::Instance& data) override {
+    buffer_->move(data);
+    return FilterStatus::Continue;
+  }
+
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     proto_->writeMessageBegin(*buffer_, *metadata);
     return FilterStatus::Continue;

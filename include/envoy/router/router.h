@@ -36,6 +36,7 @@ namespace Envoy {
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
+class ThreadLocalCluster;
 } // namespace Upstream
 
 namespace Router {
@@ -452,20 +453,22 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 /**
  * All virtual cluster stats. @see stats_macro.h
  */
-#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
+#define ALL_VIRTUAL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
-  COUNTER(upstream_rq_total)
+  COUNTER(upstream_rq_total)                                                                       \
+  STATNAME(other)                                                                                  \
+  STATNAME(vcluster)                                                                               \
+  STATNAME(vhost)
 
 /**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
-struct VirtualClusterStats {
-  ALL_VIRTUAL_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
-};
+MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -485,8 +488,9 @@ public:
    */
   virtual VirtualClusterStats& stats() const PURE;
 
-  static VirtualClusterStats generateStats(Stats::Scope& scope) {
-    return {ALL_VIRTUAL_CLUSTER_STATS(POOL_COUNTER(scope))};
+  static VirtualClusterStats generateStats(Stats::Scope& scope,
+                                           const VirtualClusterStatNames& stat_names) {
+    return VirtualClusterStats(stat_names, scope);
   }
 };
 
@@ -1182,10 +1186,6 @@ public:
    */
   virtual bool cancelAnyPendingStream() PURE;
   /**
-   * @return optionally returns the protocol for the connection pool.
-   */
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
-  /**
    * @return optionally returns the host for the connection pool.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
@@ -1237,11 +1237,13 @@ public:
    *             connection pools the description may be different each time this is called.
    * @param upstream_local_address supplies the local address of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
+   * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                           const StreamInfo::StreamInfo& info) PURE;
+                           const StreamInfo::StreamInfo& info,
+                           absl::optional<Http::Protocol> protocol) PURE;
 
   // @return the UpstreamToDownstream interface for this stream.
   //
@@ -1308,7 +1310,7 @@ public:
    * @return may be null
    */
   virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
                         const RouteEntry& route_entry,
                         absl::optional<Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const PURE;

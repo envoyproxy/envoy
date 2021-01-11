@@ -93,7 +93,7 @@ public:
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (),
               (const));
-  MOCK_METHOD(float, perUpstreamPrefetchRatio, (), (const));
+  MOCK_METHOD(float, perUpstreamPreconnectRatio, (), (const));
   MOCK_METHOD(float, peekaheadRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
@@ -142,7 +142,8 @@ public:
               upstreamHttpProtocolOptions, (), (const));
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
-  MOCK_METHOD(Http::Protocol, upstreamHttpProtocol, (absl::optional<Http::Protocol>), (const));
+  MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
+              (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -156,6 +157,11 @@ public:
   uint64_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  ClusterStatNames stat_names_;
+  ClusterLoadReportStatNames cluster_load_report_stat_names_;
+  ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
+  ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
+  ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
   ClusterStats stats_;
   Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
