@@ -1,4 +1,5 @@
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
 #include "common/config/api_type_oracle.h"
@@ -13,6 +14,7 @@ namespace {
 
 TEST(ApiTypeOracleTest, All) {
   envoy::config::filter::http::ip_tagging::v2::IPTagging v2_config;
+  envoy::config::health_checker::redis::v2::Redis v2_excludeconfig;
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging v3_config;
   ProtobufWkt::Any non_api_type;
 
@@ -20,6 +22,8 @@ TEST(ApiTypeOracleTest, All) {
             ApiTypeOracle::getEarlierVersionDescriptor(non_api_type.GetDescriptor()->full_name()));
   EXPECT_EQ(nullptr,
             ApiTypeOracle::getEarlierVersionDescriptor(v2_config.GetDescriptor()->full_name()));
+  EXPECT_EQ(nullptr, ApiTypeOracle::getEarlierVersionDescriptor(
+                         v2_excludeconfig.GetDescriptor()->full_name()));
   const auto* desc =
       ApiTypeOracle::getEarlierVersionDescriptor(v3_config.GetDescriptor()->full_name());
   EXPECT_EQ(envoy::config::filter::http::ip_tagging::v2::IPTagging::descriptor()->full_name(),
