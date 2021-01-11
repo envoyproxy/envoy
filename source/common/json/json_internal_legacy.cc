@@ -47,7 +47,6 @@ public:
   static FieldSharedPtr createArray() { return FieldSharedPtr{new Field(Type::Array)}; }
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
 
-  bool isNull() const override { return type_ == Type::Null; }
   bool isArray() const override { return type_ == Type::Array; }
   bool isObject() const override { return type_ == Type::Object; }
 
@@ -81,9 +80,6 @@ public:
   std::vector<std::string> getStringArray(const std::string& name, bool allow_empty) const override;
   std::vector<ObjectSharedPtr> asObjectArray() const override;
   std::string asString() const override { return stringValue(); }
-  bool asBoolean() const override { return booleanValue(); }
-  double asDouble() const override { return doubleValue(); }
-  int64_t asInteger() const override { return integerValue(); }
   std::string asJsonString() const override;
 
   bool empty() const override;
@@ -519,7 +515,8 @@ void Field::validateSchema(const std::string& schema) const {
   }
 
   rapidjson::SchemaDocument schema_document_for_validator(schema_document);
-  rapidjson::SchemaValidator schema_validator(schema_document_for_validator);
+  rapidjson::GenericSchemaValidator<rapidjson::SchemaDocument, rapidjson::Document>
+      schema_validator(schema_document_for_validator);
 
   if (!asRapidJsonDocument().Accept(schema_validator)) {
     rapidjson::StringBuffer schema_string_buffer;

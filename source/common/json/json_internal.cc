@@ -41,7 +41,6 @@ public:
   static FieldSharedPtr createArray() { return FieldSharedPtr{new Field(Type::Array)}; }
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
 
-  bool isNull() const override { return type_ == Type::Null; }
   bool isArray() const override { return type_ == Type::Array; }
   bool isObject() const override { return type_ == Type::Object; }
 
@@ -75,9 +74,6 @@ public:
   std::vector<std::string> getStringArray(const std::string& name, bool allow_empty) const override;
   std::vector<ObjectSharedPtr> asObjectArray() const override;
   std::string asString() const override { return stringValue(); }
-  bool asBoolean() const override { return booleanValue(); }
-  double asDouble() const override { return doubleValue(); }
-  int64_t asInteger() const override { return integerValue(); }
   std::string asJsonString() const override;
 
   bool empty() const override;
@@ -176,7 +172,7 @@ private:
  */
 class ObjectHandler : public nlohmann::json_sax<nlohmann::json> {
 public:
-  ObjectHandler() : state_(State::ExpectRoot) {}
+  ObjectHandler() = default;
 
   bool start_object(std::size_t) override;
   bool end_object() override;
@@ -233,7 +229,7 @@ private:
     ExpectArrayValueOrEndArray,
     ExpectFinished,
   };
-  State state_;
+  State state_{State::ExpectRoot};
 
   std::stack<FieldSharedPtr> stack_;
   std::string key_;
@@ -251,11 +247,11 @@ struct JsonContainer {
 };
 
 struct JsonIterator {
-  using difference_type = std::ptrdiff_t;
-  using value_type = char;
-  using pointer = const char*;
-  using reference = const char&;
-  using iterator_category = std::input_iterator_tag;
+  using difference_type = std::ptrdiff_t;            // NOLINT(readability-identifier-naming)
+  using value_type = char;                           // NOLINT(readability-identifier-naming)
+  using pointer = const char*;                       // NOLINT(readability-identifier-naming)
+  using reference = const char&;                     // NOLINT(readability-identifier-naming)
+  using iterator_category = std::input_iterator_tag; // NOLINT(readability-identifier-naming)
 
   JsonIterator& operator++() {
     ++ptr.data;
@@ -315,7 +311,7 @@ void Field::buildJsonDocument(const Field& field, nlohmann::json& value) {
   }
   case Type::Object: {
     for (const auto& item : field.value_.object_value_) {
-      auto name = std::string(item.first.c_str());
+      auto name = std::string(item.first);
 
       switch (item.second->type_) {
       case Type::Array:
