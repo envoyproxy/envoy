@@ -43,7 +43,12 @@ py_test(
     data = glob(["code_corpus/**"]),
     python_version = "PY3",
     srcs_version = "PY3",
-    tags = ["no-sandbox"],  # TODO (foreseeable): make this test run under sandbox
+    # Test must be run manually with --spawn_strategy=local
+    # TODO (foreseeable): make this test run under sandbox
+    tags = [
+        "manual",
+        "no-sandbox",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         requirement("clang"),
