@@ -1,4 +1,4 @@
-#include "common/upstream/shuffle_subset_lb.h"
+#include "common/upstream/shuffle_shard_lb.h"
 
 #include <memory>
 #include <algorithm>
@@ -21,10 +21,10 @@
 namespace Envoy {
 namespace Upstream {
 
-ShuffleSubsetLoadBalancer::ShuffleSubsetLoadBalancer(
+ShuffleShardLoadBalancer::ShuffleShardLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-    Random::RandomGenerator& random, const LoadBalancerShuffleSubsetInfo& shuffle,
+    Random::RandomGenerator& random, const LoadBalancerShuffleShardInfo& shuffle,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
@@ -37,35 +37,35 @@ ShuffleSubsetLoadBalancer::ShuffleSubsetLoadBalancer(
       random_(random), shard_size_(shuffle.shardSize()), cache_capacity_(shuffle.cacheCapacity()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set)
    {
-  ENVOY_LOG(info, "### ShuffleSubsetLoadBalancer::ShuffleSubsetLoadBalancer");
+  ENVOY_LOG(info, "### ShuffleShardLoadBalancer::ShuffleShardLoadBalancer");
   ASSERT(shuffle.isEnabled());
 
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
         ENVOY_LOG(info, "### priority-update ("+std::to_string(priority)+")");
-        if (!hosts_added.empty() || !hosts_removed.empty()) {
-          ENVOY_LOG(info, "### priority-update - DO ("+ std::to_string(hosts_added.size() + hosts_removed.size())+")");
-          for (const auto &entry : cache_) {
-            entry.second->updateSubset(priority, hosts_added, hosts_removed);
-          }
-        } else {
+        if (hosts_added.empty() && hosts_removed.empty()) {
           ENVOY_LOG(info, "### priority-update - DONT");
           const auto& hosts = original_priority_set_.hostSetsPerPriority()[priority]->hosts();
           for (const auto &entry : cache_) {
             entry.second->update(priority, hosts, {});
           }
+        } else {
+          ENVOY_LOG(info, "### priority-update - DO ("+ std::to_string(hosts_added.size() + hosts_removed.size())+")");
+          for (const auto &entry : cache_) {
+            entry.second->updateSubset(priority, hosts_added, hosts_removed);
+          }
         }
       });
 }
 
-ShuffleSubsetLoadBalancer::~ShuffleSubsetLoadBalancer() {
-  ENVOY_LOG(info, "### ShuffleSubsetLoadBalancer::~ShuffleSubsetLoadBalancer");
+ShuffleShardLoadBalancer::~ShuffleShardLoadBalancer() {
+  ENVOY_LOG(info, "### ShuffleShardLoadBalancer::~ShuffleShardLoadBalancer");
 }
 
-std::vector<uint32_t> * ShuffleSubsetLoadBalancer::combo(uint32_t i, uint32_t n, uint32_t k) {
+std::vector<uint32_t> * ShuffleShardLoadBalancer::combo(uint32_t i, uint32_t n, uint32_t k) {
     // This returns a list of elements for a given combinatoric index
     // e.g. combo(1, 3, 2) = [0, 2]
-    ENVOY_LOG(info, "### ShuffleSubsetLoadBalancer::combo " + std::to_string(i) + " " + std::to_string(n) + " " + std::to_string(k) + " " );
+    ENVOY_LOG(info, "### ShuffleShardLoadBalancer::combo " + std::to_string(i) + " " + std::to_string(n) + " " + std::to_string(k) + " " );
     uint32_t counter = 1;
     uint32_t nCk = 1;
     for(uint32_t j = n; j > n-k; j--) {
@@ -91,18 +91,13 @@ std::vector<uint32_t> * ShuffleSubsetLoadBalancer::combo(uint32_t i, uint32_t n,
     return ret;
 }
 
-HostConstSharedPtr ShuffleSubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  ENVOY_LOG(info, "### ShuffleSubsetLoadBalancer::chooseHost");
-  // Create unique hash based on metadata
-  uint32_t hash = 0;
-  if (context){
-    const auto metadata = context->metadataMatchCriteria();
-    if (metadata){
-      for (const auto& entry : metadata->metadataMatchCriteria()) {
-        hash += entry->value().hash(); // Overflows are OK
-      }
-    }
+HostConstSharedPtr ShuffleShardLoadBalancer::chooseHost(LoadBalancerContext* context) {
+  ENVOY_LOG(info, "### ShuffleShardLoadBalancer::chooseHost");
+  absl::optional<uint64_t> hash;
+  if (context) {
+    hash = context->computeHashKey();
   }
+  const uint64_t h = hash ? hash.value() : random_.random();
 
   uint32_t size = original_priority_set_.hostSetsPerPriority()[0]->hosts().size();
   uint32_t min_shard_size = std::min(size, shard_size_);
@@ -118,22 +113,22 @@ HostConstSharedPtr ShuffleSubsetLoadBalancer::chooseHost(LoadBalancerContext* co
     }
   }
 
-  uint32_t index = hash % num_indices_;
+  uint32_t index = h % num_indices_;
   HostConstSharedPtr host;
   auto it = cache_.find(index);
   if (it == cache_.end()) {
     stats_.lb_shuffle_cache_miss_.inc();
-    auto setNums = combo(index, size, min_shard_size);
+    auto index_set = combo(index, size, min_shard_size);
 
-    PriorityShuffleSubsetImplPtr shuffle_shard;
+    PriorityShuffleShardImplPtr shuffle_shard;
     if (cache_.size() >= cache_capacity_) {
       shuffle_shard = cache_.front().second;
-      shuffle_shard->set_ = setNums;
+      shuffle_shard->index_set_ = index_set;
       shuffle_shard->updateSubset(0, original_priority_set_.hostSetsPerPriority()[0]->hosts(), {});
       cache_.pop_front();
     } else {
       stats_.lb_shuffle_created_.inc();
-      shuffle_shard = std::make_shared<PriorityShuffleSubsetImpl>(*this, setNums);
+      shuffle_shard = std::make_shared<PriorityShuffleShardImpl>(*this, index_set);
     }
     host = shuffle_shard->lb_->chooseHost(context);
     cache_.emplace(index, shuffle_shard);
@@ -148,12 +143,12 @@ HostConstSharedPtr ShuffleSubsetLoadBalancer::chooseHost(LoadBalancerContext* co
   return host;
 }
 
-// Initialize a new HostSubsetImpl and LoadBalancer from the ShuffleSubsetLoadBalancer, filtering hosts
+// Initialize a new HostSubsetImpl and LoadBalancer from the ShuffleShardLoadBalancer, filtering hosts
 // with the given predicate.
-ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::PriorityShuffleSubsetImpl(const ShuffleSubsetLoadBalancer& shuffle_lb, std::vector<uint32_t> * set)
-    : set_(set), original_priority_set_(shuffle_lb.original_priority_set_)
+ShuffleShardLoadBalancer::PriorityShuffleShardImpl::PriorityShuffleShardImpl(const ShuffleShardLoadBalancer& shuffle_lb, std::vector<uint32_t> * index_set)
+    : index_set_(index_set), original_priority_set_(shuffle_lb.original_priority_set_)
       {
-  ENVOY_LOG(info, "### PriorityShuffleSubsetImpl::PriorityShuffleSubsetImpl");
+  ENVOY_LOG(info, "### PriorityShuffleShardImpl::PriorityShuffleShardImpl");
   for (size_t i = 0; i < shuffle_lb.original_priority_set_.hostSetsPerPriority().size(); ++i) {
     update(i, shuffle_lb.original_priority_set_.hostSetsPerPriority()[i]->hosts(), {});
   }
@@ -209,7 +204,7 @@ ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::PriorityShuffleSubsetImpl(
   triggerCallbacks();
 }
 
-void ShuffleSubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
+void ShuffleShardLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
                                                 const HostVector& hosts_removed,
                                                 std::function<bool(const Host&)> predicate) {
   // We cache the result of matching the host against the predicate. This ensures
@@ -303,10 +298,10 @@ void ShuffleSubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_a
                            filtered_removed, absl::nullopt);
 }
 
-HostSetImplPtr ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::createHostSet(
+HostSetImplPtr ShuffleShardLoadBalancer::PriorityShuffleShardImpl::createHostSet(
     uint32_t priority, absl::optional<uint32_t> overprovisioning_factor) {
   // Use original hostset's overprovisioning_factor.
-  ENVOY_LOG(info, "### PriorityShuffleSubsetImpl::createHostSet");
+  ENVOY_LOG(info, "### PriorityShuffleShardImpl::createHostSet");
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
 
   const HostSetPtr& host_set = original_priority_set_.hostSetsPerPriority()[priority];
@@ -320,10 +315,10 @@ HostSetImplPtr ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::createHostS
 
 }
 
-void ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::update(uint32_t priority,
+void ShuffleShardLoadBalancer::PriorityShuffleShardImpl::update(uint32_t priority,
                                                     const HostVector& hosts_added,
                                                     const HostVector& hosts_removed) {
-  ENVOY_LOG(info, "### PriorityShuffleSubsetImpl::update");
+  ENVOY_LOG(info, "### PriorityShuffleShardImpl::update");
   getOrCreateHostSet(priority);
   updateSubset(priority, hosts_added, hosts_removed);
 
@@ -335,9 +330,9 @@ void ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::update(uint32_t prior
   }
 }
 
-void ShuffleSubsetLoadBalancer::PriorityShuffleSubsetImpl::updateSubset(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
+void ShuffleShardLoadBalancer::PriorityShuffleShardImpl::updateSubset(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
   uint32_t *counter = new uint32_t(0);
-  std::vector<uint32_t>::reverse_iterator begin = set_->rbegin();
+  std::vector<uint32_t>::reverse_iterator begin = index_set_->rbegin();
   std::vector<uint32_t>::reverse_iterator * it = &begin;
 
   HostPredicate predicate = [counter, it](const Host&) -> bool {

@@ -30,13 +30,13 @@ MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
 
 MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() = default;
 
-MockLoadBalancerShuffleSubsetInfo::MockLoadBalancerShuffleSubsetInfo() {
+MockLoadBalancerShuffleShardInfo::MockLoadBalancerShuffleShardInfo() {
   ON_CALL(*this, isEnabled()).WillByDefault(Return(false));
   ON_CALL(*this, shardSize()).WillByDefault(Return(3));
   ON_CALL(*this, cacheCapacity()).WillByDefault(Return(1024));
 }
 
-MockLoadBalancerShuffleSubsetInfo::~MockLoadBalancerShuffleSubsetInfo() = default;
+MockLoadBalancerShuffleShardInfo::~MockLoadBalancerShuffleShardInfo() = default;
 
 
 MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
@@ -104,7 +104,7 @@ MockClusterInfo::MockClusterInfo()
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
-  ON_CALL(*this, lbShuffleSubsetInfo()).WillByDefault(ReturnRef(lb_shuffle_subset_));
+  ON_CALL(*this, lbShuffleShardInfo()).WillByDefault(ReturnRef(lb_shuffle_shard_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
   ON_CALL(*this, lbMaglevConfig()).WillByDefault(ReturnRef(lb_maglev_config_));

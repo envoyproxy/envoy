@@ -638,7 +638,7 @@ public:
     return source_address_;
   };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
-  const LoadBalancerShuffleSubsetInfo& lbShuffleSubsetInfo() const override { return lb_shuffle_subset_; }
+  const LoadBalancerShuffleShardInfo& lbShuffleShardInfo() const override { return lb_shuffle_shard_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
@@ -720,7 +720,7 @@ private:
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
-  LoadBalancerShuffleSubsetInfoImpl lb_shuffle_subset_;
+  LoadBalancerShuffleShardInfoImpl lb_shuffle_shard_;
   const envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;

@@ -22,19 +22,19 @@
 namespace Envoy {
 namespace Upstream {
 
-class ShuffleSubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
+class ShuffleShardLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
-  ShuffleSubsetLoadBalancer(
+  ShuffleShardLoadBalancer(
       LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
       ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-      Random::RandomGenerator& random, const LoadBalancerShuffleSubsetInfo& subsets,
+      Random::RandomGenerator& random, const LoadBalancerShuffleShardInfo& subsets,
       const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
           lb_ring_hash_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-  ~ShuffleSubsetLoadBalancer() override;
+  ~ShuffleShardLoadBalancer() override;
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -59,9 +59,9 @@ private:
   };
 
   // Represents a subset of an original PrioritySet.
-  class PriorityShuffleSubsetImpl : public PrioritySetImpl {
+  class PriorityShuffleShardImpl : public PrioritySetImpl {
   public:
-    PriorityShuffleSubsetImpl(const ShuffleSubsetLoadBalancer& subset_lb, std::vector<uint32_t> * set);
+    PriorityShuffleShardImpl(const ShuffleShardLoadBalancer& subset_lb, std::vector<uint32_t> * set);
 
     void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
@@ -78,7 +78,7 @@ private:
     // Current active LB.
     LoadBalancerPtr lb_;
 
-    std::vector<uint32_t> * set_;
+    std::vector<uint32_t> * index_set_;
 
   protected:
     HostSetImplPtr createHostSet(uint32_t priority,
@@ -89,7 +89,7 @@ private:
     const HostPredicate predicate_;
   };
 
-  using PriorityShuffleSubsetImplPtr = std::shared_ptr<PriorityShuffleSubsetImpl>;
+  using PriorityShuffleShardImplPtr = std::shared_ptr<PriorityShuffleShardImpl>;
 
   std::vector<uint32_t> * combo(uint32_t i, uint32_t n, uint32_t k);
 
@@ -110,11 +110,11 @@ private:
   const PrioritySet* original_local_priority_set_;
   Common::CallbackHandle* original_priority_set_callback_handle_;
 
-  quic::QuicLinkedHashMap<uint32_t, PriorityShuffleSubsetImplPtr> cache_;
+  quic::QuicLinkedHashMap<uint32_t, PriorityShuffleShardImplPtr> cache_;
   uint32_t num_hosts_;
   uint32_t num_indices_;
 
-  friend class ShuffleSubsetLoadBalancerDescribeMetadataTester;
+  friend class ShuffleShardLoadBalancerDescribeMetadataTester;
 };
 
 } // namespace Upstream

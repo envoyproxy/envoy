@@ -909,7 +909,7 @@ message Cluster {
 
   // Configuration for load balancing subsetting.
   LbSubsetConfig lb_subset_config = 22;
-  LbShuffleSubsetConfig lb_shuffle_subset_config = 53;
+  LbShuffleShardConfig lb_shuffle_shard_config = 53;
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only

@@ -39,7 +39,7 @@ envoy_cc_library(
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
-        ":shuffle_subset_lb_lib",
+        ":shuffle_shard_lb_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codes_interface",
@@ -425,9 +425,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "shuffle_subset_lb_lib",
-    srcs = ["shuffle_subset_lb.cc"],
-    hdrs = ["shuffle_subset_lb.h"],
+    name = "shuffle_shard_lb_lib",
+    srcs = ["shuffle_shard_lb.cc"],
+    hdrs = ["shuffle_shard_lb.h"],
     external_deps = ["quiche_quic_platform_export", "quiche_quic_platform_base", "quiche_quic_core_lru_cache_lib"],
     deps = [
         ":load_balancer_lib",

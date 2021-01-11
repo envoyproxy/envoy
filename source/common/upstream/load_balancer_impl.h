@@ -657,10 +657,10 @@ private:
   const bool list_as_any_;
 };
 
-class LoadBalancerShuffleSubsetInfoImpl : public LoadBalancerShuffleSubsetInfo {
+class LoadBalancerShuffleShardInfoImpl : public LoadBalancerShuffleShardInfo {
 public:
-  LoadBalancerShuffleSubsetInfoImpl(
-      const envoy::config::cluster::v3::Cluster::LbShuffleSubsetConfig& subset_config)
+  LoadBalancerShuffleShardInfoImpl(
+      const envoy::config::cluster::v3::Cluster::LbShuffleShardConfig& subset_config)
       : shard_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(subset_config, shard_size, 0)),
         cache_capacity_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(subset_config, cache_capacity, 256)) { }
 

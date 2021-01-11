@@ -336,9 +336,9 @@ message Cluster {
 
   // Optionally shuffle shard endpoints in this cluster into unique shards defined by
   // route metadata and size.
-  message LbShuffleSubsetConfig {
+  message LbShuffleShardConfig {
     option (udpa.annotations.versioning).previous_message_type =
-       "envoy.api.v2.Cluster.LbShuffleSubsetConfig";
+       "envoy.api.v2.Cluster.LbShuffleShardConfig";
 
     google.protobuf.UInt32Value shard_size = 8;
     google.protobuf.UInt32Value cache_capacity = 9;
@@ -907,7 +907,7 @@ message Cluster {
 
   // Configuration for load balancing subsetting.
   LbSubsetConfig lb_subset_config = 22;
-  LbShuffleSubsetConfig lb_shuffle_subset_config = 53;
+  LbShuffleShardConfig lb_shuffle_shard_config = 53;
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only

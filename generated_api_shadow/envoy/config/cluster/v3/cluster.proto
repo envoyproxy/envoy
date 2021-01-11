@@ -337,7 +337,7 @@ message Cluster {
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
   // [#next-free-field: 9]
-  message LbShuffleSubsetConfig {
+  message LbShuffleShardConfig {
     google.protobuf.UInt32Value shard_size = 8;
     google.protobuf.UInt32Value cache_capacity = 9;
   }
@@ -903,7 +903,7 @@ message Cluster {
 
   // Configuration for load balancing subsetting.
   LbSubsetConfig lb_subset_config = 22;
-  LbShuffleSubsetConfig lb_shuffle_subset_config = 53;
+  LbShuffleShardConfig lb_shuffle_shard_config = 53;
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only

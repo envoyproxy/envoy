@@ -43,7 +43,7 @@
 #include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
-#include "common/upstream/shuffle_subset_lb.h"
+#include "common/upstream/shuffle_shard_lb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -1305,11 +1305,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
         cluster->lbLeastRequestConfig(), cluster->lbConfig());
-  } else if (cluster->lbShuffleSubsetInfo().isEnabled()) {
-    lb_ = std::make_unique<ShuffleSubsetLoadBalancer>(
+  } else if (cluster->lbShuffleShardInfo().isEnabled()) {
+    lb_ = std::make_unique<ShuffleShardLoadBalancer>(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
-        cluster->lbShuffleSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
+        cluster->lbShuffleShardInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
         cluster->lbLeastRequestConfig(), cluster->lbConfig());
   } else {
     switch (cluster->lbType()) {

@@ -109,9 +109,9 @@ public:
   virtual bool listAsAny() const PURE;
 };
 
-class LoadBalancerShuffleSubsetInfo {
+class LoadBalancerShuffleShardInfo {
 public:
-  virtual ~LoadBalancerShuffleSubsetInfo() = default;
+  virtual ~LoadBalancerShuffleShardInfo() = default;
 
   /**
    * @return bool true if load balancer subsets are configured.
