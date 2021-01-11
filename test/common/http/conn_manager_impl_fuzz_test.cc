@@ -200,7 +200,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
-  bool shouldStripMatchingPort() const override { return false; }
+  Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
@@ -570,10 +570,10 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(filter_callbacks.connection_, close(_))
       .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
-  filter_callbacks.connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
-  filter_callbacks.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
                                      cluster_manager, overload_manager, config.time_system_);

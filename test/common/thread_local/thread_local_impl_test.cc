@@ -15,6 +15,26 @@ using testing::ReturnPointee;
 namespace Envoy {
 namespace ThreadLocal {
 
+TEST(MainThreadVerificationTest, All) {
+  // Main thread singleton is initialized in the constructor of tls instance. Call to main thread
+  // verification will fail before that.
+  EXPECT_DEATH(Thread::MainThread::isMainThread(),
+               "InjectableSingleton used prior to initialization");
+  {
+    EXPECT_DEATH(Thread::MainThread::isMainThread(),
+                 "InjectableSingleton used prior to initialization");
+    InstanceImpl tls;
+    // Call to main thread verification should succeed after tls instance has been initialized.
+    ASSERT(Thread::MainThread::isMainThread());
+    tls.shutdownGlobalThreading();
+    tls.shutdownThread();
+  }
+  // Main thread singleton is cleared in the destructor of tls instance. Call to main thread
+  // verification will fail after that.
+  EXPECT_DEATH(Thread::MainThread::isMainThread(),
+               "InjectableSingleton used prior to initialization");
+}
+
 class TestThreadLocalObject : public ThreadLocalObject {
 public:
   ~TestThreadLocalObject() override { onDestroy(); }

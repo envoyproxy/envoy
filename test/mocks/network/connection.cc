@@ -54,6 +54,10 @@ void MockConnectionBase::runLowWatermarkCallbacks() {
 }
 
 template <class T> static void initializeMockConnection(T& connection) {
+  ON_CALL(connection, addressProvider())
+      .WillByDefault(ReturnPointee(connection.stream_info_.downstream_address_provider_));
+  ON_CALL(connection, addressProviderSharedPtr())
+      .WillByDefault(ReturnPointee(&connection.stream_info_.downstream_address_provider_));
   ON_CALL(connection, dispatcher()).WillByDefault(ReturnRef(connection.dispatcher_));
   ON_CALL(connection, readEnabled()).WillByDefault(ReturnPointee(&connection.read_enabled_));
   ON_CALL(connection, addConnectionCallbacks(_))
@@ -76,9 +80,6 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, close(_)).WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
     connection.raiseEvent(Network::ConnectionEvent::LocalClose);
   }));
-  ON_CALL(connection, remoteAddress()).WillByDefault(ReturnRef(connection.remote_address_));
-  ON_CALL(connection, directRemoteAddress()).WillByDefault(ReturnRef(connection.remote_address_));
-  ON_CALL(connection, localAddress()).WillByDefault(ReturnRef(connection.local_address_));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
 
@@ -92,29 +93,35 @@ template <class T> static void initializeMockConnection(T& connection) {
 }
 
 MockConnection::MockConnection() {
-  remote_address_ = Utility::resolveUrl("tcp://10.0.0.3:50000");
+  stream_info_.downstream_address_provider_->setRemoteAddress(
+      Utility::resolveUrl("tcp://10.0.0.3:50000"));
   initializeMockConnection(*this);
 }
 MockConnection::~MockConnection() = default;
 
 MockServerConnection::MockServerConnection() {
-  remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");
-  local_address_ = Utility::resolveUrl("tcp://10.0.0.2:40000");
+  stream_info_.downstream_address_provider_->setRemoteAddress(
+      Utility::resolveUrl("tcp://10.0.0.1:443"));
+  stream_info_.downstream_address_provider_->setLocalAddress(
+      Utility::resolveUrl("tcp://10.0.0.2:40000"));
   initializeMockConnection(*this);
 }
 
 MockServerConnection::~MockServerConnection() = default;
 
 MockClientConnection::MockClientConnection() {
-  remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");
-  local_address_ = Utility::resolveUrl("tcp://10.0.0.2:40000");
+  stream_info_.downstream_address_provider_->setRemoteAddress(
+      Utility::resolveUrl("tcp://10.0.0.1:443"));
+  stream_info_.downstream_address_provider_->setLocalAddress(
+      Utility::resolveUrl("tcp://10.0.0.2:40000"));
   initializeMockConnection(*this);
 }
 
 MockClientConnection::~MockClientConnection() = default;
 
 MockFilterManagerConnection::MockFilterManagerConnection() {
-  remote_address_ = Utility::resolveUrl("tcp://10.0.0.3:50000");
+  stream_info_.downstream_address_provider_->setRemoteAddress(
+      Utility::resolveUrl("tcp://10.0.0.3:50000"));
   initializeMockConnection(*this);
 
   // The real implementation will move the buffer data into the socket.
