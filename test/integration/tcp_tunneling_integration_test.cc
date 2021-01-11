@@ -792,8 +792,6 @@ TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
-// TODO(irozzo): temporarily disabled as a protocol error is thrown when
-// transfer-encoding header is received in CONNECT responses.
 TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     return;
