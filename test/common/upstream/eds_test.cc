@@ -327,7 +327,7 @@ TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
 
 namespace {
 
-void endpoingWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
+void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -363,7 +363,7 @@ void endpoingWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
 
 // Verify that host weight changes cause a full rebuild.
 TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
-  endpoingWeightChangeCausesRebuildTest(*this, true);
+  endpointWeightChangeCausesRebuildTest(*this, true);
 }
 
 // Verify that host weight changes do not cause a full rebuild when the feature flag is disabled.
@@ -372,7 +372,7 @@ TEST_F(EdsTest, EndpointWeightChangeCausesRebuildDisabled) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.upstream_host_weight_change_causes_rebuild", "false"}});
 
-  endpoingWeightChangeCausesRebuildTest(*this, false);
+  endpointWeightChangeCausesRebuildTest(*this, false);
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
