@@ -84,6 +84,7 @@ struct LocalDescriptor {
     h = H::combine(std::move(h), d.token_bucket_);
     return h;
   }
+};
 
 /*
  * Base interface for generic rate limit descriptor producer.
@@ -100,7 +101,8 @@ public:
    * @param info stream info associated with the request
    * @return true if the producer populated the descriptor.
    */
-  virtual bool populateDescriptor(DescriptorEntry& descriptor, const std::string& local_service_cluster,
+  virtual bool populateDescriptor(DescriptorEntry& descriptor,
+                                  const std::string& local_service_cluster,
                                   const Http::RequestHeaderMap& headers,
                                   const StreamInfo::StreamInfo& info) const PURE;
 };
@@ -120,8 +122,8 @@ public:
    *
    * @param config supplies the configuration for the descriptor extension.
    * @param validator configuration validation visitor.
-   * @return DescriptorProducerPtr the rate limit descriptor producer which will be used to populate
-   * rate limit descriptors.
+   * @return DescriptorProducerPtr the rate limit descriptor producer which will be used to
+   * populate rate limit descriptors.
    */
   virtual DescriptorProducerPtr
   createDescriptorProducerFromProto(const Protobuf::Message& config,
