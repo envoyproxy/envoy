@@ -24,6 +24,8 @@ namespace {
 
 constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 1024;
 
+// This builds grpc-message header value from encoding buffer and the last frame (when
+// end_stream=true) and the total length of it is limited by MAX_GRPC_MESSAGE_LENGTH.
 std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance* last) {
   Buffer::OwnedImpl buffer;
   if (buffered != nullptr) {
@@ -91,7 +93,16 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
 bool GrpcWebFilter::hasGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
-    return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
+    // The value of media-type is case-sensitive https://tools.ietf.org/html/rfc2616#section-3.7.
+    const std::string content_type_value =
+        absl::AsciiStrToLower(content_type->value().getStringView());
+    // We ignore "parameter" value.
+    const std::string current_content_type =
+        content_type_value.substr(0, content_type_value.find_last_of(';'));
+    // We expect only proto encoding response
+    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md.
+    return current_content_type == Http::Headers::get().ContentTypeValues.GrpcWebProto ||
+           current_content_type == Http::Headers::get().ContentTypeValues.GrpcWeb;
   }
   return false;
 }
