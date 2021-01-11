@@ -36,8 +36,6 @@ class UpstreamRequest;
 class RouterUpstreamRequest : public LinkedObject<RouterUpstreamRequest>,
                               public UpstreamToDownstream {
 public:
-  virtual ~RouterUpstreamRequest() = default;
-
   virtual void encodeUpstreamHeaders(bool end_stream) PURE;
   virtual void encodeUpstreamData(Buffer::Instance& data, bool end_stream) PURE;
   virtual void encodeUpstreamTrailers(const Http::RequestTrailerMap& trailers) PURE;
