@@ -43,33 +43,19 @@ getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
 
 } // namespace
 
-uint64_t
-ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-                                         std::shared_ptr<const ProtocolOptionsConfigImpl> options) {
+uint64_t ProtocolOptionsConfigImpl::parseFeatures(const ProtocolOptionsConfigImpl& options) {
   uint64_t features = 0;
 
-  if (options) {
-    if (options->use_http2_) {
-      features |= Upstream::ClusterInfo::Features::HTTP2;
-    }
-    if (options->use_downstream_protocol_) {
-      features |= Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-  } else {
-    if (config.has_http2_protocol_options()) {
-      features |= Upstream::ClusterInfo::Features::HTTP2;
-    }
-    if (config.protocol_selection() ==
-        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
-      features |= Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
+  if (options.use_http2_) {
+    features |= Upstream::ClusterInfo::Features::HTTP2;
   }
-  if (config.close_connections_on_host_health_failure()) {
-    features |= Upstream::ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
+  if (options.use_downstream_protocol_) {
+    features |= Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL;
   }
-  if (options->use_alpn_) {
+  if (options.use_alpn_) {
     features |= Upstream::ClusterInfo::Features::USE_ALPN;
   }
+
   return features;
 }
 
