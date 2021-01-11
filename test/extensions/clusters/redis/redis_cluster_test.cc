@@ -1028,8 +1028,8 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
   }
 
   /*
-  // This part of the test doesn't pass, as removal of PENDING_DYNAMIC_REMOVAL hosts does not seem
-  // to be implemented for redis clusters at present.
+  // TODO(#14630) This part of the test doesn't pass, as removal of PENDING_DYNAMIC_REMOVAL hosts
+  // does not seem to be implemented for redis clusters at present.
 
   // Fail the HC for the remaining removed host
   {
