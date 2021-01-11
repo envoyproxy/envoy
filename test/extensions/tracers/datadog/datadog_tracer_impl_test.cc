@@ -198,8 +198,9 @@ TEST_F(DatadogDriverTest, NoBody) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
-            EXPECT_EQ("application/msgpack", message->headers().getContentTypeValue());
+            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+            EXPECT_EQ("application/msgpack",
+                      message->headers().ContentType()->value().getStringView());
 
             return &request;
           }));
