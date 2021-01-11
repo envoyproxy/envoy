@@ -186,6 +186,13 @@ public:
    * missing.
    */
   static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * Returns true if a header may be safely removed without causing additional
+   * problems. Effectively, header names beginning with ":" and the "host" header
+   * may not be removed.
+   */
+  static bool isRemovableHeader(absl::string_view header);
 };
 } // namespace Http
 } // namespace Envoy
