@@ -786,6 +786,7 @@ class ResponseTrailerMap
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
 using ResponseTrailerMapOptRef = OptRef<ResponseTrailerMap>;
+using ResponseTrailerMapOptConstRef = OptRef<const ResponseTrailerMap>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
