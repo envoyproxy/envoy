@@ -818,3 +818,16 @@ envoy_cc_fuzz_test(
         ":zone_aware_load_balancer_fuzz_lib",
     ],
 )
+
+envoy_cc_benchmark_binary(
+    name = "scheduler_benchmark",
+    srcs = ["scheduler_benchmark.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/upstream:scheduler_lib",
+        "//source/common/common:random_generator_lib",
+    ],
+)
+
