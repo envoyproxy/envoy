@@ -216,9 +216,6 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
         // server.
         ENVOY_LOG(trace, "postgres_proxy: enabling secure transport.");
         encrypted_ = callbacks_->onSSLRequest();
-        if (!encrypted_) {
-          ENVOY_LOG(trace, "postgres_proxy: SUCCESS - enabling secure transport.");
-        }
       }
 
       // Count it as recognized frontend message.
