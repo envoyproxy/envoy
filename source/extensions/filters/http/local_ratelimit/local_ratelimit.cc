@@ -39,7 +39,7 @@ FilterConfig::FilterConfig(
       response_headers_parser_(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
       stage_(static_cast<uint64_t>(config.stage())),
-      are_descriptors_configured_(!config.descriptors().empty()) {
+      has_descriptors_(!config.descriptors().empty()) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -48,21 +48,12 @@ FilterConfig::FilterConfig(
   if (per_route && !config.has_token_bucket()) {
     throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }
-
-  // Note: Descriptors work at the route level, as we get rate limit descriptors
-  //       from route's rate limit actions. Hence configuring descriptors at
-  //       global config level does not makes sense.
-  if (!per_route && are_descriptors_configured_) {
-    throw EnvoyException("no descriptors required for global config.");
-  }
 }
 
 bool FilterConfig::requestAllowed(
-    std::vector<Envoy::RateLimit::LocalDescriptor> route_descriptors) const {
-  return rate_limiter_.requestAllowed(route_descriptors);
+    const std::vector<RateLimit::LocalDescriptor>& request_descriptors) const {
+  return rate_limiter_.requestAllowed(request_descriptors);
 }
-
-bool FilterConfig::areDescriptorsConfigured() const { return are_descriptors_configured_; }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + ".http_local_rate_limit";
@@ -86,12 +77,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   config->stats().enabled_.inc();
 
-  std::vector<Envoy::RateLimit::LocalDescriptor> route_descriptors;
-  if (config->areDescriptorsConfigured()) {
-    getRouteSpecificDescriptors(route_descriptors, headers);
+  std::vector<RateLimit::LocalDescriptor> descriptors;
+  if (config->hasDescriptors()) {
+    populateDescriptors(descriptors, headers);
   }
 
-  if (config->requestAllowed(route_descriptors)) {
+  if (config->requestAllowed(descriptors)) {
     config->stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -115,33 +106,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void Filter::getRouteSpecificDescriptors(
-    std::vector<Envoy::RateLimit::LocalDescriptor>& local_descriptors,
-    Http::RequestHeaderMap& headers) {
+void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
+                                 Http::RequestHeaderMap& headers) {
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
   }
 
-  auto cluster = decoder_callbacks_->clusterInfo();
-  if (!cluster) {
-    return;
-  }
-
-  const Envoy::Router::RouteEntry* route_entry = route->routeEntry();
+  const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
   const auto* config = getConfig();
-  for (const Envoy::Router::RateLimitPolicyEntry& rate_limit :
+  for (const Router::RateLimitPolicyEntry& rate_limit :
        route_entry->rateLimitPolicy().getApplicableRateLimit(config->stage())) {
     const std::string& disable_key = rate_limit.disableKey();
 
     if (!disable_key.empty()) {
       continue;
     }
-    rate_limit.populateLocalDescriptors(*route_entry, local_descriptors,
-                                        config->localInfo().clusterName(), headers,
-                                        *decoder_callbacks_->streamInfo().downstreamRemoteAddress(),
-                                        &decoder_callbacks_->streamInfo().dynamicMetadata());
+    rate_limit.populateLocalDescriptors(descriptors, config->localInfo().clusterName(), headers,
+                                        decoder_callbacks_->streamInfo());
   }
 }
 

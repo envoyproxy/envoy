@@ -11,33 +11,34 @@ namespace LocalRateLimit {
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
     const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
-    const Envoy::Protobuf::RepeatedPtrField<
+    const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors)
-    : fill_interval_(fill_interval), max_tokens_(max_tokens), tokens_per_fill_(tokens_per_fill),
-      fill_timer_(fill_interval_ > std::chrono::milliseconds(0)
+    : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
       time_source_(dispatcher.timeSource()) {
-  if (fill_timer_ && fill_interval_ < std::chrono::milliseconds(50)) {
+  if (fill_timer_ && fill_interval < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }
 
-  tokens_.tokens = max_tokens;
+  token_bucket_.max_tokens_ = max_tokens;
+  token_bucket_.tokens_per_fill_ = tokens_per_fill;
+  token_bucket_.fill_interval_ = absl::FromChrono(fill_interval);
+  tokens_.tokens_ = max_tokens;
 
   if (fill_timer_) {
-    fill_timer_->enableTimer(fill_interval_);
+    fill_timer_->enableTimer(fill_interval);
   }
 
   for (const auto& descriptor : descriptors) {
-    Envoy::RateLimit::LocalDescriptor new_descriptor;
+    RateLimit::LocalDescriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
     }
-    Envoy::RateLimit::TokenBucket token_bucket;
+    RateLimit::TokenBucket token_bucket;
     token_bucket.fill_interval_ =
         absl::Milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(descriptor.token_bucket(), fill_interval, 0));
-    if (absl::ToChronoMilliseconds(token_bucket.fill_interval_).count() % fill_interval_.count() !=
-        0) {
+    if (token_bucket.fill_interval_ % token_bucket_.fill_interval_ != absl::ZeroDuration()) {
       throw EnvoyException(
           "local rate descriptor limit is not a multiple of token bucket fill timer");
     }
@@ -46,17 +47,16 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
     new_descriptor.token_bucket_ = token_bucket;
 
-    // Push to descriptors vector to maintain the ordering in which each
-    // descriptor appeared in the config.
-    descriptors_.push_back(new_descriptor);
+    auto token_state = std::make_unique<RateLimit::TokenState>();
+    token_state->tokens_ = token_bucket.max_tokens_;
+    token_state->fill_time_ = time_source_.monotonicTime();
+    new_descriptor.token_state_ = token_state.get();
+    descriptor_tokens_.emplace_back(std::move(token_state));
 
-    // Maintain the hash map of state of token bucket for each descriptor.
-    std::unique_ptr<DescriptorTokenState> descriptor_state_token =
-        std::make_unique<DescriptorTokenState>();
-    // Fill with max_tokens first time.
-    descriptor_state_token->token.tokens = token_bucket.max_tokens_;
-    descriptor_state_token->monotonic_time = time_source_.monotonicTime();
-    tokens_per_descriptor_[new_descriptor] = std::move(descriptor_state_token);
+    auto result = descriptors_.emplace(new_descriptor);
+    if (!result.second) {
+      throw EnvoyException("duplicate descriptor in the local rate descriptor");
+    }
   }
 }
 
@@ -67,49 +67,45 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 }
 
 void LocalRateLimiterImpl::onFillTimer() {
-  onFillTimerHelper(tokens_, max_tokens_, tokens_per_fill_);
+  onFillTimerHelper(tokens_, token_bucket_);
   onFillTimerDescriptorHelper();
-  fill_timer_->enableTimer(fill_interval_);
+  fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
 
-void LocalRateLimiterImpl::onFillTimerHelper(const Token& tokens, const uint32_t max_tokens,
-                                             const uint32_t tokens_per_fill) {
+void LocalRateLimiterImpl::onFillTimerHelper(const RateLimit::TokenState& tokens,
+                                             const RateLimit::TokenBucket& bucket) {
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
-  uint32_t expected_tokens = tokens.tokens.load(std::memory_order_relaxed);
+  uint32_t expected_tokens = tokens.tokens_.load(std::memory_order_relaxed);
   uint32_t new_tokens_value;
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
-    new_tokens_value = std::min(max_tokens, expected_tokens + tokens_per_fill);
+    new_tokens_value = std::min(bucket.max_tokens_, expected_tokens + bucket.tokens_per_fill_);
 
     // Testing hook.
     synchronizer_.syncPoint("on_fill_timer_pre_cas");
 
     // Loop while the weak CAS fails trying to update the tokens value.
-  } while (!tokens.tokens.compare_exchange_weak(expected_tokens, new_tokens_value,
-                                                std::memory_order_relaxed));
+  } while (!tokens.tokens_.compare_exchange_weak(expected_tokens, new_tokens_value,
+                                                 std::memory_order_relaxed));
 }
 
 void LocalRateLimiterImpl::onFillTimerDescriptorHelper() {
   auto current_time = time_source_.monotonicTime();
-  for (const auto& descriptor : tokens_per_descriptor_) {
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(current_time -
-                                                              descriptor.second->monotonic_time) >=
-        absl::ToChronoMilliseconds(descriptor.first.token_bucket_.fill_interval_)) {
-
-      onFillTimerHelper(descriptor.second->token, descriptor.first.token_bucket_.max_tokens_,
-                        descriptor.first.token_bucket_.tokens_per_fill_);
-
-      // Update the time.
-      descriptor.second->monotonic_time = current_time;
+  for (const auto& descriptor : descriptors_) {
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(
+            current_time - descriptor.token_state_->fill_time_) >=
+        absl::ToChronoMilliseconds(descriptor.token_bucket_.fill_interval_)) {
+      onFillTimerHelper(*descriptor.token_state_, descriptor.token_bucket_);
+      descriptor.token_state_->fill_time_ = current_time;
     }
   }
 }
 
-bool LocalRateLimiterImpl::requestAllowedHelper(const Token& tokens) const {
+bool LocalRateLimiterImpl::requestAllowedHelper(const RateLimit::TokenState& tokens) const {
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
-  uint32_t expected_tokens = tokens.tokens.load(std::memory_order_relaxed);
+  uint32_t expected_tokens = tokens.tokens_.load(std::memory_order_relaxed);
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
     if (expected_tokens == 0) {
@@ -120,37 +116,24 @@ bool LocalRateLimiterImpl::requestAllowedHelper(const Token& tokens) const {
     synchronizer_.syncPoint("allowed_pre_cas");
 
     // Loop while the weak CAS fails trying to subtract 1 from expected.
-  } while (!tokens.tokens.compare_exchange_weak(expected_tokens, expected_tokens - 1,
-                                                std::memory_order_relaxed));
+  } while (!tokens.tokens_.compare_exchange_weak(expected_tokens, expected_tokens - 1,
+                                                 std::memory_order_relaxed));
 
   // We successfully decremented the counter by 1.
   return true;
 }
 
 bool LocalRateLimiterImpl::requestAllowed(
-    std::vector<Envoy::RateLimit::LocalDescriptor> route_descriptors) const {
-  const Envoy::RateLimit::LocalDescriptor* descriptor = findDescriptor(route_descriptors);
-  if (descriptor == nullptr) {
-    return requestAllowedHelper(tokens_);
-  }
-  auto it = tokens_per_descriptor_.find(*descriptor);
-  return requestAllowedHelper(it->second->token);
-}
-
-const Envoy::RateLimit::LocalDescriptor* LocalRateLimiterImpl::findDescriptor(
-    std::vector<Envoy::RateLimit::LocalDescriptor> route_descriptors) const {
-  if (descriptors_.empty() || route_descriptors.empty()) {
-    return nullptr;
-  }
-  for (const auto& config_descriptor : descriptors_) {
-    for (const auto& route_descriptor : route_descriptors) {
-      if (std::equal(config_descriptor.entries_.begin(), config_descriptor.entries_.end(),
-                     route_descriptor.entries_.begin())) {
-        return &config_descriptor;
+    const std::vector<RateLimit::LocalDescriptor>& request_descriptors) const {
+  if (!descriptors_.empty() && !request_descriptors.empty()) {
+    for (const auto& request_descriptor : request_descriptors) {
+      auto it = descriptors_.find(request_descriptor);
+      if (it != descriptors_.end()) {
+        return requestAllowedHelper(*it->token_state_);
       }
     }
   }
-  return nullptr;
+  return requestAllowedHelper(tokens_);
 }
 
 } // namespace LocalRateLimit

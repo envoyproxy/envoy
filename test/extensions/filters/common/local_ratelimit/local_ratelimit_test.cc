@@ -224,6 +224,17 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFi
       EnvoyException, "local rate descriptor limit is not a multiple of token bucket fill timer");
 }
 
+TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+                            *descriptors_.Add());
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+                            *descriptors_.Add());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_),
+      EnvoyException, "duplicate descriptor in the local rate descriptor");
+}
+
 // Verify no exception for per route config without descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitNoExceptionWithoutDescriptor) {
   VERBOSE_EXPECT_NO_THROW(
@@ -265,8 +276,6 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
 
   // This tests the case in which two allowed checks race.
   {
-    TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
-                              *descriptors_.Add());
     initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
     synchronizer().enable();

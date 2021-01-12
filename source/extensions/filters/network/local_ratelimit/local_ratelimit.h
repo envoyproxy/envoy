@@ -49,7 +49,7 @@ private:
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
 
-  std::vector<Envoy::RateLimit::LocalDescriptor> descriptors_;
+  std::vector<RateLimit::LocalDescriptor> descriptors_;
   friend class LocalRateLimitTestBase;
 };
 

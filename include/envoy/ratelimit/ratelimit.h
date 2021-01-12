@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/protobuf/message_validator.h"
@@ -50,29 +51,27 @@ struct TokenBucket {
   uint32_t max_tokens_;
   uint32_t tokens_per_fill_;
   absl::Duration fill_interval_;
+};
 
-  friend bool operator==(const TokenBucket& lhs, const TokenBucket& rhs) {
-    return lhs.max_tokens_ == rhs.max_tokens_ && lhs.tokens_per_fill_ == rhs.tokens_per_fill_ &&
-           lhs.fill_interval_ == rhs.fill_interval_;
-  }
-
-  // Support absl::Hash.
-  template <typename H>
-  friend H AbslHashValue(H h, const TokenBucket& d) { // NOLINT(readability-identifier-naming)
-    h = H::combine(std::move(h), d.max_tokens_, d.tokens_per_fill_, d.fill_interval_);
-    return h;
-  }
+/**
+ * A token bucket operational state.
+ */
+struct TokenState {
+  mutable std::atomic<uint32_t> tokens_;
+  MonotonicTime fill_time_;
 };
 
 /**
  * A single rate limit request descriptor. See ratelimit.proto.
+ * The descriptor entries constitute the primary key for local descriptors.
  */
 struct LocalDescriptor {
   std::vector<DescriptorEntry> entries_;
-  TokenBucket token_bucket_;
+  TokenBucket token_bucket_ = {};
+  TokenState* token_state_ = nullptr;
 
   friend bool operator==(const LocalDescriptor& lhs, const LocalDescriptor& rhs) {
-    return lhs.entries_ == rhs.entries_ && lhs.token_bucket_ == rhs.token_bucket_;
+    return lhs.entries_ == rhs.entries_;
   }
 
   // Support absl::Hash.
@@ -81,7 +80,6 @@ struct LocalDescriptor {
     for (const auto& entry : d.entries_) {
       h = H::combine(std::move(h), entry.key_, entry.value_);
     }
-    h = H::combine(std::move(h), d.token_bucket_);
     return h;
   }
 };
@@ -95,13 +93,13 @@ public:
 
   /**
    * Potentially fill a descriptor entry to the end of descriptor.
-   * @param descriptor supplies the descriptor to optionally fill.
+   * @param descriptor_entry supplies the descriptor entry to optionally fill.
    * @param local_service_cluster supplies the name of the local service cluster.
    * @param headers supplies the header for the request.
    * @param info stream info associated with the request
    * @return true if the producer populated the descriptor.
    */
-  virtual bool populateDescriptor(DescriptorEntry& descriptor,
+  virtual bool populateDescriptor(DescriptorEntry& descriptor_entry,
                                   const std::string& local_service_cluster,
                                   const Http::RequestHeaderMap& headers,
                                   const StreamInfo::StreamInfo& info) const PURE;

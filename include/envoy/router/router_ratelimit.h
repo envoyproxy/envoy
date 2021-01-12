@@ -67,10 +67,10 @@ public:
    * @param headers supplies the header for the request.
    * @param info stream info associated with the request
    */
-  virtual void populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
-                                   const std::string& local_service_cluster,
-                                   const Http::RequestHeaderMap& headers,
-                                   const StreamInfo::StreamInfo& info) const PURE;
+  virtual void populateLocalDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
+                                        const std::string& local_service_cluster,
+                                        const Http::RequestHeaderMap& headers,
+                                        const StreamInfo::StreamInfo& info) const PURE;
 };
 
 /**

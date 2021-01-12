@@ -257,8 +257,8 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestOk) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
-  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _, _, _))
-      .WillOnce(testing::SetArgReferee<1>(descriptor_));
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -273,8 +273,8 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimited) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
-  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _, _, _))
-      .WillOnce(testing::SetArgReferee<1>(descriptor_));
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -289,8 +289,8 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
-  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _, _, _))
-      .WillOnce(testing::SetArgReferee<1>(descriptor_not_found_));
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_not_found_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -306,8 +306,8 @@ TEST_F(DescriptorFilterTest, RouteDescriptorFirstMatch) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
-  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _, _, _))
-      .WillOnce(testing::SetArgReferee<1>(descriptor_first_match_));
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_first_match_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -322,8 +322,8 @@ TEST_F(DescriptorFilterTest, RouteDescriptorWithStageConfig) {
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
               getApplicableRateLimit(1));
 
-  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _, _, _))
-      .WillOnce(testing::SetArgReferee<1>(descriptor_));
+  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

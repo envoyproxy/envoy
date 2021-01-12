@@ -170,8 +170,9 @@ public:
                            const std::string& local_service_cluster, const Http::RequestHeaderMap&,
                            const StreamInfo::StreamInfo& info) const override;
   void populateLocalDescriptors(std::vector<Envoy::RateLimit::LocalDescriptor>& descriptors,
-                           const std::string& local_service_cluster, const Http::RequestHeaderMap&,
-                           const StreamInfo::StreamInfo& info) const override;
+                                const std::string& local_service_cluster,
+                                const Http::RequestHeaderMap&,
+                                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const std::string disable_key_;
