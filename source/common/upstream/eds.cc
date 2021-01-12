@@ -47,7 +47,7 @@ EdsClusterImpl::EdsClusterImpl(
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
-  absl::node_hash_map<std::string, HostSharedPtr> updated_hosts;
+  absl::flat_hash_map<std::string, HostSharedPtr> updated_hosts;
   absl::flat_hash_set<std::string> all_new_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
@@ -238,7 +238,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
     LocalityWeightsMap& locality_weights_map, LocalityWeightsMap& new_locality_weights_map,
     PriorityStateManager& priority_state_manager,
-    absl::node_hash_map<std::string, HostSharedPtr>& updated_hosts,
+    absl::flat_hash_map<std::string, HostSharedPtr>& updated_hosts,
     const absl::flat_hash_set<std::string>& all_new_hosts) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
