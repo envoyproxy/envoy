@@ -6,7 +6,6 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
 
-import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
@@ -289,10 +288,13 @@ message GrpcStatus {
 // Change HTTP headers or trailers by appending, replacing, or removing
 // headers.
 message HeaderMutation {
-  // Add or replace HTTP headers.
+  // Add or replace HTTP headers. Attempts to set the value of
+  // any "x-envoy" header, and attempts to set the ":method",
+  // ":authority", ":scheme", or "host" headers will be ignored.
   repeated config.core.v3.HeaderValueOption set_headers = 1;
 
-  // Remove these HTTP headers.
+  // Remove these HTTP headers. Attempts to remove system headers --
+  // any header starting with ":", plus "host" -- will be ignored.
   repeated string remove_headers = 2;
 }
 

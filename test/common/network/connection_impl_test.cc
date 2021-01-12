@@ -110,7 +110,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
-  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource());
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
   EXPECT_DEATH(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -126,7 +126,8 @@ public:
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  ConnectionImplTest() : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_) {}
+  ConnectionImplTest()
+      : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
 
   void setUpBasicConnection() {
     if (dispatcher_ == nullptr) {
@@ -137,13 +138,13 @@ protected:
     listener_ =
         dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
-        *dispatcher_, socket_->localAddress(), source_address_,
+        *dispatcher_, socket_->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
     EXPECT_EQ(nullptr, const_connection.ssl());
-    EXPECT_FALSE(client_connection_->localAddressRestored());
+    EXPECT_FALSE(client_connection_->addressProvider().localAddressRestored());
   }
 
   void connect() {
@@ -377,7 +378,7 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   Address::InstanceConstSharedPtr broadcast_address;
   socket_ = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  if (socket_->localAddress()->ip()->version() == Address::IpVersion::v4) {
+  if (socket_->addressProvider().localAddress()->ip()->version() == Address::IpVersion::v4) {
     broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
   } else {
     broadcast_address = std::make_shared<Address::Ipv6Instance>("ff02::1", 0);
@@ -484,8 +485,8 @@ TEST_P(ConnectionImplTest, SocketOptions) {
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
-            server_connection_->socketOptions());
+            socket_->addressProvider().localAddress(), source_address_,
+            Network::Test::createRawBufferSocket(), server_connection_->socketOptions());
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -533,8 +534,8 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
-            server_connection_->socketOptions());
+            socket_->addressProvider().localAddress(), source_address_,
+            Network::Test::createRawBufferSocket(), server_connection_->socketOptions());
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
 
@@ -1269,7 +1270,8 @@ TEST_P(ConnectionImplTest, BindTest) {
   }
   setUpBasicConnection();
   connect();
-  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
+  EXPECT_EQ(address_string,
+            server_connection_->addressProvider().remoteAddress()->ip()->addressAsString());
 
   disconnect(true);
 }
@@ -1288,7 +1290,7 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
   EXPECT_CALL(*option, setOption(_, Eq(envoy::config::core::v3::SocketOption::STATE_PREBIND)))
       .WillOnce(Invoke([&](Socket& socket, envoy::config::core::v3::SocketOption::SocketState) {
-        socket.setLocalAddress(new_source_address);
+        socket.addressProvider().setLocalAddress(new_source_address);
         return true;
       }));
 
@@ -1296,7 +1298,8 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
   socket_options_->emplace_back(std::move(option));
   setUpBasicConnection();
   connect();
-  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
+  EXPECT_EQ(address_string,
+            server_connection_->addressProvider().remoteAddress()->ip()->addressAsString());
 
   disconnect(true);
 }
@@ -1318,7 +1321,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
       dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
 
   client_connection_ = dispatcher_->createClientConnection(
-      socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+      socket_->addressProvider().localAddress(), source_address_,
+      Network::Test::createRawBufferSocket(), nullptr);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -1882,18 +1886,21 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 
   // Check socket dump
-  EXPECT_THAT(ostream.contents(), HasSubstr("ListenSocketImpl"));
+  const auto contents = ostream.contents();
+  EXPECT_THAT(contents, HasSubstr("ListenSocketImpl"));
+  EXPECT_THAT(contents, HasSubstr("transport_protocol_: , server_name_: envoyproxy.io"));
+  EXPECT_THAT(contents, HasSubstr("SocketAddressSetterImpl"));
   if (GetParam() == Network::Address::IpVersion::v4) {
     EXPECT_THAT(
-        ostream.contents(),
+        contents,
         HasSubstr(
             "remote_address_: 1.1.1.1:80, direct_remote_address_: 1.1.1.1:80, local_address_: "
-            "1.2.3.4:56789, transport_protocol_: , server_name_: envoyproxy.io"));
+            "1.2.3.4:56789"));
   } else {
     EXPECT_THAT(
-        ostream.contents(),
+        contents,
         HasSubstr("remote_address_: [::1]:80, direct_remote_address_: [::1]:80, local_address_: "
-                  "[::1:2:3:4]:56789, transport_protocol_: , server_name_: envoyproxy.io"));
+                  "[::1:2:3:4]:56789"));
   }
 }
 
@@ -1950,7 +1957,7 @@ private:
 
 class MockTransportConnectionImplTest : public testing::Test {
 public:
-  MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource()) {
+  MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource(), nullptr) {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
@@ -2758,7 +2765,7 @@ public:
         dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_->localAddress(), Network::Address::InstanceConstSharedPtr(),
+        socket_->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
         Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();

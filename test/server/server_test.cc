@@ -1143,7 +1143,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(
       initialize("test/server/test_data/server/node_bootstrap_with_admin_socket_options.yaml"));
-  const auto address = server_->admin().socket().localAddress();
+  const auto address = server_->admin().socket().addressProvider().localAddress();
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.

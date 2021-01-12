@@ -108,9 +108,10 @@ public:
         .WillByDefault(Return(host_address_));
     ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(upstream_locality_));
-    router_.downstream_connection_.local_address_ = host_address_;
-    router_.downstream_connection_.remote_address_ =
-        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
+    router_.downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        host_address_);
+    router_.downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
 
     // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
     test_time_.setMonotonicTime(std::chrono::milliseconds(50));
@@ -5252,7 +5253,7 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
           }));
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem());
+  StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
   EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
@@ -5314,7 +5315,7 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
           }));
   expectResponseTimerCreate();
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   // Check that upstream timing is updated after the first request.
@@ -5401,7 +5402,7 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
             return nullptr;
           }));
 
-  StreamInfo::StreamInfoImpl stream_info(test_time_);
+  StreamInfo::StreamInfoImpl stream_info(test_time_, nullptr);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   expectResponseTimerCreate();

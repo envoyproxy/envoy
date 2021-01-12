@@ -127,10 +127,11 @@ ReadOrParseState Filter::onReadWorker() {
     }
 
     // Only set the local address if it really changed, and mark it as address being restored.
-    if (*proxy_protocol_header_.value().local_address_ != *socket.localAddress()) {
-      socket.restoreLocalAddress(proxy_protocol_header_.value().local_address_);
+    if (*proxy_protocol_header_.value().local_address_ !=
+        *socket.addressProvider().localAddress()) {
+      socket.addressProvider().restoreLocalAddress(proxy_protocol_header_.value().local_address_);
     }
-    socket.setRemoteAddress(proxy_protocol_header_.value().remote_address_);
+    socket.addressProvider().setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
 
   // Release the file event so that we do not interfere with the connection read events.
