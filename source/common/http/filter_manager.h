@@ -295,6 +295,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   }
   void doTrailers() override;
   bool hasTrailers() override;
+  void addStreamFilter(StreamFilterSharedPtr filter) override;
+  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override;
 
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
@@ -388,6 +390,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   }
   void doTrailers() override;
   bool hasTrailers() override;
+  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override;
 
   // Http::StreamEncoderFilterCallbacks
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
@@ -859,6 +862,17 @@ public:
         Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders()->get());
   }
 
+  void addStreamFilterAfter(StreamFilterSharedPtr filter, ActiveStreamDecoderFilter& wrapper) {
+    auto decoder_itr = std::find(decoder_filters_.begin(), decoder_filters_.end(), &wrapper);
+    ASSERT(decoder_itr != decoder_filters_.end());
+    decoder_filters_.insert(
+        decoder_itr++, std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, true));
+
+    auto encoder_itr = std::find(encoder_itr.begin(), decoder_filters_.end(), &wrapper);
+    ASSERT(decoder_itr != decoder_filters_.end());
+    decoder_filters_.insert(
+        decoder_itr++, std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, true));
+  }
   /**
    * Marks local processing as complete.
    */

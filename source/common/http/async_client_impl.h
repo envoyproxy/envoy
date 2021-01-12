@@ -18,6 +18,7 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/context.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/router/context.h"
@@ -87,6 +88,8 @@ public:
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  void addStreamFilter(StreamFilterSharedPtr ) override {}
+  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr ) override {}
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
