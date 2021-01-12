@@ -134,7 +134,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/ext_authz @gsagula @dio
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
-/*/extensions/filters/http/tcp_post @alyssawilk @wlhee
 /*/extensions/filters/network/echo @htuch @alyssawilk
 /*/extensions/filters/udp/dns_filter @abaptiste @mattklein123
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
