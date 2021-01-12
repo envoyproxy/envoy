@@ -49,11 +49,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "3ff9995a5dd3d0e703e602ca3ebd9366de2b5752",
-        sha256 = "a4c74ce9a62b1c907329d248d4c225abfae8646bc77db8d72de65726632d3571",
+        version = "f2a7f9ba09660beacfebcd37fc977480ec9a8f50",
+        sha256 = "ca9975f6d5370843167b9646028ca7a0b546f8821f217c9d9d2e033a94a35f31",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2020-12-21",
+        release_date = "2021-01-04",
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -223,14 +223,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
-        # TODO(JimmyCYJ): Bump to release 1.27
-        # This sha on grpc:v1.25.x branch is specifically chosen to fix gRPC STS call credential options.
-        version = "d8f4928fa779f6005a7fe55a176bdb373b0f910f",
-        sha256 = "bbc8f020f4e85ec029b047fab939b8c81f3d67254b5c724e1003a2bc49ddd123",
+        version = "1.34.0",
+        sha256 = "7372a881122cd85a7224435a1d58bc5e11c88d4fb98a64b83f36f3d1c2f16d39",
         strip_prefix = "grpc-{version}",
-        urls = ["https://github.com/grpc/grpc/archive/{version}.tar.gz"],
+        urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-02-11",
+        release_date = "2020-12-01",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
     com_github_luajit_luajit = dict(
@@ -715,6 +713,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -736,6 +735,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -776,12 +776,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "upb",
         project_desc = "A small protobuf implementation in C (gRPC dependency)",
         project_url = "https://github.com/protocolbuffers/upb",
-        version = "8a3ae1ef3e3e3f26b45dec735c5776737fc7247f",
-        sha256 = "e9f281c56ab1eb1f97a80ca8a83bb7ef73d230eabb8591f83876f4e7b85d9b47",
+        version = "de76b31f9c56b28120580d53a6f8d7941fdb79eb",
+        sha256 = "487d84ce85065ff89ccde1c1ac2ea1515d2be411306e4adf1be6861dc4a4a86b",
+        release_date = "2020-12-29",
         strip_prefix = "upb-{version}",
         urls = ["https://github.com/protocolbuffers/upb/archive/{version}.tar.gz"],
         use_category = ["controlplane"],
-        release_date = "2019-11-19",
         cpe = "N/A",
     ),
     kafka_source = dict(
@@ -914,6 +914,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
@@ -933,6 +934,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",

@@ -1493,7 +1493,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RateLimit";
 
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RateLimit.Action";
@@ -1694,6 +1694,9 @@ message RateLimit {
 
       // Rate limit on metadata.
       MetaData metadata = 8;
+
+      // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
+      core.v4alpha.TypedExtensionConfig extension = 9;
     }
   }
 

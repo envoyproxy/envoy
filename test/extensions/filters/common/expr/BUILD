@@ -29,6 +29,17 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "evaluator_test",
+    srcs = ["evaluator_test.cc"],
+    extension_name = "envoy.filters.http.rbac",
+    deps = [
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_cel_cpp//eval/public/structs:cel_proto_wrapper",
+    ],
+)
+
 envoy_proto_library(
     name = "evaluator_fuzz_proto",
     srcs = ["evaluator_fuzz.proto"],
