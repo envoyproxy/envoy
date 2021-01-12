@@ -3,46 +3,42 @@
 CORS
 ====
 
-This is a filter which handles Cross-Origin Resource Sharing requests based on route or virtual host settings.
-For the meaning of the headers please refer to the pages below.
+此过滤器是用来处理那些基于路由或虚拟主机设置的跨域资源请求。关于头部的含义，可以参阅下面的几页。
 
 * https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
 * https://www.w3.org/TR/cors/
-* :ref:`v2 API reference <envoy_v3_api_msg_config.route.v3.CorsPolicy>`
-* This filter should be configured with the name *envoy.filters.http.cors*.
+* :ref:`v2 API 参考 <envoy_v3_api_msg_config.route.v3.CorsPolicy>`
+* 此过滤器的名称应该被配置为 *envoy.filters.http.cors* 。
 
 .. _cors-runtime:
 
-Runtime
+运行时
 -------
-The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
-<envoy_v3_api_field_config.route.v3.CorsPolicy.filter_enabled>` field.
+启用了过滤器的请求比例可以通过 :ref:`filter_enabled
+<envoy_v3_api_field_config.route.v3.CorsPolicy.filter_enabled>` 字段中的 :ref:`runtime_key
+<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` 值来配置。
 
-The fraction of requests for which the filter is enabled in shadow-only mode can be configured via
-the :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the
-:ref:`shadow_enabled <envoy_v3_api_field_config.route.v3.CorsPolicy.shadow_enabled>` field. When enabled in
-shadow-only mode, the filter will evaluate the request's *Origin* to determine if it's valid but
-will not enforce any policies.
+仅在影子模式下，启用了过滤器的请求比例可以通过 
+:ref:`shadow_enabled <envoy_v3_api_field_config.route.v3.CorsPolicy.shadow_enabled>` 字段中的 :ref:`runtime_key
+<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` 值来配置。仅当在影子模式下启用时，过滤器将评估请求的*来源*来决定它是否是有效的，但不会强制执行任何策略。
 
 .. note::
 
-  If both ``filter_enabled`` and ``shadow_enabled`` are on, the ``filter_enabled``
-  flag will take precedence.
+  如果同时打开了 ``filter_enabled`` 和 ``shadow_enabled``， ``filter_enabled`` 标志将优先起作用。
 
 .. _cors-statistics:
 
-Statistics
-----------
+统计
+-----
 
-The CORS filter outputs statistics in the <stat_prefix>.cors.* namespace.
+CORS 过滤器输出的统计信息在 <stat_prefix>.cors.* 命名空间下。
 
 .. note::
-  Requests that do not have an Origin header will be omitted from statistics.
+  没有来源头部的请求将不会出现在统计信息中。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  origin_valid, Counter, Number of requests that have a valid Origin header.
-  origin_invalid, Counter, Number of requests that have an invalid Origin header.
+  origin_valid, Counter, 具有有效来源头部请求的总数。
+  origin_invalid, Counter, 具有无效来源头部请求的总数。
