@@ -117,7 +117,7 @@ def envoy_cc_fuzz_test(
             "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
-                "@rules_fuzzing//fuzzing:cc_engine",
+                "@envoy//bazel:fuzzing_engine",
             ],
         }),
         size = size,
@@ -127,7 +127,7 @@ def envoy_cc_fuzz_test(
     fuzzing_decoration(
         base_name = name,
         raw_binary = raw_binary_name,
-        engine = "@rules_fuzzing//fuzzing:cc_engine",
+        engine = "@envoy//bazel:fuzzing_engine",
         corpus = [corpus_name],
         dicts = dictionaries,
         tags = ["fuzz_target"] + tags,

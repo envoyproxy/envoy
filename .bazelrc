@@ -279,13 +279,9 @@ build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
 
-# The default fuzzing engine configuration.
-build --@rules_fuzzing//fuzzing:cc_engine=//test/fuzz:fuzz_runner_engine
-
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
-build:plain-fuzzer --@rules_fuzzing//fuzzing:cc_engine=@rules_fuzzing//fuzzing/engines:libfuzzer
+build:plain-fuzzer --define=ENVOY_CONFIG_ASAN=1
 build:plain-fuzzer --@rules_fuzzing//fuzzing:cc_engine_instrumentation=libfuzzer
 build:plain-fuzzer --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none
 
@@ -297,10 +293,10 @@ build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
 build:asan-honggfuzz --config=asan
 build:asan-honggfuzz --copt=-fno-omit-frame-pointer
-build:asan-honggfuzz --@rules_fuzzing//fuzzing:cc_engine=@rules_fuzzing//fuzzing/engines:honggfuzz
+build:asan-honggfuzz --define=FUZZING_ENGINE=honggfuzz
 build:asan-honggfuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=honggfuzz
 
-build:oss-fuzz --//fuzzing:cc_engine=@rules_fuzzing_oss_fuzz//:oss_fuzz_engine
+build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
 build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=oss-fuzz
 build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none
 
