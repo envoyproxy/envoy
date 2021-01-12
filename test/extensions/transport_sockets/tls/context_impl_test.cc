@@ -1978,8 +1978,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // Incrementing a value for a cipher that is part of the configuration works, and
   // we'll be able to find the value in the stats store.
   for (const auto& cipher :
-       {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_AES_128_CCM_SHA256",
-        "TLS_AES_256_CCM_8_SHA256", "TLS_CHACHA20_POLY1305_SHA256"}) {
+       {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"}) {
     // Test all built-in TLS v1.3 cipher suites https://tools.ietf.org/html/rfc8446#appendix-B.4.
     context_->incCounter("ssl.ciphers", cipher);
     Stats::CounterOptConstRef stat =
