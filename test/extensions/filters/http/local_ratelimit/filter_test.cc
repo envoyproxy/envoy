@@ -199,18 +199,15 @@ public:
         .emplace_back(route_rate_limit_);
   }
 
-  // Default token bucket
-  RateLimit::TokenBucket bucket;
-  std::vector<RateLimit::LocalDescriptor> descriptor_{{{{"foo2", "bar2"}}, {bucket}}};
+  std::vector<RateLimit::LocalDescriptor> descriptor_{{{{"foo2", "bar2"}}}};
   std::vector<RateLimit::LocalDescriptor> descriptor_first_match_{{
       {{
-           {"hello", "world"},
-           {"foo", "bar"},
-       },
-       {bucket}},
-      {{{"foo2", "bar2"}}, {bucket}},
+          {"hello", "world"},
+          {"foo", "bar"},
+      }},
+      {{{"foo2", "bar2"}}},
   }};
-  std::vector<RateLimit::LocalDescriptor> descriptor_not_found_{{{{"foo", "bar"}}, {bucket}}};
+  std::vector<RateLimit::LocalDescriptor> descriptor_not_found_{{{{"foo", "bar"}}}};
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
 };
 

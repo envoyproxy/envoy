@@ -25,7 +25,7 @@ public:
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors);
   ~LocalRateLimiterImpl();
 
-  bool requestAllowed(const std::vector<RateLimit::LocalDescriptor>& request_descriptors) const;
+  bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
 
 private:
   struct TokenState {

@@ -51,7 +51,7 @@ FilterConfig::FilterConfig(
 }
 
 bool FilterConfig::requestAllowed(
-    const std::vector<RateLimit::LocalDescriptor>& request_descriptors) const {
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   return rate_limiter_.requestAllowed(request_descriptors);
 }
 
@@ -77,7 +77,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   config->stats().enabled_.inc();
 
-  absl::InlinedVector<RateLimit::LocalDescriptor, 4> descriptors;
+  std::vector<RateLimit::LocalDescriptor> descriptors;
   if (config->hasDescriptors()) {
     populateDescriptors(descriptors, headers);
   }

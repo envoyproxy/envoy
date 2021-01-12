@@ -123,7 +123,7 @@ bool LocalRateLimiterImpl::requestAllowedHelper(const TokenState& tokens) const 
 }
 
 bool LocalRateLimiterImpl::requestAllowed(
-    const std::vector<RateLimit::LocalDescriptor>& request_descriptors) const {
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
   if (!descriptors_.empty() && !request_descriptors.empty()) {
     for (const auto& request_descriptor : request_descriptors) {
       auto it = descriptors_.find(request_descriptor);
