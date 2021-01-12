@@ -17,6 +17,8 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* router: removed `envoy.reloadable_features.preserve_query_string_in_path_redirects` and legacy code path.
+
 New Features
 ------------
 

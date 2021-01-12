@@ -332,8 +332,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                          : ""),
       path_redirect_(route.redirect().path_redirect()),
       path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
-      enable_preserve_query_in_path_redirects_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.preserve_query_string_in_path_redirects")),
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
@@ -470,7 +468,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
   }
 
-  if (enable_preserve_query_in_path_redirects_ && path_redirect_has_query_ && strip_query_) {
+  if (path_redirect_has_query_ && strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
@@ -743,44 +741,30 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   }
 
   std::string final_path_value;
-  if (enable_preserve_query_in_path_redirects_) {
-    if (!path_redirect_.empty()) {
-      // The path_redirect query string, if any, takes precedence over the request's query string,
-      // and it will not be stripped regardless of `strip_query`.
-      if (path_redirect_has_query_) {
-        final_path = path_redirect_.c_str();
-      } else {
-        const absl::string_view current_path = headers.getPathValue();
-        const size_t path_end = current_path.find('?');
-        const bool current_path_has_query = path_end != absl::string_view::npos;
-        if (current_path_has_query) {
-          final_path_value = path_redirect_;
-          final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
-          final_path = final_path_value;
-        } else {
-          final_path = path_redirect_.c_str();
-        }
-      }
+  if (!path_redirect_.empty()) {
+    // The path_redirect query string, if any, takes precedence over the request's query string,
+    // and it will not be stripped regardless of `strip_query`.
+    if (path_redirect_has_query_) {
+      final_path = path_redirect_.c_str();
     } else {
-      final_path = headers.getPathValue();
-    }
-    if (!path_redirect_has_query_ && strip_query_) {
-      const size_t path_end = final_path.find('?');
-      if (path_end != absl::string_view::npos) {
-        final_path = final_path.substr(0, path_end);
+      const absl::string_view current_path = headers.getPathValue();
+      const size_t path_end = current_path.find('?');
+      const bool current_path_has_query = path_end != absl::string_view::npos;
+      if (current_path_has_query) {
+        final_path_value = path_redirect_;
+        final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
+        final_path = final_path_value;
+      } else {
+        final_path = path_redirect_.c_str();
       }
     }
   } else {
-    if (!path_redirect_.empty()) {
-      final_path = path_redirect_.c_str();
-    } else {
-      final_path = headers.getPathValue();
-      if (strip_query_) {
-        const size_t path_end = final_path.find("?");
-        if (path_end != absl::string_view::npos) {
-          final_path = final_path.substr(0, path_end);
-        }
-      }
+    final_path = headers.getPathValue();
+  }
+  if (!path_redirect_has_query_ && strip_query_) {
+    const size_t path_end = final_path.find('?');
+    if (path_end != absl::string_view::npos) {
+      final_path = final_path.substr(0, path_end);
     }
   }
 
