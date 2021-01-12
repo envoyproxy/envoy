@@ -128,7 +128,7 @@ public:
   // If anticipate_incoming_stream is true this assumes a call to newStream is
   // pending, which is true for global preconnect.
   static bool shouldConnect(size_t pending_streams, size_t active_streams,
-                            uint32_t connecting_capacity, float preconnect_ratio,
+                            uint32_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
   void addDrainedCallbackImpl(Instance::DrainedCb cb);

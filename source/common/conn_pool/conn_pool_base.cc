@@ -36,8 +36,8 @@ void ConnPoolImplBase::destructAllConnections() {
 }
 
 bool ConnPoolImplBase::shouldConnect(size_t pending_streams, size_t active_streams,
-                                     uint32_t connecting_capacity, float preconnect_ratio,
-                                     bool anticipate_incoming_stream) {
+                                     uint32_t connecting_and_connected_capacity,
+                                     float preconnect_ratio, bool anticipate_incoming_stream) {
   // This is set to true any time global preconnect is being calculated.
   // ClusterManagerImpl::maybePreconnect is called directly before a stream is created, so the
   // stream must be anticipated.
@@ -54,7 +54,7 @@ bool ConnPoolImplBase::shouldConnect(size_t pending_streams, size_t active_strea
   // If preconnect ratio is not set, it defaults to 1, and this simplifies to the
   // legacy value of pending_streams_.size() > connecting_stream_capacity_
   return (pending_streams + active_streams + anticipated_streams) * preconnect_ratio >
-         connecting_capacity + active_streams;
+         connecting_and_connected_capacity + active_streams;
 }
 
 bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) const {
@@ -66,24 +66,25 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     return pending_streams_.size() > connecting_stream_capacity_;
   }
 
-  // If global preconnecting is on, and this connection is within the global
-  // preconnect limit, preconnect.
-  // We may eventually want to track preconnect_attempts to allow more preconnecting for
-  // heavily weighted upstreams or sticky picks.
-  if (shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
-                    global_preconnect_ratio, true)) {
-    return true;
+  // Determine if we are trying to prefetch for global preconnect or local preconnect.
+  if (global_preconnect_ratio != 0) {
+    // If global preconnecting is on, and this connection is within the global
+    // preconnect limit, preconnect.
+    // For global preconnect, we anticipate an incoming stream to this pool, since it is
+    // prefetching for the next upcoming stream, which will likely be assigned to this pool.
+    // We may eventually want to track preconnect_attempts to allow more preconnecting for
+    // heavily weighted upstreams or sticky picks.
+    return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
+                         global_preconnect_ratio, true);
+  } else {
+    // Ensure this local pool has adequate connections for the given load.
+    //
+    // Local preconnect does not need to anticipate a stream. It is called as
+    // new streams are established or torn down and simply attempts to maintain
+    // the correct ratio of streams and anticipated capacity.
+    return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
+                         perUpstreamPreconnectRatio());
   }
-
-  // The number of streams we want to be provisioned for is the number of
-  // pending and active streams times the preconnect ratio.
-  // The number of streams we are (theoretically) provisioned for is the
-  // connecting stream capacity plus the number of active streams.
-  //
-  // If preconnect ratio is not set, it defaults to 1, and this simplifies to the
-  // legacy value of pending_streams_.size() > connecting_stream_capacity_
-  return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
-                       perUpstreamPreconnectRatio());
 }
 
 float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
