@@ -84,8 +84,6 @@ public:
   const std::string OAuth = "envoy.filters.http.oauth2";
   // KillRequest filter
   const std::string KillRequest = "envoy.filters.http.kill_request";
-  // TcpPost filter
-  const std::string TcpPost = "envoy.filters.http.tcp_post";
   // External Processing filter
   const std::string ExternalProcessing = "envoy.filters.http.ext_proc";
 };
