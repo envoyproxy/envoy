@@ -256,12 +256,9 @@ void FilterMatchState::evaluateMatchTreeWithNewData(
 
   if (match_tree_evaluated_ && match_result.result_) {
     if (SkipAction().typeUrl() == match_result.result_->typeUrl()) {
-      callback_handling_filter_->skip_ = true;
-      if (secondary_filter_) {
-        secondary_filter_->skip_ = true;
-      }
+      skip_filter_ = true;
     } else {
-      callback_handling_filter_->onMatchCallback(*match_result.result_);
+      filter_->onMatchCallback(*match_result.result_);
     }
   }
 }
@@ -418,11 +415,7 @@ void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr fi
   // If we're a dual handling filter, have the encoding wrapper be the only thing registering itself
   // as the handling filter.
   if (match_state) {
-    if (dual_filter) {
-      match_state->secondary_filter_ = wrapper.get();
-    } else {
-      match_state->callback_handling_filter_ = wrapper.get();
-    }
+    match_state->filter_ = filter.get();
   }
 
   filter->setDecoderFilterCallbacks(*wrapper);
@@ -444,7 +437,7 @@ void FilterManager::addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr fi
       new ActiveStreamEncoderFilter(*this, filter, match_state, dual_filter));
 
   if (match_state) {
-    match_state->callback_handling_filter_ = wrapper.get();
+    match_state->filter_ = filter.get();
   }
 
   filter->setEncoderFilterCallbacks(*wrapper);
@@ -489,7 +482,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
           [&](auto& matching_data) { matching_data.onRequestHeaders(headers); });
     }
 
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
 
@@ -569,7 +562,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
     // If the filter pointed by entry has stopped for all frame types, return now.
@@ -703,7 +696,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
 
@@ -735,7 +728,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
       commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
@@ -949,7 +942,7 @@ void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
       commonEncodePrefix(filter, false, FilterIterationStartState::AlwaysStartFromNext);
   for (; entry != encoder_filters_.end(); entry++) {
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
 
@@ -998,7 +991,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
       (*entry)->filter_match_state_->evaluateMatchTreeWithNewData(
           [&headers](auto& matching_data) { matching_data.onResponseHeaders(headers); });
     }
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
@@ -1055,7 +1048,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
       commonEncodePrefix(filter, false, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != encoder_filters_.end(); entry++) {
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
@@ -1126,7 +1119,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool trailers_exists_at_start = filter_manager_callbacks_.responseTrailers().has_value();
   for (; entry != encoder_filters_.end(); entry++) {
-    if ((*entry)->skip_) {
+    if ((*entry)->skipFilter()) {
       continue;
     }
     // If the filter pointed by entry has stopped for all frame type, return now.

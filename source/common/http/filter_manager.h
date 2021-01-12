@@ -130,23 +130,19 @@ public:
   FilterMatchState(Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
                    HttpMatchingDataImplSharedPtr matching_data)
       : match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)),
-        match_tree_evaluated_(false) {}
+        match_tree_evaluated_(false), skip_filter_(false) {}
 
   void evaluateMatchTreeWithNewData(std::function<void(HttpMatchingDataImpl&)> update_func);
 
-  // Some callbacks should be sent to all filters (e.g. filter specific match actions), while
-  // others should trigger updates to all filters (e.g. filter skip). The callback_handling_filter_
-  // should always be present and is the filter wrapper that handles the per filter actions, while
-  // secondary_filter_ is present for dual filters to allow setting a value for both wrappers.
-  // TODO(snowp): Should we instead snap a handle to the underlying filter and a list of filter
-  // wrappers?
-  ActiveStreamFilterBase* callback_handling_filter_{};
-  ActiveStreamFilterBase* secondary_filter_{};
+  StreamFilterBase* filter_{};
+
+  bool skipFilter() const { return skip_filter_; }
 
 private:
   Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree_;
   HttpMatchingDataImplSharedPtr matching_data_;
   bool match_tree_evaluated_ : 1;
+  bool skip_filter_ : 1;
 };
 
 using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
@@ -165,8 +161,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
       : parent_(parent), iteration_state_(IterationState::Continue),
         filter_match_state_(std::move(match_state)), iterate_from_current_filter_(false),
         headers_continued_(false), continue_headers_continued_(false), end_stream_(false),
-        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false),
-        match_tree_evaluated_(false), skip_(false) {}
+        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -237,6 +232,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     }
     return saved_response_metadata_.get();
   }
+  bool skipFilter() const { return filter_match_state_ && filter_match_state_->skipFilter(); }
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
@@ -269,8 +265,6 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const bool dual_filter_ : 1;
   bool decode_headers_called_ : 1;
   bool encode_headers_called_ : 1;
-  bool match_tree_evaluated_ : 1;
-  bool skip_ : 1;
 
   friend FilterMatchState;
 };
