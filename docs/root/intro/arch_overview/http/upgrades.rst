@@ -94,6 +94,8 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
 For an example of proxying connect, please see :repo:`configs/proxy_connect.yaml <configs/proxy_connect.yaml>`
 For an example of terminating connect, please see :repo:`configs/terminate_connect.yaml <configs/terminate_connect.yaml>`
 
+.. _tunneling-tcp-over-http:
+
 Tunneling TCP over HTTP
 ^^^^^^^^^^^^^^^^^^^^^^^
 Envoy also has support for tunneling raw TCP over HTTP CONNECT requests. Find
