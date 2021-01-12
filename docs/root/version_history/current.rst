@@ -9,6 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* tcp: switched to the new TCP connection pool by default. This behavior can be temporarily reverted by setting `envoy.reloadable_features.new_tcp_connection_pool` to false.
+
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
