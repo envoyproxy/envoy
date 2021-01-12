@@ -1977,11 +1977,16 @@ protected:
 TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // Incrementing a value for a cipher that is part of the configuration works, and
   // we'll be able to find the value in the stats store.
-  context_->incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
-  Stats::CounterOptConstRef cipher =
-      store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
-  ASSERT_TRUE(cipher.has_value());
-  EXPECT_EQ(1, cipher->get().value());
+  for (const auto& cipher :
+       {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_AES_128_CCM_SHA256",
+        "TLS_AES_256_CCM_8_SHA256", "TLS_CHACHA20_POLY1305_SHA256"}) {
+    // Test all built-in TLS v1.3 cipher suites https://tools.ietf.org/html/rfc8446#appendix-B.4.
+    context_->incCounter("ssl.ciphers", cipher);
+    Stats::CounterOptConstRef stat =
+        store_.findCounterByString(absl::StrCat("ssl.ciphers.", cipher));
+    ASSERT_TRUE(stat.has_value());
+    EXPECT_EQ(1, stat->get().value());
+  }
 
   // Incrementing a stat for a random unknown cipher does not work. A
   // rate-limited error log message will also be generated but that is hard to
