@@ -17,6 +17,7 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/config:typed_config_interface",
+        "//include/envoy/protobuf:message_validator_interface",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

@@ -160,7 +160,7 @@ private:
     auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory<DataType>>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config.typed_config(), validation_visitor_, factory);
-    return factory.createDataInput(*message);
+    return factory.createDataInput(*message, validation_visitor_);
   }
 
   InputMatcherPtr createInputMatcher(
