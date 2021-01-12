@@ -70,6 +70,9 @@ public:
       }
       stream->Write(response);
       request.Clear();
+      if (response.has_status()) {
+        return grpc::Status::OK;
+      }
     }
     return grpc::Status::OK;
   }
@@ -79,7 +82,8 @@ public:
   grpc::gcp::RpcProtocolVersions server_versions;
 };
 
-class AltsIntegrationTestBase : public testing::TestWithParam<Network::Address::IpVersion>,
+class AltsIntegrationTestBase : public Event::TestUsingSimulatedTime,
+                                public testing::TestWithParam<Network::Address::IpVersion>,
                                 public HttpIntegrationTest {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
@@ -117,7 +121,9 @@ public:
         service = std::unique_ptr<grpc::Service>{capturing_handshaker_service_};
       } else {
         capturing_handshaker_service_ = nullptr;
-        service = grpc::gcp::CreateFakeHandshakerService();
+        // If max_expected_concurrent_rpcs is zero, the fake handshaker service will not track
+        // concurrent RPCs and abort if it exceeds the value.
+        service = grpc::gcp::CreateFakeHandshakerService(/* max_expected_concurrent_rpcs */ 0);
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
@@ -163,7 +169,7 @@ public:
     HttpIntegrationTest::cleanupUpstreamAndDownstream();
     dispatcher_->clearDeferredDeleteList();
     if (fake_handshaker_server_ != nullptr) {
-      fake_handshaker_server_->Shutdown();
+      fake_handshaker_server_->Shutdown(timeSystem().systemTime());
     }
     fake_handshaker_server_thread_->join();
   }

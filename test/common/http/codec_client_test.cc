@@ -296,12 +296,13 @@ TEST_F(CodecClientTest, SSLConnectionInfo) {
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
                          public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource()) {
+  CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource(), nullptr) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
     auto socket = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+        socket->addressProvider().localAddress(), source_address_,
+        Network::Test::createRawBufferSocket(), nullptr);
     upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true,
                                                      ENVOY_TCP_BACKLOG_SIZE);
     client_connection_ = client_connection.get();

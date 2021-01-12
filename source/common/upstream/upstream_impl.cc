@@ -76,37 +76,6 @@ getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
   return nullptr;
 }
 
-// TODO(alyssawilk) move this to the new config library in a follow-up.
-uint64_t
-parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
-  uint64_t features = 0;
-
-  if (options) {
-    if (options->use_http2_) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (options->use_downstream_protocol_) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-  } else {
-    if (config.has_http2_protocol_options()) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (config.protocol_selection() ==
-        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-  }
-  if (config.close_connections_on_host_health_failure()) {
-    features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
-  }
-  if (options->use_alpn_) {
-    features |= ClusterInfoImpl::Features::USE_ALPN;
-  }
-  return features;
-}
-
 Network::TcpKeepaliveConfig
 parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
   const envoy::config::core::v3::TcpKeepalive& options =
@@ -743,10 +712,10 @@ ClusterInfoImpl::ClusterInfoImpl(
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
-      per_upstream_prefetch_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.prefetch_policy(), per_upstream_prefetch_ratio, 1.0)),
-      peekahead_ratio_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.prefetch_policy(), predictive_prefetch_ratio, 0)),
+      per_upstream_preconnect_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
+      peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
+                                                       predictive_preconnect_ratio, 0)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
@@ -758,7 +727,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                                   ? std::make_unique<OptionalClusterStats>(
                                         config, *stats_scope_, factory_context.clusterManager())
                                   : nullptr),
-      features_(parseFeatures(config, http_protocol_options_)),
+      features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
+          config, http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),

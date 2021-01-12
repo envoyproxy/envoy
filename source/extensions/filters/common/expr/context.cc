@@ -4,6 +4,8 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/utility.h"
 
+#include "extensions/filters/common/expr/cel_state.h"
+
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
 
@@ -245,18 +247,22 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (value == Address) {
     if (local_) {
-      return CelValue::CreateStringView(info_.downstreamLocalAddress()->asStringView());
+      return CelValue::CreateStringView(
+          info_.downstreamAddressProvider().localAddress()->asStringView());
     } else {
-      return CelValue::CreateStringView(info_.downstreamRemoteAddress()->asStringView());
+      return CelValue::CreateStringView(
+          info_.downstreamAddressProvider().remoteAddress()->asStringView());
     }
   } else if (value == Port) {
     if (local_) {
-      if (info_.downstreamLocalAddress()->ip() != nullptr) {
-        return CelValue::CreateInt64(info_.downstreamLocalAddress()->ip()->port());
+      if (info_.downstreamAddressProvider().localAddress()->ip() != nullptr) {
+        return CelValue::CreateInt64(
+            info_.downstreamAddressProvider().localAddress()->ip()->port());
       }
     } else {
-      if (info_.downstreamRemoteAddress()->ip() != nullptr) {
-        return CelValue::CreateInt64(info_.downstreamRemoteAddress()->ip()->port());
+      if (info_.downstreamAddressProvider().remoteAddress()->ip() != nullptr) {
+        return CelValue::CreateInt64(
+            info_.downstreamAddressProvider().remoteAddress()->ip()->port());
       }
     }
   }
@@ -271,10 +277,15 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (filter_state_.hasDataWithName(value)) {
     const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
-    absl::optional<std::string> serialized = object->serializeAsString();
-    if (serialized.has_value()) {
-      std::string* out = ProtobufWkt::Arena::Create<std::string>(arena_, serialized.value());
-      return CelValue::CreateBytes(out);
+    const CelState* cel_state = dynamic_cast<const CelState*>(object);
+    if (cel_state) {
+      return cel_state->exprValue(arena_, false);
+    } else if (object != nullptr) {
+      absl::optional<std::string> serialized = object->serializeAsString();
+      if (serialized.has_value()) {
+        std::string* out = ProtobufWkt::Arena::Create<std::string>(arena_, serialized.value());
+        return CelValue::CreateBytes(out);
+      }
     }
   }
   return {};

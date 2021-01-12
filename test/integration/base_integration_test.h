@@ -252,16 +252,15 @@ public:
   }
 
 private:
-  std::string intResourceName(const envoy::config::listener::v3::Listener& m) { return m.name(); }
-  std::string intResourceName(const envoy::config::route::v3::RouteConfiguration& m) {
-    return m.name();
+  template <class T> std::string intResourceName(const T& m) {
+    // gcc doesn't allow inline template function to be specialized, using a constexpr if to
+    // workaround.
+    if constexpr (std::is_same_v<T, envoy::config::endpoint::v3::ClusterLoadAssignment>) {
+      return m.cluster_name();
+    } else {
+      return m.name();
+    }
   }
-  std::string intResourceName(const envoy::config::cluster::v3::Cluster& m) { return m.name(); }
-  std::string intResourceName(const envoy::config::endpoint::v3::ClusterLoadAssignment& m) {
-    return m.cluster_name();
-  }
-  std::string intResourceName(const envoy::config::route::v3::VirtualHost& m) { return m.name(); }
-  std::string intResourceName(const envoy::service::runtime::v3::Runtime& m) { return m.name(); }
 
   Event::GlobalTimeSystem time_system_;
 
@@ -373,6 +372,11 @@ protected:
 
   const FakeUpstreamConfig& upstreamConfig() { return upstream_config_; }
 
+  void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
+    ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
+    proxy_buffer_factory_ = proxy_buffer_factory;
+  }
+
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
@@ -460,6 +464,9 @@ private:
   FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.
   bool initialized_{};
+  // Optional factory that the proxy-under-test should use to create watermark buffers. If nullptr,
+  // the proxy uses the default watermark buffer factory to create buffers.
+  Buffer::WatermarkFactorySharedPtr proxy_buffer_factory_;
 };
 
 } // namespace Envoy

@@ -41,7 +41,9 @@ message OpenCensusConfig {
     B3 = 4;
   }
 
-  reserved 7;
+  reserved 7, 5, 6;
+
+  reserved "zipkin_exporter_enabled", "zipkin_url";
 
   // Configures tracing, e.g. the sampler, max number of annotations, etc.
   .opencensus.proto.trace.v1.TraceConfig trace_config = 1;
@@ -67,13 +69,6 @@ message OpenCensusConfig {
   // Google gRPC is supported. If :ref:`target_uri <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.target_uri>`
   // is not provided, the default production Stackdriver address will be used.
   config.core.v4alpha.GrpcService stackdriver_grpc_service = 13;
-
-  // Enables the Zipkin exporter if set to true. The url and service name must
-  // also be set.
-  bool zipkin_exporter_enabled = 5;
-
-  // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v2/spans"
-  string zipkin_url = 6;
 
   // Enables the OpenCensus Agent exporter if set to true. The ocagent_address or
   // ocagent_grpc_service must also be set.
