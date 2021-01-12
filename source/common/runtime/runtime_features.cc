@@ -61,7 +61,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.consume_all_retry_headers",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.disallow_unbounded_access_logs",
