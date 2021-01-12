@@ -248,13 +248,8 @@ private:
       stats_.logs_written_.inc();
       return true;
     }
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.disallow_unbounded_access_logs")) {
-      stats_.logs_dropped_.inc();
-      return false;
-    }
-    stats_.logs_written_.inc();
-    return true;
+    stats_.logs_dropped_.inc();
+    return false;
   }
 
   const std::chrono::milliseconds buffer_flush_interval_msec_;
