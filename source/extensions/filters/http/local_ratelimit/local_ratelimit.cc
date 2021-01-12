@@ -77,7 +77,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   config->stats().enabled_.inc();
 
-  std::vector<RateLimit::LocalDescriptor> descriptors;
+  absl::InlinedVector<RateLimit::LocalDescriptor, 4> descriptors;
   if (config->hasDescriptors()) {
     populateDescriptors(descriptors, headers);
   }

@@ -31,7 +31,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
   }
 
   for (const auto& descriptor : descriptors) {
-    RateLimit::LocalDescriptor new_descriptor;
+    LocalDescriptorImpl new_descriptor;
     for (const auto& entry : descriptor.entries()) {
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
     }
@@ -47,13 +47,12 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
     new_descriptor.token_bucket_ = token_bucket;
 
-    auto token_state = std::make_unique<RateLimit::TokenState>();
+    auto token_state = std::make_unique<TokenState>();
     token_state->tokens_ = token_bucket.max_tokens_;
     token_state->fill_time_ = time_source_.monotonicTime();
-    new_descriptor.token_state_ = token_state.get();
-    descriptor_tokens_.emplace_back(std::move(token_state));
+    new_descriptor.token_state_ = std::move(token_state);
 
-    auto result = descriptors_.emplace(new_descriptor);
+    auto result = descriptors_.emplace(std::move(new_descriptor));
     if (!result.second) {
       throw EnvoyException("duplicate descriptor in the local rate descriptor");
     }
@@ -72,7 +71,7 @@ void LocalRateLimiterImpl::onFillTimer() {
   fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
 
-void LocalRateLimiterImpl::onFillTimerHelper(const RateLimit::TokenState& tokens,
+void LocalRateLimiterImpl::onFillTimerHelper(const TokenState& tokens,
                                              const RateLimit::TokenBucket& bucket) {
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
@@ -102,7 +101,7 @@ void LocalRateLimiterImpl::onFillTimerDescriptorHelper() {
   }
 }
 
-bool LocalRateLimiterImpl::requestAllowedHelper(const RateLimit::TokenState& tokens) const {
+bool LocalRateLimiterImpl::requestAllowedHelper(const TokenState& tokens) const {
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
   uint32_t expected_tokens = tokens.tokens_.load(std::memory_order_relaxed);

@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/protobuf/message_validator.h"
@@ -34,6 +33,11 @@ struct DescriptorEntry {
   friend bool operator==(const DescriptorEntry& lhs, const DescriptorEntry& rhs) {
     return lhs.key_ == rhs.key_ && lhs.value_ == rhs.value_;
   }
+  template <typename H>
+  friend H AbslHashValue(H h,
+                         const DescriptorEntry& entry) { // NOLINT(readability-identifier-naming)
+    return H::combine(std::move(h), entry.key_, entry.value_);
+  }
 };
 
 /**
@@ -54,33 +58,12 @@ struct TokenBucket {
 };
 
 /**
- * A token bucket operational state.
- */
-struct TokenState {
-  mutable std::atomic<uint32_t> tokens_;
-  MonotonicTime fill_time_;
-};
-
-/**
  * A single rate limit request descriptor. See ratelimit.proto.
- * The descriptor entries constitute the primary key for local descriptors.
  */
 struct LocalDescriptor {
   std::vector<DescriptorEntry> entries_;
-  TokenBucket token_bucket_ = {};
-  TokenState* token_state_ = nullptr;
-
   friend bool operator==(const LocalDescriptor& lhs, const LocalDescriptor& rhs) {
     return lhs.entries_ == rhs.entries_;
-  }
-
-  // Support absl::Hash.
-  template <typename H>
-  friend H AbslHashValue(H h, const LocalDescriptor& d) { // NOLINT(readability-identifier-naming)
-    for (const auto& entry : d.entries_) {
-      h = H::combine(std::move(h), entry.key_, entry.value_);
-    }
-    return h;
   }
 };
 

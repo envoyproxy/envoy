@@ -156,7 +156,7 @@ Example filter configuration using descriptors:
                   value: 'true'
             descriptors:
             - entries:
-              - key: client_id
+              - key: client_cluster
                 value: foo
               - key: path
                 value: /foo/bar
@@ -165,7 +165,7 @@ Example filter configuration using descriptors:
                 tokens_per_fill: 10
                 fill_interval: 60s
             - entries:
-              - key: client_id
+              - key: client_cluster
                 value: foo
               - key: path
                 value: /foo/bar2
@@ -177,17 +177,18 @@ Example filter configuration using descriptors:
         route: { cluster: default_service }
       rate_limits:
       - actions: # any actions in here
-        - generic_key:
-            descriptor_value: "foo"
-            descriptor_key: "client_id"
+        - request_headers:
+            header_name: x-envoy-downstream-service-cluster
+            descriptor_key: client_cluster
         - request_headers:
             header_name: ":path"
-            descriptor_key: "path"
+            descriptor_key: path
 
 In this example, requests are rate-limited for routes prefixed with "/foo" as
-follow. If requests come from client_id "foo" for "/foo/bar" path, then 10
-req/min are allowed. But if they come from client_id "foo" for "/foo/bar2"
-path, then 100 req/min are allowed. Otherwise, 1000 req/min are allowed.
+follow. If requests come from a downstream service cluster "foo" for "/foo/bar"
+path, then 10 req/min are allowed. But if they come from a downstream service
+cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
+1000 req/min are allowed.
 
 Statistics
 ----------

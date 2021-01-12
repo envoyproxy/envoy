@@ -28,17 +28,38 @@ public:
   bool requestAllowed(const std::vector<RateLimit::LocalDescriptor>& request_descriptors) const;
 
 private:
+  struct TokenState {
+    mutable std::atomic<uint32_t> tokens_;
+    MonotonicTime fill_time_;
+  };
+  struct LocalDescriptorImpl : public RateLimit::LocalDescriptor {
+    std::unique_ptr<TokenState> token_state_;
+    RateLimit::TokenBucket token_bucket_;
+  };
+  struct LocalDescriptorHash {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)t
+    size_t operator()(const RateLimit::LocalDescriptor& d) const {
+      return absl::Hash<std::vector<RateLimit::DescriptorEntry>>()(d.entries_);
+    }
+  };
+
+  struct LocalDescriptorEqual {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    size_t operator()(const RateLimit::LocalDescriptor& a,
+                      const RateLimit::LocalDescriptor& b) const {
+      return a.entries_ == b.entries_;
+    }
+  };
   void onFillTimer();
-  void onFillTimerHelper(const RateLimit::TokenState& state, const RateLimit::TokenBucket& bucket);
+  void onFillTimerHelper(const TokenState& state, const RateLimit::TokenBucket& bucket);
   void onFillTimerDescriptorHelper();
-  bool requestAllowedHelper(const RateLimit::TokenState& tokens) const;
+  bool requestAllowedHelper(const TokenState& tokens) const;
 
   RateLimit::TokenBucket token_bucket_;
   const Event::TimerPtr fill_timer_;
   TimeSource& time_source_;
-  RateLimit::TokenState tokens_;
-  absl::flat_hash_set<RateLimit::LocalDescriptor> descriptors_;
-  std::vector<std::unique_ptr<RateLimit::TokenState>> descriptor_tokens_;
+  TokenState tokens_;
+  absl::flat_hash_set<LocalDescriptorImpl, LocalDescriptorHash, LocalDescriptorEqual> descriptors_;
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
 
   friend class LocalRateLimiterImplTest;

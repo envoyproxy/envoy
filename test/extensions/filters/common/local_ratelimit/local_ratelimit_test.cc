@@ -205,13 +205,8 @@ public:
   )";
 
   // Default token bucket
-  RateLimit::TokenBucket bucket;
-  std::vector<RateLimit::LocalDescriptor> descriptor_{{{{"foo2", "bar2"}}, {bucket}}};
-  std::vector<RateLimit::LocalDescriptor> descriptor2_{{{{
-                                                             {"hello", "world"},
-                                                             {"foo", "bar"},
-                                                         },
-                                                         bucket}}};
+  std::vector<RateLimit::LocalDescriptor> descriptor_{{{{"foo2", "bar2"}}}};
+  std::vector<RateLimit::LocalDescriptor> descriptor2_{{{{"hello", "world"}, {"foo", "bar"}}}};
 };
 
 // Verify descriptor rate limit time interval is multiple of token bucket fill interval.
