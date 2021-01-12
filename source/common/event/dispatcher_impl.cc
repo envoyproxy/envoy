@@ -39,9 +39,9 @@
 namespace Envoy {
 namespace Event {
 namespace {
-// Our tracked object stack likely won't grow larger than this initial
-// reservation; this should make appends constant time since we shouldn't
-// have to grow the stack larger.
+// The tracked object stack likely won't grow larger than this initial
+// reservation; this should make appends constant time since the stack
+// shouldn't have to grow larger.
 constexpr size_t ExpectedMaxTrackedObjectStackDepth = 10;
 } // namespace
 

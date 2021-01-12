@@ -18,8 +18,8 @@ class FatalAction {
 public:
   virtual ~FatalAction() = default;
   /**
-   * Callback function to run when we are crashing.
-   * @param objects a vector of objects we were working on when we started crashing.
+   * Callback function to run when Envoy is crashing.
+   * @param tracked_objects a span of objects Envoy was working on when Envoy started crashing.
    */
   virtual void run(absl::Span<const ScopeTrackedObject* const> tracked_objects) PURE;
 

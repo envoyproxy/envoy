@@ -7,7 +7,7 @@
 
 namespace Envoy {
 
-// A small class for tracking the managing the scope of a tracked object which is currently having
+// A small class for managing the scope of a tracked object which is currently having
 // work done in this thread.
 //
 // When created, it appends the tracked object to the dispatcher's stack of tracked objects, and
