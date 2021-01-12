@@ -320,12 +320,7 @@ rapidjson::Document Field::asRapidJsonDocument() const {
   return document;
 }
 
-uint64_t Field::hash() const {
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-  asRapidJsonDocument().Accept(writer);
-  return HashUtil::xxHash64(buffer.GetString());
-}
+uint64_t Field::hash() const { return HashUtil::xxHash64(asJsonString()); }
 
 bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);

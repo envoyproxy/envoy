@@ -248,6 +248,15 @@ TEST_F(JsonLoaderTest, Double) {
   }
 }
 
+TEST_F(JsonLoaderTest, LoadArray) {
+  ObjectSharedPtr json1 = Factory::loadFromString("[1.11, 22, \"cat\"]");
+  ObjectSharedPtr json2 = Factory::loadFromString("[22, \"cat\", 1.11]");
+
+  // Array values in different orders will not be the same.
+  EXPECT_NE(json1->asJsonString(), json2->asJsonString());
+  EXPECT_NE(json1->hash(), json2->hash());
+}
+
 TEST_F(JsonLoaderTest, Hash) {
   ObjectSharedPtr json1 = Factory::loadFromString("{\"value1\": 10.5, \"value2\": -12.3}");
   ObjectSharedPtr json2 = Factory::loadFromString("{\"value2\": -12.3, \"value1\": 10.5}");
@@ -260,6 +269,11 @@ TEST_F(JsonLoaderTest, Hash) {
   EXPECT_EQ(json2->hash(), json3->hash());
   // Ensure different hash is computed for different objects
   EXPECT_NE(json1->hash(), json4->hash());
+
+  // Nested objects with keys in different orders should be the same.
+  ObjectSharedPtr json5 = Factory::loadFromString("{\"value1\": {\"a\": true, \"b\": null}}");
+  ObjectSharedPtr json6 = Factory::loadFromString("{\"value1\": {\"b\": null, \"a\": true}}");
+  EXPECT_EQ(json5->hash(), json6->hash());
 }
 
 TEST_F(JsonLoaderTest, Schema) {
