@@ -1880,7 +1880,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 }
 
 // Test DumpState methods.
-TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
+TEST_P(ConnectionImplTest, NetworkAndPipeSocketDumpsWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
