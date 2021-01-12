@@ -22,6 +22,13 @@ public:
 
   T value() const { return value_; }
 
+  ClosedIntervalValue invert() const {
+    return ClosedIntervalValue(value_ == Interval::max_value ? Interval::min_value
+                               : value_ == Interval::min_value
+                                   ? Interval::max_value
+                                   : Interval::max_value - (value_ - Interval::min_value));
+  }
+
   // Comparisons are performed using the same operators on the underlying value
   // type, with the same exactness guarantees.
 

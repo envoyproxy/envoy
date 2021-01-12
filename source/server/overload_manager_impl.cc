@@ -64,7 +64,7 @@ public:
           // The action state is 0 for no overload up to 1 for maximal overload,
           // but the scale factor for timers is 1 for no scaling and 0 for
           // maximal scaling, so invert the value to pass in (1-value).
-          UnitFloat(1 - state.value().value()));
+          state.value().invert());
     }
   }
 
