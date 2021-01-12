@@ -4,6 +4,8 @@ load("@envoy_build_tools//toolchains:rbe_toolchains_config.bzl", "rbe_toolchains
 load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
+load("@fuzzing_py_deps//:requirements.bzl", fuzzing_pip_install = "pip_install")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
@@ -29,6 +31,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
+    rules_fuzzing_dependencies()
+    fuzzing_pip_install()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",
