@@ -300,6 +300,8 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
         thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
         // Verify we have the expected dispatcher for the new thread thread.
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
+        // Verify that it is inside the worker thread.
+        ASSERT(!Thread::MainThread::isMainThread());
       });
   thread->join();
 
