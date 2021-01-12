@@ -106,7 +106,8 @@ public:
   ~HttpIntegrationTest() override;
 
 protected:
-  void useAccessLog(absl::string_view format = "");
+  void useAccessLog(absl::string_view format = "",
+                    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
