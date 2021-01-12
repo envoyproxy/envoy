@@ -34,8 +34,8 @@ struct DescriptorEntry {
     return lhs.key_ == rhs.key_ && lhs.value_ == rhs.value_;
   }
   template <typename H>
-  friend H AbslHashValue(H h,
-                         const DescriptorEntry& entry) { // NOLINT(readability-identifier-naming)
+  friend H AbslHashValue(H h, // NOLINT(readability-identifier-naming)
+                         const DescriptorEntry& entry) {
     return H::combine(std::move(h), entry.key_, entry.value_);
   }
 };
