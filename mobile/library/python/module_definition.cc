@@ -181,12 +181,12 @@ PYBIND11_MODULE(envoy_engine, m) {
 
   py::class_<StreamPrototype, StreamPrototypeSharedPtr>(m, "StreamPrototype")
       .def("start", &StreamPrototype::start)
-      .def("set_on_headers", &StreamPrototype::set_on_headers)
+      .def("set_on_headers", &Envoy::Python::StreamPrototype::set_on_headers_shim)
       .def("set_on_data", &Envoy::Python::StreamPrototype::set_on_data_shim)
-      .def("set_on_trailers", &StreamPrototype::set_on_trailers)
-      .def("set_on_complete", &StreamPrototype::set_on_complete)
-      .def("set_on_error", &StreamPrototype::set_on_error)
-      .def("set_on_cancel", &StreamPrototype::set_on_cancel);
+      .def("set_on_trailers", &Envoy::Python::StreamPrototype::set_on_trailers_shim)
+      .def("set_on_complete", &Envoy::Python::StreamPrototype::set_on_complete_shim)
+      .def("set_on_error", &Envoy::Python::StreamPrototype::set_on_error_shim)
+      .def("set_on_cancel", &Envoy::Python::StreamPrototype::set_on_cancel_shim);
 
   py::enum_<UpstreamHttpProtocol>(m, "UpstreamHttpProtocol")
       .value("HTTP1", UpstreamHttpProtocol::HTTP1)
