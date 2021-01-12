@@ -28,6 +28,26 @@ void ActiveClient::onGoAway(Http::GoAwayErrorCode) {
   }
 }
 
+// Adjust the concurrent stream limit if the negotiated concurrent stream limit
+// is lower than the local max configured streams.
+//
+// Note: if multiple streams are assigned to a connection before the settings
+// are received, they may still be reset by the peer. This could be avoided by
+// not considering http/2 connections connected until the SETTINGS frame is
+// received, but that would result in a latency penalty instead.
+void ActiveClient::onSettings(ReceivedSettings& settings) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.improved_stream_limit_handling") &&
+      settings.maxConcurrentStreams().has_value() &&
+      settings.maxConcurrentStreams().value() < concurrent_stream_limit_) {
+    int64_t old_unused_capacity = currentUnusedCapacity();
+    concurrent_stream_limit_ = settings.maxConcurrentStreams().value();
+    int64_t delta = old_unused_capacity - currentUnusedCapacity();
+    parent_.decrClusterStreamCapacity(delta);
+    ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
+    negative_capacity_ += delta;
+  }
+}
+
 void ActiveClient::onStreamDestroy() {
   parent().onStreamClosed(*this, false);
 

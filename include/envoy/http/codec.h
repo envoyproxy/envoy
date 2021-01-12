@@ -355,6 +355,19 @@ public:
 };
 
 /**
+ * A class for sharing what HTTP/1 SETTINGS were received from the peer.
+ */
+class ReceivedSettings {
+public:
+  virtual ~ReceivedSettings() = default;
+
+  /**
+   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or 0 if it was not present.
+   */
+  virtual const absl::optional<uint32_t>& maxConcurrentStreams() const PURE;
+};
+
+/**
  * Connection level callbacks.
  */
 class ConnectionCallbacks {
@@ -365,6 +378,12 @@ public:
    * Fires when the remote indicates "go away." No new streams should be created.
    */
   virtual void onGoAway(GoAwayErrorCode error_code) PURE;
+
+  /**
+   * Fires when the peer settings frame is received from the peer.
+   * @param ReceivedSettings the settings received from the peer.
+   */
+  virtual void onSettings(ReceivedSettings& settings) { UNREFERENCED_PARAMETER(settings); }
 };
 
 /**

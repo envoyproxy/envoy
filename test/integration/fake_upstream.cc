@@ -327,11 +327,7 @@ FakeHttpConnection::FakeHttpConnection(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
   } else {
-    envoy::config::core::v3::Http2ProtocolOptions http2_options =
-        ::Envoy::Http2::Utility::initializeAndValidateOptions(
-            envoy::config::core::v3::Http2ProtocolOptions());
-    http2_options.set_allow_connect(true);
-    http2_options.set_allow_metadata(true);
+    envoy::config::core::v3::Http2ProtocolOptions http2_options = fake_upstream.http2Options();
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, random_, http2_options,
@@ -499,7 +495,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, const FakeUpstreamConfig& config)
-    : http_type_(config.upstream_protocol_),
+    : http_type_(config.upstream_protocol_), http2_options_(config.http2_options_),
       socket_(Network::SocketSharedPtr(listen_socket.release())),
       socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(config.time_system_),

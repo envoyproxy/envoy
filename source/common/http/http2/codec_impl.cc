@@ -77,6 +77,15 @@ int reasonToReset(StreamResetReason reason) {
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
 
+ReceivedSettingsImpl::ReceivedSettingsImpl(const nghttp2_settings& settings) {
+  for (uint32_t i = 0; i < settings.niv; ++i) {
+    if (settings.iv[i].settings_id == NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) {
+      concurrent_stream_limit_ = settings.iv[i].value;
+      break;
+    }
+  }
+}
+
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
   if (key != Headers::get().Cookie.get().c_str()) {
@@ -786,7 +795,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    onSettingsForTest(frame->settings);
+    onSettings(frame->settings);
   }
 
   StreamImpl* stream = getStream(frame->hd.stream_id);

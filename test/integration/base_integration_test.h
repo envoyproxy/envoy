@@ -377,6 +377,10 @@ protected:
     proxy_buffer_factory_ = proxy_buffer_factory;
   }
 
+  void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
+    upstream_config_.http2_options_.MergeFrom(options);
+  }
+
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.

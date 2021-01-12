@@ -39,6 +39,19 @@ namespace Http2 {
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 
+class ReceivedSettingsImpl : public ReceivedSettings {
+public:
+  ReceivedSettingsImpl(const nghttp2_settings& settings);
+
+  // ReceivedSettings
+  const absl::optional<uint32_t>& maxConcurrentStreams() const override {
+    return concurrent_stream_limit_;
+  }
+
+private:
+  absl::optional<uint32_t> concurrent_stream_limit_{};
+};
+
 class Utility {
 public:
   /**
@@ -440,8 +453,10 @@ protected:
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
-  // NOTE: This is only used for tests.
-  virtual void onSettingsForTest(const nghttp2_settings&) {}
+  virtual void onSettings(const nghttp2_settings& settings) {
+    ReceivedSettingsImpl received_settings(settings);
+    callbacks().onSettings(received_settings);
+  }
 
   /**
    * Check if header name contains underscore character.

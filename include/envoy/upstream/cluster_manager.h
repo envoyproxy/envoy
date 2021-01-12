@@ -82,22 +82,22 @@ struct ClusterConnectivityState {
   }
 
   template <class T> void checkAndDecrement(T& value, uint32_t delta) {
-    ASSERT(delta <= value);
+    ASSERT(value - delta <= value);
     value -= delta;
   }
 
   template <class T> void checkAndIncrement(T& value, uint32_t delta) {
-    ASSERT(std::numeric_limits<T>::max() - value > delta);
+    ASSERT(value + delta >= value);
     value += delta;
   }
 
   void incrPendingStreams(uint32_t delta) { checkAndIncrement<uint32_t>(pending_streams_, delta); }
   void decrPendingStreams(uint32_t delta) { checkAndDecrement<uint32_t>(pending_streams_, delta); }
   void incrConnectingStreamCapacity(uint32_t delta) {
-    checkAndIncrement<uint64_t>(connecting_stream_capacity_, delta);
+    checkAndIncrement<int64_t>(connecting_stream_capacity_, delta);
   }
   void decrConnectingStreamCapacity(uint32_t delta) {
-    checkAndDecrement<uint64_t>(connecting_stream_capacity_, delta);
+    checkAndDecrement<int64_t>(connecting_stream_capacity_, delta);
   }
   void incrActiveStreams(uint32_t delta) { checkAndIncrement<uint32_t>(active_streams_, delta); }
   void decrActiveStreams(uint32_t delta) { checkAndDecrement<uint32_t>(active_streams_, delta); }
@@ -111,7 +111,10 @@ struct ClusterConnectivityState {
   // For example, if an H2 connection is started with concurrent stream limit of 100, this
   // goes up by 100. If the connection is established and 2 streams are in use, it
   // would be reduced to 98 (as 2 of the 100 are not available).
-  uint64_t connecting_stream_capacity_{};
+  //
+  // Note that if more HTTP/2 streams have been established than are allowed by
+  // a late-received SETTINGS frame, this MAY BE NEGATIVE.
+  int64_t connecting_stream_capacity_{};
 };
 
 /**

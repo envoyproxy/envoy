@@ -50,6 +50,7 @@ public:
 
   // Http::ConnectionCallbacks
   MOCK_METHOD(void, onGoAway, (GoAwayErrorCode error_code));
+  MOCK_METHOD(void, onSettings, (ReceivedSettings & settings));
 };
 
 class MockFilterManagerCallbacks : public FilterManagerCallbacks {
@@ -570,6 +571,16 @@ public:
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
+};
+
+class MockReceivedSettings : public ReceivedSettings {
+public:
+  MockReceivedSettings();
+  ~MockReceivedSettings() = default;
+
+  MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
+
+  absl::optional<uint32_t> max_concurrent_streams_{};
 };
 
 } // namespace Http

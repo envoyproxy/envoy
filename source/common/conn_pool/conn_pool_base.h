@@ -52,8 +52,16 @@ public:
 
   // Returns the application protocol, or absl::nullopt for TCP.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
-  uint32_t currentUnusedCapacity() const {
-    return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
+
+  int64_t remainingConcurrentStreams() const {
+    return static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
+  }
+
+  int64_t currentUnusedCapacity() const {
+    int64_t remaining_concurrent_streams =
+        static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
+
+    return std::min<int64_t>(remaining_streams_, remaining_concurrent_streams);
   }
 
   // Closes the underlying connection.
@@ -64,6 +72,8 @@ public:
   virtual bool closingWithIncompleteStream() const PURE;
   // Returns the number of active streams on this connection.
   virtual uint32_t numActiveStreams() const PURE;
+
+  virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
     CONNECTING, // Connection is not yet established.
@@ -76,7 +86,7 @@ public:
 
   ConnPoolImplBase& parent_;
   uint32_t remaining_streams_;
-  const uint32_t concurrent_stream_limit_;
+  uint32_t concurrent_stream_limit_;
   State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
@@ -124,12 +134,13 @@ public:
   }
 
   // Determines if prefetching is warranted based on the number of streams in
-  // use, pending streams, anticipated capacity, and preconnect configuration.
+  // use, pending streams, anticipated and/or currently unused capacity, and
+  // preconnect configuration.
   //
   // If anticipate_incoming_stream is true this assumes a call to newStream is
   // pending, which is true for global preconnect.
   static bool shouldConnect(size_t pending_streams, size_t active_streams,
-                            uint32_t connecting_and_connected_capacity, float preconnect_ratio,
+                            int64_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
   void addDrainedCallbackImpl(Instance::DrainedCb cb);
@@ -193,6 +204,7 @@ public:
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
+  void decrClusterStreamCapacity(int32_t delta) { state_.decrConnectingStreamCapacity(delta); }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())

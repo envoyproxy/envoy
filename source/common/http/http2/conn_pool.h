@@ -33,7 +33,17 @@ public:
 
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
+  void onSettings(ReceivedSettings& settings) override;
 
+  bool hadNegativeDeltaOnStreamClosed() override {
+    int ret = negative_capacity_ != 0;
+    if (negative_capacity_ > 0) {
+      negative_capacity_--;
+    }
+    return ret;
+  }
+
+  uint64_t negative_capacity_{};
   bool closed_with_active_rq_{};
 };
 
