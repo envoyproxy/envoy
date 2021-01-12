@@ -471,7 +471,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   // Add hardcoded cipher suites from the TLS 1.3 spec:
-  // https://tools.ietf.org/html/rfc8446
+  // https://tools.ietf.org/html/rfc8446#appendix-B.4
   stat_name_set_->rememberBuiltins({"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384",
                                     "TLS_AES_128_CCM_SHA256", "TLS_AES_256_CCM_8_SHA256",
                                     "TLS_CHACHA20_POLY1305_SHA256"});
