@@ -1450,6 +1450,17 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
+      if (existing_host->second->weight() != host->weight()) {
+        existing_host->second->weight(host->weight());
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild")) {
+          // We do full host set rebuilds so that load balancers can do pre-computation of data
+          // structures based on host weight. This may become a performance problem in certain
+          // deployments so it is runtime feature guarded and may also need to be configurable
+          // and/or dynamic in the future.
+          hosts_changed = true;
+        }
+      }
 
       hosts_changed |=
           updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::FAILED_EDS_HEALTH);
@@ -1485,7 +1496,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
-      existing_host->second->weight(host->weight());
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
