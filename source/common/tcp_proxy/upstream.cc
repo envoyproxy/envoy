@@ -278,7 +278,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  for (const auto& header : config_.headers()) {
+  for (const auto& header : config_.headers_to_add()) {
     if (header.append().value()) {
       headers->addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
     } else {
@@ -307,7 +307,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
       {Http::Headers::get().Host, config_.hostname()},
   });
 
-  for (const auto& header : config_.headers()) {
+  for (const auto& header : config_.headers_to_add()) {
     if (header.append().value()) {
       headers->addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
     } else {
