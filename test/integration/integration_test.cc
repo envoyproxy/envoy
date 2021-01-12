@@ -67,7 +67,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
     socket_option->set_level(10000);     // Invalid level.
@@ -89,7 +89,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
     socket_option->set_level(10000);     // Invalid level.
@@ -362,6 +362,58 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   testEnvoyProxying1xx(true);
+}
+
+// Verifies that we can construct a match tree with a filter, and that we are able to skip
+// filter invocation through the match tree.
+TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  config_helper_.addFilter(R"EOF(
+name: matcher
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+  extension_config:
+    name: set-response-code
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+      code: 403
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: match-header
+      exact_match_map:
+        map:
+          match:
+            action:
+              name: skip
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    response->waitForEndStream();
+    EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
@@ -1140,8 +1192,11 @@ TEST_P(IntegrationTest, TestBind) {
                                          1024);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_NE(fake_upstream_connection_, nullptr);
-  std::string address =
-      fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
+  std::string address = fake_upstream_connection_->connection()
+                            .addressProvider()
+                            .remoteAddress()
+                            ->ip()
+                            ->addressAsString();
   EXPECT_EQ(address, address_string);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_NE(upstream_request_, nullptr);
