@@ -285,10 +285,13 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
+  ResponseHeaderMapOptRef continueHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
+  ResponseHeaderMapOptRef responseHeaders() const override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
+  ResponseTrailerMapOptRef responseTrailers() const override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -608,7 +611,10 @@ public:
 
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-    ASSERT(overridden_downstream_remote_address_ == nullptr);
+    // TODO(rgs1): we should assert overridden_downstream_remote_address_ is nullptr,
+    // but we are currently relaxing this as a workaround to:
+    //
+    // https://github.com/envoyproxy/envoy/pull/14432#issuecomment-758167614
     overridden_downstream_remote_address_ = downstream_remote_address;
   }
 
