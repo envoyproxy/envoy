@@ -11,6 +11,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
@@ -411,6 +412,12 @@ public:
   virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
+   * Returns the 100-Continue headers provided to encode100ContinueHeaders. Returns absl::nullopt if
+   * no headers have been provided yet.
+   */
+  virtual ResponseHeaderMapOptRef continueHeaders() const PURE;
+
+  /**
    * Called with headers to be encoded, optionally indicating end of stream.
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
@@ -427,6 +434,12 @@ public:
                              absl::string_view details) PURE;
 
   /**
+   * Returns the headers provided to encodeHeaders. Returns absl::nullopt if no headers have been
+   * provided yet.
+   */
+  virtual ResponseHeaderMapOptRef responseHeaders() const PURE;
+
+  /**
    * Called with data to be encoded, optionally indicating end of stream.
    * @param data supplies the data to be encoded.
    * @param end_stream supplies whether this is the last data frame.
@@ -438,6 +451,12 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Returns the trailers provided to encodeTrailers. Returns absl::nullopt if no headers have been
+   * provided yet.
+   */
+  virtual ResponseTrailerMapOptRef responseTrailers() const PURE;
 
   /**
    * Called with metadata to be encoded.
@@ -864,6 +883,16 @@ class StreamFilter : public virtual StreamDecoderFilter, public virtual StreamEn
 
 using StreamFilterSharedPtr = std::shared_ptr<StreamFilter>;
 
+class HttpMatchingData {
+public:
+  static absl::string_view name() { return "http"; }
+
+  virtual ~HttpMatchingData() = default;
+
+  virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;
+  virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
+};
+
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
  * build the filter chain in an application specific way.
@@ -879,16 +908,42 @@ public:
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   /**
+   * Add a decoder filter that is used when reading stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void
+  addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
+
+  /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   /**
+   * Add an encoder filter that is used when writing stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void
+  addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
+                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
+
+  /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a decoder/encoder filter that is used both when reading and writing stream data.
+   * @param filter supplies the filter to add.
+   * @param match_tree the MatchTree to associated with this filter.
+   */
+  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
+                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.

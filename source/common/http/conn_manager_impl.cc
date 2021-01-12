@@ -618,16 +618,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-  filter_manager_.streamInfo().setDownstreamLocalAddress(
-      connection_manager_.read_callbacks_->connection().localAddress());
-  filter_manager_.streamInfo().setDownstreamDirectRemoteAddress(
-      connection_manager_.read_callbacks_->connection().directRemoteAddress());
-  // Initially, the downstream remote address is the source address of the
-  // downstream connection. That can change later in the request's lifecycle,
-  // based on XFF processing, but setting the downstream remote address here
-  // prevents surprises for logging code in edge cases.
-  filter_manager_.streamInfo().setDownstreamRemoteAddress(
-      connection_manager_.read_callbacks_->connection().remoteAddress());
 
   filter_manager_.streamInfo().setDownstreamSslConnection(
       connection_manager_.read_callbacks_->connection().ssl());
@@ -637,7 +627,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
-    stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+    stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
+        Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
@@ -825,7 +816,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
-  auto ip = connection()->localAddress()->ip();
+  auto ip = connection()->addressProvider().localAddress()->ip();
   if (ip == nullptr) {
     return 0;
   }
@@ -1013,12 +1004,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
-    filter_manager_.streamInfo().setDownstreamRemoteAddress(
-        ConnectionManagerUtility::mutateRequestHeaders(
-            *request_headers_, connection_manager_.read_callbacks_->connection(),
-            connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
+    filter_manager_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
+        *request_headers_, connection_manager_.read_callbacks_->connection(),
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
   }
-  ASSERT(filter_manager_.streamInfo().downstreamRemoteAddress() != nullptr);
+  ASSERT(filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
@@ -1061,9 +1051,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       if (idle_timeout_ms_.count()) {
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
-          stream_idle_timer_ =
-              connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-                  [this]() -> void { onIdleTimeout(); });
+          stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
+              Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
+              [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {
         // If we had a global stream idle timeout but the route-level idle timeout is set to zero

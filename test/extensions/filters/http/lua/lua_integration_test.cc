@@ -146,7 +146,7 @@ public:
     registerTestServerPorts({"http"});
   }
 
-  void testRewriteResponse(const std::string& code) {
+  void expectResponseBodyRewrite(const std::string& code, bool empty_body, bool enable_wrap_body) {
     initializeFilter(code);
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -164,20 +164,38 @@ public:
     waitForNextUpstreamRequest();
 
     Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
-    upstream_request_->encodeHeaders(response_headers, false);
-    Buffer::OwnedImpl response_data1("good");
-    upstream_request_->encodeData(response_data1, false);
-    Buffer::OwnedImpl response_data2("bye");
-    upstream_request_->encodeData(response_data2, true);
+
+    if (empty_body) {
+      upstream_request_->encodeHeaders(response_headers, true);
+    } else {
+      upstream_request_->encodeHeaders(response_headers, false);
+      Buffer::OwnedImpl response_data1("good");
+      upstream_request_->encodeData(response_data1, false);
+      Buffer::OwnedImpl response_data2("bye");
+      upstream_request_->encodeData(response_data2, true);
+    }
 
     response->waitForEndStream();
 
-    EXPECT_EQ("2", response->headers()
-                       .get(Http::LowerCaseString("content-length"))[0]
-                       ->value()
-                       .getStringView());
-    EXPECT_EQ("ok", response->body());
+    if (enable_wrap_body) {
+      EXPECT_EQ("2", response->headers()
+                         .get(Http::LowerCaseString("content-length"))[0]
+                         ->value()
+                         .getStringView());
+      EXPECT_EQ("ok", response->body());
+    } else {
+      EXPECT_EQ("", response->body());
+    }
+
     cleanup();
+  }
+
+  void testRewriteResponse(const std::string& code) {
+    expectResponseBodyRewrite(code, false, true);
+  }
+
+  void testRewriteResponseWithoutUpstreamBody(const std::string& code, bool enable_wrap_body) {
+    expectResponseBodyRewrite(code, true, enable_wrap_body);
   }
 
   void cleanup() {
@@ -972,6 +990,47 @@ typed_config:
 )EOF";
 
   testRewriteResponse(FILTER_AND_CODE);
+}
+
+// Rewrite response buffer, without original upstream response body
+// and always wrap body.
+TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBody) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body(true):setBytes("ok")
+      response_handle:logTrace(content_length)
+
+      response_handle:headers():replace("content-length", content_length)
+    end
+)EOF";
+
+  testRewriteResponseWithoutUpstreamBody(FILTER_AND_CODE, true);
+}
+
+// Rewrite response buffer, without original upstream response body
+// and don't always wrap body.
+TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBodyAndDisableWrapBody) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      if response_handle:body(false) then
+        local content_length = response_handle:body():setBytes("ok")
+        response_handle:logTrace(content_length)
+        response_handle:headers():replace("content-length", content_length)
+      end
+    end
+)EOF";
+
+  testRewriteResponseWithoutUpstreamBody(FILTER_AND_CODE, false);
 }
 
 // Rewrite chunked response body.

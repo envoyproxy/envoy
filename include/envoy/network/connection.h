@@ -11,6 +11,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -188,16 +189,10 @@ public:
   virtual bool readEnabled() const PURE;
 
   /**
-   * @return The address of the remote client. Note that this method will never return nullptr.
+   * @return the address provider backing this connection.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
-
-  /**
-   * @return The address of the remote directly connected peer. Note that this method
-   * will never return nullptr. This address is not affected or modified by PROXY protocol
-   * or any other listener filter.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+  virtual const SocketAddressProvider& addressProvider() const PURE;
+  virtual SocketAddressProviderSharedPtr addressProviderSharedPtr() const PURE;
 
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
@@ -222,14 +217,6 @@ public:
    * supported for unix socket connections.
    */
   virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
-
-  /**
-   * @return the local address of the connection. For client connections, this is the origin
-   * address. For server connections, this is the local destination address. For server connections
-   * it can be different from the proxy address if the downstream connection has been redirected or
-   * the proxy is operating in transparent mode. Note that this method will never return nullptr.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons
@@ -288,12 +275,6 @@ public:
   virtual uint32_t bufferLimit() const PURE;
 
   /**
-   * @return boolean telling if the connection's local address has been restored to an original
-   *         destination address, rather than the address the connection was accepted at.
-   */
-  virtual bool localAddressRestored() const PURE;
-
-  /**
    * @return boolean telling if the connection is currently above the high watermark.
    */
   virtual bool aboveHighWatermark() const PURE;
@@ -327,6 +308,14 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   * Instructs the connection to start using secure transport.
+   * Note: Not all underlying transport sockets support such operation.
+   * @return boolean telling if underlying transport socket was able to
+             start secure transport.
+   */
+  virtual bool startSecureTransport() PURE;
 
   /**
    *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip

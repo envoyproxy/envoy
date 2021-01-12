@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/filter/http/grpc_http1_bridge/v2/config.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -66,7 +67,7 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
     socket_option->set_level(10000);     // Invalid level.
@@ -88,7 +89,7 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
-        addr_socket.second->localAddress()->ip()->port());
+        addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
     socket_option->set_level(10000);     // Invalid level.
@@ -363,6 +364,58 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   testEnvoyProxying1xx(true);
 }
 
+// Verifies that we can construct a match tree with a filter, and that we are able to skip
+// filter invocation through the match tree.
+TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  config_helper_.addFilter(R"EOF(
+name: matcher
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+  extension_config:
+    name: set-response-code
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+      code: 403
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: match-header
+      exact_match_map:
+        map:
+          match:
+            action:
+              name: skip
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    response->waitForEndStream();
+    EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
+}
+
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
 // pending request is not sent on a connection that has been half-closed.
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
@@ -417,6 +470,8 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
+
+const ::envoy::config::filter::http::grpc_http1_bridge::v2::Config _grpc_http1_bridge_dummy;
 
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
@@ -1137,8 +1192,11 @@ TEST_P(IntegrationTest, TestBind) {
                                          1024);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_NE(fake_upstream_connection_, nullptr);
-  std::string address =
-      fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
+  std::string address = fake_upstream_connection_->connection()
+                            .addressProvider()
+                            .remoteAddress()
+                            ->ip()
+                            ->addressAsString();
   EXPECT_EQ(address, address_string);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_NE(upstream_request_, nullptr);
@@ -1550,6 +1608,38 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   EXPECT_EQ("Hello World", response->body());
 }
 
+// Expect that if an upgrade was not expected, the HCM correctly removes upgrade headers from the
+// response and the response encoder does not drop trailers.
+TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n"
+                                              "connection: upgrade\r\n"
+                                              "upgrade: websocket\r\n"
+                                              "Transfer-encoding: chunked\r\n\r\n"
+                                              "b\r\nHello World\r\n0\r\n"
+                                              "trailer1:t2\r\n"
+                                              "\r\n",
+                                              false));
+
+  // Expect that upgrade headers are dropped and trailers are sent.
+  response->waitForHeaders();
+  EXPECT_EQ(nullptr, response->headers().Upgrade());
+  EXPECT_EQ(nullptr, response->headers().Connection());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("Hello World", response->body());
+  EXPECT_NE(response->trailers(), nullptr);
+}
+
 TEST_P(IntegrationTest, ConnectWithNoBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1607,10 +1697,13 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"));
-  // The response will be rejected because chunked headers are not allowed with CONNECT upgrades.
-  // Envoy will send a local reply due to the invalid upstream response.
-  tcp_client->waitForDisconnect(false);
-  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 503 Service Unavailable\r\n"));
+  tcp_client->waitForData("\r\n\r\n", false);
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n")) << tcp_client->data();
+  // Make sure the following payload is proxied without chunks or any other modifications.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\npayload"), &data));
+
+  tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 

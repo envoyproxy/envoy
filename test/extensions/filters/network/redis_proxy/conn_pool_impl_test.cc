@@ -1174,7 +1174,7 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
 
 TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   cm_.initializeThreadLocalClusters({"fake_cluster"});
-  tls_.defer_delete = true;
+  tls_.defer_delete_ = true;
   std::unique_ptr<NiceMock<Stats::MockStore>> store =
       std::make_unique<NiceMock<Stats::MockStore>>();
   cluster_refresh_manager_ =

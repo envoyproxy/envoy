@@ -40,7 +40,7 @@ TEST(CurlTest, BuiltWithExpectedFeatures) {
   EXPECT_EQ(0, info->features & CURL_VERSION_HTTPS_PROXY);
   EXPECT_EQ(0, info->features & CURL_VERSION_MULTI_SSL);
   EXPECT_EQ(0, info->features & CURL_VERSION_BROTLI);
-  EXPECT_EQ(0, info->features & CURL_VERSION_ALTSVC);
+  EXPECT_NE(0, info->features & CURL_VERSION_ALTSVC);
   EXPECT_EQ(0, info->features & CURL_VERSION_HTTP3);
   EXPECT_NE(0, info->ares_num);
 }

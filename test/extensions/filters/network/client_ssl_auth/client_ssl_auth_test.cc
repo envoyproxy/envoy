@@ -57,7 +57,8 @@ test: a
 class ClientSslAuthFilterTest : public testing::Test {
 protected:
   ClientSslAuthFilterTest()
-      : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
+      : request_(&cm_.thread_local_cluster_.async_client_),
+        interval_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)),
         ssl_(std::make_shared<Ssl::MockConnectionInfo>()) {}
   ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
@@ -76,7 +77,7 @@ ip_white_list:
     envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
     cm_.initializeClusters({"vpn"}, {});
-    EXPECT_CALL(cm_, clusters());
+    cm_.initializeThreadLocalClusters({"vpn"});
     setupRequest();
     config_ =
         ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
@@ -95,8 +96,9 @@ ip_white_list:
   }
 
   void setupRequest() {
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+        .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(
             Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -106,7 +108,7 @@ ip_white_list:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Upstream::MockClusterManager cm_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Http::MockAsyncClientRequest request_;
   ClientSslAuthConfigSharedPtr config_;
@@ -159,8 +161,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Create a new filter for an SSL connection, with no backing auth data yet.
   createAuthFilter();
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_));
-  filter_callbacks_.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
   std::string expected_sha_1("digest");
   EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -182,8 +184,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();
-  filter_callbacks_.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
   std::string expected_sha_2("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314");
   EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
@@ -195,8 +197,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // White list case.
   createAuthFilter();
-  filter_callbacks_.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -206,8 +208,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // IPv6 White list case.
   createAuthFilter();
-  filter_callbacks_.connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv6Instance>("2001:abcd::1");
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv6Instance>("2001:abcd::1"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -250,8 +252,9 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   callbacks_->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
 
   // Interval timer fires, cannot obtain async client.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {

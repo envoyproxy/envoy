@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace LocalInfo {
@@ -25,6 +26,11 @@ public:
    * @return the human readable zone name. E.g., "us-east-1a".
    */
   virtual const std::string& zoneName() const PURE;
+
+  /**
+   * @return the zone name as a stat name.
+   */
+  virtual const Stats::StatName& zoneStatName() const PURE;
 
   /**
    * @return the human readable cluster name. E.g., "eta".

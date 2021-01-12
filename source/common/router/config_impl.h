@@ -177,7 +177,7 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
-  Stats::StatName statName() const override { return stat_name_; }
+  Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
@@ -194,10 +194,18 @@ public:
 private:
   enum class SslRequirements { None, ExternalOnly, All };
 
+  struct StatNameProvider {
+    StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
+        : stat_name_storage_(name, symbol_table) {}
+    Stats::StatNameManagedStorage stat_name_storage_;
+  };
+
   struct VirtualClusterBase : public VirtualCluster {
   public:
-    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope)
-        : stat_name_(stat_name), scope_(std::move(scope)), stats_(generateStats(*scope_)) {}
+    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope,
+                       const VirtualClusterStatNames& stat_names)
+        : stat_name_(stat_name), scope_(std::move(scope)),
+          stats_(generateStats(*scope_, stat_names)) {}
 
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
@@ -209,22 +217,22 @@ private:
     mutable VirtualClusterStats stats_;
   };
 
-  struct VirtualClusterEntry : public VirtualClusterBase {
+  struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
-                        Stats::StatNamePool& pool, Stats::Scope& scope);
+                        Stats::Scope& scope, const VirtualClusterStatNames& stat_names);
 
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
-    explicit CatchAllVirtualCluster(Stats::StatNamePool& pool, Stats::Scope& scope)
-        : VirtualClusterBase(pool.add("other"), scope.createScope("other")) {}
+    CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
+        : VirtualClusterBase(stat_names.other_, scope.scopeFromStatName(stat_names.other_),
+                             stat_names) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
 
-  Stats::StatNamePool stat_name_pool_;
-  const Stats::StatName stat_name_;
+  const Stats::StatNameManagedStorage stat_name_storage_;
   Stats::ScopePtr vcluster_scope_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
@@ -402,9 +410,9 @@ class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
   // Constructor that enables internal redirect with policy_config controlling the configurable
   // behaviors.
-  explicit InternalRedirectPolicyImpl(
-      const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
-      ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
+  InternalRedirectPolicyImpl(const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+                             ProtobufMessage::ValidationVisitor& validator,
+                             absl::string_view current_route_name);
   // Default constructor that disables internal redirect.
   InternalRedirectPolicyImpl() = default;
 
@@ -458,7 +466,8 @@ public:
     if (!isDirectResponse()) {
       return false;
     }
-    return !host_redirect_.empty() || !path_redirect_.empty() || !prefix_rewrite_redirect_.empty();
+    return !host_redirect_.empty() || !path_redirect_.empty() ||
+           !prefix_rewrite_redirect_.empty() || regex_rewrite_redirect_ != nullptr;
   }
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
@@ -553,7 +562,9 @@ protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   std::string regex_rewrite_substitution_;
+  std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
   absl::optional<ConnectConfig> connect_config_;
@@ -561,11 +572,13 @@ protected:
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
   /**
-   * returns the correct path rewrite string for this route.
+   * Returns the correct path rewrite string for this route.
+   *
+   * The provided container may be used to store memory backing the return value
+   * therefore it must outlive any use of the return value.
    */
-  const std::string& getPathRewrite() const {
-    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
-  }
+  const std::string& getPathRewrite(const Http::RequestHeaderMap& headers,
+                                    absl::optional<std::string>& container) const;
 
   void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;

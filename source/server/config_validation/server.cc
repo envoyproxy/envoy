@@ -85,8 +85,8 @@ void ValidationInstance::initialize(const Options& options,
   bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),
-      options.serviceNodeName());
+      stats().symbolTable(), bootstrap.node(), local_address, options.serviceZone(),
+      options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap, options);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
@@ -101,7 +101,7 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
       localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      grpc_context_, router_context_, accessLogManager(), singletonManager(), time_system_);
+      grpc_context_, router_context_, accessLogManager(), singletonManager());
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

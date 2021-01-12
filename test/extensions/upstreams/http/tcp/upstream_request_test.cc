@@ -38,9 +38,10 @@ public:
   TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
     NiceMock<Router::MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
-    EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm, true, route_entry, Envoy::Http::Protocol::Http11,
-                                               nullptr);
+    cm.initializeThreadLocalClusters({"fake_cluster"});
+    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(&mock_pool_));
+    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
+                                               Envoy::Http::Protocol::Http11, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
@@ -143,10 +144,10 @@ TEST_F(TcpUpstreamTest, V1Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
-  mock_router_filter_.client_connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
-  mock_router_filter_.client_connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+      ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
@@ -166,10 +167,10 @@ TEST_F(TcpUpstreamTest, V2Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
-  mock_router_filter_.client_connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
-  mock_router_filter_.client_connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+      ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
@@ -183,28 +184,6 @@ TEST_F(TcpUpstreamTest, V2Header) {
   EXPECT_CALL(connection_, write(BufferStringEqual("foo"), false));
   Buffer::OwnedImpl buffer("foo");
   tcp_upstream_->encodeData(buffer, false);
-}
-
-// Verifies that a reset after end_stream=true doesn't trigger a callback
-// on the router filter.
-TEST_F(TcpUpstreamTest, ResetAfterEndStream) {
-  Buffer::OwnedImpl buffer("something");
-  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferStringEqual("something"), _, true));
-  tcp_upstream_->onUpstreamData(buffer, true);
-  tcp_upstream_->onEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-// Verifies that if we send data after the upstream has been reset nothing crashes.
-TEST_F(TcpUpstreamTest, DataAfterReset) {
-  tcp_upstream_->resetStream();
-  Buffer::OwnedImpl buffer("something");
-  tcp_upstream_->onUpstreamData(buffer, true);
-}
-
-// Verifies that if we send headers after the upstream has been reset nothing crashes.
-TEST_F(TcpUpstreamTest, HeadersAfterReset) {
-  tcp_upstream_->resetStream();
-  EXPECT_FALSE(tcp_upstream_->encodeHeaders(request_, false).ok());
 }
 
 TEST_F(TcpUpstreamTest, TrailersEndStream) {

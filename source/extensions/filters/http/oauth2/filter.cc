@@ -234,12 +234,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
         sendUnauthorizedResponse();
-        return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+        return Http::FilterHeadersStatus::StopIteration;
       }
       // Avoid infinite redirect storm
       if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
         sendUnauthorizedResponse();
-        return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+        return Http::FilterHeadersStatus::StopIteration;
       }
       Http::ResponseHeaderMapPtr response_headers{
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
@@ -305,7 +305,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
     config_->stats().oauth_unauthorized_rq_.inc();
 
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // At this point, we *are* on /_oauth. We believe this request comes from the authorization
@@ -314,14 +314,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const auto query_parameters = Http::Utility::parseQueryString(path_str);
   if (query_parameters.find(queryParamsError()) != query_parameters.end()) {
     sendUnauthorizedResponse();
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // if the data we need is not present on the URL, stop execution
   if (query_parameters.find(queryParamsCode()) == query_parameters.end() ||
       query_parameters.find(queryParamsState()) == query_parameters.end()) {
     sendUnauthorizedResponse();
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   auth_code_ = query_parameters.at(queryParamsCode());
@@ -330,7 +330,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   Http::Utility::Url state_url;
   if (!state_url.initialize(state_, false)) {
     sendUnauthorizedResponse();
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
@@ -381,7 +381,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
-  return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,

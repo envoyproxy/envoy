@@ -222,9 +222,9 @@ protected:
   absl::Mutex lock_;
   Http::RequestHeaderMapPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
+  FakeHttpConnection& parent_;
 
 private:
-  FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
@@ -547,6 +547,11 @@ public:
   FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+               const Network::Address::InstanceConstSharedPtr& address,
+               const FakeUpstreamConfig& config);
+
+  // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 
@@ -574,7 +579,9 @@ public:
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
+  Network::Address::InstanceConstSharedPtr localAddress() const {
+    return socket_->addressProvider().localAddress();
+  }
 
   // Wait for one of the upstreams to receive a connection
   ABSL_MUST_USE_RESULT
@@ -644,7 +651,7 @@ private:
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->localAddress();
+      return socket_->addressProvider().localAddress();
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
