@@ -9,6 +9,17 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
+  :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>`
+  for all responses when Envoy is in the health check failed state. Additionally, receiving the
+  :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>`
+  header (either in response to normal traffic or in response to an HTTP :ref:`active health check <arch_overview_health_checking>`) will
+  cause Envoy to immediately :ref:`exclude <arch_overview_load_balancing_excluded>` the host from
+  load balancing calculations. This has the useful property that such hosts, which are being
+  explicitly told to disable traffic, will not be counted for panic routing calculations. See the
+  excluded documentation for more information. This behavior can be temporarily reverted by setting
+  the `envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster` feature flag
+  to false.
 * tcp: setting NODELAY in the base connection class. This should have no effect for TCP or HTTP proxying, but may improve throughput in other areas. This behavior can be temporarily reverted by setting `envoy.reloadable_features.always_nodelay` to false.
 * upstream: host weight changes now cause a full load balancer rebuild as opposed to happening
   atomically inline. This change has been made to support load balancer pre-computation of data

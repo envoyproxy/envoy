@@ -68,6 +68,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.fix_wildcard_matching",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
+    "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
     "envoy.reloadable_features.http_default_alpn",
     "envoy.reloadable_features.http_match_on_all_headers",
     "envoy.reloadable_features.http_set_copy_replace_all_headers",
