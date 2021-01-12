@@ -132,17 +132,15 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   switch (result.status_) {
-  case LoadDnsCacheEntryStatus::InCache: {
+  case LoadDnsCacheEntryStatus::InCache:
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
-  }
-  case LoadDnsCacheEntryStatus::Loading: {
+  case LoadDnsCacheEntryStatus::Loading:
     ASSERT(cache_load_handle_ != nullptr);
     ENVOY_STREAM_LOG(debug, "waiting to load DNS cache entry", *decoder_callbacks_);
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-  }
-  case LoadDnsCacheEntryStatus::Overflow: {
+  case LoadDnsCacheEntryStatus::Overflow:
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache overflow", *decoder_callbacks_);
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
@@ -150,9 +148,6 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                                        absl::nullopt, ResponseStrings::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void ProxyFilter::onLoadDnsCacheComplete() {
