@@ -12,12 +12,11 @@ namespace {
 // segments.
 std::string expandRegex(const std::string& regex) {
   return absl::StrReplaceAll(
-      regex, {// Regex to look for either IPv4 or IPv6 addresses.
-              {"<ADDRESS>",
-               R"((?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}_\d+|\[[_aAbBcCdDeEfF[:digit:]]+\]_\d+))"},
+      regex, {// Regex to look for either IPv4 or IPv6 addresses plus port number after underscore.
+              {"<ADDRESS>", R"((?:(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[[a-fA-F_\d]+\])_\d+))"},
               // Cipher names can contain alphanumerics with dashes and
               // underscores.
-              {"<CIPHER>", R"([0-9A-Za-z_-]+)"},
+              {"<CIPHER>", R"([\w-]+)"},
               // A generic name can contain any character except dots.
               {"<NAME>", R"([^\.]+)"},
               // Route names may contain dots in addition to alphanumerics and
@@ -58,24 +57,24 @@ TagNameValues::TagNameValues() {
          R"(^http\.<NAME>\.dynamodb\.table\.<NAME>\.capacity\.<NAME>(\.__partition_id=(\w{7}))$)",
          ".dynamodb.table.");
 
-  // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)<base_stat> or
+  // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)* or
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.(<operation_name>.)[<partition_id>]
   addRe2(DYNAMO_OPERATION,
          R"(^http\.<NAME>\.dynamodb.(?:operation|table\.<NAME>\.capacity)(\.(<NAME>))(?:\.|$))",
          ".dynamodb.");
 
-  // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.<base_stat>
+  // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
   addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
          ".collection.");
 
-  // http.[<stat_prefix>.]dynamodb.table.(<table_name>.) or
+  // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
   addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
-  // mongo.[<stat_prefix>.]collection.(<collection>.)query.<base_stat>
+  // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
   addRe2(MONGO_COLLECTION, R"(^mongo\.<NAME>\.collection\.((<NAME>)\.).*?query\.)", ".collection.");
 
-  // mongo.[<stat_prefix>.]cmd.(<cmd>.)<base_stat>
+  // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
   addRe2(MONGO_CMD, R"(^mongo\.<NAME>\.cmd\.((<NAME>)\.))", ".cmd.");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
@@ -99,10 +98,10 @@ TagNameValues::TagNameValues() {
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
   addRe2(GRPC_BRIDGE_SERVICE, R"(^cluster\.<NAME>\.grpc\.((<NAME>)\.))", ".grpc.");
 
-  // tcp.(<stat_prefix>.)<base_stat>
+  // tcp.(<stat_prefix>.)*
   addRe2(TCP_PREFIX, R"(^tcp\.((<NAME>)\.))");
 
-  // udp.(<stat_prefix>.)<base_stat>
+  // udp.(<stat_prefix>.)*
   addRe2(UDP_PREFIX, R"(^udp\.((<NAME>)\.))");
 
   // auth.clientssl.(<stat_prefix>.)*
