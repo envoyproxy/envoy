@@ -24,7 +24,6 @@ constexpr auto CloseLogMessageWithMs = "{} gRPC config stream closed {}ms ago: {
 constexpr uint32_t RetryInitialDelayMs = 500;
 constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
 
-constexpr int64_t UnsetStatus = -9999;
 } // namespace
 
 template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
@@ -95,7 +94,6 @@ public:
   void onReceiveMessage(ResponseProtoPtr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
-    unsetFailure();
     // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to
     // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.
@@ -168,11 +166,12 @@ private:
     uint64_t ms_since_first_close = std::chrono::duration_cast<std::chrono::milliseconds>(
                                         time_source_.monotonicTime() - close_time_)
                                         .count();
+    auto close_status = close_status_.value();
 
     // This is a different error. Log the old error and remember the new error.
-    if (status != close_status_) {
+    if (status != close_status) {
       ENVOY_LOG(warn, CloseLogMessageWithMs, service_method_.name(), ms_since_first_close,
-                close_status_, close_message_);
+                close_status, close_message_);
       setFailure(status, message);
       return;
     }
@@ -180,7 +179,7 @@ private:
     // Log event and reset if we are over the time limit.
     if (ms_since_first_close > RetryMaxDelayMs) {
       ENVOY_LOG(warn, CloseLogMessageWithMs, service_method_.name(), ms_since_first_close,
-                close_status_, close_message_);
+                close_status, close_message_);
       unsetFailure();
     }
   }
@@ -191,8 +190,8 @@ private:
            Grpc::Status::WellKnownGrpcStatus::Internal == status;
   }
 
-  void unsetFailure() { close_status_ = UnsetStatus; }
-  bool isFailureSet() { return close_status_ != UnsetStatus; }
+  void unsetFailure() { close_status_ = absl::nullopt; }
+  bool isFailureSet() { return close_status_.has_value(); }
 
   void setFailure(Grpc::Status::GrpcStatus status, const std::string& message) {
     close_status_ = status;
@@ -219,7 +218,7 @@ private:
   Event::TimerPtr drain_request_timer_;
 
   // Record close status and message of the first failure.
-  Grpc::Status::GrpcStatus close_status_ = UnsetStatus;
+  absl::optional<Grpc::Status::GrpcStatus> close_status_ = absl::nullopt;
   std::string close_message_;
   MonotonicTime close_time_;
 };
