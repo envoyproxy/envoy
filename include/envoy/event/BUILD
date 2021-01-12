@@ -19,11 +19,12 @@ envoy_cc_library(
     deps = [
         ":deferred_deletable",
         ":file_event_interface",
+        ":scaled_range_timer_manager_interface",
         ":schedulable_cb_interface",
         ":signal_interface",
+        ":timer_interface",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/filesystem:watcher_interface",
         "//include/envoy/network:connection_handler_interface",
         "//include/envoy/network:connection_interface",

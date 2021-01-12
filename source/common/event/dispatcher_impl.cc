@@ -15,6 +15,7 @@
 #include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/libevent_scheduler.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
@@ -37,17 +38,22 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
-                               Event::TimeSystem& time_system,
-                               const Buffer::WatermarkFactorySharedPtr& factory)
+DispatcherImpl::DispatcherImpl(
+    const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
+    const std::function<ScaledRangeTimerManagerPtr(Dispatcher&)>& scaled_timer_factory,
+    const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : name_(name), api_(api),
-      buffer_factory_(factory != nullptr ? factory
-                                         : std::make_shared<Buffer::WatermarkBufferFactory>()),
+      buffer_factory_(watermark_factory != nullptr
+                          ? watermark_factory
+                          : std::make_shared<Buffer::WatermarkBufferFactory>()),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {
+      current_to_delete_(&to_delete_1_),
+      scaled_timer_manager_(scaled_timer_factory != nullptr
+                                ? scaled_timer_factory(*this)
+                                : std::make_unique<ScaledRangeTimerManagerImpl>(*this)) {
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
@@ -188,6 +194,17 @@ Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedP
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
   return createTimerInternal(cb);
+}
+
+TimerPtr DispatcherImpl::createScaledTimer(ScaledRangeTimerManager::TimerType timer_type,
+                                           TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return scaled_timer_manager_->createTimer(timer_type, std::move(cb));
+}
+
+TimerPtr DispatcherImpl::createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return scaled_timer_manager_->createTimer(minimum, std::move(cb));
 }
 
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {

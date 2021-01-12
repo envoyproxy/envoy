@@ -35,6 +35,18 @@ public:
    * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
    *             This name will appear in per-handler/worker statistics, such as
    *             "server.worker_2.watchdog_miss".
+   * @param scaled_timer_factory the factory to use when creating the scaled timer manager.
+   * @return Event::DispatcherPtr which is owned by the caller.
+   */
+  virtual Event::DispatcherPtr
+  allocateDispatcher(const std::string& name,
+                     const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) PURE;
+
+  /**
+   * Allocate a dispatcher.
+   * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
+   *             This name will appear in per-handler/worker statistics, such as
+   *             "server.worker_2.watchdog_miss".
    * @param watermark_factory the watermark factory, ownership is transferred to the dispatcher.
    * @return Event::DispatcherPtr which is owned by the caller.
    */

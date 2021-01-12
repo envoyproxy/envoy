@@ -58,5 +58,8 @@ public:
 
 using ScaledRangeTimerManagerPtr = std::unique_ptr<ScaledRangeTimerManager>;
 
+class Dispatcher;
+using ScaledRangeTimerManagerFactory = std::function<ScaledRangeTimerManagerPtr(Dispatcher&)>;
+
 } // namespace Event
 } // namespace Envoy

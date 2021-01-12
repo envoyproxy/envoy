@@ -14,14 +14,6 @@ class MockThreadLocalOverloadState : public ThreadLocalOverloadState {
 public:
   MockThreadLocalOverloadState();
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
-  Event::TimerPtr createScaledTimer(Event::ScaledRangeTimerManager::TimerType timer_type,
-                                    Event::TimerCb callback) override;
-  Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
-                                    Event::TimerCb callback) override;
-  MOCK_METHOD(Event::Timer*, createScaledTypedTimer_,
-              (Event::ScaledRangeTimerManager::TimerType, Event::TimerCb));
-  MOCK_METHOD(Event::Timer*, createScaledMinimumTimer_,
-              (Event::ScaledTimerMinimum, Event::TimerCb));
 
 private:
   const OverloadActionState disabled_state_;
@@ -37,6 +29,7 @@ public:
   MOCK_METHOD(bool, registerForAction,
               (const std::string& action, Event::Dispatcher& dispatcher,
                OverloadActionCb callback));
+  MOCK_METHOD(Event::ScaledRangeTimerManagerFactory, scaledTimerFactory, (), (override));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
 
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;

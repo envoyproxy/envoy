@@ -83,6 +83,21 @@ public:
     return timer;
   }
 
+  Event::TimerPtr createScaledTimer(ScaledTimerMinimum minimum, Event::TimerCb cb) override {
+    auto timer = Event::TimerPtr{createScaledTimer_(minimum, cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
+  Event::TimerPtr createScaledTimer(ScaledRangeTimerManager::TimerType timer_type,
+                                    Event::TimerCb cb) override {
+    auto timer = Event::TimerPtr{createScaledTypedTimer_(timer_type, cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
     auto schedulable_cb = Event::SchedulableCallbackPtr{createSchedulableCallback_(cb)};
     // Assert that schedulable_cb is not null to avoid confusing test failures down the line.
@@ -124,6 +139,9 @@ public:
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
+  MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
+  MOCK_METHOD(Timer*, createScaledTypedTimer_,
+              (ScaledRangeTimerManager::TimerType timer_type, Event::TimerCb cb));
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());

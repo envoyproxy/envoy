@@ -115,6 +115,7 @@ public:
   bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
+  Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
 
   // Stop the overload manager timer and wait for any pending resource updates to complete.
   // After this returns, overload manager clients should not receive any more callbacks

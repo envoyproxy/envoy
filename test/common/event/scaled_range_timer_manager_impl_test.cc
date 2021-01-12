@@ -622,8 +622,8 @@ TEST_F(ScaledRangeTimerManagerTest, LooksUpConfiguredMinimums) {
   // one calls into this one after looking up the minimum.
   class TestScaledRangeTimerManager : public ScaledRangeTimerManagerImpl {
   public:
-    using ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl;
     using ScaledRangeTimerManagerImpl::createTimer;
+    using ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl;
     TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
       return createScaledTimer(minimum, callback);
     }

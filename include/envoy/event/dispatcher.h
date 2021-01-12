@@ -9,6 +9,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -76,6 +77,21 @@ public:
    * @param cb supplies the callback to invoke when the timer fires.
    */
   virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
+
+  /**
+   * Allocates a scaled timer. @see Timer for docs on how to use the timer.
+   * @param timer_type the type of timer to create.
+   * @param cb supplies the callback to invoke when the timer fires.
+   */
+  virtual Event::TimerPtr createScaledTimer(Event::ScaledRangeTimerManager::TimerType timer_type,
+                                            TimerCb cb) PURE;
+
+  /**
+   * Allocates a scaled timer. @see Timer for docs on how to use the timer.
+   * @param minimum the rule for computing the minimum value of the timer.
+   * @param cb supplies the callback to invoke when the timer fires.
+   */
+  virtual Event::TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) PURE;
 
   /**
    * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped

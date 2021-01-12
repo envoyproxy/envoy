@@ -27,6 +27,7 @@ using testing::AnyNumber;
 using testing::ByMove;
 using testing::DoubleNear;
 using testing::Invoke;
+using testing::InvokeArgument;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Property;
@@ -492,45 +493,39 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             saturation_threshold: 1.0
   )YAML";
 
+TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager})));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
+}
+
 TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
   setDispatcherExpectation();
   auto manager(createOverloadManager(kReducedTimeoutsConfig));
 
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager})));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
 
   manager->start();
 
+  EXPECT_CALL(mock_dispatcher, post).WillOnce(InvokeArgument<0>());
   // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
   // a timer scale factor of 0.8 (1 - 0.2).
-  EXPECT_CALL(*scaled_timer_manager, setScaleFactor(DoubleNear(0.8, 0.00001)));
+  EXPECT_CALL(*mock_scaled_timer_manager, setScaleFactor(DoubleNear(0.8, 0.00001)));
   factory1_.monitor_->setPressure(0.6);
 
   timer_cb_();
-}
-
-TEST_F(OverloadManagerImplTest, CreateTypedTimer) {
-  setDispatcherExpectation();
-  auto manager(createOverloadManager(kReducedTimeoutsConfig));
-
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
-  EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
-  manager->start();
-
-  auto* mock_scaled_timer = new Event::MockTimer();
-  MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(
-      *scaled_timer_manager,
-      createTypedTimer_(Event::ScaledRangeTimerManager::TimerType::UnscaledRealTimerForTest, _))
-      .WillOnce(Return(mock_scaled_timer));
-
-  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
-      Event::ScaledRangeTimerManager::TimerType::UnscaledRealTimerForTest,
-      mock_callback.AsStdFunction());
-
-  EXPECT_EQ(mock_scaled_timer, timer.get());
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
