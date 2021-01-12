@@ -148,6 +148,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                                        absl::nullopt, ResponseStrings::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void ProxyFilter::onLoadDnsCacheComplete() {
