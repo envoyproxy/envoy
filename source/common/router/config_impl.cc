@@ -35,7 +35,6 @@
 #include "common/protobuf/utility.h"
 #include "common/router/reset_header_parser.h"
 #include "common/router/retry_state_impl.h"
-#include "common/runtime/runtime_features.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/common/utility.h"
