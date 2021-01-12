@@ -728,7 +728,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                                         config, *stats_scope_, factory_context.clusterManager())
                                   : nullptr),
       features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
-          config, http_protocol_options_)),
+          config, *http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
