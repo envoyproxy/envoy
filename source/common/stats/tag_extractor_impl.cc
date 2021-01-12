@@ -27,7 +27,7 @@ bool regexStartsWithDot(absl::string_view regex) {
 TagExtractorImplBase::TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                                            absl::string_view substr)
     : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr) {
-  PERF_TAG_COUNTERS_INIT(counters_);
+  PERF_TAG_INIT;
 }
 
 std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
@@ -92,7 +92,7 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
 
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re-skip", name_);
-    PERF_TAG_SKIPPED_INC(counters_);
+    PERF_TAG_INC(skipped_);
     return false;
   }
 
@@ -116,11 +116,11 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
     std::string::size_type end = remove_subexpr.second - stat_name.begin();
     remove_characters.insert(start, end);
     PERF_RECORD(perf, "re-match", name_);
-    PERF_TAG_MATCHED_INC(counters_);
+    PERF_TAG_INC(matched_);
     return true;
   }
   PERF_RECORD(perf, "re-miss", name_);
-  PERF_TAG_MISSED_INC(counters_);
+  PERF_TAG_INC(missed_);
   return false;
 }
 
@@ -134,7 +134,7 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
 
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re2-skip", name_);
-    PERF_TAG_SKIPPED_INC(counters_);
+    PERF_TAG_INC(skipped_);
     return false;
   }
 
@@ -161,11 +161,11 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
     remove_characters.insert(start, end);
 
     PERF_RECORD(perf, "re2-match", name_);
-    PERF_TAG_MATCHED_INC(counters_);
+    PERF_TAG_INC(matched_);
     return true;
   }
   PERF_RECORD(perf, "re2-miss", name_);
-  PERF_TAG_MISSED_INC(counters_);
+  PERF_TAG_INC(missed_);
   return false;
 }
 

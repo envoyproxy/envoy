@@ -28,26 +28,22 @@ struct Counters {
   uint32_t missed_{};
 };
 
-#define PERF_TAG_COUNTERS(var)                                                                     \
+#define PERF_TAG_COUNTERS                                                                          \
   ~TagExtractorImplBase() override {                                                               \
     std::cout << fmt::format("TagStats for {} tag extractor: skipped {}, matched {}, missing {}",  \
-                             name_, var->skipped_, var->matched_, var->missed_)                    \
+                             name_, counters_->skipped_, counters_->matched_, counters_->missed_)  \
               << std::endl;                                                                        \
   }                                                                                                \
-  std::unique_ptr<Counters> var
+  std::unique_ptr<Counters> counters_
 
-#define PERF_TAG_COUNTERS_INIT(var) var = std::make_unique<Counters>()
-#define PERF_TAG_SKIPPED_INC(var) var->skipped_++
-#define PERF_TAG_MISSED_INC(var) var->missed_++
-#define PERF_TAG_MATCHED_INC(var) var->matched_++
+#define PERF_TAG_INIT counters_ = std::make_unique<Counters>()
+#define PERF_TAG_INC(member) ++(counters_->member)
 
 #else
 
-#define PERF_TAG_COUNTERS(var)
-#define PERF_TAG_COUNTERS_INIT(var)
-#define PERF_TAG_SKIPPED_INC(var)
-#define PERF_TAG_MISSED_INC(var)
-#define PERF_TAG_MATCHED_INC(var)
+#define PERF_TAG_COUNTERS
+#define PERF_TAG_INIT
+#define PERF_TAG_INC(member)
 
 #endif
 
@@ -100,7 +96,7 @@ protected:
   const std::string prefix_;
   const std::string substr_;
 
-  PERF_TAG_COUNTERS(counters_);
+  PERF_TAG_COUNTERS;
 };
 
 class TagExtractorStdRegexImpl : public TagExtractorImplBase {
