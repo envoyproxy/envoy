@@ -19,6 +19,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* tcp_proxy: add support for converting raw TCP streams into HTTP/1.1 CONNECT requests. See :ref:`upgrade documentation <tunneling-tcp-over-http>` for details.
 
 Deprecated
 ----------
