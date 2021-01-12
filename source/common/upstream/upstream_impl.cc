@@ -1413,7 +1413,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
-  absl::node_hash_set<std::string> existing_hosts_for_current_priority(
+  absl::flat_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
   // Keep track of hosts we're adding (or replacing)
   absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
