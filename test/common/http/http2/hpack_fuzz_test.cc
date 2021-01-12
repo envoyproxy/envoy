@@ -104,7 +104,7 @@ struct NvComparator {
     }
     absl::string_view a_val(reinterpret_cast<char*>(a.value), a.valuelen);
     absl::string_view b_val(reinterpret_cast<char*>(b.value), b.valuelen);
-    return b_val > a_val;
+    return a_val < b_val;
   }
 };
 
