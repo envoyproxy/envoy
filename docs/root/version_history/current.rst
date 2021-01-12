@@ -27,6 +27,7 @@ Removed Config or Runtime
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 * access_logs: removed legacy unbounded access logs and runtime guard `envoy.reloadable_features.disallow_unbounded_access_logs`.
+* http: removed legacy HTTP/1.1 error reporting path and runtime guard `envoy.reloadable_features.early_errors_via_hcm`.
 
 New Features
 ------------
