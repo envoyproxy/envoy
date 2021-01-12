@@ -225,18 +225,18 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
 }
 
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
-  auto* header = this->config_.add_headers();
+  auto* header = this->config_.add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key("header0");
   hdr->set_value("value0");
 
-  header = this->config_.add_headers();
+  header = this->config_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value1");
   header->mutable_append()->set_value(true);
 
-  header = this->config_.add_headers();
+  header = this->config_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value2");

@@ -39,7 +39,7 @@ static_resources:
                     upgrade_configs:
                       - upgrade_type: CONNECT
                         connect_config:
-                          use_post: true
+                          allow_post: true
           http_filters:
           - name: envoy.filters.http.router
           http2_protocol_options:

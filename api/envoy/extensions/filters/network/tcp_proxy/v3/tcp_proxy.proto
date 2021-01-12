@@ -78,7 +78,8 @@ message TcpProxy {
 
     // Additional request headers to upstream proxy. This is mainly used to
     // trigger upstream to convert POST requests back to CONNECT requests.
-    repeated config.core.v3.HeaderValueOption headers = 3;
+    repeated config.core.v3.HeaderValueOption headers_to_add = 3
+        [(validate.rules).repeated = {max_items: 1000}];
   }
 
   reserved 6;
