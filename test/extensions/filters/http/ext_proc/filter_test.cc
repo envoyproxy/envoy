@@ -29,6 +29,7 @@ using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
+using testing::Eq;
 using testing::Invoke;
 using testing::Unused;
 
@@ -228,8 +229,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "Bad request", _, _, "Got a bad request"))
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
+                                                 Eq(absl::nullopt), "Got a bad request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -278,6 +279,92 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::OK, "", _, Eq(absl::nullopt), ""))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  /*auto* immediate_response = */ resp1->mutable_immediate_response();
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  EXPECT_FALSE(stream_close_sent_);
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{};
+  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(expected_response_headers,
+                                                     immediate_response_headers));
+
+  data_.add("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  data_.add("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+  EXPECT_TRUE(stream_close_sent_);
+}
+
+TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, "", _, Eq(999), ""))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto* immediate_response = resp1->mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::Forbidden);
+  immediate_response->mutable_grpc_status()->set_status(999);
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  EXPECT_FALSE(stream_close_sent_);
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{};
+  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(expected_response_headers,
+                                                     immediate_response_headers));
+
+  data_.add("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  data_.add("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+  EXPECT_TRUE(stream_close_sent_);
+}
+
 TEST_F(HttpFilterTest, PostAndFail) {
   initialize(R"EOF(
   grpc_service:
@@ -294,7 +381,9 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_FALSE(stream_close_sent_);
 
   // Oh no! The remote server had a failure!
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError, "", Eq(nullptr), Eq(absl::nullopt),
+                             "ext_proc error: gRPC error 13"));
   // In this case, this call includes header encoding
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
