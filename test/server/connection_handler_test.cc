@@ -32,7 +32,6 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Property;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -469,7 +468,7 @@ TEST_F(ConnectionHandlerTest, SetListenerRejectFraction) {
   EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
-  EXPECT_CALL(*listener, setRejectFraction(Property(&UnitFloat::value, 0.1234f)));
+  EXPECT_CALL(*listener, setRejectFraction(UnitFloat(0.1234f)));
   EXPECT_CALL(*listener, onDestroy());
 
   handler_->setListenerRejectFraction(UnitFloat(0.1234f));
@@ -482,7 +481,7 @@ TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
-  EXPECT_CALL(*listener, setRejectFraction(Property(&UnitFloat::value, 0.12345f)));
+  EXPECT_CALL(*listener, setRejectFraction(UnitFloat(0.12345f)));
   EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
   EXPECT_CALL(*listener, onDestroy());
 

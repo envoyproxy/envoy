@@ -53,9 +53,9 @@ public:
    * @return a random boolean value, with probability `p` equaling true.
    */
   bool bernoulli(UnitFloat p) {
-    if (p.isMin()) {
+    if (p == UnitFloat::min()) {
       return false;
-    } else if (p.isMax()) {
+    } else if (p == UnitFloat::max()) {
       return true;
     }
     return random() < static_cast<result_type>(p.value() * static_cast<float>(max()));

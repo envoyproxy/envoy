@@ -86,7 +86,7 @@ public:
     const OverloadActionState state = actionState();
     state_ =
         value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
-    return state.value().value() != actionState().value().value();
+    return state.value() != actionState().value();
   }
 
   OverloadActionState actionState() const override { return state_; }
@@ -117,7 +117,7 @@ public:
       state_ = OverloadActionState(
           UnitFloat((value - scaling_threshold_) / (saturated_threshold_ - scaling_threshold_)));
     }
-    return state_.value().value() != old_state.value().value();
+    return state_.value() != old_state.value();
   }
 
   OverloadActionState actionState() const override { return state_; }
@@ -272,7 +272,7 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
     state_ = new_state;
   }
 
-  return state_.value().value() != old_state.value().value();
+  return state_.value() != old_state.value();
 }
 
 OverloadActionState OverloadAction::getState() const { return state_; }

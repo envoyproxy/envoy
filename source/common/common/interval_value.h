@@ -22,9 +22,8 @@ public:
 
   T value() const { return value_; }
 
-  bool isMin() const { return value_ == Interval::min_value; }
-  bool isMax() const { return value_ == Interval::max_value; }
-
+  bool operator==(ClosedIntervalValue<T, Interval> other) const { return value_ == other.value(); }
+  bool operator!=(ClosedIntervalValue<T, Interval> other) const { return value_ != other.value(); }
   bool operator<(ClosedIntervalValue<T, Interval> other) const { return value_ < other.value(); }
   bool operator<=(ClosedIntervalValue<T, Interval> other) const { return value_ <= other.value(); }
   bool operator>=(ClosedIntervalValue<T, Interval> other) const { return value_ >= other.value(); }
