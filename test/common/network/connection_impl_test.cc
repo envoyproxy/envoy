@@ -1884,18 +1884,15 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  // Avoid setting noDelay on the fake fd of 0.
+  auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
   Address::InstanceConstSharedPtr server_addr;
-  Address::InstanceConstSharedPtr local_addr;
   if (GetParam() == Network::Address::IpVersion::v4) {
     server_addr = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("1.1.1.1", 80, nullptr)};
-    local_addr = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance("1.2.3.4", 56789, nullptr)};
   } else {
     server_addr = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance("::1", 80, nullptr)};
-    local_addr = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance("::1:2:3:4", 56789, nullptr)};
   }
 
   auto connection_socket =
@@ -1917,12 +1914,12 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
         contents,
         HasSubstr(
             "remote_address_: 1.1.1.1:80, direct_remote_address_: 1.1.1.1:80, local_address_: "
-            "1.2.3.4:56789"));
+            "/pipe/path"));
   } else {
     EXPECT_THAT(
         contents,
         HasSubstr("remote_address_: [::1]:80, direct_remote_address_: [::1]:80, local_address_: "
-                  "[::1:2:3:4]:56789"));
+                  "/pipe/path"));
   }
 }
 
