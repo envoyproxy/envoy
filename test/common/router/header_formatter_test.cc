@@ -82,18 +82,18 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalPortVariable)
   // Validate for IPv4 address
   auto address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
-  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  stream_info.downstream_address_provider_->setLocalAddress(address);
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "8443");
 
   // Validate for IPv6 address
   address =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
-  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  stream_info.downstream_address_provider_->setLocalAddress(address);
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "9443");
 
   // Validate for Pipe
   address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
-  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  stream_info.downstream_address_provider_->setLocalAddress(address);
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "");
 }
 

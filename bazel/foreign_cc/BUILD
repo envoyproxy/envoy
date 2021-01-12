@@ -126,6 +126,8 @@ envoy_cmake_external(
         "CURL_CA_PATH": "none",
         "CMAKE_USE_OPENSSL": "off",
         "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
+        # Avoid libidn2
+        "USE_LIBIDN2": "off",
         # NGHTTP2.
         "USE_NGHTTP2": "on",
         "NGHTTP2_LIBRARY": "$EXT_BUILD_DEPS/nghttp2",

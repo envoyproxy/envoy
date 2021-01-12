@@ -49,11 +49,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "3ff9995a5dd3d0e703e602ca3ebd9366de2b5752",
-        sha256 = "a4c74ce9a62b1c907329d248d4c225abfae8646bc77db8d72de65726632d3571",
+        version = "f2a7f9ba09660beacfebcd37fc977480ec9a8f50",
+        sha256 = "ca9975f6d5370843167b9646028ca7a0b546f8821f217c9d9d2e033a94a35f31",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2020-12-21",
+        release_date = "2021-01-04",
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -727,6 +727,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -748,6 +749,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -788,12 +790,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "upb",
         project_desc = "A small protobuf implementation in C (gRPC dependency)",
         project_url = "https://github.com/protocolbuffers/upb",
-        version = "382d5afc60e05470c23e8de19b19fc5ad231e732",
-        sha256 = "7992217989f3156f8109931c1fc6db3434b7414957cb82371552377beaeb9d6c",
+        version = "de76b31f9c56b28120580d53a6f8d7941fdb79eb",
+        sha256 = "487d84ce85065ff89ccde1c1ac2ea1515d2be411306e4adf1be6861dc4a4a86b",
+        release_date = "2020-12-29",
         strip_prefix = "upb-{version}",
         urls = ["https://github.com/protocolbuffers/upb/archive/{version}.tar.gz"],
         use_category = ["controlplane"],
-        release_date = "2020-08-03",
         cpe = "N/A",
     ),
     kafka_source = dict(
@@ -926,6 +928,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
@@ -945,6 +948,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
