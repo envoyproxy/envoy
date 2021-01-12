@@ -15,8 +15,7 @@ namespace {
 // Integration tests for active health checking.
 // The tests fetch the cluster configuration using CDS in order to actively start health
 // checking after Envoy and the hosts are initialized.
-class HealthCheckIntegrationTestBase : public Event::TestUsingSimulatedTime,
-                                       public HttpIntegrationTest {
+class HealthCheckIntegrationTestBase : public HttpIntegrationTest {
 public:
   HealthCheckIntegrationTestBase(
       Network::Address::IpVersion ip_version,
@@ -135,11 +134,11 @@ struct HttpHealthCheckIntegrationTestParams {
   FakeHttpConnection::Type upstream_protocol;
 };
 
-class HttpHealthCheckIntegrationTest
+class HttpHealthCheckIntegrationTestBase
     : public testing::TestWithParam<HttpHealthCheckIntegrationTestParams>,
       public HealthCheckIntegrationTestBase {
 public:
-  HttpHealthCheckIntegrationTest()
+  HttpHealthCheckIntegrationTestBase()
       : HealthCheckIntegrationTestBase(GetParam().ip_version, GetParam().upstream_protocol) {}
 
   // Returns the 4 combinations for testing:
@@ -201,8 +200,18 @@ public:
   }
 };
 
+class HttpHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
+                                       public HttpHealthCheckIntegrationTestBase {};
+
 INSTANTIATE_TEST_SUITE_P(
     IpHttpVersions, HttpHealthCheckIntegrationTest,
+    testing::ValuesIn(HttpHealthCheckIntegrationTest::getHttpHealthCheckIntegrationTestParams()),
+    HttpHealthCheckIntegrationTest::httpHealthCheckTestParamsToString);
+
+class RealTimeHttpHealthCheckIntegrationTest : public HttpHealthCheckIntegrationTestBase {};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpHttpVersions, RealTimeHttpHealthCheckIntegrationTest,
     testing::ValuesIn(HttpHealthCheckIntegrationTest::getHttpHealthCheckIntegrationTestParams()),
     HttpHealthCheckIntegrationTest::httpHealthCheckTestParamsToString);
 
@@ -251,6 +260,111 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
   // Endpoint doesn't reply, and a healthcheck failure occurs (due to timeout).
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that health checking gracefully handles a NO_ERROR GOAWAY from the upstream.
+TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
+  initialize();
+
+  // GOAWAY doesn't exist in HTTP1.
+  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    return;
+  }
+
+  const uint32_t cluster_idx = 0;
+  initHttpHealthCheck(cluster_idx);
+
+  // Send a GOAWAY with NO_ERROR and then a 200. The health checker should allow the request
+  // to finish despite the GOAWAY.
+  clusters_[cluster_idx].host_fake_connection_->encodeGoAway();
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
+
+  // Advance time to cause another health check.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+
+  ASSERT_TRUE(clusters_[cluster_idx].host_upstream_->waitForHttpConnection(
+      *dispatcher_, clusters_[cluster_idx].host_fake_connection_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 2);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that health checking properly handles a GOAWAY with an error, followed
+// by a reset. This test uses the real time system because it flakes with
+// simulated time.
+// The test goes through this sequence:
+// 1) send a GOAWAY with a PROTOCOL_ERROR code from the upstream
+// 2) waitForDisconnect on the health check connection
+// 3) advance time to trigger another health check
+// 4) wait for a new health check on a new connection.
+//
+// The flake was caused by the GOAWAY simultaneously causing the downstream
+// health checker to close the connection (because of the GOAWAY) and the fake
+// upstream to also close the connection (because of special handling for
+// protocol errors). This meant that waitForDisconnect() could finish waiting
+// before the health checker saw the GOAWAY and enabled the health check
+// interval timer. This would cause simulated time to advance too early, and no
+// followup health check would happen. Using real time solves this because then
+// the ordering of advancing the time system and enabling the health check timer
+// is inconsequential.
+TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayErroSingleEndpointGoAwayErrorr) {
+  initialize();
+
+  // GOAWAY doesn't exist in HTTP1.
+  if (upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+    return;
+  }
+
+  const uint32_t cluster_idx = 0;
+  initHttpHealthCheck(cluster_idx);
+
+  // Send a GOAWAY with an error. The health checker should treat this as an
+  // error and cancel the request.
+  clusters_[cluster_idx].host_fake_connection_->encodeProtocolError();
+
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  // Advance time to cause another health check.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+
+  ASSERT_TRUE(clusters_[cluster_idx].host_upstream_->waitForHttpConnection(
+      *dispatcher_, clusters_[cluster_idx].host_fake_connection_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
+      *dispatcher_, clusters_[cluster_idx].host_stream_));
+  ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+            clusters_[cluster_idx].name_);
+
+  clusters_[cluster_idx].host_stream_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 

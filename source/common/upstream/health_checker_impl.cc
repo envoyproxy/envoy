@@ -260,11 +260,14 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
                                            parent_.transportSocketMatchMetadata().get());
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
+    client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
     expect_reset_ = false;
+    reuse_connection_ = parent_.reuse_connection_;
   }
 
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
+  request_in_flight_ = true;
 
   const auto request_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
       {{Http::Headers::get().Method, "GET"},
@@ -284,13 +287,49 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,
                                                                         absl::string_view) {
+  request_in_flight_ = false;
+  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
+                 HostUtility::healthFlagsToString(*host_));
   if (expect_reset_) {
     return;
   }
 
-  ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
+  if (client_ && !reuse_connection_) {
+    client_->close();
+  }
+
   handleFailure(envoy::data::core::v3::NETWORK);
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onGoAway(
+    Http::GoAwayErrorCode error_code) {
+  ENVOY_CONN_LOG(debug, "connection going away goaway_code={}, health_flags={}", *client_,
+                 error_code, HostUtility::healthFlagsToString(*host_));
+
+  // Runtime guard around graceful handling of NO_ERROR GOAWAY handling. The old behavior is to
+  // ignore GOAWAY completely.
+  if (!parent_.runtime_.snapshot().runtimeFeatureEnabled(
+          "envoy.reloadable_features.health_check.graceful_goaway_handling")) {
+    return;
+  }
+
+  if (request_in_flight_ && error_code == Http::GoAwayErrorCode::NoError) {
+    // The server is starting a graceful shutdown. Allow the in flight request
+    // to finish without treating this as a health check error, and then
+    // reconnect.
+    reuse_connection_ = false;
+    return;
+  }
+
+  if (request_in_flight_) {
+    // Record this as a failed health check.
+    handleFailure(envoy::data::core::v3::NETWORK);
+  }
+
+  if (client_) {
+    expect_reset_ = true;
+    client_->close();
+  }
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
@@ -323,6 +362,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
+  request_in_flight_ = false;
+
   switch (healthCheckResult()) {
   case HealthCheckResult::Succeeded:
     handleSuccess(false);
@@ -350,7 +391,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     return false;
   }
 
-  if (!parent_.reuse_connection_) {
+  if (!reuse_connection_) {
     return true;
   }
 
@@ -380,6 +421,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
+  request_in_flight_ = false;
   if (client_) {
     host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
     ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,

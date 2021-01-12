@@ -716,6 +716,15 @@ void ConnectionImpl::shutdownNotice() {
   }
 }
 
+Status ConnectionImpl::protocolErrorForTest() {
+  int rc = nghttp2_submit_goaway(session_, NGHTTP2_FLAG_NONE,
+                                 nghttp2_session_get_last_proc_stream_id(session_),
+                                 NGHTTP2_PROTOCOL_ERROR, nullptr, 0);
+  ASSERT(rc == 0);
+
+  return sendPendingFrames();
+}
+
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
                  static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
