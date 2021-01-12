@@ -307,16 +307,7 @@ void SquashFilter::cleanup() {
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::MessagePtr&& m) {
-  Buffer::InstancePtr& data = m->body();
-  uint64_t num_slices = data->getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  data->getRawSlices(slices.begin(), num_slices);
-  std::string jsonbody;
-  for (const Buffer::RawSlice& slice : slices) {
-    jsonbody += std::string(static_cast<const char*>(slice.mem_), slice.len_);
-  }
-
-  return Json::Factory::loadFromString(jsonbody);
+  return Json::Factory::loadFromString(m->bodyAsString());
 }
 
 } // namespace Squash
