@@ -237,6 +237,10 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
       protocol_selection: USE_DOWNSTREAM_PROTOCOL
   )EOF";
   create(parseBootstrapFromV3Yaml(yaml));
+  auto info =
+      cluster_manager_->clusters().active_clusters_.find("http12_cluster")->second.get().info();
+  EXPECT_NE(0, info->features() & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL);
+
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
