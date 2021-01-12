@@ -22,6 +22,9 @@ public:
 
   T value() const { return value_; }
 
+  // Comparisons are performed using the same operators on the underlying value
+  // type, with the same exactness guarantees.
+
   bool operator==(ClosedIntervalValue<T, Interval> other) const { return value_ == other.value(); }
   bool operator!=(ClosedIntervalValue<T, Interval> other) const { return value_ != other.value(); }
   bool operator<(ClosedIntervalValue<T, Interval> other) const { return value_ < other.value(); }
