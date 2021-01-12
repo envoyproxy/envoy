@@ -159,18 +159,24 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("baz", {"z"}, "");
   grpc_mux_->start();
 
+  // Send another message for foo so that the node is cleared in the cached request.
+  // This is to test that the the node is set again in the first message below.
+  expectSendMessage("foo", {"z", "x", "y"}, "");
+  auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_);
+
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
-      .Times(3);
+      .Times(4);
   EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer, enableTimer(_, _));
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_EQ(0, control_plane_pending_requests_.value());
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("foo", {"x", "y"}, "", true);
+  expectSendMessage("foo", {"z", "x", "y"}, "", true);
   expectSendMessage("bar", {}, "");
   expectSendMessage("baz", {"z"}, "");
+  expectSendMessage("foo", {"x", "y"}, "");
   timer->invokeCallback();
 
   expectSendMessage("baz", {}, "");

@@ -351,15 +351,7 @@ def _com_github_zlib_ng_zlib_ng():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive(
-        "com_google_cel_cpp",
-        patch_args = ["-p1"],
-        # Patches to remove "fast" protobuf-internal access
-        # The patch can be removed when the "fast" access is safe to be enabled back.
-        # This requires public visibility of Reflection::LookupMapValue in protobuf and
-        # any release of cel-cpp after 10/27/2020.
-        patches = ["@envoy//bazel:cel-cpp.patch"],
-    )
+    external_http_archive("com_google_cel_cpp")
     external_http_archive("rules_antlr")
 
     # Parser dependencies
@@ -641,12 +633,10 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
-        # Patch curl 7.72.0 due to CMake's problematic implementation of policy `CMP0091`
-        # introduced in CMake 3.15 and then deprecated in CMake 3.18. Curl forcing the CMake
-        # ruleset to 3.16 breaks the Envoy windows fastbuild target.
-        # Also cure a fatal assumption creating a static library using LLVM `lld-link.exe`
-        # adding dynamic link flags, which breaks the Envoy clang-cl library archive step.
-        # Upstream patch submitted: https://github.com/curl/curl/pull/6050
+        # Patch curl 7.74.0 due to CMake's problematic implementation of policy `CMP0091`
+        # and introduction of libidn2 dependency which is inconsistently available and must
+        # not be a dynamic dependency on linux.
+        # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362
         # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
         # by elimination of the curl dependency.
         patches = ["@envoy//bazel/foreign_cc:curl.patch"],
@@ -754,12 +744,23 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
-def _upb():
-    external_http_archive(
-        name = "upb",
-        patches = ["@envoy//bazel:upb.patch"],
-        patch_args = ["-p1"],
+    native.bind(
+        name = "re2",
+        actual = "@com_googlesource_code_re2//:re2",
     )
+
+    native.bind(
+        name = "upb_lib_descriptor",
+        actual = "@upb//:descriptor_upb_proto",
+    )
+
+    native.bind(
+        name = "upb_textformat_lib",
+        actual = "@upb//:textformat",
+    )
+
+def _upb():
+    external_http_archive(name = "upb")
 
     native.bind(
         name = "upb_lib",

@@ -1,3 +1,4 @@
+#include "envoy/common/optref.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
@@ -66,7 +67,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -128,7 +129,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
@@ -209,7 +210,7 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionDecodingHeaders) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
@@ -260,7 +261,7 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
   Buffer::OwnedImpl data("data");
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*headers))));
+      .WillByDefault(Return((makeOptRef(*headers))));
   filter_manager_->createFilterChain();
 
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
