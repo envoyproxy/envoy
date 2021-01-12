@@ -297,7 +297,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingHeaders) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
@@ -335,7 +335,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();
