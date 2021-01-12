@@ -16,7 +16,7 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
 
   const std::string stat_prefix = fmt::format("postgres.{}", proto_config.stat_prefix());
   const bool enable_sql = PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_sql_parsing, true);
-  const bool terminate_ssl = PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, terminate_ssl, false);
+  const bool terminate_ssl = proto_config.terminate_ssl();
 
   PostgresFilterConfigSharedPtr filter_config(std::make_shared<PostgresFilterConfig>(
       stat_prefix, enable_sql, terminate_ssl, context.scope()));
