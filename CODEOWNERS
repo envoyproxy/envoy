@@ -161,3 +161,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
+# Rate limit expression descriptor
+/*/extensions/rate_limit_descriptors/expr @kyessenov @lizan

@@ -320,6 +320,7 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
         ":non_copyable",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
