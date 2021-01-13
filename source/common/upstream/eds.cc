@@ -247,12 +247,11 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // is responsible for both determining whether there was a change and to perform the actual update
   // to current_hosts_copy, so it must be called even if we know that we need to update (e.g. if the
   // overprovisioning factor changes).
-  // TODO(htuch): We eagerly update all the host sets here on weight changes, which isn't great,
-  // since this has the knock on effect that we rebuild the load balancers and locality scheduler.
-  // We could make this happen lazily, as we do for host-level weight updates, where as things age
-  // out of the locality scheduler, we discover their new weights. We don't currently have a shared
-  // object for locality weights that we can update here, we should add something like this to
-  // improve performance and scalability of locality weight updates.
+  //
+  // TODO(htuch): We eagerly update all the host sets here on weight changes, which may have
+  // performance implications, since this has the knock on effect that we rebuild the load balancers
+  // and locality scheduler. See the comment in BaseDynamicClusterImpl::updateDynamicHostList
+  // about this. In the future we may need to do better here.
   const bool hosts_updated = updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added,
                                                    hosts_removed, updated_hosts, all_hosts_);
   if (hosts_updated || host_set.overprovisioningFactor() != overprovisioning_factor ||
