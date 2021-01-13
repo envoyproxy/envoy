@@ -35,6 +35,9 @@ using testing::Unused;
 
 using namespace std::chrono_literals;
 
+// These tests are all unit tests that directly drive an instance of the
+// ext_proc filter and verify the behavior using mocks.
+
 class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml) {
@@ -92,6 +95,8 @@ protected:
   Buffer::OwnedImpl data_;
 };
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an empty response
 TEST_F(HttpFilterTest, SimplestPost) {
   initialize(R"EOF(
   grpc_service:
@@ -153,6 +158,9 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with a message that modifies the request
+// headers.
 TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   initialize(R"EOF(
   grpc_service:
@@ -215,6 +223,10 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an "immediate response" message
+// that should result in a response being directly sent downstream with
+// custom headers.
 TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   initialize(R"EOF(
   grpc_service:
@@ -279,6 +291,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an empty immediate_response message
 TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   initialize(R"EOF(
   grpc_service:
@@ -321,6 +335,9 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   EXPECT_TRUE(stream_close_sent_);
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an immediate response message
+// that contains a non-default gRPC status.
 TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   initialize(R"EOF(
   grpc_service:
@@ -365,6 +382,8 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   EXPECT_TRUE(stream_close_sent_);
 }
 
+// Using the default configuration, test the filter with a processor that
+// returns an error from from the gRPC stream.
 TEST_F(HttpFilterTest, PostAndFail) {
   initialize(R"EOF(
   grpc_service:
@@ -407,6 +426,9 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// returns an error from the gRPC stream that is ignored because the
+// failure_mode_allow parameter is set.
 TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   initialize(R"EOF(
   grpc_service:
@@ -447,6 +469,8 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message by closing the gRPC stream.
 TEST_F(HttpFilterTest, PostAndClose) {
   initialize(R"EOF(
   grpc_service:
@@ -489,6 +513,10 @@ TEST_F(HttpFilterTest, PostAndClose) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message incorrectly by sending a
+// request_body message, which should result in the stream being closed
+// and ignored.
 TEST_F(HttpFilterTest, OutOfOrder) {
   initialize(R"EOF(
   grpc_service:

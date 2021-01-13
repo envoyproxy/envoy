@@ -19,6 +19,10 @@ using Extensions::HttpFilters::ExternalProcessing::ExtProcTestUtility;
 
 using Http::LowerCaseString;
 
+// These tests exercise the ext_proc filter through Envoy's integration test
+// environment by configuring an instance of the Envoy server and driving it
+// through the mock network stack.
+
 class ExtProcIntegrationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
@@ -76,6 +80,9 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// by immediately closing the stream.
 TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -109,6 +116,9 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// by returning a failure before the first stream response can be sent.
 TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -129,6 +139,9 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// by requesting to modify the request headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -186,6 +199,10 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// by sending back an immediate_response message, which should be
+// returned directly to the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   initializeConfig();
   HttpIntegrationTest::initialize();
