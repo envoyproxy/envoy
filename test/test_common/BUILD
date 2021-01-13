@@ -238,6 +238,7 @@ envoy_cc_test_library(
     deps = [
         ":global_lib",
         ":test_time_system_interface",
+        "//source/common/event:real_time_system_lib",
     ],
 )
 
@@ -251,7 +252,6 @@ envoy_cc_test_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_lib",
-        "//source/common/event:real_time_system_lib",
     ],
 )
 
