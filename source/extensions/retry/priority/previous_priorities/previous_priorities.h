@@ -29,7 +29,8 @@ private:
   void recalculatePerPriorityState(uint32_t priority, const Upstream::PrioritySet& priority_set) {
     // Recalculate health and priority the same way the load balancer does it.
     Upstream::LoadBalancerBase::recalculatePerPriorityState(
-        priority, priority_set, per_priority_load_, per_priority_health_, per_priority_degraded_);
+        priority, priority_set, per_priority_load_, per_priority_health_, per_priority_degraded_,
+        total_healthy_hosts_);
   }
 
   uint32_t adjustedAvailability(std::vector<uint32_t>& per_priority_health,
@@ -47,6 +48,7 @@ private:
   Upstream::HealthyAndDegradedLoad per_priority_load_;
   Upstream::HealthyAvailability per_priority_health_;
   Upstream::DegradedAvailability per_priority_degraded_;
+  uint32_t total_healthy_hosts_;
 };
 
 } // namespace Priority

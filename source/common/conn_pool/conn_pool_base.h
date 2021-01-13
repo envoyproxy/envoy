@@ -122,6 +122,15 @@ public:
     return *static_cast<T*>(&context);
   }
 
+  // Determines if prefetching is warranted based on the number of streams in
+  // use, pending streams, anticipated capacity, and preconnect configuration.
+  //
+  // If anticipate_incoming_stream is true this assumes a call to newStream is
+  // pending, which is true for global preconnect.
+  static bool shouldConnect(size_t pending_streams, size_t active_streams,
+                            uint32_t connecting_and_connected_capacity, float preconnect_ratio,
+                            bool anticipate_incoming_stream = false);
+
   void addDrainedCallbackImpl(Instance::DrainedCb cb);
   void drainConnectionsImpl();
 
@@ -158,8 +167,7 @@ public:
   void checkForDrained();
   void scheduleOnUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);
-  // Called if this pool is likely to be picked soon, to determine if it's worth
-  // preconnecting a connection.
+  // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
   bool maybePreconnect(float global_preconnect_ratio);
 
   virtual ConnectionPool::Cancellable* newPendingStream(AttachContext& context) PURE;
@@ -185,6 +193,7 @@ public:
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
 protected:
+  // Creates up to 3 connections, based on the preconnect ratio.
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   // Creates up to 3 connections, based on the preconnect ratio.
