@@ -16,23 +16,18 @@ namespace Envoy {
 namespace ThreadLocal {
 
 TEST(MainThreadVerificationTest, All) {
-  // Main thread singleton is initialized in the constructor of tls instance. Call to main thread
-  // verification will fail before that.
-  EXPECT_DEATH(Thread::MainThread::isMainThread(),
-               "InjectableSingleton used prior to initialization");
+  // Before threading is on, assertion on main thread should be true.
+  EXPECT_TRUE(Thread::MainThread::isMainThread());
   {
-    EXPECT_DEATH(Thread::MainThread::isMainThread(),
-                 "InjectableSingleton used prior to initialization");
     InstanceImpl tls;
-    // Call to main thread verification should succeed after tls instance has been initialized.
-    ASSERT(Thread::MainThread::isMainThread());
+    // Tls instance has been initialized.
+    // Call to main thread verification should succeed in main thread.
+    EXPECT_TRUE(Thread::MainThread::isMainThread());
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
-  // Main thread singleton is cleared in the destructor of tls instance. Call to main thread
-  // verification will fail after that.
-  EXPECT_DEATH(Thread::MainThread::isMainThread(),
-               "InjectableSingleton used prior to initialization");
+  // After threading is off, assertion on main thread should be true.
+  EXPECT_TRUE(Thread::MainThread::isMainThread());
 }
 
 class TestThreadLocalObject : public ThreadLocalObject {
@@ -305,6 +300,8 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
         thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
         // Verify we have the expected dispatcher for the new thread thread.
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
+        // Verify that it is inside the worker thread.
+        EXPECT_FALSE(Thread::MainThread::isMainThread());
       });
   thread->join();
 
