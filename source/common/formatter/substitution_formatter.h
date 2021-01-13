@@ -123,6 +123,10 @@ private:
   std::vector<FormatterProviderPtr> providers_;
 };
 
+// Helper classes for StructFormatter::StructFormatMapVisitor.
+template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
+template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
+
 /**
  * An formatter for structured log formats, which returns a Struct proto that
  * can be converted easily into multiple formats.
@@ -158,8 +162,6 @@ private:
     StructFormatListPtr value_;
   };
 
-  template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
-  template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
   using StructFormatMapVisitor = StructFormatMapVisitorHelper<
       const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
