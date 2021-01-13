@@ -8,6 +8,8 @@ envoy_cc_library(
     name = "envoy_engine_cc_lib",
     srcs = [
         "bridge_utility.cc",
+        "engine.cc",
+        "engine_builder.cc",
         "log_level.cc",
         "request_method.cc",
         "retry_policy.cc",

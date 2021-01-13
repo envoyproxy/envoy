@@ -6,11 +6,13 @@ pybind_library(
     name = "envoy_engine_lib",
     srcs = [
         "bytes_view.cc",
+        "engine_builder_shim.cc",
         "stream_prototype_shim.cc",
         "stream_shim.cc",
     ],
     hdrs = [
         "bytes_view.h",
+        "engine_builder_shim.h",
         "stream_prototype_shim.h",
         "stream_shim.h",
     ],
