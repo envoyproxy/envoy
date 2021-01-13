@@ -63,6 +63,7 @@ The following sandboxes are available:
     postgres
     redis
     skywalking_tracing
+    tls-sni
     tls
     wasm-cc
     websocket
