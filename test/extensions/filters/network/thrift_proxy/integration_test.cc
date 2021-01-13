@@ -290,9 +290,14 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
   const std::string partial_request =
       request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write(partial_request));
   tcp_client->close();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
 
   test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
 
@@ -408,7 +413,8 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
   ASSERT_TRUE(tcp_client->write(partial_request));
   tcp_client->close();
 
-  ASSERT_TRUE(expected_upstream->waitForAndConsumeDisconnectedConnection());
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
 
   test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
 

@@ -528,6 +528,9 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   absl::MutexLock lock(&lock_);
   if (read_disable_on_new_connection_) {
+    // Disable early close detection to avoid closing the network connection before full
+    // initialization is complete.
+    connection.detectEarlyCloseWhenReadDisabled(false);
     connection.readDisable(true);
   }
   auto connection_wrapper = std::make_unique<SharedConnectionWrapper>(connection);
@@ -575,9 +578,6 @@ AssertionResult FakeUpstream::waitForHttpConnection(
         *this, consumeConnection(), http_type_, time_system_, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
     VERIFY_ASSERTION(connection->initialize());
-    if (read_disable_on_new_connection_) {
-      VERIFY_ASSERTION(connection->readDisable(false));
-    }
     return AssertionSuccess();
   });
 }
@@ -612,7 +612,6 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
             Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
             envoy::config::core::v3::HttpProtocolOptions::ALLOW);
         VERIFY_ASSERTION(connection->initialize());
-        VERIFY_ASSERTION(connection->readDisable(false));
         return AssertionSuccess();
       });
     }
@@ -638,7 +637,6 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     absl::MutexLock lock(&lock_);
     connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
     VERIFY_ASSERTION(connection->initialize());
-    VERIFY_ASSERTION(connection->readDisable(false));
     VERIFY_ASSERTION(connection->enableHalfClose(enable_half_close_));
     return AssertionSuccess();
   });
@@ -646,6 +644,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
 
 testing::AssertionResult
 FakeUpstream::waitForAndConsumeDisconnectedConnection(std::chrono::milliseconds timeout) {
+  ASSERT(!read_disable_on_new_connection_);
   SharedConnectionWrapper* connection;
   {
     absl::MutexLock lock(&lock_);
@@ -657,17 +656,32 @@ FakeUpstream::waitForAndConsumeDisconnectedConnection(std::chrono::milliseconds 
     if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
-
-    connection = &consumeConnection();
   }
+
+  VERIFY_ASSERTION(runOnDispatcherThreadAndWait([&]() {
+    absl::MutexLock lock(&lock_);
+    connection = &consumeConnection();
+    return AssertionSuccess();
+  }));
+
   return connection->waitForDisconnect(time_system_, timeout);
 }
 
 SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   ASSERT(!new_connections_.empty());
   auto* const connection_wrapper = new_connections_.front().get();
+  // Skip the thread safety check if the network connection has already been freed since there's no
+  // alternate way to get access to the dispatcher.
+  ASSERT(!connection_wrapper->connected() ||
+         connection_wrapper->connection().dispatcher().isThreadSafe());
   connection_wrapper->setParented();
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
+  if (read_disable_on_new_connection_) {
+    // Re-enable read and early close detection.
+    auto& connection = connection_wrapper->connection();
+    connection.detectEarlyCloseWhenReadDisabled(true);
+    connection.readDisable(false);
+  }
   return *connection_wrapper;
 }
 

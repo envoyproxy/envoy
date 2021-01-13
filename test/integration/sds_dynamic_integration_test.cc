@@ -646,6 +646,8 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
     sendSdsResponse(getWrongSecret(client_cert_));
   };
   initialize();
+  // Allow the fake upstreams to detect an error and disconnect during the TLS handshake.
+  fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
   // Make a simple request, should get 503
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
