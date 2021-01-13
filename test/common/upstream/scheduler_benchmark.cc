@@ -1,5 +1,3 @@
-// Usage: bazel run //test/common/upstream:iwrr_benchmark
-
 #include <algorithm>
 #include <iostream>
 #include <memory>

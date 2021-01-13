@@ -34,6 +34,7 @@ Preconnecting
 STATNAME
 SkyWalking
 TIDs
+WRSQ
 ceil
 CHACHA
 CHLO
@@ -1223,6 +1224,7 @@ wildcards
 winsock
 workspace
 writev
+wrsq
 xDS
 xDSes
 xdstp

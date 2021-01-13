@@ -49,7 +49,7 @@ public:
   }
 
   std::shared_ptr<C> pickAndAdd(std::function<double(const C&)>) override {
-    // Burn through the prepick queue.
+    // Burn through the pre-pick queue.
     while (!prepick_queue_.empty()) {
       auto prepicked_obj = prepick_queue_.front();
       prepick_queue_.pop();
@@ -99,7 +99,7 @@ private:
   }
 
   // Performs a weighted random selection on the queues containing objects of the same weight.
-  // Popping off the top of the queue to pick an object will honor the selection problability based
+  // Popping off the top of the queue to pick an object will honor the selection probability based
   // on the weight provided when the object was added.
   QueueInfo chooseQueue() {
     ASSERT(!queue_map_.empty());
