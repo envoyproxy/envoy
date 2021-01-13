@@ -1881,7 +1881,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
 
-  auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+  const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
@@ -1987,6 +1987,35 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnecti
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Should survive from multiple streamInfo():downstreamSslConnection() calls.
+// This is a regression test for #14091.
+TEST_F(LuaHttpFilterTest, SurviveMultipleDownstreamSslConnectionCalls) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:streamInfo():downstreamSslConnection() ~= nil then
+         request_handle:logTrace("downstreamSslConnection is present")
+      end
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  const auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+  for (uint64_t i = 0; i < 200; i++) {
+    EXPECT_CALL(*filter_,
+                scriptLog(spdlog::level::trace, StrEq("downstreamSslConnection is present")));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+    filter_->onDestroy();
+    setupFilter();
+  }
 }
 
 TEST_F(LuaHttpFilterTest, ImportPublicKey) {

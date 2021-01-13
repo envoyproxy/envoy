@@ -555,6 +555,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
 
 void FilterChainManagerImpl::convertIPsToTries() {
   for (auto& [destination_port, destination_ips_pair] : destination_ports_map_) {
+    UNREFERENCED_PARAMETER(destination_port);
     // These variables are used as we build up the destination CIDRs used for the trie.
     auto& [destination_ips_map, destination_ips_trie] = destination_ips_pair;
     std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>>
@@ -568,8 +569,11 @@ void FilterChainManagerImpl::convertIPsToTries() {
       // We need to get access to all of the source IP strings so that we can convert them into
       // a trie like we did for the destination IPs above.
       for (auto& [server_name, transport_protocols_map] : *server_names_map_ptr) {
+        UNREFERENCED_PARAMETER(server_name);
         for (auto& [transport_protocol, application_protocols_map] : transport_protocols_map) {
+          UNREFERENCED_PARAMETER(transport_protocol);
           for (auto& [application_protocol, source_arrays] : application_protocols_map) {
+            UNREFERENCED_PARAMETER(application_protocol);
             for (auto& [source_ips_map, source_ips_trie] : source_arrays) {
               std::vector<
                   std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>

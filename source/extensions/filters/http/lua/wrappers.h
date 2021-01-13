@@ -207,7 +207,10 @@ private:
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamSslConnection);
 
   // Envoy::Lua::BaseLuaObject
-  void onMarkDead() override { dynamic_metadata_wrapper_.reset(); }
+  void onMarkDead() override {
+    dynamic_metadata_wrapper_.reset();
+    downstream_ssl_connection_.reset();
+  }
 
   StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
