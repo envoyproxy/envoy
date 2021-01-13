@@ -2000,7 +2000,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // fallback registration does not occur. So we test for the fallback only in
   // release builds.
 #ifdef NDEBUG
-  stat = store_.findCounterByString("ssl.ciphers.fallback");
+  Stats::CounterOptConstRef stat = store_.findCounterByString("ssl.ciphers.fallback");
   ASSERT_TRUE(stat.has_value());
   EXPECT_EQ(1, stat->get().value());
 #endif
