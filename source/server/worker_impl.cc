@@ -153,7 +153,7 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
 }
 
 void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
-  handler_->setListenerRejectFraction(static_cast<float>(state.value()));
+  handler_->setListenerRejectFraction(state.value());
 }
 
 } // namespace Server

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <chrono>
 #include <stack>
 
@@ -32,7 +34,7 @@ public:
   // ScaledRangeTimerManager impl
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override;
   TimerPtr createTimer(TimerType timer_type, TimerCb callback) override;
-  void setScaleFactor(double scale_factor) override;
+  void setScaleFactor(UnitFloat scale_factor) override;
 
 private:
   class RangeTimerImpl;

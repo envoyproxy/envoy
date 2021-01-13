@@ -29,7 +29,7 @@ public:
 
   explicit constexpr OverloadActionState(UnitFloat value) : action_value_(value) {}
 
-  float value() const { return action_value_.value(); }
+  UnitFloat value() const { return action_value_; }
   bool isSaturated() const { return action_value_.value() == UnitFloat::max().value(); }
 
 private:

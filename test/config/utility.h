@@ -209,7 +209,8 @@ public:
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
-  bool setAccessLog(const std::string& filename, absl::string_view format = "");
+  bool setAccessLog(const std::string& filename, absl::string_view format = "",
+                    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
 
   // Set the listener access log for the first listener to a given file.
   bool setListenerAccessLog(const std::string& filename, absl::string_view format = "");

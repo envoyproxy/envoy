@@ -163,9 +163,9 @@ TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerMinimum minimum, Ti
   return std::make_unique<RangeTimerImpl>(minimum, callback, *this);
 }
 
-void ScaledRangeTimerManagerImpl::setScaleFactor(double scale_factor) {
+void ScaledRangeTimerManagerImpl::setScaleFactor(UnitFloat scale_factor) {
   const MonotonicTime now = dispatcher_.approximateMonotonicTime();
-  scale_factor_ = UnitFloat(scale_factor);
+  scale_factor_ = scale_factor;
   for (auto& queue : queues_) {
     resetQueueTimer(*queue, now);
   }

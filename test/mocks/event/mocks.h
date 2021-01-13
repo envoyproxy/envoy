@@ -207,7 +207,7 @@ public:
   }
   MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
   MOCK_METHOD(Timer*, createTypedTimer_, (ScaledRangeTimerManager::TimerType, TimerCb));
-  MOCK_METHOD(void, setScaleFactor, (double), (override));
+  MOCK_METHOD(void, setScaleFactor, (UnitFloat), (override));
 };
 
 class MockSchedulableCallback : public SchedulableCallback {
