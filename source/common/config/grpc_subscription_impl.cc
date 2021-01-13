@@ -134,7 +134,7 @@ GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
     : GrpcSubscriptionImpl(
           grpc_mux, callbacks, resource_decoder, stats,
           TypeUtil::descriptorFullNameToTypeUrl(collection_locator.resource_type()), dispatcher,
-          init_fetch_timeout, is_aggregated, true),
+          init_fetch_timeout, is_aggregated, false),
       collection_locator_(collection_locator) {}
 
 void GrpcCollectionSubscriptionImpl::start(const std::set<std::string>& resource_names) {

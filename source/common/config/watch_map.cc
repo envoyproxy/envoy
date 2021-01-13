@@ -92,7 +92,9 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
   }
 
   const auto prefix = namespaceFromName(resource_name);
-  const auto resource_key = use_namespace_matching_ && !prefix.empty() ? prefix : resource_name;
+  const bool is_xdstp = XdsResourceIdentifier::hasXdsTpScheme(resource_name);
+  const auto resource_key =
+      (use_namespace_matching_ || is_xdstp) && !prefix.empty() ? prefix : resource_name;
   const auto watches_interested = watch_interest_.find(resource_key);
   if (watches_interested != watch_interest_.end()) {
     for (const auto& watch : watches_interested->second) {
