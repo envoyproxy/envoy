@@ -1928,10 +1928,11 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ConnectionMocks mocks = createConnectionMocks(false);
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
+  auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
 
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, nullptr),
       std::move(mocks.transport_socket_), stream_info_, true);
 
   // Start measuring memory and dump state.
