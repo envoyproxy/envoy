@@ -1,8 +1,8 @@
 diff --git a/BUILD b/BUILD
-index efc3d8e7f..425eb15d5 100644
+index 112432160..5d4c9de35 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -247,36 +247,38 @@ cc_library(
+@@ -292,36 +292,37 @@ cc_library(
  # Map of all well known protos.
  # name => (include path, imports)
  WELL_KNOWN_PROTO_MAP = {
@@ -46,15 +46,14 @@ index efc3d8e7f..425eb15d5 100644
 -    "wrappers": ("src/google/protobuf/wrappers.proto", []),
 +    "wrappers": ("google/protobuf/wrappers.proto", []),
  }
++RELATIVE_WELL_KNOWN_PROTOS = [proto[1][0] for proto in WELL_KNOWN_PROTO_MAP.items()]
 
 -WELL_KNOWN_PROTOS = [value[0] for value in WELL_KNOWN_PROTO_MAP.values()]
-+RELATIVE_WELL_KNOWN_PROTOS = [proto[1][0] for proto in WELL_KNOWN_PROTO_MAP.items()]
-+
 +WELL_KNOWN_PROTOS = ["src/" + s for s in RELATIVE_WELL_KNOWN_PROTOS]
 
  filegroup(
      name = "well_known_protos",
-@@ -306,10 +308,17 @@ cc_proto_library(
+@@ -353,10 +354,17 @@ cc_library(
  # )
  ################################################################################
 
@@ -73,7 +72,7 @@ index efc3d8e7f..425eb15d5 100644
      visibility = ["//visibility:public"],
      deps = [dep + "_proto" for dep in proto[1][1]],
  ) for proto in WELL_KNOWN_PROTO_MAP.items()]
-@@ -869,7 +878,7 @@ internal_copied_filegroup(
+@@ -850,7 +858,7 @@ internal_copied_filegroup(
 
  # TODO(dzc): Remove this once py_proto_library can have labels in srcs, in
  # which case we can simply add :protos_python in srcs.
@@ -82,7 +81,7 @@ index efc3d8e7f..425eb15d5 100644
 
  py_proto_library(
      name = "protobuf_python",
-@@ -988,7 +997,7 @@ cc_library(
+@@ -968,7 +976,7 @@ cc_library(
 
  proto_lang_toolchain(
      name = "cc_toolchain",

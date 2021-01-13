@@ -288,7 +288,7 @@ platform_filter_name: StopOnRequestHeadersThenResumeOnResumeDecoding
 
   Event::PostCb resume_post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(1);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
@@ -898,7 +898,7 @@ platform_filter_name: StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding
 
   Event::PostCb resume_post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(1);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
   filter_->resumeDecoding();
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_request_calls, 1);
@@ -1061,7 +1061,7 @@ platform_filter_name: StopOnResponseHeadersThenResumeOnResumeEncoding
 
   Event::PostCb resume_post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
-  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(1);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
   filter_->resumeEncoding();
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_response_calls, 1);
@@ -1670,7 +1670,7 @@ platform_filter_name: StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding
 
   Event::PostCb resume_post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&resume_post_cb));
-  EXPECT_CALL(encoder_callbacks_, continueEncoding()).Times(1);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
   filter_->resumeEncoding();
   resume_post_cb();
   EXPECT_EQ(invocations.on_resume_response_calls, 1);

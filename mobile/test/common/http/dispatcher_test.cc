@@ -167,8 +167,8 @@ TEST_F(DispatcherTest, SetDestinationCluster) {
   send_headers_post_cb3();
 
   // Encode response headers.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 1);
@@ -300,8 +300,8 @@ TEST_F(DispatcherTest, SetDestinationClusterUpstreamProtocol) {
   send_headers_post_cb4();
 
   // Encode response headers.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 1);
@@ -363,8 +363,8 @@ TEST_F(DispatcherTest, Queueing) {
   send_headers_post_cb();
 
   // Encode response headers.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 1);
@@ -424,8 +424,8 @@ TEST_F(DispatcherTest, BasicStreamHeaders) {
   send_headers_post_cb();
 
   // Encode response headers.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 1);
@@ -484,8 +484,8 @@ TEST_F(DispatcherTest, BasicStreamData) {
   data_post_cb();
 
   // Encode response data.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   Buffer::InstancePtr response_data{new Buffer::OwnedImpl("response body")};
   response_encoder_->encodeData(*response_data, true);
   ASSERT_EQ(cc.on_data_calls, 1);
@@ -544,8 +544,8 @@ TEST_F(DispatcherTest, BasicStreamTrailers) {
   trailers_post_cb();
 
   // Encode response trailers.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test_trailer"}};
   response_encoder_->encodeTrailers(response_trailers);
   ASSERT_EQ(cc.on_trailers_calls, 1);
@@ -643,8 +643,8 @@ TEST_F(DispatcherTest, MultipleDataStream) {
   response_encoder_->encodeData(*response_data, false);
   ASSERT_EQ(cc.on_data_calls, 1);
 
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   Buffer::InstancePtr response_data2{new Buffer::OwnedImpl("response body2")};
   response_encoder_->encodeData(*response_data2, true);
   ASSERT_EQ(cc.on_data_calls, 2);
@@ -756,8 +756,8 @@ TEST_F(DispatcherTest, MultipleStreams) {
   send_headers_post_cb2();
 
   // Finish stream 2.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers2{{":status", "200"}};
   response_encoder2->encodeHeaders(response_headers2, true);
   ASSERT_EQ(cc2.on_headers_calls, 1);
@@ -765,8 +765,8 @@ TEST_F(DispatcherTest, MultipleStreams) {
   ASSERT_EQ(cc2.on_complete_calls, 1);
 
   // Finish stream 1.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 1);
@@ -831,8 +831,8 @@ TEST_F(DispatcherTest, EnvoyLocalReplyNotAnError) {
 
   // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
   // 503 should have an ENVOY_CONNECTION_FAILURE error code.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "503"}};
   response_encoder_->encodeHeaders(response_headers, true);
   // Ensure that the callbacks on the bridge_callbacks were called.
@@ -899,8 +899,8 @@ TEST_F(DispatcherTest, EnvoyLocalReplyNon503NotAnError) {
 
   // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
   // non-503 should have an ENVOY_UNDEFINED_ERROR error code.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "504"}};
   response_encoder_->encodeHeaders(response_headers, true);
   // Ensure that the callbacks on the bridge_callbacks were called.
@@ -974,8 +974,8 @@ TEST_F(DispatcherTest, EnvoyResponseWithErrorCode) {
 
   // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
   // 503 should have an ENVOY_CONNECTION_FAILURE error code.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{
       {":status", "218"},
       {"x-internal-error-code", std::to_string(ENVOY_CONNECTION_FAILURE)},
@@ -1031,8 +1031,8 @@ TEST_F(DispatcherTest, ResetStreamLocal) {
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&cancel_stream_post_cb));
   ASSERT_EQ(http_dispatcher_.cancelStream(stream), ENVOY_SUCCESS);
 
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   cancel_stream_post_cb();
   ASSERT_EQ(cc.on_cancel_calls, 1);
   ASSERT_EQ(cc.on_error_calls, 0);
@@ -1086,8 +1086,8 @@ TEST_F(DispatcherTest, DoubleResetStreamLocal) {
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&cancel_stream_post_cb2));
   ASSERT_EQ(http_dispatcher_.cancelStream(stream), ENVOY_SUCCESS);
 
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
 
   cancel_stream_post_cb();
   cancel_stream_post_cb2();
@@ -1178,8 +1178,8 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   // runResetCallbacks. The Http::ConnectionManager depends on the Http::Dispatcher::DirectStream
   // firing this tight loop to let the Http::ConnectionManager clean up its stream state.
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteReset, _));
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   response_encoder_->getStream().resetStream(StreamResetReason::RemoteReset);
   // Ensure that the on_error on the bridge_callbacks was called.
   ASSERT_EQ(cc.on_error_calls, 1);
@@ -1243,8 +1243,8 @@ TEST_F(DispatcherTest, StreamResetAfterOnComplete) {
   send_headers_post_cb();
 
   // Encode response headers.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 1);
@@ -1298,8 +1298,8 @@ TEST_F(DispatcherTest, ResetWhenRemoteClosesBeforeLocal) {
   start_stream_post_cb();
 
   // Encode response headers.
-  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
-  EXPECT_CALL(event_dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(event_dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);
   ASSERT_EQ(cc.on_headers_calls, 1);

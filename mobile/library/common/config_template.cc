@@ -199,6 +199,7 @@ stats_sinks:
   - name: envoy.metrics_service
     typed_config:
       "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
+      transport_api_version: V3
       report_counters_as_deltas: true
       grpc_service:
         envoy_grpc:

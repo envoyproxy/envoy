@@ -7,32 +7,6 @@ on:
   pull_request:
 
 jobs:
-  linuxdist:
-    name: linux_dist
-    runs-on: ubuntu-18.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/linux_ci_setup.sh
-      - name: 'Build envoy.aar distributable'
-        run: |
-          export PATH=/usr/lib/llvm-10/bin:$PATH
-          export CC=clang
-          export CXX=clang++
-          export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          bazelisk build --fat_apk_cpu=x86 //:android_dist_ci
-    # TODO: parallelize these two jobs
-      - name: 'Build Java app'
-        run: |
-          export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          bazelisk build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
-      - name: 'Build kotlin app'
-        run: |
-          export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          bazelisk build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
   macdist:
     name: mac_dist
     runs-on: macOS-latest
@@ -50,7 +24,7 @@ jobs:
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
         run: bazelisk build --fat_apk_cpu=x86 //:android_dist_ci
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: envoy.aar
           path: dist/envoy.aar
@@ -70,7 +44,7 @@ jobs:
           architecture: x64
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: envoy.aar
           path: dist/
@@ -103,7 +77,7 @@ jobs:
           architecture: x64
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: envoy.aar
           path: dist/
@@ -122,25 +96,31 @@ jobs:
         name: 'Check liveliness'
   kotlintests:
     name: kotlin_tests
-    runs-on: ubuntu-18.04
+    runs-on: macOS-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/linux_ci_setup.sh
-      - run: bazelisk test --test_output=all --build_tests_only //library/kotlin/test/...
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: bazel test --test_output=all --build_tests_only //library/kotlin/test/...
         name: 'Run Kotlin library tests'
   javatests:
     name: java_tests
-    runs-on: ubuntu-18.04
+    runs-on: macOS-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/linux_ci_setup.sh
-      - run: bazelisk test --test_output=all --build_tests_only //library/java/test/...
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: bazel test --test_output=all --build_tests_only //library/java/test/...
         name: 'Run Java library tests'

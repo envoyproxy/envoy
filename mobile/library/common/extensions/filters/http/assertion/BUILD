@@ -1,21 +1,30 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library")
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
+load(
+    "@envoy//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_extension_package",
+    "envoy_proto_library",
+)
 
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//visibility:public"])
+envoy_extension_package()
 
-api_proto_package(
-    deps = ["@envoy_api//envoy/config/common/matcher/v3:pkg"],
+envoy_proto_library(
+    name = "filter",
+    srcs = ["filter.proto"],
+    deps = [
+        "@envoy_api//envoy/config/common/matcher/v3:pkg",
+    ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "assertion_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     repository = "@envoy",
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
-        ":pkg_cc_proto",
+        "filter_cc_proto",
         "@envoy//include/envoy/http:codes_interface",
         "@envoy//include/envoy/http:filter_interface",
         "@envoy//source/common/http:header_map_lib",
@@ -24,14 +33,14 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     repository = "@envoy",
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":assertion_filter_lib",
-        ":pkg_cc_proto",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",
     ],
 )
