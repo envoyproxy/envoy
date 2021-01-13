@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "common/http/filter_manager.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -146,6 +147,8 @@ private:
 };
 
 using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
+
+struct ActiveStreamEncoderFilter;
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
@@ -356,6 +359,12 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
+
+  // When a filter is installed as a dual filter, we end up adding it both to the decoding and
+  // encoding filter list. By storing a reference to the encoding element from the decoder filter,
+  // we are able to easily look up the position of the encoding filter when attempting to
+  // dynamically insert a filter via the filter callbacks.
+  std::list<std::unique_ptr<ActiveStreamEncoderFilter>>::iterator dual_filter_itr_;
 };
 
 using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
@@ -390,9 +399,9 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   }
   void doTrailers() override;
   bool hasTrailers() override;
-  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override;
 
   // Http::StreamEncoderFilterCallbacks
+  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override;
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
   void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
   ResponseTrailerMap& addEncodedTrailers() override;
@@ -701,6 +710,12 @@ public:
   void addStreamFilter(StreamFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, true);
     addStreamEncoderFilterWorker(filter, nullptr, true);
+
+    // Store a reference to the encoder filter on the decoder filter so we can easily infer the
+    // position of the encoding filter in the list from the decoder filter.
+    auto& decoder_filter = decoder_filters_.back();
+    auto encoder_filter_itr = encoder_filters_.end()--;
+    decoder_filter->dual_filter_itr_ = encoder_filter_itr;
   }
   void addStreamFilter(StreamFilterSharedPtr filter,
                        Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
@@ -718,6 +733,12 @@ public:
 
     addStreamDecoderFilterWorker(filter, nullptr, true);
     addStreamEncoderFilterWorker(filter, nullptr, true);
+
+    // Store a reference to the encoder filter on the decoder filter so we can easily infer the
+    // position of the encoding filter in the list from the decoder filter.
+    auto& decoder_filter = decoder_filters_.back();
+    auto encoder_filter_itr = encoder_filters_.end()--;
+    decoder_filter->dual_filter_itr_ = encoder_filter_itr;
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
@@ -863,15 +884,25 @@ public:
   }
 
   void addStreamFilterAfter(StreamFilterSharedPtr filter, ActiveStreamDecoderFilter& wrapper) {
-    auto decoder_itr = std::find(decoder_filters_.begin(), decoder_filters_.end(), &wrapper);
-    ASSERT(decoder_itr != decoder_filters_.end());
-    decoder_filters_.insert(
-        decoder_itr++, std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, true));
+    auto decoder_filter_itr = decoder_filters_.insert(wrapper.entry()++, std::make_unique<ActiveStreamDecoderFilter>(
+                                                   *this, filter, nullptr, true));
 
-    auto encoder_itr = std::find(encoder_itr.begin(), decoder_filters_.end(), &wrapper);
-    ASSERT(decoder_itr != decoder_filters_.end());
+    ASSERT(wrapper.dual_filter_itr_ != encoder_filters_.end());
+    auto encoder_filter_itr = encoder_filters_.insert(wrapper.dual_filter_itr_++, std::make_unique<ActiveStreamEncoderFilter>(
+                                                            *this, filter, nullptr, true));
+
+    decoder_filter_itr->get()->dual_filter_itr_ = encoder_filter_itr;
+  }
+
+  void addStreamDecoderFilterAfter(StreamDecoderFilterSharedPtr filter,
+                                   ActiveStreamDecoderFilter& wrapper) {
     decoder_filters_.insert(
-        decoder_itr++, std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, true));
+        wrapper.entry()++, std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, false));
+  }
+  void addStreamEncoderFilterAfter(StreamEncoderFilterSharedPtr filter,
+                                   ActiveStreamEncoderFilter& wrapper) {
+    encoder_filters_.insert(
+        wrapper.entry()++, std::make_unique<ActiveStreamEncoderFilter>(*this, filter, nullptr, false));
   }
   /**
    * Marks local processing as complete.

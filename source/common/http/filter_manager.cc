@@ -307,7 +307,7 @@ void ActiveStreamDecoderFilter::addStreamFilter(StreamFilterSharedPtr filter) {
   parent_.addStreamFilterAfter(filter, *this);
 }
 void ActiveStreamDecoderFilter::addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) {
-  parent_.addStreamDecoderStreamFilter(filter, *this);
+  parent_.addStreamDecoderFilterAfter(filter, *this);
 }
 
 void ActiveStreamDecoderFilter::drainSavedRequestMetadata() {
@@ -1435,8 +1435,8 @@ void ActiveStreamEncoderFilter::doTrailers() {
 bool ActiveStreamEncoderFilter::hasTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers().has_value();
 }
-void ActiveStreamEncoderFilter::addEncoderFilter(StreamEncoderFilterSharedPtr filter) {
-  parent_.addEncoderFilterAfter(filter, *this);
+void ActiveStreamEncoderFilter::addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) {
+  parent_.addStreamEncoderFilterAfter(filter, *this);
 }
 void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
