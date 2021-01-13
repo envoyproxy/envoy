@@ -20,7 +20,6 @@ InstanceImpl::~InstanceImpl() {
   ASSERT(shutdown_);
   thread_local_data_.data_.clear();
   Thread::MainThread::clear();
-  ASSERT(Thread::MainThread::isMainThread());
 }
 
 SlotPtr InstanceImpl::allocateSlot() {

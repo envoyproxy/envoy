@@ -17,17 +17,17 @@ namespace ThreadLocal {
 
 TEST(MainThreadVerificationTest, All) {
   // Before threading is on, assertion on main thread should be true.
-  ASSERT(Thread::MainThread::isMainThread());
+  EXPECT_TRUE(Thread::MainThread::isMainThread());
   {
     InstanceImpl tls;
     // Tls instance has been initialized.
     // Call to main thread verification should succeed in main thread.
-    ASSERT(Thread::MainThread::isMainThread());
+    EXPECT_TRUE(Thread::MainThread::isMainThread());
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
   // After threading is off, assertion on main thread should be true.
-  ASSERT(Thread::MainThread::isMainThread());
+  EXPECT_TRUE(Thread::MainThread::isMainThread());
 }
 
 class TestThreadLocalObject : public ThreadLocalObject {
@@ -301,7 +301,7 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
         // Verify we have the expected dispatcher for the new thread thread.
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
         // Verify that it is inside the worker thread.
-        ASSERT(!Thread::MainThread::isMainThread());
+        EXPECT_FALSE(Thread::MainThread::isMainThread());
       });
   thread->join();
 
