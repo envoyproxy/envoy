@@ -113,6 +113,22 @@ envoy_cc_test(
 )
 
 envoy_cc_benchmark_binary(
+    name = "edf_speed_test",
+    srcs = ["edf_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/upstream:edf_scheduler_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "edf_speed_test_benchmark_test",
+    benchmark_binary = "edf_speed_test",
+)
+
+envoy_cc_benchmark_binary(
     name = "eds_speed_test",
     srcs = ["eds_speed_test.cc"],
     external_deps = [
