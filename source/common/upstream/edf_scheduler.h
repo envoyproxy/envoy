@@ -4,6 +4,7 @@
 #include <queue>
 
 #include "envoy/upstream/scheduler.h"
+
 #include "common/common/assert.h"
 
 namespace Envoy {

@@ -1,12 +1,13 @@
 #include "common/upstream/wrsq_scheduler.h"
+
 #include "test/mocks/common.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
@@ -61,7 +62,7 @@ TEST(WRSQSchedulerTest, ProbabilityVerification) {
   // If we try every random number between 0 and the weight sum, we should select each object the
   // number of times equal to its weight.
   for (uint32_t i = 0; i < weight_sum; ++i) {
-    EXPECT_CALL(random, random()).Times(1).WillRepeatedly(Return(i));
+    EXPECT_CALL(random, random()).WillOnce(Return(i));
     // The weights will not change with WRSQ, so the predicate does not matter.
     auto peek = sched.peekAgain([](const double&) { return 1; });
     auto p = sched.pickAndAdd([](const double&) { return 1; });
@@ -86,10 +87,7 @@ TEST(WRSQSchedulerTest, Expired1) {
     sched.add(1, second_entry);
   }
 
-  EXPECT_CALL(random, random())
-    .WillOnce(Return(0))
-    .WillOnce(Return(299))
-    .WillOnce(Return(1337));
+  EXPECT_CALL(random, random()).WillOnce(Return(0)).WillOnce(Return(299)).WillOnce(Return(1337));
   auto peek = sched.peekAgain([](const double&) { return 1; });
   auto p1 = sched.pickAndAdd([](const double&) { return 1; });
   auto p2 = sched.pickAndAdd([](const double&) { return 1; });
@@ -113,10 +111,10 @@ TEST(WRSQSchedulerTest, Expired2) {
   }
 
   EXPECT_CALL(random, random())
-    .WillOnce(Return(0))
-    .WillOnce(Return(299))
-    .WillOnce(Return(1337))
-    .WillOnce(Return(8675309));
+      .WillOnce(Return(0))
+      .WillOnce(Return(299))
+      .WillOnce(Return(1337))
+      .WillOnce(Return(8675309));
   auto peek = sched.peekAgain([](const double&) { return 1; });
   auto p1 = sched.pickAndAdd([](const double&) { return 1; });
   auto p2 = sched.pickAndAdd([](const double&) { return 1; });
@@ -214,16 +212,16 @@ TEST(WRSQSchedulerTest, ExpireAll) {
       for (int i = 0; i < 1000; ++i) {
         EXPECT_CALL(random, random()).WillOnce(Return(rnum++));
         switch (*sched.pickAndAdd([](const double&) { return 1; })) {
-          case 42:
-          case 37:
-            ++weight1pick;
-            break;
-          case 7:
-          case 13:
-            ++weight5pick;
-            break;
-          default:
-            EXPECT_TRUE(false) << "bogus value returned";
+        case 42:
+        case 37:
+          ++weight1pick;
+          break;
+        case 7:
+        case 13:
+          ++weight5pick;
+          break;
+        default:
+          EXPECT_TRUE(false) << "bogus value returned";
         }
       }
       EXPECT_GT(weight5pick, 0);
@@ -235,11 +233,11 @@ TEST(WRSQSchedulerTest, ExpireAll) {
     for (int i = 0; i < 1000; ++i) {
       EXPECT_CALL(random, random()).WillRepeatedly(Return(rnum++));
       switch (*sched.peekAgain([](const double&) { return 1; })) {
-        case 42:
-        case 37:
-          break;
-        default:
-          EXPECT_TRUE(false) << "bogus value returned";
+      case 42:
+      case 37:
+        break;
+      default:
+        EXPECT_TRUE(false) << "bogus value returned";
       }
     }
   }

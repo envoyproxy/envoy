@@ -1,12 +1,12 @@
 // Usage: bazel run //test/common/upstream:iwrr_benchmark
 
 #include <algorithm>
-#include <memory>
 #include <iostream>
+#include <memory>
 
+#include "common/common/random_generator.h"
 #include "common/upstream/edf_scheduler.h"
 #include "common/upstream/wrsq_scheduler.h"
-#include "common/common/random_generator.h"
 
 #include "test/benchmark/main.h"
 
@@ -23,8 +23,8 @@ public:
     double weight;
   };
 
-  static std::vector<ObjInfo> setupSplitWeights(
-      Scheduler<uint32_t>& sched, size_t num_objs, ::benchmark::State& state) {
+  static std::vector<ObjInfo> setupSplitWeights(Scheduler<uint32_t>& sched, size_t num_objs,
+                                                ::benchmark::State& state) {
     std::vector<ObjInfo> info;
 
     state.PauseTiming();
@@ -38,7 +38,7 @@ public:
       }
 
       info.emplace_back(oi);
-    } 
+    }
 
     std::random_shuffle(info.begin(), info.end());
     state.ResumeTiming();
@@ -50,18 +50,17 @@ public:
     return info;
   }
 
-  static std::vector<ObjInfo> setupUniqueWeights(
-      Scheduler<uint32_t>& sched, size_t num_objs, ::benchmark::State& state) {
+  static std::vector<ObjInfo> setupUniqueWeights(Scheduler<uint32_t>& sched, size_t num_objs,
+                                                 ::benchmark::State& state) {
     std::vector<ObjInfo> info;
 
     state.PauseTiming();
     for (uint32_t i = 0; i < num_objs; ++i) {
       ObjInfo oi;
-      oi.val = std::make_shared<uint32_t>(i),
-      oi.weight = static_cast<double>(i + 1),
+      oi.val = std::make_shared<uint32_t>(i), oi.weight = static_cast<double>(i + 1),
 
       info.emplace_back(oi);
-    } 
+    }
 
     std::random_shuffle(info.begin(), info.end());
     state.ResumeTiming();
@@ -73,19 +72,16 @@ public:
     return info;
   }
 
-  static void pickTest(Scheduler<uint32_t>& sched,
-                       ::benchmark::State& state,
+  static void pickTest(Scheduler<uint32_t>& sched, ::benchmark::State& state,
                        std::function<std::vector<ObjInfo>(Scheduler<uint32_t>&)> setup) {
 
     std::vector<ObjInfo> obj_info;
     for (auto _ : state) { // NOLINT: Silences warning about dead store
-      if (obj_info.empty()){
+      if (obj_info.empty()) {
         obj_info = setup(sched);
       }
 
-      auto p = sched.pickAndAdd([&obj_info](const auto& i) {
-        return obj_info[i].weight;
-      });
+      auto p = sched.pickAndAdd([&obj_info](const auto& i) { return obj_info[i].weight; });
     }
   }
 };
@@ -163,27 +159,26 @@ void BM_UniqueWeightPickWRSQ(::benchmark::State& state) {
 }
 
 BENCHMARK(BM_SplitWeightAddEdf)
-  ->Unit(::benchmark::kMicrosecond)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
+    ->Unit(::benchmark::kMicrosecond)
+    ->RangeMultiplier(8)
+    ->Range(1 << 6, 1 << 14);
 BENCHMARK(BM_SplitWeightAddWRSQ)
-  ->Unit(::benchmark::kMicrosecond)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
-BENCHMARK(BM_SplitWeightPickEdf)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
-BENCHMARK(BM_SplitWeightPickWRSQ)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
+    ->Unit(::benchmark::kMicrosecond)
+    ->RangeMultiplier(8)
+    ->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_SplitWeightPickEdf)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_SplitWeightPickWRSQ)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
 BENCHMARK(BM_UniqueWeightAddEdf)
-  ->Unit(::benchmark::kMicrosecond)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
+    ->Unit(::benchmark::kMicrosecond)
+    ->RangeMultiplier(8)
+    ->Range(1 << 6, 1 << 14);
 BENCHMARK(BM_UniqueWeightAddWRSQ)
-  ->Unit(::benchmark::kMicrosecond)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
-BENCHMARK(BM_UniqueWeightPickEdf)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
-BENCHMARK(BM_UniqueWeightPickWRSQ)
-  ->RangeMultiplier(8)->Range(1<<6, 1<<14);
+    ->Unit(::benchmark::kMicrosecond)
+    ->RangeMultiplier(8)
+    ->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_UniqueWeightPickEdf)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_UniqueWeightPickWRSQ)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
 
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
-

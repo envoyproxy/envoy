@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
 #include <functional>
+#include <memory>
 
 namespace Envoy {
 namespace Upstream {
@@ -9,8 +9,7 @@ namespace Upstream {
 /**
  * The base class for scheduler implementations used in various load balancers.
  */
-template <class C>
-class Scheduler {
+template <class C> class Scheduler {
 public:
   virtual ~Scheduler() {}
 

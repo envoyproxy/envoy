@@ -128,11 +128,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "scheduler_lib",
-    hdrs = ["edf_scheduler.h", "wrsq_scheduler.h"],
+    hdrs = [
+        "edf_scheduler.h",
+        "wrsq_scheduler.h",
+    ],
     deps = [
-        "//source/common/common:assert_lib",
-        "//include/envoy/upstream:scheduler_interface",
         "//include/envoy/common:random_generator_interface",
+        "//include/envoy/upstream:scheduler_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 

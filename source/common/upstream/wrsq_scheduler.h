@@ -1,17 +1,18 @@
 #pragma once
 
 #include <algorithm>
-#include <memory>
 #include <iostream>
+#include <memory>
+#include <queue>
 #include <utility>
 #include <vector>
-#include <queue>
-
-#include "absl/container/flat_hash_map.h"
 
 #include "envoy/common/random_generator.h"
 #include "envoy/upstream/scheduler.h"
+
 #include "common/common/assert.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -22,22 +23,21 @@ namespace Upstream {
 // objects to their respective queue based on weight. When performing a pick operation, a queue is
 // selected and an object is pulled. Each queue gets its own selection probability which is weighted
 // as the sum of all weights of objects contained within. Once a queue is picked, you can simply
-// pull from the top and honor the expected selection probability of each object. 
+// pull from the top and honor the expected selection probability of each object.
 //
 // Adding an object will cause the scheduler to rebuild internal structures on the first pick that
 // follows. This operation will be linear on the number of unique weights among objects inserted.
 // Outside of this case, object picking is logarithmic with the number of unique weights. Adding
 // objects is always constant time.
-// 
+//
 // For the case where all object weights are the same, WRSQ behaves identical to vanilla
 // round-robin. If all object weights are different, it behaves identical to weighted random
 // selection.
 //
 // NOTE: This class only supports integral weights and does not allow for the changing of object
 // weights on the fly.
-template <class C>
-class WRSQScheduler : public Scheduler<C> {
- public:
+template <class C> class WRSQScheduler : public Scheduler<C> {
+public:
   WRSQScheduler(Random::RandomGenerator& random) : random_(random) {}
 
   std::shared_ptr<C> peekAgain(std::function<double(const C&)>) override {
@@ -66,11 +66,9 @@ class WRSQScheduler : public Scheduler<C> {
     queue_map_[weight].emplace(std::move(entry));
   }
 
-  bool empty() const override {
-    return queue_map_.empty();
-  }
+  bool empty() const override { return queue_map_.empty(); }
 
- private:
+private:
   using ObjQueue = std::queue<std::weak_ptr<C>>;
   using QueueMap = absl::flat_hash_map<double, ObjQueue>;
 
@@ -110,9 +108,7 @@ class WRSQScheduler : public Scheduler<C> {
 
     const double weight_sum = cumulative_weights_.back().cumulative_weight;
     uint64_t rnum = random_.random() % static_cast<uint32_t>(weight_sum);
-    auto it = std::upper_bound(cumulative_weights_.begin(),
-                               cumulative_weights_.end(),
-                               rnum,
+    auto it = std::upper_bound(cumulative_weights_.begin(), cumulative_weights_.end(), rnum,
                                [](auto a, auto b) { return a < b.cumulative_weight; });
     ASSERT(it != cumulative_weights_.end());
     return *it;

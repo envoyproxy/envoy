@@ -85,7 +85,7 @@ envoy_cc_test(
     srcs = ["wrsq_scheduler_test.cc"],
     deps = [
         "//source/common/upstream:scheduler_lib",
-        "//test/mocks:common_lib"
+        "//test/mocks:common_lib",
     ],
 )
 
@@ -826,8 +826,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
-        "//source/common/upstream:scheduler_lib",
         "//source/common/common:random_generator_lib",
+        "//source/common/upstream:scheduler_lib",
     ],
 )
-
