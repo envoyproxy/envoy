@@ -315,8 +315,8 @@ private:
     double deadline_;
     // Tie breaker for entries with the same deadline. This is used to provide FIFO behavior.
     uint64_t order_offset_;
-    // We only hold a weak pointer, since we don't support a remove operator. This allows entries
-    // to be lazily unloaded from the queue.
+    // We only hold a weak pointer, since we don't support a remove operator. This allows entries to
+    // be lazily unloaded from the queue.
     std::weak_ptr<C> entry_;
 
     // Flip < direction to make this a min queue.
@@ -330,8 +330,8 @@ private:
   // TODO(htuch): Is it worth the small extra complexity to use integer time for performance
   // reasons?
   double current_time_{};
-  // Offset used during addition to break ties when entries have the same weight but should
-  // reflect FIFO insertion order in picks.
+  // Offset used during addition to break ties when entries have the same weight but should reflect
+  // FIFO insertion order in picks.
   uint64_t order_offset_{};
   // Min priority queue for EDF.
   std::priority_queue<EdfEntry> queue_;
