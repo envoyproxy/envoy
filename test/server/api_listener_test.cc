@@ -23,12 +23,7 @@ class ApiListenerTest : public testing::Test {
 protected:
   ApiListenerTest()
       : listener_manager_(std::make_unique<ListenerManagerImpl>(server_, listener_factory_,
-                                                                worker_factory_, false)) {
-    ON_CALL(server_.dispatcher_, createScaledTypedTimer_)
-        .WillByDefault([&](auto, Event::TimerCb callback) {
-          return server_.dispatcher_.createTimer_(std::move(callback));
-        });
-  }
+                                                                worker_factory_, false)) {}
 
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;

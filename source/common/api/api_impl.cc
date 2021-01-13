@@ -18,9 +18,9 @@ Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store,
       process_context_(process_context), watermark_factory_(std::move(watermark_factory)) {}
 
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name) {
-  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, nullptr,
-                                                 watermark_factory_);
+  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, watermark_factory_);
 }
+
 Event::DispatcherPtr
 Impl::allocateDispatcher(const std::string& name,
                          const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) {
@@ -30,8 +30,7 @@ Impl::allocateDispatcher(const std::string& name,
 
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name,
                                               Buffer::WatermarkFactoryPtr&& factory) {
-  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, nullptr,
-                                                 std::move(factory));
+  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, std::move(factory));
 }
 
 } // namespace Api

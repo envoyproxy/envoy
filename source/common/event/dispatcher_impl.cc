@@ -38,10 +38,24 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(
-    const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
-    const std::function<ScaledRangeTimerManagerPtr(Dispatcher&)>& scaled_timer_factory,
-    const Buffer::WatermarkFactorySharedPtr& watermark_factory)
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system)
+    : DispatcherImpl(name, api, time_system, {}) {}
+
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system,
+                               const Buffer::WatermarkFactorySharedPtr& watermark_factory)
+    : DispatcherImpl(
+          name, api, time_system,
+          [](Dispatcher& dispatcher) {
+            return std::make_unique<ScaledRangeTimerManagerImpl>(dispatcher);
+          },
+          watermark_factory) {}
+
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+                               Event::TimeSystem& time_system,
+                               const ScaledRangeTimerManagerFactory& scaled_timer_factory,
+                               const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : name_(name), api_(api),
       buffer_factory_(watermark_factory != nullptr
                           ? watermark_factory
@@ -50,10 +64,7 @@ DispatcherImpl::DispatcherImpl(
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_),
-      scaled_timer_manager_(scaled_timer_factory != nullptr
-                                ? scaled_timer_factory(*this)
-                                : std::make_unique<ScaledRangeTimerManagerImpl>(*this)) {
+      current_to_delete_(&to_delete_1_), scaled_timer_manager_(scaled_timer_factory(*this)) {
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
