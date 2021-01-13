@@ -194,6 +194,11 @@ public:
                const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info),
               (const));
+  MOCK_METHOD(void, populateLocalDescriptors,
+              (std::vector<Envoy::RateLimit::LocalDescriptor> & descriptors,
+               const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& info),
+              (const));
 
   uint64_t stage_{};
   std::string disable_key_;

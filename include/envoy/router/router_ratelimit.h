@@ -59,6 +59,18 @@ public:
                                    const std::string& local_service_cluster,
                                    const Http::RequestHeaderMap& headers,
                                    const StreamInfo::StreamInfo& info) const PURE;
+
+  /**
+   * Potentially populate the local descriptor array with new descriptors to query.
+   * @param descriptors supplies the descriptor array to optionally fill.
+   * @param local_service_cluster supplies the name of the local service cluster.
+   * @param headers supplies the header for the request.
+   * @param info stream info associated with the request
+   */
+  virtual void populateLocalDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
+                                        const std::string& local_service_cluster,
+                                        const Http::RequestHeaderMap& headers,
+                                        const StreamInfo::StreamInfo& info) const PURE;
 };
 
 /**

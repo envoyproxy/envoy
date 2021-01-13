@@ -103,6 +103,93 @@ The route specific configuration:
 Note that if this filter is configured as globally disabled and there are no virtual host or route level
 token buckets, no rate limiting will be applied.
 
+.. _config_http_filters_local_rate_limit_descriptors:
+
+Using rate limit descriptors for local rate limiting
+----------------------------------------------------
+
+Rate limit descriptors can be used to override local per-route rate limiting.
+A route's :ref:`rate limit action <envoy_v3_api_msg_config.route.v3.RateLimit>`
+is used to match up a :ref:`local descriptor
+<envoy_v3_api_msg_extensions.common.ratelimit.v3.LocalRateLimitDescriptor>` in
+the filter config descriptor list. The local descriptor's token bucket
+settings are then used to decide if the request should be rate limited or not
+depending on whether the local descriptor's entries match the route's rate
+limit actions descriptor entries. If there is no matching descriptor entries,
+the default token bucket is used.
+
+Example filter configuration using descriptors:
+
+.. validated-code-block:: yaml
+  :type-name:  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      routes:
+      - match: { prefix: "/foo" }
+        route: { cluster: service_protected_by_rate_limit }
+        typed_per_filter_config:
+          envoy.filters.http.local_ratelimit:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            stat_prefix: test
+            token_bucket:
+              max_tokens: 1000
+              tokens_per_fill: 1000
+              fill_interval: 60s
+            filter_enabled:
+              runtime_key: test_enabled
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            filter_enforced:
+              runtime_key: test_enforced
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            response_headers_to_add:
+              - append: false
+                header:
+                  key: x-test-rate-limit
+                  value: 'true'
+            descriptors:
+            - entries:
+              - key: client_cluster
+                value: foo
+              - key: path
+                value: /foo/bar
+              token_bucket:
+                max_tokens: 10
+                tokens_per_fill: 10
+                fill_interval: 60s
+            - entries:
+              - key: client_cluster
+                value: foo
+              - key: path
+                value: /foo/bar2
+              token_bucket:
+                max_tokens: 100
+                tokens_per_fill: 100
+                fill_interval: 60s
+      - match: { prefix: "/" }
+        route: { cluster: default_service }
+      rate_limits:
+      - actions: # any actions in here
+        - request_headers:
+            header_name: x-envoy-downstream-service-cluster
+            descriptor_key: client_cluster
+        - request_headers:
+            header_name: ":path"
+            descriptor_key: path
+
+In this example, requests are rate-limited for routes prefixed with "/foo" as
+follow. If requests come from a downstream service cluster "foo" for "/foo/bar"
+path, then 10 req/min are allowed. But if they come from a downstream service
+cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
+1000 req/min are allowed.
+
 Statistics
 ----------
 
