@@ -10,6 +10,11 @@
 namespace Envoy {
 namespace Platform {
 
+// TODO(crockeo): refactor engine callbacks
+//   - make EngineCallbacks struct with on_engine_running and (eventually) on_exit
+//   - change context from Engine ptr to EngineCallbacks ptr
+//   - move c_on_(...) from private static fn to static fn in anonymous namespace
+
 class Engine {
 public:
   ~Engine();
