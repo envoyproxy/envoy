@@ -13,6 +13,7 @@ namespace {
 
 constexpr absl::string_view text{"application/grpc-web-text"};
 constexpr absl::string_view binary{"application/grpc-web"};
+constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
 
 using SkipEncodingEmptyTrailers = bool;
 using ContentType = std::string;
@@ -242,15 +243,15 @@ TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseWithoutContentType) {
 }
 
 TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLargeEnd) {
-  const std::string start(1024, 'a');
-  const std::string end(1024, 'b');
+  const std::string start(MAX_GRPC_MESSAGE_LENGTH, 'a');
+  const std::string end(MAX_GRPC_MESSAGE_LENGTH, 'b');
   testBadUpstreamResponse(start, end, /*expected=*/start);
 }
 
 TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLargeFirst) {
-  const std::string start(2048, 'a');
-  const std::string end(1024, 'b');
-  testBadUpstreamResponse(start, end, /*expected=*/start.substr(0, 1024));
+  const std::string start(2 * MAX_GRPC_MESSAGE_LENGTH, 'a');
+  const std::string end(MAX_GRPC_MESSAGE_LENGTH, 'b');
+  testBadUpstreamResponse(start, end, /*expected=*/start.substr(0, MAX_GRPC_MESSAGE_LENGTH));
 }
 
 } // namespace

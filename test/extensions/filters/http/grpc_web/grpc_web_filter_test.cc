@@ -45,6 +45,7 @@ const char INVALID_B64_MESSAGE[] = "****";
 const size_t INVALID_B64_MESSAGE_SIZE = sizeof(INVALID_B64_MESSAGE) - 1;
 const char TRAILERS[] = "\x80\x00\x00\x00\x20grpc-status:0\r\ngrpc-message:ok\r\n";
 const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
+constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
 
 } // namespace
 
@@ -212,11 +213,12 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
   buffer->add(data);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
-  TestUtility::feedBufferWithRandomCharacters(data, 1024);
+  TestUtility::feedBufferWithRandomCharacters(data, MAX_GRPC_MESSAGE_LENGTH);
   const std::string expected_grpc_message =
-      absl::StrCat("hellohello", data.toString()).substr(0, 1024);
+      absl::StrCat("hellohello", data.toString()).substr(0, MAX_GRPC_MESSAGE_LENGTH);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
-  EXPECT_EQ(1024, response_headers.get_(Http::Headers::get().GrpcMessage).length());
+  EXPECT_EQ(MAX_GRPC_MESSAGE_LENGTH,
+            response_headers.get_(Http::Headers::get().GrpcMessage).length());
   EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
 }
 
@@ -229,8 +231,8 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeEncodingBuffer)
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl encoded_buffer;
-  encoded_buffer.add(std::string(2048, 'a'));
-
+  encoded_buffer.add(std::string(2 * MAX_GRPC_MESSAGE_LENGTH, 'a'));
+  // The encoding buffer is filled with data more than MAX_GRPC_MESSAGE_LENGTH.
   auto on_modify_encoding_buffer = [&encoded_buffer](std::function<void(Buffer::Instance&)> cb) {
     cb(encoded_buffer);
   };
@@ -243,7 +245,8 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeEncodingBuffer)
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_.encodeData(encoded_buffer, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(encoded_buffer, true));
-  EXPECT_EQ(1024, response_headers.get_(Http::Headers::get().GrpcMessage).length());
+  EXPECT_EQ(MAX_GRPC_MESSAGE_LENGTH,
+            response_headers.get_(Http::Headers::get().GrpcMessage).length());
 }
 
 TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeLastData) {
@@ -255,11 +258,13 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeLastData) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.encodeHeaders(response_headers, false));
   Buffer::OwnedImpl data;
-  data.add(std::string(2048, 'a'));
-  // The buffered length is limited to 1024.
-  const std::string expected_grpc_message = data.toString().substr(1024);
+  // The last data length is set to be bigger than "MAX_GRPC_MESSAGE_LENGTH".
+  const std::string expected_grpc_message = std::string(MAX_GRPC_MESSAGE_LENGTH + 1, 'a');
+  data.add(expected_grpc_message);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, true));
-  EXPECT_EQ(1024, response_headers.get_(Http::Headers::get().GrpcMessage).length());
+  // The grpc-message value length is the same as the last sent buffer.
+  EXPECT_EQ(MAX_GRPC_MESSAGE_LENGTH + 1,
+            response_headers.get_(Http::Headers::get().GrpcMessage).length());
   EXPECT_EQ(expected_grpc_message, response_headers.get_(Http::Headers::get().GrpcMessage));
 }
 

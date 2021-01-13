@@ -22,10 +22,14 @@ namespace GrpcWeb {
 
 namespace {
 
-constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 1024;
+// This is arbitrarily chosen.
+// TODO(dio): Make it configurable when it is needed.
+constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
 
 // This builds grpc-message header value from encoding buffer and the last frame (when
-// end_stream=true) and the total length of it is limited by MAX_GRPC_MESSAGE_LENGTH.
+// end_stream=true). When we have buffered data in encoding buffer, we limit the length of
+// grpc-message to be smaller than MAX_GRPC_MESSAGE_LENGTH. However, when we only have "last" data,
+// we send it all.
 std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance* last) {
   Buffer::OwnedImpl buffer;
   if (buffered != nullptr) {
@@ -35,14 +39,12 @@ std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance*
 
   if (last != nullptr) {
     uint64_t needed = last->length();
-    if ((buffer.length() + needed) >= MAX_GRPC_MESSAGE_LENGTH) {
+    if (buffered != nullptr && (buffer.length() + needed) >= MAX_GRPC_MESSAGE_LENGTH) {
       needed = std::min(needed, MAX_GRPC_MESSAGE_LENGTH - buffer.length());
     }
     buffer.move(*last, needed);
     last->drain(last->length());
   }
-
-  ASSERT(buffer.length() <= MAX_GRPC_MESSAGE_LENGTH);
 
   const uint64_t message_length = buffer.length();
   std::string message(message_length, 0);
