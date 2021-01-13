@@ -1,7 +1,7 @@
 .. _version_history:
 
-Version history
----------------
+版本历史
+----------
 
 .. toctree::
   :titlesonly:
