@@ -83,7 +83,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
-  void setListenerRejectFraction(float reject_fraction) override;
+  void setListenerRejectFraction(UnitFloat reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   /**
@@ -361,7 +361,7 @@ private:
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
-  float listener_reject_fraction_{0};
+  UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };
 
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,

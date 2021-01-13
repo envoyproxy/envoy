@@ -4,6 +4,8 @@
 #include "envoy/event/scaled_timer_minimum.h"
 #include "envoy/event/timer.h"
 
+#include "common/common/interval_value.h"
+
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -36,7 +38,7 @@ public:
    * factor of 0.5 causes firing halfway between min and max, and a factor of 1 causes firing at
    * max.
    */
-  virtual void setScaleFactor(double scale_factor) PURE;
+  virtual void setScaleFactor(UnitFloat scale_factor) PURE;
 };
 
 using ScaledRangeTimerManagerPtr = std::unique_ptr<ScaledRangeTimerManager>;

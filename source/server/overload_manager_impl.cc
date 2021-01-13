@@ -60,7 +60,11 @@ public:
   void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
     actions_[action.index()] = state;
     if (scaled_timer_action_.has_value() && scaled_timer_action_.value() == action) {
-      scaled_timer_manager_->setScaleFactor(1 - state.value());
+      scaled_timer_manager_->setScaleFactor(
+          // The action state is 0 for no overload up to 1 for maximal overload,
+          // but the scale factor for timers is 1 for no scaling and 0 for
+          // maximal scaling, so invert the value to pass in (1-value).
+          state.value().invert());
     }
   }
 
@@ -86,6 +90,8 @@ public:
     const OverloadActionState state = actionState();
     state_ =
         value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
+    // This is a floating point comparison, though state_ is always either
+    // saturated or inactive so there's no risk due to floating point precision.
     return state.value() != actionState().value();
   }
 
@@ -117,6 +123,9 @@ public:
       state_ = OverloadActionState(
           UnitFloat((value - scaling_threshold_) / (saturated_threshold_ - scaling_threshold_)));
     }
+    // All values of state_ are produced via this same code path. Even if
+    // old_state and state_ should be approximately equal, there's no harm in
+    // signaling for a small change if they're not float::operator== equal.
     return state_.value() != old_state.value();
   }
 
@@ -258,7 +267,7 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
   }
   const auto trigger_new_state = it->second->actionState();
   active_gauge_.set(trigger_new_state.isSaturated() ? 1 : 0);
-  scale_percent_gauge_.set(trigger_new_state.value() * 100);
+  scale_percent_gauge_.set(trigger_new_state.value().value() * 100);
 
   {
     // Compute the new state as the maximum over all trigger states.

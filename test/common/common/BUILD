@@ -196,6 +196,7 @@ envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
     deps = [
+        "//source/common/common:interval_value",
         "//source/common/common:random_generator_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:environment_lib",

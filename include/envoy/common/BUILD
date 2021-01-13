@@ -38,6 +38,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "random_generator_interface",
     hdrs = ["random_generator.h"],
+    deps = ["//source/common/common:interval_value"],
 )
 
 envoy_cc_library(

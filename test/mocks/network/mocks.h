@@ -397,7 +397,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
-  MOCK_METHOD(void, setRejectFraction, (float));
+  MOCK_METHOD(void, setRejectFraction, (UnitFloat));
 };
 
 class MockConnectionHandler : public ConnectionHandler {
@@ -419,7 +419,7 @@ public:
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
-  MOCK_METHOD(void, setListenerRejectFraction, (float), (override));
+  MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
 };
 
@@ -509,7 +509,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
-  MOCK_METHOD(void, setRejectFraction, (float), (override));
+  MOCK_METHOD(void, setRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
