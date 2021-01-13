@@ -22,6 +22,8 @@ public:
 
   T value() const { return value_; }
 
+  // Returns a value that is as far from max as the original value is from min.
+  // This guarantees that max().invert() == min() and min().invert() == max().
   ClosedIntervalValue invert() const {
     return ClosedIntervalValue(value_ == Interval::max_value ? Interval::min_value
                                : value_ == Interval::min_value
