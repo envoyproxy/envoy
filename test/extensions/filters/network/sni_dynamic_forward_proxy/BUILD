@@ -33,8 +33,8 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.network.sni_dynamic_forward_proxy",
-    # TODO(envoyproxy/windows-dev): Diagnose failure building ith clang-cl (msvc shows no issues)
-    tags = ["skip_on_clang-cl"],
+    # TODO(envoyproxy/windows-dev): Diagnose failure building with clang-cl (msvc shows no issues)
+    tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/listener/tls_inspector:config",

@@ -108,7 +108,7 @@ envoy_cc_test(
     # TODO(envoyproxy/windows-dev): Under winsock2, reverse lookup of ::1/127.0.0.1 may not
     # resolve to localhost, even when explicitly defined in Windows\System32\drivers\etc\hosts
     # depending on the DNS provider and domain configuration
-    tags = ["flaky_on_clang-cl"],
+    tags = ["fails_on_clang_cl"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:dns_interface",

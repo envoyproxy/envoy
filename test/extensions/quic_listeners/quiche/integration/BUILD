@@ -19,7 +19,7 @@ envoy_cc_test(
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
     tags = [
-        "flaky_on_windows",
+        "fails_on_windows",
         "nofips",
     ],
     deps = [
