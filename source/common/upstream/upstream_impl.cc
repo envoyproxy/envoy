@@ -1416,7 +1416,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   absl::flat_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
   // Keep track of hosts we're adding (or replacing)
-  absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
+  absl::flat_hash_set<absl::string_view> new_hosts_for_current_priority(new_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     if (updated_hosts.count(host->address()->asString())) {
