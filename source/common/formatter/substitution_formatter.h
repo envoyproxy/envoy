@@ -162,8 +162,6 @@ private:
     StructFormatListPtr value_;
   };
 
-  template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
-  template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
   using StructFormatMapVisitor = StructFormatMapVisitorHelper<
       const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
