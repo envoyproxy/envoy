@@ -139,6 +139,8 @@ public:
     return false;
   }
 
+  absl::optional<Grpc::Status::GrpcStatus> getCloseStatus() { return close_status_; }
+
 private:
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));

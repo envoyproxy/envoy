@@ -8,6 +8,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,6 +31,10 @@ protected:
                          "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints"),
                      random_, dispatcher_, stats_, rate_limit_settings_) {}
 
+  Event::SimulatedTimeSystem& simulatedTimeSystem() {
+    return dynamic_cast<Event::SimulatedTimeSystem&>(dispatcher_.timeSource());
+  }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   Grpc::MockAsyncStream async_stream_;
   Stats::TestUtil::TestStore stats_;
@@ -47,6 +52,8 @@ protected:
 // Tests that establishNewStream() establishes it, a second call does nothing, and a third call
 // after the stream was disconnected re-establishes it.
 TEST_F(GrpcStreamTest, EstablishStream) {
+  auto& time_source = simulatedTimeSystem();
+
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
   // Successful establishment
   {
@@ -70,6 +77,32 @@ TEST_F(GrpcStreamTest, EstablishStream) {
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
+  }
+  // maybeLogClose: Repeated failures that are warned only after a timeout.
+  {
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
+    grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Unavailable, "Not available");
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::Unavailable);
+    time_source.advanceTimeWait(std::chrono::milliseconds(1000));
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded, "Too long");
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
+    // sleep long enough for the warning log to go thru and reset.
+    time_source.advanceTimeWait(std::chrono::milliseconds(100000));
+
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded, "Too long");
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
+  }
+  // maybeLogClose: failures that should not be processed.
+  {
+    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
+    grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::NotFound, "Not Found");
+    EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
   }
 }
 
