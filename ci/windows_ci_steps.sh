@@ -50,7 +50,7 @@ BAZEL_BUILD_OPTIONS=(
     --show_task_finish
     --verbose_failures
     "--test_output=errors"
-    "--repository_cache=${BUILD_DIR}/repository_cache"
+    "--repository_cache=${BUILD_DIR/\/c/c:}/repository_cache"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
