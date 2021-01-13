@@ -238,7 +238,6 @@ envoy_cc_test_library(
     deps = [
         ":global_lib",
         ":test_time_system_interface",
-        "//source/common/event:real_time_system_lib",
     ],
 )
 
@@ -252,6 +251,7 @@ envoy_cc_test_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_lib",
+        "//source/common/event:real_time_system_lib",
     ],
 )
 
@@ -300,7 +300,6 @@ envoy_cc_test_library(
     hdrs = ["wasm_base.h"],
     deps = [
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/common/wasm:wasm_interoperation_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",

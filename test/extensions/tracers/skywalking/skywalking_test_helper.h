@@ -43,10 +43,13 @@ public:
     auto segment_context = segment_context_factory->create();
 
     auto span = segment_context->createCurrentSegmentRootSpan();
-    span->startSpan(false);
+    span->startSpan(seed + "#OPERATION");
     span->setPeer(seed + "#ADDRESS");
-    span->setSamplingStatus(do_sample);
-    span->endSpan(false);
+
+    if (!do_sample)
+      span->setSkipAnalysis();
+
+    span->endSpan();
 
     return segment_context->createSW8HeaderValue(seed + "#ENDPOINT");
   }
@@ -69,7 +72,9 @@ public:
     if (previous_span_context) {
       segment_context = segment_context_factory->create(previous_span_context);
     } else {
-      segment_context = segment_context_factory->create(sampled);
+      segment_context = segment_context_factory->create();
+      if (!sampled)
+        segment_context->setSkipAnalysis();
     }
 
     return segment_context;
@@ -82,14 +87,16 @@ public:
                           ? segment_context->createCurrentSegmentSpan(parent_span_store)
                           : segment_context->createCurrentSegmentRootSpan();
 
-    span_store->startSpan(false);
-    span_store->setOperationName(seed + "#OPERATION");
+    span_store->startSpan(seed + "#OPERATION");
     span_store->setPeer("0.0.0.0");
     span_store->addTag(seed + "#TAG_KEY_A", seed + "#TAG_VALUE_A");
     span_store->addTag(seed + "#TAG_KEY_B", seed + "#TAG_VALUE_B");
     span_store->addTag(seed + "#TAG_KEY_C", seed + "#TAG_VALUE_C");
-    span_store->setSamplingStatus(sample);
-    span_store->endSpan(false);
+
+    if (!sample)
+      span_store->setSkipAnalysis();
+
+    span_store->endSpan();
 
     return span_store;
   }

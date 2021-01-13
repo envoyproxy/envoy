@@ -84,14 +84,14 @@ for how to update or override dependencies.
     ```
 
     Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
-    
+
     #### Config Flag Choices
-    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:   
-    
+    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:
+
     - `--config=libc++` means using `clang` + `libc++`
     - `--config=clang` means using `clang` + `libstdc++`
     - no config flag means using `gcc` + `libstdc++`
-  
+
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):

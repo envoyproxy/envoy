@@ -94,13 +94,14 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->service());
     EXPECT_EQ("FAKE_FAKE_FAKE", span->segmentContext()->serviceInstance());
 
-    // Tracing decision will be overwrite by sampling flag in propagation headers.
-    EXPECT_EQ(false, span->segmentContext()->defaultSamplingStatus());
+    // Tracing decision will be overwrite by skip analysis flag in propagation headers.
+    EXPECT_FALSE(span->segmentContext()->skipAnalysis());
 
     // Since the sampling flag is false, no segment data is reported.
+    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
 
-    EXPECT_EQ(0U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+    EXPECT_EQ(1U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
   }
 
   {
@@ -108,17 +109,18 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     Http::TestRequestHeaderMapImpl new_request_headers{
         {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
 
-    Tracing::SpanPtr org_new_span = driver_->startSpan(mock_tracing_config_, new_request_headers,
-                                                       "", time_system_.systemTime(), decision);
+    Tracing::SpanPtr org_span = driver_->startSpan(mock_tracing_config_, new_request_headers, "",
+                                                   time_system_.systemTime(), decision);
 
-    Span* new_span = dynamic_cast<Span*>(org_new_span.get());
-    ASSERT(new_span);
+    Span* span = dynamic_cast<Span*>(org_span.get());
+    ASSERT(span);
 
-    EXPECT_EQ(true, new_span->segmentContext()->defaultSamplingStatus());
+    EXPECT_FALSE(span->segmentContext()->skipAnalysis());
 
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
-    new_span->finishSpan();
-    EXPECT_EQ(1U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+    span->finishSpan();
+
+    EXPECT_EQ(2U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
   }
 
   {
@@ -147,9 +149,13 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
                                                time_system_.systemTime(), decision);
     Span* new_span = dynamic_cast<Span*>(span.get());
     ASSERT(new_span);
-    EXPECT_EQ(false, new_span->segmentContext()->defaultSamplingStatus());
+
+    EXPECT_TRUE(new_span->segmentContext()->skipAnalysis());
+
+    EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
-    EXPECT_EQ(1U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+
+    EXPECT_EQ(3U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
   }
 }
 

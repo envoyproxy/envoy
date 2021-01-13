@@ -27,7 +27,7 @@ public:
                                 Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                 SkyWalkingTracerStats& stats, uint32_t delayed_buffer_size,
                                 const std::string& token);
-  ~TraceSegmentReporter();
+  ~TraceSegmentReporter() override;
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;

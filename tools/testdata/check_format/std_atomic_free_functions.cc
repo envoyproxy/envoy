@@ -8,3 +8,4 @@ void do_atomic_stuff() {
 }
 
 } // namespace Envoy
+

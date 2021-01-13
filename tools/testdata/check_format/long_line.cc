@@ -1,6 +1,5 @@
 namespace Envoy {
 
-HereIsAVeryLongTypeItsReallyPrettyAbsurdButSomeTimesWeNeedToBeCreative&
-andIfWeMakeTypeLongWeShouldMakeTheFunctionLongTooDontYouThink(int a, int b);
+HereIsAVeryLongTypeItsReallyPrettyAbsurdButSomeTimesWeNeedToBeCreative& andIfWeMakeTypeLongWeShouldMakeTheFunctionLongTooDontYouThink(int a, int b);
 
 } // namespace Envoy

@@ -28,14 +28,14 @@ public:
         segment_context_(segment_context) {}
 
   // Tracing::Span
-  void setOperation(absl::string_view operation) override;
+  void setOperation(absl::string_view) override {}
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestam, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Http::RequestHeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
-  void setSampled(bool do_sample) override { span_entity_->setSamplingStatus(do_sample); }
+  void setSampled(bool do_sample) override;
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; }

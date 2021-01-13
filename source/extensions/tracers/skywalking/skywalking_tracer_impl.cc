@@ -53,7 +53,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // TODO(shikugawa): support extension span header.
   auto propagation_header = request_headers.get(kSkywalkingPropagationHeaderKey);
   if (propagation_header.empty()) {
-    segment_context = segment_context_factory_->create(decision.traced);
+    segment_context = segment_context_factory_->create();
+    // Sampling status is always true on SkyWalking. But with disabling skip_analysis,
+    // this span can't be analyzed.
+    if (!decision.traced) {
+      segment_context->setSkipAnalysis();
+    }
   } else {
     auto header_value_string = propagation_header[0]->value().getStringView();
     try {
