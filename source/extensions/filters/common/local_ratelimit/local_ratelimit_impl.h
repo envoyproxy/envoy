@@ -35,6 +35,14 @@ private:
   struct LocalDescriptorImpl : public RateLimit::LocalDescriptor {
     std::unique_ptr<TokenState> token_state_;
     RateLimit::TokenBucket token_bucket_;
+    std::string ToString() const {
+      std::vector<std::string> entries;
+      entries.reserve(entries_.size());
+      for (const auto& entry : entries_) {
+        entries.push_back(absl::StrCat(entry.key_, "=", entry.value_));
+      }
+      return absl::StrJoin(entries, ", ");
+    }
   };
   struct LocalDescriptorHash {
     using is_transparent = void; // NOLINT(readability-identifier-naming)t
@@ -42,7 +50,6 @@ private:
       return absl::Hash<std::vector<RateLimit::DescriptorEntry>>()(d.entries_);
     }
   };
-
   struct LocalDescriptorEqual {
     using is_transparent = void; // NOLINT(readability-identifier-naming)
     size_t operator()(const RateLimit::LocalDescriptor& a,
@@ -50,6 +57,7 @@ private:
       return a.entries_ == b.entries_;
     }
   };
+
   void onFillTimer();
   void onFillTimerHelper(const TokenState& state, const RateLimit::TokenBucket& bucket);
   void onFillTimerDescriptorHelper();

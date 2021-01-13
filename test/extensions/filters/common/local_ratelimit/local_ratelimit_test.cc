@@ -227,7 +227,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
 
   EXPECT_THROW_WITH_MESSAGE(
       LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_),
-      EnvoyException, "duplicate descriptor in the local rate descriptor");
+      EnvoyException, "duplicate descriptor in the local rate descriptor: foo2=bar2");
 }
 
 // Verify no exception for per route config without descriptors.
