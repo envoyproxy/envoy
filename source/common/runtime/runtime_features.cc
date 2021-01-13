@@ -64,7 +64,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.consume_all_retry_headers",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
-    "envoy.reloadable_features.disallow_unbounded_access_logs",
     "envoy.reloadable_features.early_errors_via_hcm",
     "envoy.reloadable_features.enable_dns_cache_circuit_breakers",
     "envoy.reloadable_features.fix_upgrade_response",
