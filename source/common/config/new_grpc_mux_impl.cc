@@ -164,7 +164,7 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   std::set<std::string> xdstp_resources;
   // TODO(htuch): add support for resources beyond glob collections, the constraints below around
   // resource size and ID reflect the progress of the xdstp:// implementation.
-  if (XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
+  if (!resources.empty() && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
     // Callers must be asking for a single resource, the collection.
     ASSERT(resources.size() == 1);
     auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
