@@ -133,7 +133,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//include/envoy/upstream:scheduler_interface",
         "//include/envoy/common:random_generator_interface",
-        "//source/common/common:random_generator_lib", # @tallen
     ],
 )
 

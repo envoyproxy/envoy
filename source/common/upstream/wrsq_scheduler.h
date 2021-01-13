@@ -32,12 +32,14 @@ namespace Upstream {
 // For the case where all object weights are the same, WRSQ behaves identical to vanilla
 // round-robin. If all object weights are different, it behaves identical to weighted random
 // selection.
+//
+// NOTE: This class only supports integral weights and does not allow for the changing of object
+// weights on the fly.
 template <class C>
 class WRSQScheduler : public Scheduler<C> {
  public:
   WRSQScheduler(Random::RandomGenerator& random) : random_(random) {}
 
-  // Upstream::Scheduler.
   std::shared_ptr<C> peekAgain(std::function<double(const C&)>) override {
     std::shared_ptr<C> picked{pickAndAddInternal()};
     if (picked != nullptr) {
@@ -79,6 +81,7 @@ class WRSQScheduler : public Scheduler<C> {
     ObjQueue* q;
   };
 
+  // If needed, such as after object expiry or addition, rebuild the cumulative weights vector.
   void maybeRebuildCumulativeWeights() {
     if (!rebuild_cumulative_weights_) {
       return;
@@ -97,6 +100,9 @@ class WRSQScheduler : public Scheduler<C> {
     rebuild_cumulative_weights_ = false;
   }
 
+  // Performs a weighted random selection on the queues containing objects of the same weight.
+  // Popping off the top of the queue to pick an object will honor the selection problability based
+  // on the weight provided when the object was added.
   QueueInfo chooseQueue() {
     ASSERT(!queue_map_.empty());
 
@@ -153,6 +159,9 @@ class WRSQScheduler : public Scheduler<C> {
   // A mapping from an object weight to the associated queue.
   QueueMap queue_map_;
 
+  // Stores the necessary information to perform a weighted random selection of the different
+  // queues. A cumulative sum is also kept of the total object weights for a queue, which allows for
+  // a single random number generation and a binary search to pick a queue.
   std::vector<QueueInfo> cumulative_weights_;
 
   // Keeps state that determines whether the cumulative weights need to be rebuilt. If any objects

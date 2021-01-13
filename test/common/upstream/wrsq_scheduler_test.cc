@@ -186,6 +186,69 @@ TEST(WRSQSchedulerTest, ManyPeekahead) {
   }
 }
 
+// Expire all objects and verify nullptr is returned.
+TEST(WRSQSchedulerTest, ExpireAll) {
+  Random::MockRandomGenerator random;
+  WRSQScheduler<uint32_t> sched(random);
+
+  // The weights are small enough that we can just burn through all the relevant random numbers that
+  // would be generated as long as we hit 12 consecutive numbers for each part.
+  uint32_t rnum{0};
+
+  {
+    // Add objects of the same weight.
+    auto e1 = std::make_shared<uint32_t>(42);
+    auto e2 = std::make_shared<uint32_t>(37);
+    sched.add(1, e1);
+    sched.add(1, e2);
+
+    {
+      auto e3 = std::make_shared<uint32_t>(7);
+      auto e4 = std::make_shared<uint32_t>(13);
+      sched.add(5, e3);
+      sched.add(5, e4);
+
+      // We've got unexpired values, so we should be able to pick them. While we're at it, we can
+      // check we're getting objects from both weight queues.
+      uint32_t weight1pick{0}, weight5pick{0};
+      for (int i = 0; i < 1000; ++i) {
+        EXPECT_CALL(random, random()).WillOnce(Return(rnum++));
+        switch (*sched.pickAndAdd([](const double&) { return 1; })) {
+          case 42:
+          case 37:
+            ++weight1pick;
+            break;
+          case 7:
+          case 13:
+            ++weight5pick;
+            break;
+          default:
+            EXPECT_TRUE(false) << "bogus value returned";
+        }
+      }
+      EXPECT_GT(weight5pick, 0);
+      EXPECT_GT(weight1pick, 0);
+    }
+
+    // Expired the entirety of the high-probability queue. Let's make sure we behave properly by
+    // expiring them and only returning the unexpired entries.
+    for (int i = 0; i < 1000; ++i) {
+      EXPECT_CALL(random, random()).WillRepeatedly(Return(rnum++));
+      switch (*sched.peekAgain([](const double&) { return 1; })) {
+        case 42:
+        case 37:
+          break;
+        default:
+          EXPECT_TRUE(false) << "bogus value returned";
+      }
+    }
+  }
+
+  // All values have expired, so only nullptr should be returned.
+  EXPECT_CALL(random, random()).WillRepeatedly(Return(rnum++));
+  EXPECT_EQ(sched.peekAgain([](const double&) { return 1; }), nullptr);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
