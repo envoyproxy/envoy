@@ -220,6 +220,12 @@ EXTENSIONS = {
     #
 
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
+    
+    #
+    # IO socket
+    #
+
+    "envoy.io_socket.user_space_socket":                "//source/extensions/io_socket/buffered_io_socket:buffered_io_socket_handle_lib",
 
     #
     # WebAssembly runtimes
@@ -231,9 +237,10 @@ EXTENSIONS = {
     "envoy.wasm.runtime.wasmtime":                      "//source/extensions/wasm_runtime/wasmtime:config",
 
     #
-    # IO socket
+    # Rate limit descriptors
     #
-    "envoy.io_socket.user_space_socket":                "//source/extensions/io_socket/buffered_io_socket:buffered_io_socket_handle_lib",
+
+    "envoy.rate_limit_descriptors.expr":                "//source/extensions/rate_limit_descriptors/expr:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

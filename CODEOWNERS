@@ -153,6 +153,8 @@ extensions/filters/common/original_src @snowp @klarose
 # Core upstream code
 extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
+# user space socket pair and event
+/*/extensions/io_socket/buffered_io_socket @lambdai @antoniovicente
 # OAuth2
 extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Local Rate Limit
@@ -160,5 +162,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
-# user space socket pair and event
-/*/extensions/io_socket/buffered_io_socket @lambdai @antoniovicente
+# Rate limit expression descriptor
+/*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
