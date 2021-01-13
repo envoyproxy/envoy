@@ -68,6 +68,9 @@ TEST_F(DnsCacheResourceManagerTest, CheckDnsResource) {
   EXPECT_EQ(2, pending_requests.count());
   EXPECT_TRUE(pending_requests.canCreate());
 
+  EXPECT_EQ(0, resource_manager_->stats().rq_pending_open_.value());
+  EXPECT_EQ(0, resource_manager_->stats().rq_pending_remaining_.value());
+
   cleanup();
 }
 } // namespace
