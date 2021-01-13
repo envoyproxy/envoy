@@ -13,12 +13,15 @@ TLS Server name indication (``SNI``)
    :ref:`jq <start_sandboxes_setup_jq>`
 	Parse ``json`` output from the upstream echo servers.
 
-This example demonstrates an Envoy proxy that listens on multiple domains
-on the same ``IP`` address and either provides separate ``TLS`` termination
-or proxies to an upstream ``TLS`` service for each.
+This example demonstrates an Envoy proxy that listens on three ``TLS`` domains
+on the same ``IP`` address.
 
-It also demonstrates Envoy acting as a client proxy connecting to upstream
-``SNI`` services.
+The first two domains (``domain1`` and ``domain2``) terminate the ``TLS`` and proxy
+to upstream ``HTTP`` hosts.
+
+The other domain (``domain3``) is proxied unterminated, based on the ``SNI`` headers.
+
+It also demonstrates Envoy acting as a client proxy connecting to upstream ``SNI`` services.
 
 .. _install_sandboxes_tls_sni_step1:
 
@@ -84,9 +87,11 @@ In front of these is an Envoy proxy that listens on https://localhost:10000 and 
 - ``domain2.example.com``
 - ``domain3.example.com``
 
-This proxy uses the keys and certificates :ref:`you created in step 1 <install_sandboxes_tls_sni_step1>`.
+The first two domains use the keys and certificates :ref:`you created in step 1 <install_sandboxes_tls_sni_step1>` to  terminate ``TLS``.
 
-It also starts an Envoy proxy client which listens on http://localhost:20000.
+The third domain proxies to the upstream ``TLS`` server based on the requested ``SNI`` address, and does no ``TLS`` termination itself.
+
+The composition also starts an Envoy proxy client which listens on http://localhost:20000.
 
 The client proxy has no ``TLS`` termination but instead proxies three routed paths -
 ``/domain1``, ``/domain2`` and ``/domain3`` - to the ``SNI``-enabled proxy.

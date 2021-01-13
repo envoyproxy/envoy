@@ -20,7 +20,6 @@ mkdir -p certs
 run_log "Create certificates for each of the services"
 create_self_signed_certs domain1
 create_self_signed_certs domain2
-# create_self_signed_certs domain3
 
 bring_up_example
 
