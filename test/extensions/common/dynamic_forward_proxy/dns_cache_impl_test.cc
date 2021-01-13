@@ -662,7 +662,7 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
 TEST_F(DnsCacheImplTest, CircuitBreakersNotInvoked) {
   initialize();
 
-  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  auto raii_ptr = dns_cache_->canCreateDnsRequest();
   EXPECT_NE(raii_ptr.get(), nullptr);
 }
 
@@ -670,7 +670,7 @@ TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
   config_.mutable_dns_cache_circuit_breaker()->mutable_max_pending_requests()->set_value(0);
   initialize();
 
-  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  auto raii_ptr = dns_cache_->canCreateDnsRequest();
   EXPECT_EQ(raii_ptr.get(), nullptr);
   EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
@@ -680,7 +680,7 @@ TEST_F(DnsCacheImplTest, ClustersCircuitBreakersOverflow) {
   NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
 
   EXPECT_CALL(pending_requests_, canCreate()).WillOnce(Return(false));
-  auto raii_ptr = dns_cache_->canCreateDnsRequest(pending_requests_);
+  auto raii_ptr = dns_cache_->canCreateDnsRequest();
   EXPECT_EQ(raii_ptr.get(), nullptr);
   EXPECT_EQ(0, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
