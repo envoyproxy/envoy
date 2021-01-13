@@ -12,19 +12,18 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 45
     container:
-      image: envoyproxy/envoy-build-ubuntu:04f06115b6ee7cfea74930353fb47a41149cbec3
+      image: envoyproxy/envoy-build-ubuntu:11efa5680d987fff33fde4af3cc5ece105015d04
+      env:
+        CLANG_FORMAT: /opt/llvm/bin/clang-format
+        BUILDIFIER_BIN: /usr/local/bin/buildifier
+        BUILDOZER_BIN: /usr/local/bin/buildozer
+        ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
       - name: 'Run formatters'
-        run: |
-          export PATH=/opt/llvm/bin:$PATH
-          export CLANG_FORMAT=clang-format
-          export BUILDIFIER_BIN=/usr/local/bin/buildifier
-          export BUILDOZER_BIN=/usr/local/bin/buildozer
-          export ENVOY_BAZEL_PREFIX=@envoy
-          ./tools/check_format.sh
+        run: ./tools/check_format.sh
   precommit:
     name: precommit
     runs-on: macOS-latest
@@ -47,19 +46,24 @@ jobs:
         run: swiftlint lint --strict
   kotlinlint:
     name: kotlin_lint
-    runs-on: ubuntu-18.04
+    runs-on: macOS-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/linux_ci_setup.sh
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
       - name: 'Run Kotlin Lint (Detekt)'
         run: |
-          bazelisk build \
+          bazel build \
             //library/kotlin/src/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
       - name: 'Run Kotlin Formatter (ktlint)'
         run: |
-          bazelisk build kotlin_format
+          bazel build kotlin_format

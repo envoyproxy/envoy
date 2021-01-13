@@ -10,12 +10,12 @@ jobs:
     name: android_deploy
     runs-on: ubuntu-18.04
     timeout-minutes: 240
+    container:
+      image: envoyproxy/envoy-build-ubuntu:11efa5680d987fff33fde4af3cc5ece105015d04
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/linux_ci_setup.sh
       - name: 'Configure envoy-bot git user'
         run: |
           # Switch global user to be envoy-bot for deployment
@@ -30,7 +30,7 @@ jobs:
 
           # Build and create the artifacts
           current_release_tag=$(git describe --tags --abbrev=0 --exact-match)
-          bazelisk build \
+          bazel build \
             --config=release-android \
             --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a \
             --define=pom_version="${current_release_tag:1}" \

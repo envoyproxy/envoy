@@ -14,24 +14,24 @@ jobs:
     name: coverage
     runs-on: ubuntu-18.04
     timeout-minutes: 120
+    container:
+      image: envoyproxy/envoy-build-ubuntu:11efa5680d987fff33fde4af3cc5ece105015d04
+      env:
+        BAZEL_BUILD_OPTIONS: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+        COVERAGE_THRESHOLD: 95
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/linux_ci_setup.sh
       - name: 'Run coverage'
         continue-on-error: true
-        run: |
-          export PATH=/usr/lib/llvm-10/bin:$PATH
-          export CC=clang
-          export CXX=clang++
-          export COVERAGE_THRESHOLD=95
-          ./envoy/test/run_envoy_bazel_coverage.sh //test/...
+        run: "PATH=/opt/llvm/bin:${PATH} ./envoy/test/run_envoy_bazel_coverage.sh //test/..."
       - name: 'package coverage'
         run: |
           tar -czvf coverage.tar.gz generated/coverage
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: coverage.tar.gz
           path: coverage.tar.gz

@@ -10,27 +10,28 @@ on:
 jobs:
   main_android_dist_ci:
     name: main_android_dist_ci
-    runs-on: ubuntu-18.04
+    runs-on: macOS-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: 'Install dependencies'
-        run: ./ci/linux_ci_setup.sh
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
         run: |
-          export PATH=/usr/lib/llvm-10/bin:$PATH
-          export CC=clang
-          export CXX=clang++
-          export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
           current_short_commit=$(git rev-parse --short HEAD)
           bazelisk build \
               --config=release-android \
               --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a \
               --define=pom_version=main-$current_short_commit \
               //:android_dist_ci
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: envoy_android_aar_sources
           path: bazel-bin/envoy_mobile.zip
@@ -50,7 +51,7 @@ jobs:
         run: mkdir -p dist/ios_artifact/Envoy.framework
       - name: 'Move artifact to directory for zipping'
         run: mv dist/Envoy.framework/* dist/ios_artifact/Envoy.framework
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: envoy_ios_framework
           path: dist/ios_artifact
@@ -65,7 +66,7 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: envoy_ios_framework
           path: dist/envoy_ios_cocoapods
@@ -75,7 +76,7 @@ jobs:
         run: mkdir -p dist/envoy_ios_cocoapods/Envoy.framework/Swift
       - name: 'Create empty Swift file to force Swift libraries to link properly'
         run: touch dist/envoy_ios_cocoapods/Envoy.framework/Swift/Empty.swift
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: envoy_ios_cocoapods
           path: dist/envoy_ios_cocoapods

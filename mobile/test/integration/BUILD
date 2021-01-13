@@ -10,7 +10,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common/extensions/filters/http/local_error:config",
-        "//library/common/extensions/filters/http/local_error:pkg_cc_proto",
+        "//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "//library/common/http:dispatcher_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",

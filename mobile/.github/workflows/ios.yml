@@ -22,7 +22,7 @@ jobs:
       - name: 'Zip Envoy.framework.zip distributable'
         run: zip -r dist/Envoy.framework.zip dist/Envoy.framework
       - run: ls -lh dist/
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v2
         with:
           name: Envoy.framework.zip
           path: dist/Envoy.framework.zip
@@ -37,7 +37,7 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: Envoy.framework.zip
           path: dist/
@@ -61,7 +61,7 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: Envoy.framework.zip
           path: dist/
