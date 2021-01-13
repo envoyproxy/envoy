@@ -87,9 +87,10 @@ In front of these is an Envoy proxy that listens on https://localhost:10000 and 
 - ``domain2.example.com``
 - ``domain3.example.com``
 
-The first two domains use the keys and certificates :ref:`you created in step 1 <install_sandboxes_tls_sni_step1>` to  terminate ``TLS``.
+The first two domains use the keys and certificates :ref:`you created in step 1 <install_sandboxes_tls_sni_step1>` to  terminate ``TLS`` and
+proxy to the two upstream ``HTTP`` servers.
 
-The third domain proxies to the upstream ``TLS`` server based on the requested ``SNI`` address, and does no ``TLS`` termination itself.
+The third domain proxies to the upstream ``TLS`` server based on the requested ``SNI`` address, but does no ``TLS`` termination itself.
 
 The composition also starts an Envoy proxy client which listens on http://localhost:20000.
 
