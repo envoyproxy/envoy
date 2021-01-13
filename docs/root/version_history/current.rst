@@ -21,7 +21,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * active http health checks: properly handles HTTP/2 GOAWAY frames from the upstream. Previously a GOAWAY frame due to a graceful listener drain could cause improper failed health checks due to streams being refused by the upstream on a connection that is going away. To revert to old GOAWAY handling behavior, set the runtime feature `envoy.reloadable_features.health_check.graceful_goaway_handling` to false.
-* http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures.
+* http: reverting a behavioral change where upstream connect timeouts were temporarily treated differently from other connection failures. The change back to the original behavior can be temporarily reverted by setting `envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure` to false.
 
 Removed Config or Runtime
 -------------------------
