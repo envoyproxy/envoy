@@ -12,8 +12,10 @@
 #include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracker.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -26,7 +28,19 @@ namespace {
 constexpr absl::string_view kTransportSocketConnectTimeoutTerminationDetails =
     "transport socket timeout was reached";
 
+std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
+  switch (connection_state) {
+  case Connection::State::Open:
+    return os << "Open";
+  case Connection::State::Closing:
+    return os << "Closing";
+  case Connection::State::Closed:
+    return os << "Closed";
+  }
+  return os;
 }
+
+} // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
@@ -530,6 +544,7 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
 }
 
 void ConnectionImpl::onFileEvent(uint32_t events) {
+  ScopeTrackerScopeState scope(this, this->dispatcher_);
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
   if (immediate_error_event_ != ConnectionEvent::Connected) {
@@ -753,6 +768,14 @@ void ConnectionImpl::flushWriteBuffer() {
   }
 }
 
+void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "ConnectionImpl " << this << DUMP_MEMBER(connecting_) << DUMP_MEMBER(bind_error_)
+     << DUMP_MEMBER(state()) << DUMP_MEMBER(read_buffer_limit_) << "\n";
+
+  DUMP_DETAILS(socket_);
+}
+
 ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                                            ConnectionSocketPtr&& socket,
                                            TransportSocketPtr&& transport_socket,
@@ -794,7 +817,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
                      std::move(transport_socket), stream_info_, false),
-      stream_info_(dispatcher.timeSource()) {
+      stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
@@ -810,8 +833,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 
     const Network::Address::InstanceConstSharedPtr* source = &source_address;
 
-    if (socket_->localAddress()) {
-      source = &socket_->localAddress();
+    if (socket_->addressProvider().localAddress()) {
+      source = &socket_->addressProvider().localAddress();
     }
 
     if (*source != nullptr) {
@@ -833,8 +856,9 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
+  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
+                 socket_->addressProvider().remoteAddress()->asString());
+  const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);

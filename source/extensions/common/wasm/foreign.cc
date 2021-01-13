@@ -19,6 +19,8 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
+using CelStateType = Filters::Common::Expr::CelStateType;
+
 template <typename T> WasmForeignFunction createFromClass() {
   auto c = std::make_shared<T>();
   return c->create(c);
@@ -224,19 +226,19 @@ public:
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::DeclarePropertyArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
-        WasmType type = WasmType::Bytes;
+        CelStateType type = CelStateType::Bytes;
         switch (args.type()) {
         case envoy::source::extensions::common::wasm::WasmType::Bytes:
-          type = WasmType::Bytes;
+          type = CelStateType::Bytes;
           break;
         case envoy::source::extensions::common::wasm::WasmType::Protobuf:
-          type = WasmType::Protobuf;
+          type = CelStateType::Protobuf;
           break;
         case envoy::source::extensions::common::wasm::WasmType::String:
-          type = WasmType::String;
+          type = CelStateType::String;
           break;
         case envoy::source::extensions::common::wasm::WasmType::FlatBuffers:
-          type = WasmType::FlatBuffers;
+          type = CelStateType::FlatBuffers;
           break;
         default:
           // do nothing
@@ -259,8 +261,8 @@ public:
         }
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->declareProperty(
-            args.name(),
-            std::make_unique<const WasmStatePrototype>(args.readonly(), type, args.schema(), span));
+            args.name(), std::make_unique<const Filters::Common::Expr::CelStatePrototype>(
+                             args.readonly(), type, args.schema(), span));
       }
       return WasmResult::BadArgument;
     };
