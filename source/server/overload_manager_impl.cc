@@ -90,7 +90,7 @@ public:
     const OverloadActionState state = actionState();
     state_ =
         value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
-    // This is a floating point comparision, though state_ is always either
+    // This is a floating point comparison, though state_ is always either
     // saturated or inactive so there's no risk due to floating point precision.
     return state.value() != actionState().value();
   }
@@ -125,7 +125,7 @@ public:
     }
     // All values of state_ are produced via this same code path. Even if
     // old_state and state_ should be approximately equal, there's no harm in
-    // signalling for a small change if they're not float::operator== equal.
+    // signaling for a small change if they're not float::operator== equal.
     return state_.value() != old_state.value();
   }
 
