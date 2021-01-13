@@ -79,7 +79,7 @@ public:
     Extensions::Common::Wasm::Context::log(static_cast<spdlog::level::level_enum>(level), message);
     return proxy_wasm::WasmResult::Ok;
   }
-  MOCK_METHOD2(log_, void(spdlog::level::level_enum level, absl::string_view message));
+  MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message));
 };
 
 class WasmCommonTest : public testing::TestWithParam<std::string> {
@@ -147,9 +147,10 @@ TEST_P(WasmCommonTest, EnvoyWasm) {
 
   delete root_context;
 
-  WasmStatePrototype wasm_state_prototype(true, WasmType::Bytes, "",
-                                          StreamInfo::FilterState::LifeSpan::FilterChain);
-  auto wasm_state = std::make_unique<WasmState>(wasm_state_prototype);
+  Filters::Common::Expr::CelStatePrototype wasm_state_prototype(
+      true, Filters::Common::Expr::CelStateType::Bytes, "",
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto wasm_state = std::make_unique<Filters::Common::Expr::CelState>(wasm_state_prototype);
   Protobuf::Arena arena;
   EXPECT_EQ(wasm_state->exprValue(&arena, true).MessageOrDie(), nullptr);
   wasm_state->setValue("foo");
@@ -446,6 +447,9 @@ TEST_P(WasmCommonTest, Utilities) {
 }
 
 TEST_P(WasmCommonTest, Stats) {
+  // We set logger level to critical here to gain more coverage.
+  Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::critical);
+
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Upstream::MockClusterManager cluster_manager;

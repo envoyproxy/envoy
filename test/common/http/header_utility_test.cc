@@ -53,9 +53,18 @@ TEST_F(HeaderUtilityTest, RemovePortsFromHost) {
       {"[fc00::1]:80", "[fc00::1]:80"}      // port not matching w/ ipv6
   };
 
+  const std::vector<std::pair<std::string, std::string>> any_host_headers{
+      {"localhost:9999", "localhost"}, // name any port
+  };
+
   for (const auto& host_pair : host_headers) {
     auto& host_header = hostHeaderEntry(host_pair.first);
     HeaderUtility::stripPortFromHost(headers_, 443);
+    EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
+  }
+  for (const auto& host_pair : any_host_headers) {
+    auto& host_header = hostHeaderEntry(host_pair.first);
+    HeaderUtility::stripPortFromHost(headers_, absl::nullopt);
     EXPECT_EQ(host_header.value().getStringView(), host_pair.second);
   }
 }
@@ -681,6 +690,15 @@ TEST(PercentEncoding, ShouldCloseConnection) {
       Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "close"}}));
   EXPECT_TRUE(HeaderUtility::shouldCloseConnection(
       Protocol::Http11, TestRequestHeaderMapImpl{{"proxy-connection", "foo,close"}}));
+}
+
+TEST(RequiredHeaders, IsRemovableHeader) {
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader(":path"));
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader("host"));
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader("Host"));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader(""));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader("hostname"));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader("Content-Type"));
 }
 
 } // namespace Http

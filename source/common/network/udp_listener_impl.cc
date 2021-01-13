@@ -37,8 +37,9 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
 
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
-    throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
-                                              socket_->localAddress()->asString()));
+    throw CreateListenerException(
+        fmt::format("cannot set post-bound socket option on socket: {}",
+                    socket_->addressProvider().localAddress()->asString()));
   }
 }
 
@@ -69,7 +70,8 @@ void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
-      socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
+      socket_->ioHandle(), *socket_->addressProvider().localAddress(), *this, time_source_,
+      packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     // TODO(mattklein123): When rate limited logging is implemented log this at error level
@@ -99,7 +101,7 @@ void UdpListenerImpl::handleWriteCallback() {
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 
 const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
-  return socket_->localAddress();
+  return socket_->addressProvider().localAddress();
 }
 
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {

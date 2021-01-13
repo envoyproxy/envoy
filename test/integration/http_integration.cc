@@ -263,9 +263,11 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
-void HttpIntegrationTest::useAccessLog(absl::string_view format) {
+void HttpIntegrationTest::useAccessLog(
+    absl::string_view format,
+    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters) {
   access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format));
+  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format, formatters));
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
@@ -575,6 +577,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 

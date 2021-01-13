@@ -216,7 +216,8 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context);
+               std::unique_ptr<ProcessContext> process_context,
+               Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   ~InstanceImpl() override;
 
@@ -361,10 +362,10 @@ private:
   Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
-  const std::thread::id main_thread_id_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
+  ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
 

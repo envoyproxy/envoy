@@ -2,11 +2,16 @@
 
 #include <memory>
 
-#include "common/http/filter_manager.h"
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
+#include "envoy/network/socket.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/dump_state_utils.h"
@@ -17,6 +22,7 @@
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -36,19 +42,11 @@ public:
   }
 
   Http::RequestHeaderMapOptConstRef requestHeaders() const override {
-    if (request_headers_) {
-      return absl::make_optional(std::cref(*request_headers_));
-    }
-
-    return absl::nullopt;
+    return makeOptRefFromPtr(request_headers_);
   }
 
   Http::ResponseHeaderMapOptConstRef responseHeaders() const override {
-    if (response_headers_) {
-      return absl::make_optional(std::cref(*response_headers_));
-    }
-
-    return absl::nullopt;
+    return makeOptRefFromPtr(response_headers_);
   }
 
 private:
@@ -104,6 +102,36 @@ public:
   }
 };
 
+template <class DataInputType, class ProtoType>
+class HttpHeadersDataInputFactoryBase : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  explicit HttpHeadersDataInputFactoryBase(const std::string& name) : name_(name) {}
+
+  std::string name() const override { return name_; }
+
+  Matcher::DataInputPtr<HttpMatchingData>
+  createDataInput(const Protobuf::Message& config,
+                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
+
+    return std::make_unique<DataInputType>(typed_config.header_name());
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtoType>();
+  }
+
+private:
+  const std::string name_;
+};
+
+class HttpRequestHeadersDataInputFactory
+    : public HttpHeadersDataInputFactoryBase<
+          HttpRequestHeadersDataInput, envoy::type::matcher::v3::HttpRequestHeaderMatchInput> {
+public:
+  HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request-headers") {}
+};
+
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
@@ -112,6 +140,13 @@ public:
   headerMap(const HttpMatchingData& data) const override {
     return data.responseHeaders();
   }
+};
+
+class HttpResponseHeadersDataInputFactory
+    : public HttpHeadersDataInputFactoryBase<
+          HttpResponseHeadersDataInput, envoy::type::matcher::v3::HttpResponseHeaderMatchInput> {
+public:
+  HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response-headers") {}
 };
 
 class SkipAction : public Matcher::ActionBase<
@@ -149,6 +184,17 @@ private:
 using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
 
 struct ActiveStreamEncoderFilter;
+
+class SkipActionFactory : public Matcher::ActionFactory {
+public:
+  std::string name() const override { return "skip"; }
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&) override {
+    return []() { return std::make_unique<SkipAction>(); };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
+  }
+};
 
 /**
  * Base class wrapper for both stream encoder and decoder filters.
@@ -323,10 +369,13 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
+  ResponseHeaderMapOptRef continueHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
+  ResponseHeaderMapOptRef responseHeaders() const override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
+  ResponseTrailerMapOptRef responseTrailers() const override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -639,6 +688,49 @@ public:
 };
 
 /**
+ * This class allows the remote address to be overridden for HTTP stream info. This is used for
+ * XFF handling. This is required to avoid providing stream info with a non-const address provider.
+ * Private inheritance from SocketAddressProvider is used to make sure users get the address
+ * provider via the normal getter.
+ */
+class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                       private Network::SocketAddressProvider {
+public:
+  using StreamInfoImpl::StreamInfoImpl;
+
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    // TODO(rgs1): we should assert overridden_downstream_remote_address_ is nullptr,
+    // but we are currently relaxing this as a workaround to:
+    //
+    // https://github.com/envoyproxy/envoy/pull/14432#issuecomment-758167614
+    overridden_downstream_remote_address_ = downstream_remote_address;
+  }
+
+  // StreamInfo::StreamInfo
+  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
+
+  // Network::SocketAddressProvider
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddress();
+  }
+  bool localAddressRestored() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
+  }
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+    return overridden_downstream_remote_address_ != nullptr
+               ? overridden_downstream_remote_address_
+               : StreamInfoImpl::downstreamAddressProvider().remoteAddress();
+  }
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
+  }
+
+private:
+  Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
+};
+
+/**
  * FilterManager manages decoding a request through a series of decoding filter and the encoding
  * of the resulting response.
  */
@@ -656,7 +748,8 @@ public:
         connection_(connection), stream_id_(stream_id), proxy_100_continue_(proxy_100_continue),
         buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
         local_reply_(local_reply),
-        stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
+        stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
+                     parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -667,10 +760,10 @@ public:
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_) << "\n";
 
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseHeaders());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseTrailers());
+    DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
+    DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
+    DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
+    DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
     DUMP_DETAILS(&stream_info_);
   }
 
@@ -745,15 +838,15 @@ public:
   void log() {
     RequestHeaderMap* request_headers = nullptr;
     if (filter_manager_callbacks_.requestHeaders()) {
-      request_headers = &filter_manager_callbacks_.requestHeaders()->get();
+      request_headers = filter_manager_callbacks_.requestHeaders().ptr();
     }
     ResponseHeaderMap* response_headers = nullptr;
     if (filter_manager_callbacks_.responseHeaders()) {
-      response_headers = &filter_manager_callbacks_.responseHeaders()->get();
+      response_headers = filter_manager_callbacks_.responseHeaders().ptr();
     }
     ResponseTrailerMap* response_trailers = nullptr;
     if (filter_manager_callbacks_.responseTrailers()) {
-      response_trailers = &filter_manager_callbacks_.responseTrailers()->get();
+      response_trailers = filter_manager_callbacks_.responseTrailers().ptr();
     }
 
     for (const auto& log_handler : access_log_handlers_) {
@@ -876,11 +969,11 @@ public:
 
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
-        filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
+        filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
       state_.is_head_request_ = true;
     }
     state_.is_grpc_request_ =
-        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders()->get());
+        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders().ref());
   }
 
   void addStreamFilterAfter(StreamFilterSharedPtr filter, ActiveStreamDecoderFilter& wrapper) {
@@ -931,6 +1024,10 @@ public:
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
   const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
+  }
 
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
@@ -1023,7 +1120,7 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
-  StreamInfo::StreamInfoImpl stream_info_;
+  OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;

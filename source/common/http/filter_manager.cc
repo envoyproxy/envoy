@@ -16,6 +16,8 @@ namespace Envoy {
 namespace Http {
 
 namespace {
+REGISTER_FACTORY(HttpRequestHeadersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
+REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory);
 
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
 
@@ -377,11 +379,19 @@ void ActiveStreamDecoderFilter::encode100ContinueHeaders(ResponseHeaderMapPtr&& 
   }
 }
 
+ResponseHeaderMapOptRef ActiveStreamDecoderFilter::continueHeaders() const {
+  return parent_.filter_manager_callbacks_.continueHeaders();
+}
+
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
   parent_.stream_info_.setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
+}
+
+ResponseHeaderMapOptRef ActiveStreamDecoderFilter::responseHeaders() const {
+  return parent_.filter_manager_callbacks_.responseHeaders();
 }
 
 void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -392,6 +402,10 @@ void ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data, bool end_stre
 void ActiveStreamDecoderFilter::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   parent_.filter_manager_callbacks_.setResponseTrailers(std::move(trailers));
   parent_.encodeTrailers(nullptr, *parent_.filter_manager_callbacks_.responseTrailers());
+}
+
+ResponseTrailerMapOptRef ActiveStreamDecoderFilter::responseTrailers() const {
+  return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
 void ActiveStreamDecoderFilter::encodeMetadata(MetadataMapPtr&& metadata_map_ptr) {
@@ -501,6 +515,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ASSERT(!(status == FilterHeadersStatus::ContinueAndDontEndStream && !(*entry)->end_stream_),
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "decodeHeaders when end_stream is already false");
+    ENVOY_BUG(
+        !state_.local_complete_ || status == FilterHeadersStatus::StopIteration,
+        "Filters should return FilterHeadersStatus::StopIteration after sending a local reply.");
 
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
@@ -508,7 +525,8 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     (*entry)->decode_headers_called_ = true;
 
-    const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
+    const auto continue_iteration =
+        (*entry)->commonHandleAfterHeadersCallback(status, end_stream) && !state_.local_complete_;
 
     // If this filter ended the stream, decodeComplete() should be called for it.
     if ((*entry)->end_stream_) {
@@ -868,16 +886,14 @@ void FilterManager::sendLocalReplyViaFilterChain(
                  absl::string_view& content_type) -> void {
             // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
             // opt refs.
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
-                                     ? &filter_manager_callbacks_.requestHeaders()->get()
-                                     : nullptr,
-                                 response_headers, stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 stream_info_, code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             // TODO: Start encoding from the last decoder filter that saw the
             // request instead.
-            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders()->get(), end_stream);
+            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
             // TODO: Start encoding from the last decoder filter that saw the
@@ -909,10 +925,8 @@ void FilterManager::sendDirectLocalReply(
           },
           [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
               absl::string_view& content_type) -> void {
-            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().has_value()
-                                     ? &filter_manager_callbacks_.requestHeaders()->get()
-                                     : nullptr,
-                                 response_headers, stream_info_, code, body, content_type);
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 stream_info_, code, body, content_type);
           },
           [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
             // Move the response headers into the FilterManager to make sure they're visible to
@@ -1274,11 +1288,11 @@ bool FilterManager::createFilterChain() {
   bool upgrade_rejected = false;
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
-    upgrade = filter_manager_callbacks_.requestHeaders()->get().Upgrade();
+    upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
 
     // Treat CONNECT requests as a special upgrade case.
     if (!upgrade && HeaderUtility::isConnect(*filter_manager_callbacks_.requestHeaders())) {
-      upgrade = filter_manager_callbacks_.requestHeaders()->get().Method();
+      upgrade = filter_manager_callbacks_.requestHeaders()->Method();
     }
   }
 
