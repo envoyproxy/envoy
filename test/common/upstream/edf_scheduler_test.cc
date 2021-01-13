@@ -6,18 +6,18 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-TEST(TimeWheelTest, TwEmpty) {
+TEST(TimeWheelTest, Empty) {
   TimeWheel<uint32_t> sched;
   EXPECT_EQ(nullptr, sched.peekAgain([](const double&) { return 0; }));
   EXPECT_EQ(nullptr, sched.pickAndAdd([](const double&) { return 0; }));
 }
 
 // Validate we get regular RR behavior when all weights are the same.
-TEST(TimeWheelTest, TwUnweighted) {
+TEST(TimeWheelTest, Unweighted) {
   TimeWheel<uint32_t> sched;
-  // FIX: Stablizate the test when increasing `num_entries`. The impl is fine but the double
+  // FIX: Stabilize the test when increasing `num_entries`. The impl is fine but the double
   // precision give it the by-1 count error.
-  constexpr uint32_t num_entries = 4;
+  constexpr uint32_t num_entries = 128;
   std::shared_ptr<uint32_t> entries[num_entries];
 
   for (uint32_t i = 0; i < num_entries; ++i) {
@@ -25,7 +25,7 @@ TEST(TimeWheelTest, TwUnweighted) {
     sched.add(1, entries[i]);
   }
 
-  for (uint32_t rounds = 0; rounds < 4; ++rounds) {
+  for (uint32_t rounds = 0; rounds < 128; ++rounds) {
     for (uint32_t i = 0; i < num_entries; ++i) {
       auto peek = sched.peekAgain([](const double&) { return 1; });
       auto p = sched.pickAndAdd([](const double&) { return 1; });
@@ -35,11 +35,10 @@ TEST(TimeWheelTest, TwUnweighted) {
   }
 }
 
-TEST(TimeWheelTest, TwWeighted) {
+// Validate we get weighted RR behavior when weights are distinct.
+TEST(TimeWheelTest, Weighted) {
   TimeWheel<uint32_t> sched;
-  // FIX: Stablizate the test when increasing `num_entries`. The impl is fine but the double
-  // precision give it the by-1 count error.
-  constexpr uint32_t num_entries = 4;
+  constexpr uint32_t num_entries = 128;
   std::shared_ptr<uint32_t> entries[num_entries];
   uint32_t pick_count[num_entries];
 
@@ -47,31 +46,29 @@ TEST(TimeWheelTest, TwWeighted) {
     entries[i] = std::make_shared<uint32_t>(i);
     pick_count[i] = 0;
   }
-  // All the scheduable in the same slot are considered as the same deadline when picking. Insert
+  // All the schedulable in the same slot are considered as the same deadline when picking. Insert
   // the highest weight first so it is scheduled first. It's not a problem in the long run but order
   // matters in this test case.
   for (uint32_t i = 0; i < num_entries; ++i) {
     sched.add(num_entries - i, entries[num_entries - i - 1]);
   }
-  FANCY_LOG(error, "--------------after init------");
-  sched.dump();
-  FANCY_LOG(error, "--------------start test------");
-  for (uint32_t i = 0; i < (num_entries * (1 + num_entries)) / 2; ++i) {
+  for (uint32_t i = 0; i < (num_entries * (1 + num_entries)) / 2 * 10; ++i) {
     auto peek = sched.peekAgain([](const double& orig) { return orig + 1; });
-    sched.dump();
-
     auto p = sched.pickAndAdd([](const double& orig) { return orig + 1; });
-    sched.dump();
-
     EXPECT_EQ(*p, *peek);
     ++pick_count[*p];
   }
 
   for (uint32_t i = 0; i < num_entries; ++i) {
-    EXPECT_EQ(i + 1, pick_count[i]);
+    // `off-by-1` problem. Each of the scheduled task are expected to run 10 times the weight.
+    // Confirm that task are picked between [10xWeight-1, 10xWeight+1].
+    EXPECT_LE(10 * (i + 1) - 1, pick_count[i]);
+    EXPECT_GE(10 * (i + 1) + 1, pick_count[i]);
   }
 }
-TEST(TimeWheelTest, TwExpired) {
+
+// Validate that expired entries are ignored.
+TEST(TimeWheelTest, Expired) {
   TimeWheel<uint32_t> sched;
 
   auto second_entry = std::make_shared<uint32_t>(42);
@@ -87,7 +84,9 @@ TEST(TimeWheelTest, TwExpired) {
   EXPECT_EQ(*second_entry, *p);
   EXPECT_EQ(*second_entry, *p);
 }
-TEST(TimeWheelTest, TwExpiredPeek) {
+
+// Validate that expired entries are not peeked.
+TEST(TimeWheelTest, ExpiredPeek) {
   TimeWheel<uint32_t> sched;
 
   {
@@ -103,7 +102,7 @@ TEST(TimeWheelTest, TwExpiredPeek) {
 }
 
 // Validate that expired entries are ignored.
-TEST(TimeWheelTest, TwExpiredPeekedIsNotPicked) {
+TEST(TimeWheelTest, ExpiredPeekedIsNotPicked) {
   TimeWheel<uint32_t> sched;
 
   {

@@ -1,8 +1,9 @@
 #pragma once
 #include <cstdint>
 #include <iostream>
-#include <queue>
 #include <list>
+#include <queue>
+
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -21,24 +22,18 @@ namespace Upstream {
 template <class C> class TimeWheel {
   struct EdfEntry {
     double deadline_;
-    // Tie breaker for entries with the same deadline. This is used to provide FIFO behavior.
-    //    uint64_t order_offset_;
     // We only hold a weak pointer, since we don't support a remove operator. This allows entries
     // to be lazily unloaded from the queue.
     std::weak_ptr<C> entry_;
-
-    // Flip < direction to make this a min queue.
-    // bool operator<(const EdfEntry& other) const {
-    //   return deadline_ > other.deadline_ ||
-    //          (deadline_ == other.deadline_ && order_offset_ > other.order_offset_);
-    // }
   };
 
 public:
-  TimeWheel(int wheel_size = 16) : wheel_size_(wheel_size), wheel_(wheel_size) {}
+  TimeWheel(int wheel_size = 4) : wheel_size_(wheel_size), wheel_(wheel_size) {}
   void dump() {
     FANCY_LOG(trace, "prepick size = {}", prepick_list_.size());
-    FANCY_LOG(trace, "wheel size = {}", std::reduce(wheel_.begin(), wheel_.end(), 0, [](int acc, const auto& l) {return acc + l.size();} ));
+    FANCY_LOG(trace, "wheel size = {}",
+              std::reduce(wheel_.begin(), wheel_.end(), 0,
+                          [](int acc, const auto& l) { return acc + l.size(); }));
     FANCY_LOG(trace, "distant size = {}", distant_entries_.size());
   }
   void maybeAdvanceCurrent() {
@@ -56,7 +51,7 @@ public:
     offset_ = 0;
     spreadDistantEntries(distant_entries_, wheel_, current_lower_boundary_, per_slot_range_);
   }
-  void addDeadline(double deadline, std::shared_ptr<C> entry) {
+  void addDeadline(const double& deadline, std::weak_ptr<C> entry) {
     ASSERT(deadline > current_lower_boundary_);
     EDF_TRACE("Insertion {} in queue with deadline {}.", static_cast<const void*>(entry.get()),
               deadline);
@@ -69,7 +64,7 @@ public:
     }
     maybeAdvanceCurrent();
   }
-  void add(double weight, std::shared_ptr<C> entry) {
+  void add(const double& weight, std::weak_ptr<C> entry) {
     ASSERT(weight > 0);
     const double deadline = current_lower_boundary_ + 1.0 / weight;
     EDF_TRACE("Insertion {} in queue with deadline {} and weight {}.",
@@ -77,7 +72,7 @@ public:
     addDeadline(deadline, std::move(entry));
   }
   // TODO(lambdai): Currently the code assumes rotate the wheel by 1 is sufficient. It's not always
-  // true. Also need to fix with hierachical wheels.
+  // true. Also need to fix with hierarchical wheels.
   bool spreadDistantEntries(std::list<EdfEntry>& upper, std::vector<std::list<EdfEntry>>& lower,
                             const double& base, const double& span) {
     if (upper.empty()) {
@@ -94,9 +89,10 @@ public:
       }
       // No precision lost before 2 ^ 53 / (number of slot).
       int offset = static_cast<int>((iter->deadline_ - base) / span);
-      lower[offset].splice(lower[offset].begin(), upper, iter++);
+      // Push back to each slot so that the early element in upper wheel is early in lower wheel.
+      lower[offset].splice(lower[offset].end(), upper, iter++);
     }
-    // FIXME
+    // FIX-ME
     return true;
   }
 
@@ -135,7 +131,7 @@ public:
       bool spreaded =
           spreadDistantEntries(distant_entries_, wheel_, current_lower_boundary_, per_slot_range_);
       if (!spreaded) {
-        // FIXME: repeatedly spread until distant entries are empty.
+        // FIX-ME: repeatedly spread until distant entries are empty.
         return nullptr;
       }
     }
@@ -144,39 +140,39 @@ public:
   std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) {
     auto [has_next, next] = nextAvailableInWheel();
     if (has_next) {
-      prepick_list_.push(next.entry_);
-      const double deadline = next.deadline_ + 1.0 /
-                                                   // has_next guarantee the shared_ptr exists.
-                                                   calculate_weight(*next.entry_.lock());
-      addDeadline(deadline, next.entry_.lock());
+      prepick_list_.push(next->entry_);
+      const double deadline = next->deadline_ + 1.0 /
+                                                    // has_next guarantee the shared_ptr exists.
+                                                    calculate_weight(*(next->entry_.lock()));
+      addDeadline(deadline, next->entry_);
       wheel_[offset_].pop_front();
       maybeAdvanceCurrent();
-      return next.entry_.lock();
+      return next->entry_.lock();
     }
     return nullptr;
   }
   // TODO(lambdai): When is empty called? Consider maintain the current non-empty slot in the rest
-  // of th flow.
+  // of the flow.
   bool empty() const {
     return distant_entries_.empty() &&
            std::all_of(wheel_.begin(), wheel_.end(), [](auto& slot) { return slot.empty(); });
   }
 
 private:
-  std::pair<bool, EdfEntry> nextAvailableInWheel() {
+  std::pair<bool, EdfEntry*> nextAvailableInWheel() {
     // TODO(lambdai): dedup with pickAndAdd
     while (true) {
       while (offset_ < wheel_size_) {
         auto& current_slot = wheel_[offset_];
         while (!current_slot.empty()) {
-          const EdfEntry& edf_entry = current_slot.front();
+          EdfEntry& edf_entry = current_slot.front();
           // Entry has been removed, let's see if there's another one.
           if (edf_entry.entry_.expired()) {
             EDF_TRACE("Entry has expired, repick.");
             current_slot.pop_front();
             continue;
           }
-          return std::pair<bool, EdfEntry>(true, edf_entry);
+          return std::pair<bool, EdfEntry*>(true, &edf_entry);
         }
         ++offset_;
       }
@@ -184,8 +180,8 @@ private:
       bool spreaded =
           spreadDistantEntries(distant_entries_, wheel_, current_lower_boundary_, per_slot_range_);
       if (!spreaded) {
-        // FIXME: repeatedly spread until distant entries are empty.
-        return std::make_pair<bool, EdfEntry>(false, EdfEntry());
+        // FIX-ME: repeatedly spread until distant entries are empty.
+        return std::make_pair<bool, EdfEntry*>(false, nullptr);
       }
     }
   }
@@ -196,7 +192,7 @@ private:
   double per_slot_range_{1};
   double current_time_{0.0};
   std::list<EdfEntry> distant_entries_;
-  std::queue<std::weak_ptr<C>, std::list<std::weak_ptr<C>>> prepick_list_;
+  std::queue<std::weak_ptr<C>, std::deque<std::weak_ptr<C>>> prepick_list_;
 };
 
 // Earliest Deadline First (EDF) scheduler
