@@ -27,6 +27,7 @@ proto_library(
         "//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg",
         "//envoy/config/resource_monitor/injected_resource/v2alpha:pkg",
         "//envoy/config/retry/omit_canary_hosts/v2:pkg",
+        "//envoy/config/retry/omit_canary_hosts/v3:pkg",
         "//envoy/config/retry/previous_hosts/v2:pkg",
         "//envoy/config/route/v3:pkg",
         "//envoy/config/tap/v3:pkg",
