@@ -4,6 +4,7 @@ package envoy.config.listener.v4alpha;
 
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
@@ -23,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// [#next-free-field: 6]
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.listener.v3.Filter";
 
@@ -34,10 +36,16 @@ message Filter {
   // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
   oneof config_type {
+    // Filter specific configuration which depends on the filter being
+    // instantiated. See the supported filters for further documentation.
     google.protobuf.Any typed_config = 4;
+
+    // Configuration source specifier for an extension configuration discovery
+    // service. In case of a failure and without the default configuration, the
+    // listener closes the connections.
+    // [#not-implemented-hide:]
+    core.v4alpha.ExtensionConfigSource config_discovery = 5;
   }
 }
 
