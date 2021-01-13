@@ -95,6 +95,7 @@ envoy_extension_cc_test_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
