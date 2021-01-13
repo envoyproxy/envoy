@@ -439,8 +439,8 @@ TEST(Context, ConnectionAttributes) {
   Network::Address::InstanceConstSharedPtr upstream_local_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 1000, false);
   const std::string sni_name = "kittens.com";
-  EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
-  EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
+  info.downstream_address_provider_->setLocalAddress(local);
+  info.downstream_address_provider_->setRemoteAddress(remote);
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
   EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));

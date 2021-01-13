@@ -12,7 +12,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filter:96.3"
 "source/common/filter/http:96.3"
 "source/common/http/http3:50.0"
-"source/common/init:96.4"
 "source/common/json:90.6"
 "source/common/network:95.1"
 "source/common/protobuf:94.6"
@@ -36,7 +35,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/rbac:87.5"
 "source/extensions/filters/http/cache:92.4"
 "source/extensions/filters/http/cache/simple_http_cache:95.2"
-"source/extensions/filters/http/dynamic_forward_proxy:95.0"
 "source/extensions/filters/http/grpc_json_transcoder:94.8"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/kill_request:95.0" # Death tests don't report LCOV

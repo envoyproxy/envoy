@@ -332,7 +332,7 @@ void StreamEncoderImpl::readDisable(bool disable) {
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
 const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
-  return connection_.connection().localAddress();
+  return connection_.connection().addressProvider().localAddress();
 }
 
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
@@ -1212,15 +1212,6 @@ Envoy::StatusOr<int> ClientConnectionImpl::onHeadersComplete() {
         pending_response_.value().encoder_.connectRequest()) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;
-
-      // For responses to connect requests, do not accept the chunked
-      // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
-      if (headers->TransferEncoding() &&
-          absl::EqualsIgnoreCase(headers->TransferEncoding()->value().getStringView(),
-                                 Headers::get().TransferEncodingValues.Chunked)) {
-        RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));
-        return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
-      }
     }
 
     if (strict_1xx_and_204_headers_ && (parser_.status_code < 200 || parser_.status_code == 204)) {

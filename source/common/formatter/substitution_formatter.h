@@ -23,8 +23,9 @@ namespace Formatter {
 class SubstitutionFormatParser {
 public:
   static std::vector<FormatterProviderPtr> parse(const std::string& format);
+  static std::vector<FormatterProviderPtr>
+  parse(const std::string& format, const std::vector<CommandParserPtr>& command_parsers);
 
-private:
   /**
    * Parse a header format rule of the form: %REQ(X?Y):Z% .
    * Will populate a main_header and an optional alternative header if specified.
@@ -60,11 +61,23 @@ private:
                            const std::string& separator, std::string& main,
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 
+  /**
+   * Return a FormatterProviderPtr if a built-in command is parsed from the token. This method
+   * handles mapping the command name to an appropriate formatter after parsing.
+   *
+   * TODO(rgs1): this can be refactored into a dispatch table using the command name as the key and
+   * the parsing parameters as the value.
+   *
+   * @param token the token to parse
+   * @return FormattterProviderPtr substitution provider for the parsed command or nullptr
+   */
+  static FormatterProviderPtr parseBuiltinCommand(const std::string& token);
+
+private:
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
   static const size_t TrailParamStart{sizeof("TRAILER(") - 1};
-  static const size_t StartTimeParamStart{sizeof("START_TIME(") - 1};
 };
 
 /**
@@ -94,6 +107,8 @@ private:
 class FormatterImpl : public Formatter {
 public:
   FormatterImpl(const std::string& format, bool omit_empty_values = false);
+  FormatterImpl(const std::string& format, bool omit_empty_values,
+                const std::vector<CommandParserPtr>& command_parsers);
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -379,11 +394,15 @@ private:
 };
 
 /**
- * FormatterProvider for request start time from StreamInfo.
+ * Base FormatterProvider for system times from StreamInfo.
  */
-class StartTimeFormatter : public FormatterProvider {
+class SystemTimeFormatter : public FormatterProvider {
 public:
-  StartTimeFormatter(const std::string& format);
+  using TimeFieldExtractor =
+      std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
+  using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
+
+  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
@@ -393,8 +412,45 @@ public:
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
 
+protected:
+  // Given an access log token, attempt to parse out the format string between parenthesis.
+  //
+  // @param token The access log token, e.g. `START_TIME` or `START_TIME(...)`
+  // @param parameters_start The index of the first character where the parameters parenthesis would
+  //                         begin if it exists. Must not be out of bounds of `token` or its NUL
+  //                         char.
+  // @return The format string between parenthesis, or an empty string if none exists.
+  static std::string parseFormat(const std::string& token, size_t parameters_start);
+
 private:
   const Envoy::DateFormatter date_formatter_;
+  const TimeFieldExtractorPtr time_field_extractor_;
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for request start time from StreamInfo.
+ */
+class StartTimeFormatter : public SystemTimeFormatter {
+public:
+  StartTimeFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for downstream cert start time from the StreamInfo's
+ * ConnectionInfo.
+ */
+class DownstreamPeerCertVStartFormatter : public SystemTimeFormatter {
+public:
+  DownstreamPeerCertVStartFormatter(const std::string& format);
+};
+
+/**
+ * SystemTimeFormatter (FormatterProvider) for downstream cert end time from the StreamInfo's
+ * ConnectionInfo.
+ */
+class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
+public:
+  DownstreamPeerCertVEndFormatter(const std::string& format);
 };
 
 } // namespace Formatter
