@@ -337,7 +337,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    reset_reason = Http::StreamResetReason::LocalReset;
+    reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
   // Mimic an upstream reset.
