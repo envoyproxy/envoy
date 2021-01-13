@@ -4,10 +4,14 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/socket.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/dump_state_utils.h"
@@ -18,6 +22,7 @@
 #include "common/http/headers.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -97,6 +102,36 @@ public:
   }
 };
 
+template <class DataInputType, class ProtoType>
+class HttpHeadersDataInputFactoryBase : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  explicit HttpHeadersDataInputFactoryBase(const std::string& name) : name_(name) {}
+
+  std::string name() const override { return name_; }
+
+  Matcher::DataInputPtr<HttpMatchingData>
+  createDataInput(const Protobuf::Message& config,
+                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config =
+        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
+
+    return std::make_unique<DataInputType>(typed_config.header_name());
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtoType>();
+  }
+
+private:
+  const std::string name_;
+};
+
+class HttpRequestHeadersDataInputFactory
+    : public HttpHeadersDataInputFactoryBase<
+          HttpRequestHeadersDataInput, envoy::type::matcher::v3::HttpRequestHeaderMatchInput> {
+public:
+  HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request-headers") {}
+};
+
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
@@ -107,9 +142,26 @@ public:
   }
 };
 
+class HttpResponseHeadersDataInputFactory
+    : public HttpHeadersDataInputFactoryBase<
+          HttpResponseHeadersDataInput, envoy::type::matcher::v3::HttpResponseHeaderMatchInput> {
+public:
+  HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response-headers") {}
+};
+
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
+class SkipActionFactory : public Matcher::ActionFactory {
+public:
+  std::string name() const override { return "skip"; }
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&) override {
+    return []() { return std::make_unique<SkipAction>(); };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
+  }
+};
 /**
  * Base class wrapper for both stream encoder and decoder filters.
  *
@@ -611,7 +663,10 @@ public:
 
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-    ASSERT(overridden_downstream_remote_address_ == nullptr);
+    // TODO(rgs1): we should assert overridden_downstream_remote_address_ is nullptr,
+    // but we are currently relaxing this as a workaround to:
+    //
+    // https://github.com/envoyproxy/envoy/pull/14432#issuecomment-758167614
     overridden_downstream_remote_address_ = downstream_remote_address;
   }
 
