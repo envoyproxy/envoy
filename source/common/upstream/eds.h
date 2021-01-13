@@ -52,8 +52,8 @@ private:
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
                               const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
-                              PriorityStateManager& priority_state_manager,
-                              absl::node_hash_map<std::string, HostSharedPtr>& updated_hosts);
+                              PriorityStateManager& priority_state_manager, HostMap& updated_hosts,
+                              const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
 
   // ClusterImplBase

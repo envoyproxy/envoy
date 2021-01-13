@@ -47,7 +47,8 @@ EdsClusterImpl::EdsClusterImpl(
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
-  absl::node_hash_map<std::string, HostSharedPtr> updated_hosts;
+  absl::flat_hash_map<std::string, HostSharedPtr> updated_hosts;
+  absl::flat_hash_set<std::string> all_new_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
     parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
@@ -55,10 +56,11 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      priority_state_manager.registerHostForPriority(
-          lb_endpoint.endpoint().hostname(),
-          parent_.resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
-          lb_endpoint, parent_.time_source_);
+      auto address = parent_.resolveProtoAddress(lb_endpoint.endpoint().address());
+      priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
+                                                     locality_lb_endpoint, lb_endpoint,
+                                                     parent_.time_source_);
+      all_new_hosts.emplace(address->asString());
     }
   }
 
@@ -79,13 +81,13 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
     if (priority_state[i].first != nullptr) {
       cluster_rebuilt |= parent_.updateHostsPerLocality(
           i, overprovisioning_factor, *priority_state[i].first, parent_.locality_weights_map_[i],
-          priority_state[i].second, priority_state_manager, updated_hosts);
+          priority_state[i].second, priority_state_manager, updated_hosts, all_new_hosts);
     } else {
       // If the new update contains a priority with no hosts, call the update function with an empty
       // set of hosts.
       cluster_rebuilt |= parent_.updateHostsPerLocality(
           i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
-          priority_state_manager, updated_hosts);
+          priority_state_manager, updated_hosts, all_new_hosts);
     }
   }
 
@@ -98,7 +100,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
     }
     cluster_rebuilt |= parent_.updateHostsPerLocality(
         i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
-        priority_state_manager, updated_hosts);
+        priority_state_manager, updated_hosts, all_new_hosts);
   }
 
   parent_.all_hosts_ = std::move(updated_hosts);
@@ -236,7 +238,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
     LocalityWeightsMap& locality_weights_map, LocalityWeightsMap& new_locality_weights_map,
     PriorityStateManager& priority_state_manager,
-    absl::node_hash_map<std::string, HostSharedPtr>& updated_hosts) {
+    absl::flat_hash_map<std::string, HostSharedPtr>& updated_hosts,
+    const absl::flat_hash_set<std::string>& all_new_hosts) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
@@ -252,8 +255,9 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // performance implications, since this has the knock on effect that we rebuild the load balancers
   // and locality scheduler. See the comment in BaseDynamicClusterImpl::updateDynamicHostList
   // about this. In the future we may need to do better here.
-  const bool hosts_updated = updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added,
-                                                   hosts_removed, updated_hosts, all_hosts_);
+  const bool hosts_updated =
+      updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
+                            updated_hosts, all_hosts_, all_new_hosts);
   if (hosts_updated || host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
