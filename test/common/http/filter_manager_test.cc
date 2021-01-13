@@ -343,6 +343,9 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   filter_manager_->decodeHeaders(*grpc_headers, true);
   filter_manager_->destroyFilters();
 }
+
+TEST_F(FilterManagerTest, InjectStreamFilter) {}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

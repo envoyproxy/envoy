@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.composite.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.composite.v3";
+option java_outer_classname = "CompositeProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Composite]
+// Composite Filter :ref:`configuration overview <config_http_filters_cors>`.
+// [#extension: envoy.filters.http.composite]
+
+// Composite filter config.
+message Composite {
+  // List of permissible types that may be provided via the matching API.
+  repeated string type_url = 1;
+}
