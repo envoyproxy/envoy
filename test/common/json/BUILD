@@ -21,12 +21,12 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_test(
-    name = "json_loader_test",
-    srcs = ["json_loader_test.cc"],
-    deps = [
-        "//source/common/json:json_loader_lib",
-        "//source/common/stats:isolated_store_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
+# envoy_cc_test(
+#     name = "json_loader_test",
+#     srcs = ["json_loader_test.cc"],
+#     deps = [
+#         "//source/common/json:json_loader_lib",
+#         "//source/common/stats:isolated_store_lib",
+#         "//test/test_common:utility_lib",
+#     ],
+# )

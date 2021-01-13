@@ -109,6 +109,7 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; 
   if [ $? -eq 1 ]; then
     echo Per-extension coverage failed:
     echo "$output"
+    COVERAGE_FAILED=1
     exit 1
   fi
   echo Per-extension coverage passed.
