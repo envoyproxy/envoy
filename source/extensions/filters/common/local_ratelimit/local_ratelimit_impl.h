@@ -35,7 +35,7 @@ private:
   struct LocalDescriptorImpl : public RateLimit::LocalDescriptor {
     std::unique_ptr<TokenState> token_state_;
     RateLimit::TokenBucket token_bucket_;
-    std::string ToString() const {
+    std::string toString() const {
       std::vector<std::string> entries;
       entries.reserve(entries_.size());
       for (const auto& entry : entries_) {

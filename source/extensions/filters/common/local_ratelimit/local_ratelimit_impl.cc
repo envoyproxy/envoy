@@ -55,7 +55,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     auto result = descriptors_.emplace(std::move(new_descriptor));
     if (!result.second) {
       throw EnvoyException(absl::StrCat("duplicate descriptor in the local rate descriptor: ",
-                                        new_descriptor.ToString()));
+                                        result.first->toString()));
     }
   }
 }
