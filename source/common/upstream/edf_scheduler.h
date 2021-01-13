@@ -19,6 +19,11 @@ namespace Upstream {
 #define EDF_TRACE(...)
 #endif
 
+// Earliest Deadline First (EDF) scheduler powered by timer wheel
+// (https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling) used for weighted round robin.
+// Each pick from the schedule has the earliest deadline entry selected. Entries have deadlines set
+// at current time + 1 / weight, providing an approximated weighted round robin behavior with
+// floating point weights and an amortized O(1) pick time.
 template <class C> class TimeWheel {
   struct EdfEntry {
     double deadline_;
@@ -29,6 +34,7 @@ template <class C> class TimeWheel {
 
 public:
   TimeWheel(int wheel_size = 4) : wheel_size_(wheel_size), wheel_(wheel_size) {}
+
   void dump() {
     FANCY_LOG(trace, "prepick size = {}", prepick_list_.size());
     FANCY_LOG(trace, "wheel size = {}",
@@ -36,6 +42,7 @@ public:
                           [](int acc, const auto& l) { return acc + l.size(); }));
     FANCY_LOG(trace, "distant size = {}", distant_entries_.size());
   }
+
   void maybeAdvanceCurrent() {
     // There is entry in the current slot regardless the entry is expired or not. Leave it here for
     // the next pick.
@@ -51,6 +58,7 @@ public:
     offset_ = 0;
     spreadDistantEntries(distant_entries_, wheel_, current_lower_boundary_, per_slot_range_);
   }
+
   void addDeadline(const double& deadline, std::weak_ptr<C> entry) {
     ASSERT(deadline > current_lower_boundary_);
     EDF_TRACE("Insertion {} in queue with deadline {}.", static_cast<const void*>(entry.get()),
@@ -64,6 +72,7 @@ public:
     }
     maybeAdvanceCurrent();
   }
+
   void add(const double& weight, std::weak_ptr<C> entry) {
     ASSERT(weight > 0);
     const double deadline = current_lower_boundary_ + 1.0 / weight;
@@ -71,6 +80,7 @@ public:
               static_cast<const void*>(entry.get()), deadline, weight);
     addDeadline(deadline, std::move(entry));
   }
+
   // TODO(lambdai): Currently the code assumes rotate the wheel by 1 is sufficient. It's not always
   // true. Also need to fix with hierarchical wheels.
   bool spreadDistantEntries(std::list<EdfEntry>& upper, std::vector<std::list<EdfEntry>>& lower,
@@ -151,6 +161,7 @@ public:
     }
     return nullptr;
   }
+
   // TODO(lambdai): When is empty called? Consider maintain the current non-empty slot in the rest
   // of the flow.
   bool empty() const {
@@ -185,21 +196,30 @@ private:
       }
     }
   }
+
+  // Number of slots in the `wheel_`.
   const int wheel_size_;
+  // A wheel of the entry list. Each list has a time range. This list contains all the entries that
+  // fall into this range.
   std::vector<std::list<EdfEntry>> wheel_;
+  // The starting time range of the current slot.
   double current_lower_boundary_{0.0};
+  // The current slot in `wheel_`.
   int offset_{0};
-  double per_slot_range_{1};
-  double current_time_{0.0};
+  // The time span of each slot.
+  const double per_slot_range_{1};
+  // The `wheel_` has limit upper bound. All the entries beyond the upper bound are maintained in
+  // this collection.
   std::list<EdfEntry> distant_entries_;
+  // The pre-selected entries used to support peek.
   std::queue<std::weak_ptr<C>, std::deque<std::weak_ptr<C>>> prepick_list_;
 };
 
 // Earliest Deadline First (EDF) scheduler
-// (https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling) used for weighted round
-// robin. Each pick from the schedule has the earliest deadline entry selected. Entries have
-// deadlines set at current time + 1 / weight, providing weighted round robin behavior with
-// floating point weights and an O(log n) pick time.
+// (https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling) used for weighted round robin.
+// Each pick from the schedule has the earliest deadline entry selected. Entries have deadlines set
+// at current time + 1 / weight, providing weighted round robin behavior with floating point
+// weights and an O(log n) pick time.
 template <class C> class EdfScheduler {
 public:
   // Each time peekAgain is called, it will return the best-effort subsequent
