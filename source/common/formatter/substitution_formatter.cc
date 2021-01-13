@@ -357,6 +357,15 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     return std::make_unique<DownstreamPeerCertVEndFormatter>(token);
   } else if (absl::StartsWith(token, "GRPC_STATUS")) {
     return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>());
+  } else if (absl::StartsWith(token, "REQUEST_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::RequestHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_TRAILERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
   }
 
   return nullptr;
@@ -953,6 +962,44 @@ ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http:
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo&, absl::string_view) const {
   return HeaderFormatter::formatValue(response_trailers);
+}
+
+HeadersByteSizeFormatter::HeadersByteSizeFormatter(const HeaderType header_type)
+    : header_type_(header_type) {}
+
+std::string HeadersByteSizeFormatter::extractHeadersByteSize(
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers) const {
+  std::string val;
+  switch (header_type_) {
+  case HeaderType::RequestHeaders:
+    val = absl::StrCat(request_headers.byteSize());
+    break;
+  case HeaderType::ResponseHeaders:
+    val = absl::StrCat(response_headers.byteSize());
+    break;
+  case HeaderType::ResponseTrailers:
+    val = absl::StrCat(response_trailers.byteSize());
+    break;
+  }
+  return val;
+}
+
+absl::optional<std::string>
+HeadersByteSizeFormatter::format(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&, absl::string_view) const {
+  return extractHeadersByteSize(request_headers, response_headers, response_trailers);
+}
+
+ProtobufWkt::Value
+HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
+                                      const Http::ResponseHeaderMap& response_headers,
+                                      const Http::ResponseTrailerMap& response_trailers,
+                                      const StreamInfo::StreamInfo&, absl::string_view) const {
+  std::string val = extractHeadersByteSize(request_headers, response_headers, response_trailers);
+  return ValueUtil::stringValue(val);
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
