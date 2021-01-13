@@ -107,7 +107,7 @@ An example set up proxying SMTP would look something like this:
 
 [SMTP Upstream] --- raw SMTP --- [L2 Envoy]  --- SMTP tunneled over HTTP/2 CONNECT --- [L1 Envoy]  --- raw SMTP  --- [Client]
 
-HTTP/2 POST can be also used to proxy multiplexed TCP when intermidiate proxies that don't support
+HTTP/2 POST can also be used to proxy multiplexed TCP when intermediate proxies that don't support
 CONNECT. An example set up proxying HTTP would look something like this:
 
 [TCP Server] --- raw TCP --- [L2 Envoy]  --- TCP tunneled over HTTP/2 POST --- [Intermidate Proxies] --- HTTP/2 POST --- [L1 Envoy]  --- raw TCP  --- [TCP Client]
