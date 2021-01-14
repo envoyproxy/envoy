@@ -390,7 +390,7 @@ stat_prefix: name
   Extensions::Filters::Common::RateLimit::MockClient* rl_client =
       new Extensions::Filters::Common::RateLimit::MockClient();
   manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::RateLimitFilter::Filter>(
-      rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
+      *rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
 
   factory_context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
@@ -398,7 +398,7 @@ stat_prefix: name
   tcp_proxy.set_cluster("fake_cluster");
   TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
   manager.addReadFilter(
-      std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_));
+      std::make_shared<TcpProxy::Filter>(*tcp_proxy_config, factory_context.cluster_manager_));
 
   Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
