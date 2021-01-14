@@ -170,6 +170,10 @@ The upstream ``service-https`` handles the request.
    :ref:`Securing Envoy quick start guide <start_quick_start_securing>`
       Outline of key concepts for securing Envoy.
 
+   :ref:`TLS SNI sandbox <install_sandboxes_tls_sni>`
+      Example of using Envoy to serve multiple domains protected by TLS and
+      served from the same ``IP`` address.
+
    :ref:`Double proxy sandbox <install_sandboxes_double_proxy>`
       An example of securing traffic between proxies with validation and
       mutual authentication using ``mTLS`` with non-``HTTP`` traffic.

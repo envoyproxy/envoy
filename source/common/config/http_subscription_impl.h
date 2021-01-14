@@ -34,8 +34,7 @@ public:
                        ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::Subscription
-  void start(const std::set<std::string>& resource_names,
-             const bool use_namespace_matching = false) override;
+  void start(const std::set<std::string>& resource_names) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
   void requestOnDemandUpdate(const std::set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
