@@ -56,13 +56,13 @@ double AdmissionControlFilterConfig::successRateThreshold() const {
   return std::min<double>(pct, 100.0) / 100.0;
 }
 
-AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
+AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfig& config,
                                                const std::string& stats_prefix)
-    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
-      record_request_(true) {}
+    : config_(config), stats_(generateStats(config_.scope(), stats_prefix)), record_request_(true) {
+}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
+  if (!config_.filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     // We must forego recording the success/failure of this request during encoding.
     record_request_ = false;
     return Http::FilterHeadersStatus::Continue;
@@ -104,11 +104,11 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
     }
 
     const uint32_t status = enumToInt(grpc_status.value());
-    successful_response = config_->responseEvaluator().isGrpcSuccess(status);
+    successful_response = config_.responseEvaluator().isGrpcSuccess(status);
   } else {
     // HTTP response.
     const uint64_t http_status = Http::Utility::getResponseStatus(headers);
-    successful_response = config_->responseEvaluator().isHttpSuccess(http_status);
+    successful_response = config_.responseEvaluator().isHttpSuccess(http_status);
   }
 
   if (successful_response) {
@@ -125,8 +125,7 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (expect_grpc_status_in_trailer_) {
     absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(trailers, false);
 
-    if (grpc_status.has_value() &&
-        config_->responseEvaluator().isGrpcSuccess(grpc_status.value())) {
+    if (grpc_status.has_value() && config_.responseEvaluator().isGrpcSuccess(grpc_status.value())) {
       recordSuccess();
     } else {
       recordFailure();
@@ -139,19 +138,19 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 bool AdmissionControlFilter::shouldRejectRequest() const {
   // This formula is documented in the admission control filter documentation:
   // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/admission_control_filter.html
-  const auto request_counts = config_->getController().requestCounts();
+  const auto request_counts = config_.getController().requestCounts();
   const double total_requests = request_counts.requests;
   const double successful_requests = request_counts.successes;
-  double probability = total_requests - successful_requests / config_->successRateThreshold();
+  double probability = total_requests - successful_requests / config_.successRateThreshold();
   probability = probability / (total_requests + 1);
-  const auto aggression = config_->aggression();
+  const auto aggression = config_.aggression();
   if (aggression != 1.0) {
     probability = std::pow(probability, 1.0 / aggression);
   }
 
   // Choosing an accuracy of 4 significant figures for the probability.
   static constexpr uint64_t accuracy = 1e4;
-  auto r = config_->random().random();
+  auto r = config_.random().random();
   return (accuracy * std::max(probability, 0.0)) > (r % accuracy);
 }
 

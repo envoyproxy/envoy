@@ -31,7 +31,7 @@ class AwsRequestSigningFilterTest : public testing::Test {
 public:
   void setup() {
     filter_config_ = std::make_shared<MockFilterConfig>();
-    filter_ = std::make_unique<Filter>(filter_config_);
+    filter_ = std::make_unique<Filter>(*filter_config_);
   }
 
   std::shared_ptr<MockFilterConfig> filter_config_;

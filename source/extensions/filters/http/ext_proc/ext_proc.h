@@ -78,8 +78,8 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
   };
 
 public:
-  Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
-      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+  Filter(const FilterConfig& config, ExternalProcessorClientPtr&& client)
+      : config_(config), client_(std::move(client)), stats_(config.stats()) {}
 
   void onDestroy() override;
 
@@ -103,7 +103,7 @@ private:
   void closeStream();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
-  const FilterConfigSharedPtr config_;
+  const FilterConfig& config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
 

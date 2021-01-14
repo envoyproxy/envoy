@@ -119,15 +119,15 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
   return true;
 }
 
-HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
+HeaderToMetadataFilter::HeaderToMetadataFilter(const Config& config) : config_(config) {}
 
 HeaderToMetadataFilter::~HeaderToMetadataFilter() = default;
 
 Http::FilterHeadersStatus HeaderToMetadataFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                                 bool) {
-  const auto* config = getConfig();
-  if (config->doRequest()) {
-    writeHeaderToMetadata(headers, config->requestRules(), *decoder_callbacks_);
+  const auto& config = getConfig();
+  if (config.doRequest()) {
+    writeHeaderToMetadata(headers, config.requestRules(), *decoder_callbacks_);
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -140,9 +140,9 @@ void HeaderToMetadataFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus HeaderToMetadataFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool) {
-  const auto* config = getConfig();
-  if (config->doResponse()) {
-    writeHeaderToMetadata(headers, config->responseRules(), *encoder_callbacks_);
+  const auto& config = getConfig();
+  if (config.doResponse()) {
+    writeHeaderToMetadata(headers, config.responseRules(), *encoder_callbacks_);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -261,20 +261,14 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 }
 
 // TODO(rgs1): this belongs in one of the filter interfaces, see issue #10164.
-const Config* HeaderToMetadataFilter::getConfig() const {
-  // Cached config pointer.
-  if (effective_config_) {
-    return effective_config_;
-  }
-
-  effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(
+const Config& HeaderToMetadataFilter::getConfig() const {
+  auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(
       HttpFilterNames::get().HeaderToMetadata, decoder_callbacks_->route());
-  if (effective_config_) {
-    return effective_config_;
+  if (config) {
+    return *config;
   }
 
-  effective_config_ = config_.get();
-  return effective_config_;
+  return config_;
 }
 
 } // namespace HeaderToMetadataFilter

@@ -144,16 +144,16 @@ using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 class GrpcStatsFilter : public Http::PassThroughFilter {
 public:
-  GrpcStatsFilter(ConfigConstSharedPtr config) : config_(config) {}
+  GrpcStatsFilter(const Config& config) : config_(config) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
     if (grpc_request_) {
       cluster_ = decoder_callbacks_->clusterInfo();
       if (cluster_) {
-        if (config_->stats_for_all_methods_) {
+        if (config_.stats_for_all_methods_) {
           // Get dynamically-allocated Context::RequestStatNames from the context.
-          request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
+          request_names_ = config_.context_.resolveDynamicServiceAndMethod(headers.Path());
           do_stat_tracking_ = request_names_.has_value();
         } else {
           // This case handles both proto_config.stats_for_all_methods() == false,
@@ -178,8 +178,8 @@ public:
             // an empty optional; each of the `charge` functions on the context
             // will interpret an empty optional for this value to mean that the
             // service.method prefix on the stat should be omitted.
-            if (config_->allowlist_) {
-              request_names_ = config_->allowlist_->lookup(*request_names);
+            if (config_.allowlist_) {
+              request_names_ = config_.allowlist_->lookup(*request_names);
             }
           }
         }
@@ -194,7 +194,7 @@ public:
       if (delta > 0) {
         maybeWriteFilterState();
         if (doStatTracking()) {
-          config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
+          config_.context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
         }
       }
     }
@@ -205,8 +205,8 @@ public:
                                           bool end_stream) override {
     grpc_response_ = Grpc::Common::isGrpcResponseHeaders(headers, end_stream);
     if (doStatTracking()) {
-      config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
-                                   headers.GrpcStatus());
+      config_.context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
+                                  headers.GrpcStatus());
       if (end_stream) {
         maybeChargeUpstreamStat();
       }
@@ -220,7 +220,7 @@ public:
       if (delta > 0) {
         maybeWriteFilterState();
         if (doStatTracking()) {
-          config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
+          config_.context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
         }
       }
     }
@@ -229,8 +229,8 @@ public:
 
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
     if (doStatTracking()) {
-      config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
-                                   trailers.GrpcStatus());
+      config_.context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
+                                  trailers.GrpcStatus());
       maybeChargeUpstreamStat();
     }
     return Http::FilterTrailersStatus::Continue;
@@ -239,7 +239,7 @@ public:
   bool doStatTracking() const { return do_stat_tracking_; }
 
   void maybeWriteFilterState() {
-    if (!config_->emit_filter_state_) {
+    if (!config_.emit_filter_state_) {
       return;
     }
     if (filter_object_ == nullptr) {
@@ -255,19 +255,19 @@ public:
   }
 
   void maybeChargeUpstreamStat() {
-    if (config_->enable_upstream_stats_ &&
+    if (config_.enable_upstream_stats_ &&
         decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().has_value() &&
         decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().has_value()) {
       std::chrono::milliseconds chrono_duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(
               decoder_callbacks_->streamInfo().lastUpstreamRxByteReceived().value() -
               decoder_callbacks_->streamInfo().lastUpstreamTxByteSent().value());
-      config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
+      config_.context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
     }
   }
 
 private:
-  ConfigConstSharedPtr config_;
+  const Config& config_;
   GrpcStatsObject* filter_object_{};
   bool do_stat_tracking_{false};
   bool grpc_request_{false};
@@ -284,10 +284,10 @@ Http::FilterFactoryCb GrpcStatsFilterConfigFactory::createFilterFactoryFromProto
     const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& factory_context) {
 
-  ConfigConstSharedPtr config = std::make_shared<const Config>(proto_config, factory_context);
+  auto config = std::make_shared<const Config>(proto_config, factory_context);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<GrpcStatsFilter>(config));
+    callbacks.addStreamFilter(std::make_shared<GrpcStatsFilter>(*config));
   };
 }
 

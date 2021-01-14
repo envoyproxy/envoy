@@ -122,7 +122,7 @@ private:
  */
 class Filter : public Http::StreamFilter, public Filters::Common::RateLimit::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
+  Filter(FilterConfig& config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
@@ -161,11 +161,11 @@ private:
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
 
-  Http::Context& httpContext() { return config_->httpContext(); }
+  Http::Context& httpContext() { return config_.httpContext(); }
 
   enum class State { NotStarted, Calling, Complete, Responded };
 
-  FilterConfigSharedPtr config_;
+  FilterConfig& config_;
   Filters::Common::RateLimit::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};

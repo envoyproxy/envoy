@@ -32,7 +32,7 @@ Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
   Common::Compressors::CompressorFilterConfigSharedPtr config = std::make_shared<GzipFilterConfig>(
       proto_config, stats_prefix, context.scope(), context.runtime());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Common::Compressors::CompressorFilter>(config));
+    callbacks.addStreamFilter(std::make_shared<Common::Compressors::CompressorFilter>(*config));
   };
 }
 

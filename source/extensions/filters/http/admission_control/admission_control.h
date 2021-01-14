@@ -86,8 +86,7 @@ using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionCon
 class AdmissionControlFilter : public Http::PassThroughFilter,
                                protected Logger::Loggable<Logger::Id::filter> {
 public:
-  AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
-                         const std::string& stats_prefix);
+  AdmissionControlFilter(AdmissionControlFilterConfig& config, const std::string& stats_prefix);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
@@ -106,15 +105,15 @@ private:
 
   void recordSuccess() {
     stats_.rq_success_.inc();
-    config_->getController().recordSuccess();
+    config_.getController().recordSuccess();
   }
 
   void recordFailure() {
     stats_.rq_failure_.inc();
-    config_->getController().recordFailure();
+    config_.getController().recordFailure();
   }
 
-  const AdmissionControlFilterConfigSharedPtr config_;
+  AdmissionControlFilterConfig& config_;
   AdmissionControlStats stats_;
   bool expect_grpc_status_in_trailer_{false};
 

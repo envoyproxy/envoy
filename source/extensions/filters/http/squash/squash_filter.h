@@ -78,7 +78,7 @@ private:
 class SquashFilter : public Http::StreamDecoderFilter,
                      protected Logger::Loggable<Logger::Id::filter> {
 public:
-  SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm);
+  SquashFilter(SquashFilterConfig& config, Upstream::ClusterManager& cm);
   ~SquashFilter() override;
 
   // Http::StreamFilterBase
@@ -108,7 +108,7 @@ private:
   // Creates a JSON from the message body.
   Json::ObjectSharedPtr getJsonBody(Http::ResponseMessagePtr&& m);
 
-  const SquashFilterConfigSharedPtr config_;
+  const SquashFilterConfig& config_;
 
   // Current state of the squash filter. If is_squashing_ is true, Hold the request while we
   // communicate with the squash server to attach a debugger. If it is false, let the request

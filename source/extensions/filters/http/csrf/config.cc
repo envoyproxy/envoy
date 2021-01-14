@@ -17,7 +17,7 @@ Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoTyped(
   CsrfFilterConfigSharedPtr config =
       std::make_shared<CsrfFilterConfig>(policy, stats_prefix, context.scope(), context.runtime());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<CsrfFilter>(config));
+    callbacks.addStreamDecoderFilter(std::make_shared<CsrfFilter>(*config));
   };
 }
 

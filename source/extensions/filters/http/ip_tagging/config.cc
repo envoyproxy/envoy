@@ -17,11 +17,11 @@ Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
-  IpTaggingFilterConfigSharedPtr config(
-      new IpTaggingFilterConfig(proto_config, stat_prefix, context.scope(), context.runtime()));
+  auto config = std::make_shared<IpTaggingFilterConfig>(proto_config, stat_prefix, context.scope(),
+                                                        context.runtime());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<IpTaggingFilter>(config));
+    callbacks.addStreamDecoderFilter(std::make_shared<IpTaggingFilter>(*config));
   };
 }
 

@@ -47,7 +47,7 @@ class ProxyFilter
       public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  ProxyFilter(const ProxyFilterConfigSharedPtr& config) : config_(config) {}
+  ProxyFilter(ProxyFilterConfig& config) : config_(config) {}
 
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -58,7 +58,7 @@ public:
   void onLoadDnsCacheComplete() override;
 
 private:
-  const ProxyFilterConfigSharedPtr config_;
+  ProxyFilterConfig& config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;

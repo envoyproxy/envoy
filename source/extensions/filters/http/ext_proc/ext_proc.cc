@@ -34,7 +34,7 @@ void Filter::onDestroy() { closeStream(); }
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of_stream) {
   // We're at the start, so start the stream and send a headers message
   request_headers_ = &headers;
-  stream_ = client_->start(*this, config_->grpcTimeout());
+  stream_ = client_->start(*this, config_.grpcTimeout());
   stats_.streams_started_.inc();
   ProcessingRequest req;
   auto* headers_req = req.mutable_request_headers();
@@ -90,7 +90,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
   ENVOY_LOG(debug, "Received gRPC error on stream: {}", status);
   stream_closed_ = true;
   stats_.streams_failed_.inc();
-  if (config_->failureModeAllow()) {
+  if (config_.failureModeAllow()) {
     // Ignore this and treat as a successful close
     onGrpcClose();
     stats_.failure_mode_allowed_.inc();

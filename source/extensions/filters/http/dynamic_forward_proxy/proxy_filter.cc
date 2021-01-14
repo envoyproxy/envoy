@@ -54,7 +54,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   Upstream::ThreadLocalCluster* cluster =
-      config_->clusterManager().getThreadLocalCluster(route_entry->clusterName());
+      config_.clusterManager().getThreadLocalCluster(route_entry->clusterName());
   if (!cluster) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -74,7 +74,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   const bool should_use_dns_cache_circuit_breakers =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_dns_cache_circuit_breakers");
 
-  circuit_breaker_ = config_->cache().canCreateDnsRequest(
+  circuit_breaker_ = config_.cache().canCreateDnsRequest(
       !should_use_dns_cache_circuit_breakers
           ? absl::make_optional(std::reference_wrapper<ResourceLimit>(
                 cluster_info_->resourceManager(route_entry->priority()).pendingRequests()))
@@ -124,8 +124,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   //                     not obvious to the user if something is misconfigured. We should see if
   //                     we can do better here, perhaps by checking the cache to see if anything
   //                     else is attached to it or something else?
-  auto result = config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(),
-                                                   default_port, *this);
+  auto result = config_.cache().loadDnsCacheEntry(headers.Host()->value().getStringView(),
+                                                  default_port, *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();

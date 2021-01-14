@@ -82,7 +82,7 @@ private:
   // equaling true.
   bool isKillRequestEnabled();
 
-  const envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request_;
+  const envoy::extensions::filters::http::kill_request::v3::KillRequest& kill_request_;
   Random::RandomGenerator& random_generator_;
 };
 

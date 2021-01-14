@@ -81,7 +81,7 @@ using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
  */
 class IpTaggingFilter : public Http::StreamDecoderFilter {
 public:
-  IpTaggingFilter(IpTaggingFilterConfigSharedPtr config);
+  IpTaggingFilter(IpTaggingFilterConfig& config);
   ~IpTaggingFilter() override;
 
   // Http::StreamFilterBase
@@ -95,7 +95,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  IpTaggingFilterConfigSharedPtr config_;
+  IpTaggingFilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 

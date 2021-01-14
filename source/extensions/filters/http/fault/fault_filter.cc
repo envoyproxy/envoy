@@ -93,7 +93,7 @@ void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::St
       .inc();
 }
 
-FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
+FaultFilter::FaultFilter(FaultFilterConfig& config) : config_(config) {}
 
 FaultFilter::~FaultFilter() {
   ASSERT(delay_timer_ == nullptr);
@@ -109,7 +109,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // NOTE: We should not use runtime when reading from route-level
   // faults. In other words, runtime is supported only when faults are
   // configured at the filter level.
-  fault_settings_ = config_->settings();
+  fault_settings_ = config_.settings();
   if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
     const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
     const auto* route_entry = decoder_callbacks_->route()->routeEntry();
@@ -136,7 +136,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     downstream_cluster_ = std::string(headers.getEnvoyDownstreamServiceClusterValue());
     if (!downstream_cluster_.empty()) {
       downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
-          downstream_cluster_, config_->scope().symbolTable());
+          downstream_cluster_, config_.scope().symbolTable());
     }
 
     downstream_cluster_delay_percent_key_ =
@@ -206,7 +206,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
     return;
   }
 
-  config_->stats().response_rl_injected_.inc();
+  config_.stats().response_rl_injected_.inc();
 
   response_limiter_ = std::make_unique<StreamRateLimiter>(
       rate_kbps.value(), encoder_callbacks_->encoderBufferLimit(),
@@ -215,19 +215,19 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
       [this](Buffer::Instance& data, bool end_stream) {
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
-      [this] { encoder_callbacks_->continueEncoding(); }, config_->timeSource(),
+      [this] { encoder_callbacks_->continueEncoding(); }, config_.timeSource(),
       decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
 }
 
 bool FaultFilter::faultOverflow() {
-  const uint64_t max_faults = config_->runtime().snapshot().getInteger(
+  const uint64_t max_faults = config_.runtime().snapshot().getInteger(
       fault_settings_->maxActiveFaultsRuntime(), fault_settings_->maxActiveFaults().has_value()
                                                      ? fault_settings_->maxActiveFaults().value()
                                                      : std::numeric_limits<uint64_t>::max());
   // Note: Since we don't compare/swap here this is a fuzzy limit which is similar to how the
   // other circuit breakers work.
-  if (config_->stats().active_faults_.value() >= max_faults) {
-    config_->stats().faults_overflow_.inc();
+  if (config_.stats().active_faults_.value() >= max_faults) {
+    config_.stats().faults_overflow_.inc();
     return true;
   }
 
@@ -241,11 +241,11 @@ bool FaultFilter::isDelayEnabled(const Http::RequestHeaderMap& request_headers) 
   }
 
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_delay_percent_key_, request_delay->percentage(&request_headers));
+    return config_.runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
+                                                       request_delay->percentage(&request_headers));
   }
-  return config_->runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
-                                                      request_delay->percentage(&request_headers));
+  return config_.runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
+                                                     request_delay->percentage(&request_headers));
 }
 
 bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) {
@@ -255,11 +255,11 @@ bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) 
   }
 
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_abort_percent_key_, request_abort->percentage(&request_headers));
+    return config_.runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
+                                                       request_abort->percentage(&request_headers));
   }
-  return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
-                                                      request_abort->percentage(&request_headers));
+  return config_.runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
+                                                     request_abort->percentage(&request_headers));
 }
 
 bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers) {
@@ -268,7 +268,7 @@ bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& reque
   }
 
   // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
-  return config_->runtime().snapshot().featureEnabled(
+  return config_.runtime().snapshot().featureEnabled(
       fault_settings_->responseRateLimitPercentRuntime(),
       fault_settings_->responseRateLimit()->percentage(&request_headers));
 }
@@ -289,10 +289,10 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   }
 
   std::chrono::milliseconds duration =
-      std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
+      std::chrono::milliseconds(config_.runtime().snapshot().getInteger(
           fault_settings_->delayDurationRuntime(), config_duration.value().count()));
   if (!downstream_cluster_delay_duration_key_.empty()) {
-    duration = std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
+    duration = std::chrono::milliseconds(config_.runtime().snapshot().getInteger(
         downstream_cluster_delay_duration_key_, duration.count()));
   }
 
@@ -334,11 +334,11 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   }
 
   auto default_http_status_code = static_cast<uint64_t>(http_status.value());
-  auto runtime_http_status_code = config_->runtime().snapshot().getInteger(
+  auto runtime_http_status_code = config_.runtime().snapshot().getInteger(
       fault_settings_->abortHttpStatusRuntime(), default_http_status_code);
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
-    runtime_http_status_code = config_->runtime().snapshot().getInteger(
+    runtime_http_status_code = config_.runtime().snapshot().getInteger(
         downstream_cluster_abort_http_status_key_, default_http_status_code);
   }
 
@@ -353,11 +353,11 @@ FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
   }
 
   auto default_grpc_status_code = static_cast<uint64_t>(grpc_status.value());
-  auto runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
+  auto runtime_grpc_status_code = config_.runtime().snapshot().getInteger(
       fault_settings_->abortGrpcStatusRuntime(), default_grpc_status_code);
 
   if (!downstream_cluster_abort_grpc_status_key_.empty()) {
-    runtime_grpc_status_code = config_->runtime().snapshot().getInteger(
+    runtime_grpc_status_code = config_.runtime().snapshot().getInteger(
         downstream_cluster_abort_grpc_status_key_, default_grpc_status_code);
   }
 
@@ -367,19 +367,19 @@ FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    config_->incDelays(downstream_cluster_storage_->statName());
+    config_.incDelays(downstream_cluster_storage_->statName());
   }
 
-  config_->stats().delays_injected_.inc();
+  config_.stats().delays_injected_.inc();
 }
 
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    config_->incAborts(downstream_cluster_storage_->statName());
+    config_.incAborts(downstream_cluster_storage_->statName());
   }
 
-  config_->stats().aborts_injected_.inc();
+  config_.stats().aborts_injected_.inc();
 }
 
 Http::FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
@@ -418,7 +418,7 @@ bool FaultFilter::tryIncActiveFaults() {
   }
 
   // TODO(mattklein123): Consider per-fault type active fault gauges.
-  config_->stats().active_faults_.inc();
+  config_.stats().active_faults_.inc();
   fault_active_ = true;
 
   return true;
@@ -430,7 +430,7 @@ void FaultFilter::onDestroy() {
     response_limiter_->destroy();
   }
   if (fault_active_) {
-    config_->stats().active_faults_.dec();
+    config_.stats().active_faults_.dec();
   }
 }
 

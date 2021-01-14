@@ -20,7 +20,7 @@ Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromP
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, cache_manager_factory, context.clusterManager()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<ProxyFilter>(filter_config));
+    callbacks.addStreamDecoderFilter(std::make_shared<ProxyFilter>(*filter_config));
   };
 }
 

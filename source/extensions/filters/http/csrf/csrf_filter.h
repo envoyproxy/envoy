@@ -90,7 +90,7 @@ using CsrfFilterConfigSharedPtr = std::shared_ptr<CsrfFilterConfig>;
 
 class CsrfFilter : public Http::StreamDecoderFilter {
 public:
-  CsrfFilter(CsrfFilterConfigSharedPtr config);
+  CsrfFilter(CsrfFilterConfig& config);
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -113,7 +113,7 @@ private:
   bool isValid(const absl::string_view source_origin, Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  CsrfFilterConfigSharedPtr config_;
+  CsrfFilterConfig& config_;
   const CsrfPolicy* policy_;
 };
 

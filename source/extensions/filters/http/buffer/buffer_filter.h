@@ -48,7 +48,7 @@ using BufferFilterConfigSharedPtr = std::shared_ptr<BufferFilterConfig>;
  */
 class BufferFilter : public Http::StreamDecoderFilter {
 public:
-  BufferFilter(BufferFilterConfigSharedPtr config);
+  BufferFilter(BufferFilterConfig& config);
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -64,7 +64,7 @@ private:
   void initConfig();
   void maybeAddContentLength();
 
-  BufferFilterConfigSharedPtr config_;
+  BufferFilterConfig& config_;
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RequestHeaderMap* request_headers_{};

@@ -58,20 +58,20 @@ DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : DirectionConfig(proto_config.common_config(), stats_prefix + "response.", scope, runtime) {}
 
-DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
-    : config_(std::move(config)), request_byte_tracker_(config_->trailersCompressedBytesString(),
-                                                        config_->trailersUncompressedBytesString()),
-      response_byte_tracker_(config_->trailersCompressedBytesString(),
-                             config_->trailersUncompressedBytesString()) {}
+DecompressorFilter::DecompressorFilter(DecompressorFilterConfig& config)
+    : config_(config), request_byte_tracker_(config_.trailersCompressedBytesString(),
+                                             config_.trailersUncompressedBytesString()),
+      response_byte_tracker_(config_.trailersCompressedBytesString(),
+                             config_.trailersUncompressedBytesString()) {}
 
 Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                             bool end_stream) {
   // Two responsibilities on the request side:
   //   1. If response decompression is enabled (and advertisement is enabled), then advertise to
   //      the upstream that this hop is able to decompress responses via the Accept-Encoding header.
-  if (config_->responseDirectionConfig().decompressionEnabled() &&
-      config_->requestDirectionConfig().advertiseAcceptEncoding()) {
-    headers.appendInline(accept_encoding_handle.handle(), config_->contentEncoding(), ",");
+  if (config_.responseDirectionConfig().decompressionEnabled() &&
+      config_.requestDirectionConfig().advertiseAcceptEncoding()) {
+    headers.appendInline(accept_encoding_handle.handle(), config_.contentEncoding(), ",");
     ENVOY_STREAM_LOG(debug,
                      "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",
                      *decoder_callbacks_, headers.getInlineValue(accept_encoding_handle.handle()));
@@ -84,7 +84,7 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
   ENVOY_STREAM_LOG(debug, "DecompressorFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
 
   //   2. Setup request decompression if all checks comply.
-  return maybeInitDecompress(config_->requestDirectionConfig(), request_decompressor_,
+  return maybeInitDecompress(config_.requestDirectionConfig(), request_decompressor_,
                              *decoder_callbacks_, headers);
 };
 
@@ -94,7 +94,7 @@ Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bo
     if (end_stream) {
       trailers = HeaderMapOptRef(std::ref(decoder_callbacks_->addDecodedTrailers()));
     }
-    decompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_, data,
+    decompress(config_.requestDirectionConfig(), request_decompressor_, *decoder_callbacks_, data,
                request_byte_tracker_, trailers);
   }
   return Http::FilterDataStatus::Continue;
@@ -116,7 +116,7 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
   }
   ENVOY_STREAM_LOG(debug, "DecompressorFilter::encodeHeaders: {}", *encoder_callbacks_, headers);
 
-  return maybeInitDecompress(config_->responseDirectionConfig(), response_decompressor_,
+  return maybeInitDecompress(config_.responseDirectionConfig(), response_decompressor_,
                              *encoder_callbacks_, headers);
 }
 
@@ -126,8 +126,8 @@ Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bo
     if (end_stream) {
       trailers = HeaderMapOptRef(std::ref(encoder_callbacks_->addEncodedTrailers()));
     }
-    decompress(config_->responseDirectionConfig(), response_decompressor_, *encoder_callbacks_,
-               data, response_byte_tracker_, trailers);
+    decompress(config_.responseDirectionConfig(), response_decompressor_, *encoder_callbacks_, data,
+               response_byte_tracker_, trailers);
   }
   return Http::FilterDataStatus::Continue;
 }

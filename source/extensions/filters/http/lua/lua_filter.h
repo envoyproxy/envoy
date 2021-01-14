@@ -394,7 +394,7 @@ private:
 
 namespace {
 
-PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
+PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig& filter_config,
                                     Http::StreamFilterCallbacks* callbacks) {
   const FilterConfigPerRoute* config_per_route = nullptr;
   if (callbacks && callbacks->route()) {
@@ -407,13 +407,11 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
       return nullptr;
     }
     if (!config_per_route->name().empty()) {
-      ASSERT(filter_config);
-      return filter_config->perLuaCodeSetup(config_per_route->name());
+      return filter_config.perLuaCodeSetup(config_per_route->name());
     }
     return config_per_route->perLuaCodeSetup();
   }
-  ASSERT(filter_config);
-  return filter_config->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
+  return filter_config.perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
 }
 
 } // namespace
@@ -425,9 +423,9 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
  */
 class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::lua> {
 public:
-  Filter(FilterConfigConstSharedPtr config) : config_(config) {}
+  Filter(const FilterConfig& config) : config_(config) {}
 
-  Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
+  Upstream::ClusterManager& clusterManager() { return config_.cluster_manager_; }
   void scriptError(const Filters::Common::Lua::LuaException& e);
   virtual void scriptLog(spdlog::level::level_enum level, const char* message);
 
@@ -437,7 +435,7 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
-    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_, decoder_callbacks_.callbacks_);
     const int function_ref = setup ? setup->requestFunctionRef() : LUA_REFNIL;
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
                      setup, headers, end_stream);
@@ -458,7 +456,7 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_, decoder_callbacks_.callbacks_);
     const int function_ref = setup ? setup->responseFunctionRef() : LUA_REFNIL;
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
                      function_ref, setup, headers, end_stream);
@@ -531,7 +529,7 @@ private:
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
-  FilterConfigConstSharedPtr config_;
+  const FilterConfig& config_;
   DecoderCallbacks decoder_callbacks_{*this};
   EncoderCallbacks encoder_callbacks_{*this};
   StreamHandleRef request_stream_wrapper_;

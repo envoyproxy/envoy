@@ -62,10 +62,10 @@ class HealthCheckFilter : public Http::StreamFilter {
 public:
   HealthCheckFilter(Server::Configuration::FactoryContext& context, bool pass_through_mode,
                     HealthCheckCacheManagerSharedPtr cache_manager,
-                    HeaderDataVectorSharedPtr header_match_data,
+                    const std::vector<Http::HeaderUtility::HeaderDataPtr>& header_match_data,
                     ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages)
       : context_(context), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
-        header_match_data_(std::move(header_match_data)),
+        header_match_data_(header_match_data),
         cluster_min_healthy_percentages_(cluster_min_healthy_percentages) {}
 
   // Http::StreamFilterBase
@@ -106,7 +106,7 @@ private:
   bool health_check_request_{};
   bool pass_through_mode_{};
   HealthCheckCacheManagerSharedPtr cache_manager_;
-  const HeaderDataVectorSharedPtr header_match_data_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& header_match_data_;
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages_;
 };
 

@@ -126,7 +126,7 @@ using DecompressorFilterConfigSharedPtr = std::shared_ptr<DecompressorFilterConf
 class DecompressorFilter : public Http::PassThroughFilter,
                            public Logger::Loggable<Logger::Id::filter> {
 public:
-  DecompressorFilter(DecompressorFilterConfigSharedPtr config);
+  DecompressorFilter(DecompressorFilterConfig& config);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
@@ -169,7 +169,7 @@ private:
     if (direction_config.decompressionEnabled() && !hasCacheControlNoTransform(headers) &&
         contentEncodingMatches(headers)) {
       direction_config.stats().decompressed_.inc();
-      decompressor = config_->makeDecompressor();
+      decompressor = config_.makeDecompressor();
 
       // Update headers.
       headers.removeContentLength();
@@ -215,7 +215,7 @@ private:
     if (headers.getInline(handle)) {
       absl::string_view coding =
           StringUtil::trim(StringUtil::cropRight(headers.getInlineValue(handle), ","));
-      return StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding);
+      return StringUtil::CaseInsensitiveCompare()(config_.contentEncoding(), coding);
     }
     return false;
   }
@@ -232,7 +232,7 @@ private:
     }
   }
 
-  DecompressorFilterConfigSharedPtr config_;
+  DecompressorFilterConfig& config_;
   Compression::Decompressor::DecompressorPtr request_decompressor_{};
   Compression::Decompressor::DecompressorPtr response_decompressor_{};
   ByteTracker request_byte_tracker_;

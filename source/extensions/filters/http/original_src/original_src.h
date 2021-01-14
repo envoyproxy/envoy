@@ -33,7 +33,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  Config config_;
+  const Config& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 

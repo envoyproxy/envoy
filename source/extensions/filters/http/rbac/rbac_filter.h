@@ -70,8 +70,7 @@ using RoleBasedAccessControlFilterConfigSharedPtr =
 class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
                                      public Logger::Loggable<Logger::Id::rbac> {
 public:
-  RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
-      : config_(config) {}
+  RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfig& config) : config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -93,7 +92,7 @@ public:
   void onDestroy() override {}
 
 private:
-  RoleBasedAccessControlFilterConfigSharedPtr config_;
+  RoleBasedAccessControlFilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 

@@ -25,19 +25,19 @@ AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     : stats_prefix_(std::move(stats_prefix)), time_source_(time_source),
       adaptive_concurrency_feature_(proto_config.enabled(), runtime) {}
 
-AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
-    AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
-    : config_(std::move(config)), controller_(std::move(controller)) {}
+AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(AdaptiveConcurrencyFilterConfig& config,
+                                                     Controller::ConcurrencyController& controller)
+    : config_(config), controller_(controller) {}
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // In addition to not sampling if the filter is disabled, health checks should also not be sampled
   // by the concurrency controller since they may potentially bias the sample aggregate to lower
   // latency measurements.
-  if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
+  if (!config_.filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (controller_->forwardingDecision() == Controller::RequestForwardingAction::Block) {
+  if (controller_.forwardingDecision() == Controller::RequestForwardingAction::Block) {
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "reached concurrency limit",
                                        nullptr, absl::nullopt, "reached_concurrency_limit");
     return Http::FilterHeadersStatus::StopIteration;
@@ -45,9 +45,9 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::Request
 
   // When the deferred_sample_task_ object is destroyed, the request start time is sampled. This
   // occurs either when encoding is complete or during destruction of this filter object.
-  const auto now = config_->timeSource().monotonicTime();
+  const auto now = config_.timeSource().monotonicTime();
   deferred_sample_task_ =
-      std::make_unique<Cleanup>([this, now]() { controller_->recordLatencySample(now); });
+      std::make_unique<Cleanup>([this, now]() { controller_.recordLatencySample(now); });
 
   return Http::FilterHeadersStatus::Continue;
 }
@@ -62,7 +62,7 @@ void AdaptiveConcurrencyFilter::onDestroy() {
     // TODO (tonya11en): Return some RAII handle from the concurrency controller that performs this
     // logic as part of its lifecycle.
     deferred_sample_task_->cancel();
-    controller_->cancelLatencySample();
+    controller_.cancelLatencySample();
   }
 }
 

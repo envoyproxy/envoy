@@ -15,7 +15,7 @@ Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
   CorsFilterConfigSharedPtr config =
       std::make_shared<CorsFilterConfig>(stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
+    callbacks.addStreamFilter(std::make_shared<CorsFilter>(*config));
   };
 }
 

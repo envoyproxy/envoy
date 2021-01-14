@@ -232,8 +232,8 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::StreamDecoderFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
-      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+  Filter(FilterConfig& config, Filters::Common::ExtAuthz::ClientPtr&& client)
+      : config_(config), client_(std::move(client)), stats_(config.stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -273,7 +273,7 @@ private:
   enum class FilterReturn { ContinueDecoding, StopDecoding };
 
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
-  FilterConfigSharedPtr config_;
+  FilterConfig& config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RequestHeaderMap* request_headers_;

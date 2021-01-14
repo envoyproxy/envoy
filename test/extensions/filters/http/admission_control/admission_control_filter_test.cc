@@ -76,7 +76,7 @@ public:
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
-    filter_ = std::make_shared<AdmissionControlFilter>(config, "test_prefix.");
+    filter_ = std::make_shared<AdmissionControlFilter>(*config, "test_prefix.");
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 

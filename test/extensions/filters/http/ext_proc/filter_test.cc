@@ -49,7 +49,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
-    filter_ = std::make_unique<Filter>(config_, std::move(client_));
+    filter_ = std::make_unique<Filter>(*config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }

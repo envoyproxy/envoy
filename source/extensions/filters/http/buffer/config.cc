@@ -22,7 +22,7 @@ Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
 
   BufferFilterConfigSharedPtr filter_config(new BufferFilterConfig(proto_config));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(filter_config));
+    callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(*filter_config));
   };
 }
 

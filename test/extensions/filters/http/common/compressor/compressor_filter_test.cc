@@ -71,9 +71,11 @@ public:
     TestUtility::loadFromJson(json, compressor);
     config_ =
         std::make_shared<TestCompressorFilterConfig>(compressor, "test.", stats_, runtime_, "test");
-    filter_ = std::make_unique<CompressorFilter>(config_);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    filter_ = std::make_unique<CompressorFilter>(*config_);
+    decoder_callbacks_ = std::make_shared<NiceMock<Http::MockStreamDecoderFilterCallbacks>>();
+    encoder_callbacks_ = std::make_shared<NiceMock<Http::MockStreamEncoderFilterCallbacks>>();
+    filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
   }
 
   void verifyCompressedData() {
@@ -106,7 +108,7 @@ public:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
     if (with_compression) {
       if (with_trailers) {
-        EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+        EXPECT_CALL(*decoder_callbacks_, addDecodedData(_, true))
             .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
         Http::TestRequestTrailerMapImpl trailers;
         EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
@@ -150,7 +152,7 @@ public:
       EXPECT_EQ("test", headers.get_("content-encoding"));
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
       if (with_trailers) {
-        EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+        EXPECT_CALL(*encoder_callbacks_, addEncodedData(_, true))
             .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
         Http::TestResponseTrailerMapImpl trailers;
         EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
@@ -165,15 +167,15 @@ public:
     }
   }
 
+  Stats::TestUtil::TestStore stats_;
+  NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<TestCompressorFilterConfig> config_;
-  std::unique_ptr<CompressorFilter> filter_;
+  std::shared_ptr<NiceMock<Http::MockStreamDecoderFilterCallbacks>> decoder_callbacks_;
+  std::shared_ptr<NiceMock<Http::MockStreamEncoderFilterCallbacks>> encoder_callbacks_;
   Buffer::OwnedImpl data_;
   std::string expected_str_;
   std::string response_stats_prefix_{};
-  Stats::TestUtil::TestStore stats_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  std::unique_ptr<CompressorFilter> filter_;
 };
 
 // Test if Runtime Feature is Disabled
@@ -653,10 +655,10 @@ protected:
 }
 )EOF",
                               compressor);
-    auto config1 = std::make_shared<TestCompressorFilterConfig>(compressor, "test1.", stats1_,
-                                                                runtime_, "test1");
-    config1->setExpectedCompressCalls(0);
-    filter1_ = std::make_unique<CompressorFilter>(config1);
+    config1_ = std::make_shared<TestCompressorFilterConfig>(compressor, "test1.", stats1_, runtime_,
+                                                            "test1");
+    config1_->setExpectedCompressCalls(0);
+    filter1_ = std::make_unique<CompressorFilter>(*config1_);
 
     TestUtility::loadFromJson(R"EOF(
 {
@@ -669,15 +671,17 @@ protected:
 }
 )EOF",
                               compressor);
-    auto config2 = std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats2_,
-                                                                runtime_, "test2");
-    config2->setExpectedCompressCalls(0);
-    filter2_ = std::make_unique<CompressorFilter>(config2);
+    config2_ = std::make_shared<TestCompressorFilterConfig>(compressor, "test2.", stats2_, runtime_,
+                                                            "test2");
+    config2_->setExpectedCompressCalls(0);
+    filter2_ = std::make_unique<CompressorFilter>(*config2_);
   }
 
   NiceMock<Runtime::MockLoader> runtime_;
   Stats::TestUtil::TestStore stats1_;
   Stats::TestUtil::TestStore stats2_;
+  std::shared_ptr<TestCompressorFilterConfig> config1_;
+  std::shared_ptr<TestCompressorFilterConfig> config2_;
   std::unique_ptr<CompressorFilter> filter1_;
   std::unique_ptr<CompressorFilter> filter2_;
 };
@@ -767,7 +771,7 @@ TEST(LegacyTest, GzipStats) {
   auto config =
       std::make_shared<TestCompressorFilterConfig>(compressor, "test.", stats, runtime, "gzip");
   config->setExpectedCompressCalls(0);
-  auto gzip_filter = std::make_unique<CompressorFilter>(config);
+  auto gzip_filter = std::make_unique<CompressorFilter>(*config);
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   gzip_filter->setDecoderFilterCallbacks(decoder_callbacks);
   Http::TestRequestHeaderMapImpl req_headers{{":method", "get"},

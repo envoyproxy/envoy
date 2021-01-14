@@ -95,7 +95,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::PassThroughFilter {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(config) {}
+  Filter(const FilterConfig& config) : config_(config) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -107,8 +107,8 @@ private:
   void populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
 
-  const FilterConfig* getConfig() const;
-  FilterConfigSharedPtr config_;
+  const FilterConfig& getConfig() const;
+  const FilterConfig& config_;
 };
 
 } // namespace LocalRateLimitFilter

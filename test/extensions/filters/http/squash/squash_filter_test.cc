@@ -169,7 +169,7 @@ protected:
     factory_context_.cluster_manager_.initializeThreadLocalClusters({"squash"});
     config_ = std::make_shared<SquashFilterConfig>(p, factory_context_.cluster_manager_);
 
-    filter_ = std::make_shared<SquashFilter>(config_, factory_context_.cluster_manager_);
+    filter_ = std::make_shared<SquashFilter>(*config_, factory_context_.cluster_manager_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 

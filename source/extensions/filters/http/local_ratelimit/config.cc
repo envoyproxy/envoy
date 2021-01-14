@@ -16,10 +16,10 @@ namespace LocalRateLimitFilter {
 Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
+  auto filter_config = std::make_shared<FilterConfig>(
       proto_config, context.localInfo(), context.dispatcher(), context.scope(), context.runtime());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
+    callbacks.addStreamFilter(std::make_shared<Filter>(*filter_config));
   };
 }
 

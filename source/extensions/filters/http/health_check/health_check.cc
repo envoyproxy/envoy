@@ -52,7 +52,7 @@ void HealthCheckCacheManager::onTimer() {
 
 Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                            bool end_stream) {
-  if (Http::HeaderUtility::matchHeaders(headers, *header_match_data_)) {
+  if (Http::HeaderUtility::matchHeaders(headers, header_match_data_)) {
     health_check_request_ = true;
     callbacks_->streamInfo().healthCheck(true);
 

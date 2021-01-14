@@ -36,14 +36,14 @@ BufferFilterConfig::BufferFilterConfig(
     const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config)
     : settings_(proto_config) {}
 
-BufferFilter::BufferFilter(BufferFilterConfigSharedPtr config)
-    : config_(config), settings_(config->settings()) {}
+BufferFilter::BufferFilter(BufferFilterConfig& config)
+    : config_(config), settings_(config.settings()) {}
 
 void BufferFilter::initConfig() {
   ASSERT(!config_initialized_);
   config_initialized_ = true;
 
-  settings_ = config_->settings();
+  settings_ = config_.settings();
 
   if (!callbacks_->route() || !callbacks_->route()->routeEntry()) {
     return;

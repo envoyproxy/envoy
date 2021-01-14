@@ -40,8 +40,7 @@ std::string generateRcDetails(absl::string_view error_msg) {
 
 } // namespace
 
-Filter::Filter(FilterConfigSharedPtr config)
-    : stats_(config->stats()), config_(std::move(config)) {}
+Filter::Filter(FilterConfig& config) : stats_(config.stats()), config_(config) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
@@ -56,7 +55,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   state_ = Calling;
   stopped_ = false;
 
-  if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
+  if (config_.bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
     // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
     // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
     ENVOY_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements");
@@ -71,7 +70,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           HttpFilterNames::get().JwtAuthn, decoder_callbacks_->route());
   if (per_route_config != nullptr) {
     std::string error_msg;
-    std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);
+    std::tie(verifier, error_msg) = config_.findPerRouteVerifier(*per_route_config);
     if (!error_msg.empty()) {
       stats_.denied_.inc();
       state_ = Responded;
@@ -81,7 +80,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       return Http::FilterHeadersStatus::StopIteration;
     }
   } else {
-    verifier = config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
+    verifier = config_.findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
   }
 
   if (verifier == nullptr) {

@@ -44,7 +44,7 @@ using CorsFilterConfigSharedPtr = std::shared_ptr<CorsFilterConfig>;
 
 class CorsFilter : public Http::StreamFilter {
 public:
-  CorsFilter(CorsFilterConfigSharedPtr config);
+  CorsFilter(CorsFilterConfig& config);
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -98,7 +98,7 @@ private:
   bool is_cors_request_{};
   const Http::HeaderEntry* origin_{};
 
-  CorsFilterConfigSharedPtr config_;
+  CorsFilterConfig& config_;
 };
 
 } // namespace Cors

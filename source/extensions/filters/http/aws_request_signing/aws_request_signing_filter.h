@@ -77,7 +77,7 @@ private:
  */
 class Filter : public Http::PassThroughDecoderFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const std::shared_ptr<FilterConfig>& config);
+  Filter(FilterConfig& config);
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
@@ -85,7 +85,7 @@ public:
                                           bool end_stream) override;
 
 private:
-  std::shared_ptr<FilterConfig> config_;
+  FilterConfig& config_;
 };
 
 } // namespace AwsRequestSigningFilter

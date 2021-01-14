@@ -69,36 +69,36 @@ bool FilterConfig::enforced() const {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const auto* config = getConfig();
+  const auto& config = getConfig();
 
-  if (!config->enabled()) {
+  if (!config.enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  config->stats().enabled_.inc();
+  config.stats().enabled_.inc();
 
   std::vector<RateLimit::LocalDescriptor> descriptors;
-  if (config->hasDescriptors()) {
+  if (config.hasDescriptors()) {
     populateDescriptors(descriptors, headers);
   }
 
-  if (config->requestAllowed(descriptors)) {
-    config->stats().ok_.inc();
+  if (config.requestAllowed(descriptors)) {
+    config.stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
-  config->stats().rate_limited_.inc();
+  config.stats().rate_limited_.inc();
 
-  if (!config->enforced()) {
+  if (!config.enforced()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  config->stats().enforced_.inc();
+  config.stats().enforced_.inc();
 
   decoder_callbacks_->sendLocalReply(
-      config->status(), "local_rate_limited",
-      [this, config](Http::HeaderMap& headers) {
-        config->responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
+      config.status(), "local_rate_limited",
+      [this, &config](Http::HeaderMap& headers) {
+        config.responseHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());
       },
       absl::nullopt, "local_rate_limited");
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
@@ -115,27 +115,27 @@ void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descri
 
   const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
-  const auto* config = getConfig();
+  const auto& config = getConfig();
   for (const Router::RateLimitPolicyEntry& rate_limit :
-       route_entry->rateLimitPolicy().getApplicableRateLimit(config->stage())) {
+       route_entry->rateLimitPolicy().getApplicableRateLimit(config.stage())) {
     const std::string& disable_key = rate_limit.disableKey();
 
     if (!disable_key.empty()) {
       continue;
     }
-    rate_limit.populateLocalDescriptors(descriptors, config->localInfo().clusterName(), headers,
+    rate_limit.populateLocalDescriptors(descriptors, config.localInfo().clusterName(), headers,
                                         decoder_callbacks_->streamInfo());
   }
 }
 
-const FilterConfig* Filter::getConfig() const {
+const FilterConfig& Filter::getConfig() const {
   const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(
       "envoy.filters.http.local_ratelimit", decoder_callbacks_->route());
   if (config) {
-    return config;
+    return *config;
   }
 
-  return config_.get();
+  return config_;
 }
 
 } // namespace LocalRateLimitFilter

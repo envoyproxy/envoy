@@ -46,13 +46,12 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  AdmissionControlFilterConfigSharedPtr filter_config =
-      std::make_shared<AdmissionControlFilterConfig>(
-          config, context.runtime(), context.api().randomGenerator(), context.scope(),
-          std::move(tls), std::move(response_evaluator));
+  auto filter_config = std::make_shared<AdmissionControlFilterConfig>(
+      config, context.runtime(), context.api().randomGenerator(), context.scope(), std::move(tls),
+      std::move(response_evaluator));
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));
+    callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(*filter_config, prefix));
   };
 }
 

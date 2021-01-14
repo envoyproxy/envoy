@@ -53,8 +53,8 @@ using ConcurrencyControllerSharedPtr = std::shared_ptr<Controller::ConcurrencyCo
 class AdaptiveConcurrencyFilter : public Http::PassThroughFilter,
                                   Logger::Loggable<Logger::Id::filter> {
 public:
-  AdaptiveConcurrencyFilter(AdaptiveConcurrencyFilterConfigSharedPtr config,
-                            ConcurrencyControllerSharedPtr controller);
+  AdaptiveConcurrencyFilter(AdaptiveConcurrencyFilterConfig& config,
+                            Controller::ConcurrencyController& controller);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
@@ -64,8 +64,8 @@ public:
   void onDestroy() override;
 
 private:
-  AdaptiveConcurrencyFilterConfigSharedPtr config_;
-  const ConcurrencyControllerSharedPtr controller_;
+  AdaptiveConcurrencyFilterConfig& config_;
+  Controller::ConcurrencyController& controller_;
   std::unique_ptr<Cleanup> deferred_sample_task_;
 };
 

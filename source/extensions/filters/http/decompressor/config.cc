@@ -33,7 +33,7 @@ Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyp
       proto_config, stats_prefix, context.scope(), context.runtime(),
       std::move(decompressor_factory));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<DecompressorFilter>(filter_config));
+    callbacks.addStreamFilter(std::make_shared<DecompressorFilter>(*filter_config));
   };
 }
 

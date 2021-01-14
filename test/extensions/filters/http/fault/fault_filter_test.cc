@@ -124,7 +124,7 @@ public:
 
   void SetUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
     config_ = std::make_shared<FaultFilterConfig>(fault, runtime_, "prefix.", stats_, time_system_);
-    filter_ = std::make_unique<FaultFilter>(config_);
+    filter_ = std::make_unique<FaultFilter>(*config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());

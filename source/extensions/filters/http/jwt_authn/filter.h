@@ -19,7 +19,7 @@ class Filter : public Http::StreamDecoderFilter,
                public Verifier::Callbacks,
                public Logger::Loggable<Logger::Id::jwt> {
 public:
-  Filter(FilterConfigSharedPtr config);
+  Filter(FilterConfig& config);
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -47,7 +47,7 @@ private:
   // Mark if request has been stopped.
   bool stopped_ = false;
   // Filter config object.
-  FilterConfigSharedPtr config_;
+  FilterConfig& config_;
   // Verify context for current request.
   ContextSharedPtr context_;
 };

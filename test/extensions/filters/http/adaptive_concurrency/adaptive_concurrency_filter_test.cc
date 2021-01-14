@@ -40,10 +40,10 @@ public:
 
   void SetUp() override {
     const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency config;
-    auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
-        config, runtime_, "testprefix.", stats_, time_system_);
+    config_ = std::make_shared<AdaptiveConcurrencyFilterConfig>(config, runtime_, "testprefix.",
+                                                                stats_, time_system_);
 
-    filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+    filter_ = std::make_unique<AdaptiveConcurrencyFilter>(*config_, *controller_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -63,6 +63,7 @@ public:
   std::shared_ptr<MockConcurrencyController> controller_{new MockConcurrencyController()};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  std::shared_ptr<AdaptiveConcurrencyFilterConfig> config_;
   std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
 };
 
@@ -88,7 +89,7 @@ enabled:
 
   auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
       config, runtime_, "testprefix.", stats_, time_system_);
-  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(*config_ptr, *controller_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -158,7 +159,7 @@ enabled:
 
   auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
       config, runtime_, "testprefix.", stats_, time_system_);
-  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(*config_ptr, *controller_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -207,7 +208,7 @@ enabled:
 
   auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
       config, runtime_, "testprefix.", stats_, time_system_);
-  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(*config_ptr, *controller_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 

@@ -14,10 +14,10 @@ namespace Lua {
 Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::lua::v3::Lua& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
-  FilterConfigConstSharedPtr filter_config(new FilterConfig{
-      proto_config, context.threadLocal(), context.clusterManager(), context.api()});
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, context.threadLocal(), context.clusterManager(), context.api());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
+    callbacks.addStreamFilter(std::make_shared<Filter>(*filter_config));
   };
 }
 

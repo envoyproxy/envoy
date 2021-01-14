@@ -47,7 +47,7 @@ public:
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
   }
 
-  CsrfFilterTest() : config_(setupConfig()), filter_(config_) {}
+  CsrfFilterTest() : config_(setupConfig()), filter_(*config_) {}
 
   void SetUp() override {
     setRoutePolicy(config_->policy());

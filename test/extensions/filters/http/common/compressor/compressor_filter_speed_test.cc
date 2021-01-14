@@ -106,7 +106,7 @@ static Result compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionP
   ON_CALL(runtime.snapshot_, featureEnabled("test.filter_enabled", 100))
       .WillByDefault(Return(true));
 
-  auto filter = std::make_unique<CompressorFilter>(config);
+  auto filter = std::make_unique<CompressorFilter>(*config);
   filter->setDecoderFilterCallbacks(decoder_callbacks);
 
   Http::TestRequestHeaderMapImpl headers = {{":method", "get"}, {"accept-encoding", "gzip"}};

@@ -35,7 +35,7 @@ public:
     return std::make_shared<BufferFilterConfig>(proto_config);
   }
 
-  BufferFilterTest() : config_(setupConfig()), filter_(config_) {
+  BufferFilterTest() : config_(setupConfig()), filter_(*config_) {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 

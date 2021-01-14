@@ -37,7 +37,7 @@ Http::FilterFactoryCb CompressorFilterFactory::createFilterFactoryFromProtoTyped
       std::make_shared<CompressorFilterConfig>(proto_config, stats_prefix, context.scope(),
                                                context.runtime(), std::move(compressor_factory));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Common::Compressors::CompressorFilter>(config));
+    callbacks.addStreamFilter(std::make_shared<Common::Compressors::CompressorFilter>(*config));
   };
 }
 

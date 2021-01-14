@@ -69,7 +69,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
 
   std::string effective_policy_id;
   const auto shadow_engine =
-      config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
+      config_.engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
 
   if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
@@ -78,11 +78,11 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
                                     &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
-      config_->stats().shadow_allowed_.inc();
+      config_.stats().shadow_allowed_.inc();
     } else {
       ENVOY_LOG(debug, "shadow denied, matched policy {}",
                 effective_policy_id.empty() ? "none" : effective_policy_id);
-      config_->stats().shadow_denied_.inc();
+      config_.stats().shadow_denied_.inc();
       shadow_resp_code =
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
@@ -103,7 +103,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   }
 
   const auto engine =
-      config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
+      config_.engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
     std::string effective_policy_id;
     bool allowed = engine->handleAction(*callbacks_->connection(), headers,
@@ -111,14 +111,14 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
     if (allowed) {
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
-      config_->stats().allowed_.inc();
+      config_.stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
                                  absl::nullopt,
                                  Filters::Common::RBAC::responseDetail(log_policy_id));
-      config_->stats().denied_.inc();
+      config_.stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
   }

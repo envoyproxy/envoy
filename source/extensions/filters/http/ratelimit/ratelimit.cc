@@ -30,8 +30,8 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   const bool is_internal_request = Http::HeaderUtility::isEnvoyInternalRequest(headers);
-  if ((is_internal_request && config_->requestType() == FilterRequestType::External) ||
-      (!is_internal_request && config_->requestType() == FilterRequestType::Internal)) {
+  if ((is_internal_request && config_.requestType() == FilterRequestType::External) ||
+      (!is_internal_request && config_.requestType() == FilterRequestType::Internal)) {
     return;
   }
 
@@ -73,14 +73,14 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, config_->domain(), descriptors, callbacks_->activeSpan(),
+    client_->limit(*this, config_.domain(), descriptors, callbacks_->activeSpan(),
                    callbacks_->streamInfo());
     initiating_call_ = false;
   }
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
+  if (!config_.runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -150,7 +150,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
   Stats::StatName empty_stat_name;
-  Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
+  Filters::Common::RateLimit::StatNames& stat_names = config_.statNames();
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
     callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
@@ -166,7 +166,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
-    Http::CodeStats::ResponseStatInfo info{config_->scope(),
+    Http::CodeStats::ResponseStatInfo info{config_.scope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
                                            enumToInt(Http::Code::TooManyRequests),
@@ -177,7 +177,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
-    if (config_->enableXEnvoyRateLimitedHeader()) {
+    if (config_.enableXEnvoyRateLimitedHeader()) {
       if (response_headers_to_add_ == nullptr) {
         response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
       }
@@ -187,7 +187,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     break;
   }
 
-  if (config_->enableXRateLimitHeaders()) {
+  if (config_.enableXRateLimitHeaders()) {
     Http::ResponseHeaderMapPtr rate_limit_headers =
         XRateLimitHeaderUtils::create(std::move(descriptor_statuses));
     if (response_headers_to_add_ == nullptr) {
@@ -199,17 +199,17 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
-      config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
+      config_.runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
     callbacks_->sendLocalReply(
         Http::Code::TooManyRequests, response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
         },
-        config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
+        config_.rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
-    if (config_->failureModeAllow()) {
+    if (config_.failureModeAllow()) {
       cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
       if (!initiating_call_) {
         appendRequestHeaders(req_headers_to_add);
@@ -231,14 +231,14 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
                                           std::vector<RateLimit::Descriptor>& descriptors,
                                           const Http::RequestHeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
-       rate_limit_policy.getApplicableRateLimit(config_->stage())) {
+       rate_limit_policy.getApplicableRateLimit(config_.stage())) {
     const std::string& disable_key = rate_limit.disableKey();
     if (!disable_key.empty() &&
-        !config_->runtime().snapshot().featureEnabled(
+        !config_.runtime().snapshot().featureEnabled(
             fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
+    rate_limit.populateDescriptors(descriptors, config_.localInfo().clusterName(), headers,
                                    callbacks_->streamInfo());
   }
 }

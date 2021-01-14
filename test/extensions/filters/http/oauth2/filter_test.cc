@@ -110,7 +110,7 @@ public:
     config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
                                              scope_, "test.");
 
-    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_);
+    filter_ = std::make_shared<OAuth2Filter>(*config_, std::move(oauth_client_ptr), test_time_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
     filter_->validator_ = validator_;

@@ -168,7 +168,7 @@ using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
  */
 class CompressorFilter : public Http::PassThroughFilter {
 public:
-  explicit CompressorFilter(const CompressorFilterConfigSharedPtr config);
+  explicit CompressorFilter(CompressorFilterConfig& config);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -210,7 +210,7 @@ private:
 
   Envoy::Compression::Compressor::CompressorPtr response_compressor_;
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;
-  const CompressorFilterConfigSharedPtr config_;
+  CompressorFilterConfig& config_;
   std::unique_ptr<std::string> accept_encoding_;
 };
 

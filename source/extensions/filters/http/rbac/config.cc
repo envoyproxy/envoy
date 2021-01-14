@@ -19,7 +19,7 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
                                                                      context.scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
+    callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(*config));
   };
 }
 

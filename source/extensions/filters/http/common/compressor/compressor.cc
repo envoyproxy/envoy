@@ -40,7 +40,7 @@ const std::vector<std::string>& defaultContentEncoding() {
 
 // List of CompressorFilterConfig objects registered for a stream.
 struct CompressorRegistry : public StreamInfo::FilterState::Object {
-  std::list<CompressorFilterConfigSharedPtr> filter_configs_;
+  std::list<std::reference_wrapper<CompressorFilterConfig>> filter_configs_;
 };
 
 // Key to per stream CompressorRegistry objects.
@@ -138,8 +138,7 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
   return config;
 }
 
-CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
-    : config_(std::move(config)) {}
+CompressorFilter::CompressorFilter(CompressorFilterConfig& config) : config_(config) {}
 
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                           bool end_stream) {
@@ -150,21 +149,21 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
     accept_encoding_ = std::make_unique<std::string>(accept_encoding->value().getStringView());
   }
 
-  const auto& response_config = config_->responseDirectionConfig();
+  const auto& response_config = config_.responseDirectionConfig();
   if (response_config.compressionEnabled() && response_config.removeAcceptEncodingHeader()) {
     headers.removeInline(accept_encoding_handle.handle());
   }
 
-  const auto& request_config = config_->requestDirectionConfig();
+  const auto& request_config = config_.requestDirectionConfig();
   if (!end_stream && request_config.compressionEnabled() &&
       request_config.isMinimumContentLength(headers) &&
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
       isTransferEncodingAllowed(headers)) {
     headers.removeContentLength();
-    headers.setInline(request_content_encoding_handle.handle(), config_->contentEncoding());
+    headers.setInline(request_content_encoding_handle.handle(), config_.contentEncoding());
     request_config.stats().compressed_.inc();
-    request_compressor_ = config_->makeCompressor();
+    request_compressor_ = config_.makeCompressor();
   } else {
     request_config.stats().not_compressed_.inc();
   }
@@ -174,7 +173,7 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
 
 Http::FilterDataStatus CompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (request_compressor_ != nullptr) {
-    compressAndUpdateStats(request_compressor_, config_->requestDirectionConfig().stats(), data,
+    compressAndUpdateStats(request_compressor_, config_.requestDirectionConfig().stats(), data,
                            end_stream);
   }
   return Http::FilterDataStatus::Continue;
@@ -186,7 +185,7 @@ Http::FilterTrailersStatus CompressorFilter::decodeTrailers(Http::RequestTrailer
     // The presence of trailers means the stream is ended, but decodeData()
     // is never called with end_stream=true, thus let the compression library know
     // that the stream is ended.
-    compressAndUpdateStats(request_compressor_, config_->requestDirectionConfig().stats(),
+    compressAndUpdateStats(request_compressor_, config_.requestDirectionConfig().stats(),
                            empty_buffer, true);
     decoder_callbacks_->addDecodedData(empty_buffer, true);
   }
@@ -218,7 +217,7 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
 
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
-  const auto& config = config_->responseDirectionConfig();
+  const auto& config = config_.responseDirectionConfig();
   const bool isEnabledAndContentLengthBigEnough =
       config.compressionEnabled() && config.isMinimumContentLength(headers);
   const bool isCompressible = isEnabledAndContentLengthBigEnough &&
@@ -229,10 +228,10 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
     headers.removeContentLength();
-    headers.setInline(response_content_encoding_handle.handle(), config_->contentEncoding());
+    headers.setInline(response_content_encoding_handle.handle(), config_.contentEncoding());
     config.stats().compressed_.inc();
     // Finally instantiate the compressor.
-    response_compressor_ = config_->makeCompressor();
+    response_compressor_ = config_.makeCompressor();
   } else {
     config.stats().not_compressed_.inc();
   }
@@ -249,7 +248,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
 
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (response_compressor_ != nullptr) {
-    compressAndUpdateStats(response_compressor_, config_->responseDirectionConfig().stats(), data,
+    compressAndUpdateStats(response_compressor_, config_.responseDirectionConfig().stats(), data,
                            end_stream);
   }
   return Http::FilterDataStatus::Continue;
@@ -261,7 +260,7 @@ Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTraile
     // The presence of trailers means the stream is ended, but encodeData()
     // is never called with end_stream=true, thus let the compression library know
     // that the stream is ended.
-    compressAndUpdateStats(response_compressor_, config_->responseDirectionConfig().stats(),
+    compressAndUpdateStats(response_compressor_, config_.responseDirectionConfig().stats(),
                            empty_buffer, true);
     encoder_callbacks_->addEncodedData(empty_buffer, true);
   }
@@ -299,7 +298,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   // Find all compressors enabled for the filter chain.
   std::map<std::string, uint32_t> allowed_compressors;
   uint32_t registration_count{0};
-  for (const auto& filter_config :
+  for (CompressorFilterConfig& filter_config :
        decoder_callbacks_->streamInfo()
            .filterState()
            ->getDataReadOnly<CompressorRegistry>(compressorRegistryKey())
@@ -314,10 +313,10 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // If "gzip" is not excluded from the decision process then it will take precedence over
     // "deflate" and the resulting response won't be compressed at all.
     if (!content_type_value.empty() &&
-        !filter_config->responseDirectionConfig().contentTypeValues().empty()) {
+        !filter_config.responseDirectionConfig().contentTypeValues().empty()) {
       auto iter =
-          filter_config->responseDirectionConfig().contentTypeValues().find(content_type_value);
-      if (iter == filter_config->responseDirectionConfig().contentTypeValues().end()) {
+          filter_config.responseDirectionConfig().contentTypeValues().find(content_type_value);
+      if (iter == filter_config.responseDirectionConfig().contentTypeValues().end()) {
         // Skip adding this filter to the list of allowed compressors.
         continue;
       }
@@ -327,9 +326,9 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // case when there are two gzip filters using different compression levels for different content
     // sizes. In such case we ignore duplicates (or different filters for the same encoding)
     // registered last.
-    auto enc = allowed_compressors.find(filter_config->contentEncoding());
+    auto enc = allowed_compressors.find(filter_config.contentEncoding());
     if (enc == allowed_compressors.end()) {
-      allowed_compressors.insert({filter_config->contentEncoding(), registration_count});
+      allowed_compressors.insert({filter_config.contentEncoding(), registration_count});
       ++registration_count;
     }
   }
@@ -416,15 +415,15 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
 // the Accept-Encoding header.
 bool CompressorFilter::shouldCompress(const CompressorFilter::EncodingDecision& decision) const {
   const bool should_compress =
-      absl::EqualsIgnoreCase(config_->contentEncoding(), decision.encoding());
-  const ResponseCompressorStats& stats = config_->responseDirectionConfig().responseStats();
+      absl::EqualsIgnoreCase(config_.contentEncoding(), decision.encoding());
+  const ResponseCompressorStats& stats = config_.responseDirectionConfig().responseStats();
 
   switch (decision.stat()) {
   case CompressorFilter::EncodingDecision::HeaderStat::ValidCompressor:
     if (should_compress) {
       stats.header_compressor_used_.inc();
       // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
-      if (absl::EqualsIgnoreCase("gzip", config_->contentEncoding())) {
+      if (absl::EqualsIgnoreCase("gzip", config_.contentEncoding())) {
         stats.header_gzip_.inc();
       }
     } else {
@@ -449,7 +448,7 @@ bool CompressorFilter::shouldCompress(const CompressorFilter::EncodingDecision& 
 
 bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const {
   if (accept_encoding_ == nullptr) {
-    config_->responseDirectionConfig().responseStats().no_accept_header_.inc();
+    config_.responseDirectionConfig().responseStats().no_accept_header_.inc();
     return false;
   }
 
@@ -485,10 +484,10 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
 }
 
 bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
-  const bool is_etag_allowed = !(config_->responseDirectionConfig().disableOnEtagHeader() &&
+  const bool is_etag_allowed = !(config_.responseDirectionConfig().disableOnEtagHeader() &&
                                  headers.getInline(etag_handle.handle()));
   if (!is_etag_allowed) {
-    config_->responseDirectionConfig().responseStats().not_compressed_etag_.inc();
+    config_.responseDirectionConfig().responseStats().not_compressed_etag_.inc();
   }
   return is_etag_allowed;
 }
@@ -528,7 +527,7 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMa
                                  Http::Headers::get().TransferEncodingValues.Compress) ||
           // or with a custom non-standard compression provided by an external
           // compression library.
-          absl::EqualsIgnoreCase(trimmed_value, config_->contentEncoding())) {
+          absl::EqualsIgnoreCase(trimmed_value, config_.contentEncoding())) {
         return false;
       }
     }

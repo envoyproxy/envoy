@@ -18,12 +18,11 @@ Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyp
     const envoy::extensions::filters::http::squash::v3::Squash& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
 
-  SquashFilterConfigSharedPtr config = std::make_shared<SquashFilterConfig>(
-      SquashFilterConfig(proto_config, context.clusterManager()));
+  auto config = std::make_shared<SquashFilterConfig>(proto_config, context.clusterManager());
 
   return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
-        std::make_shared<SquashFilter>(config, context.clusterManager()));
+        std::make_shared<SquashFilter>(*config, context.clusterManager()));
   };
 }
 

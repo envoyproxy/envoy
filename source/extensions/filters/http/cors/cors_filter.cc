@@ -40,8 +40,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(generateStats(stats_prefix + "cors.", scope)) {}
 
-CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
-    : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
+CorsFilter::CorsFilter(CorsFilterConfig& config)
+    : policies_({{nullptr, nullptr}}), config_(config) {}
 
 // This handles the CORS preflight request as described in
 // https://www.w3.org/TR/cors/#resource-preflight-requests
@@ -66,11 +66,11 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
   }
 
   if (!isOriginAllowed(origin_->value())) {
-    config_->stats().origin_invalid_.inc();
+    config_.stats().origin_invalid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
-  config_->stats().origin_valid_.inc();
+  config_.stats().origin_valid_.inc();
   if (shadowEnabled() && !enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }

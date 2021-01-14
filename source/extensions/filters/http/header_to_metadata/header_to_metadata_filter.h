@@ -134,7 +134,7 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 class HeaderToMetadataFilter : public Http::StreamFilter,
                                public Logger::Loggable<Logger::Id::filter> {
 public:
-  HeaderToMetadataFilter(const ConfigSharedPtr config);
+  HeaderToMetadataFilter(const Config& config);
   ~HeaderToMetadataFilter() override;
 
   // Http::StreamFilterBase
@@ -171,8 +171,7 @@ private:
 
   using StructMap = std::map<std::string, ProtobufWkt::Struct>;
 
-  const ConfigSharedPtr config_;
-  mutable const Config* effective_config_{nullptr};
+  const Config& config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 
@@ -192,7 +191,7 @@ private:
                    ValueEncode) const;
   void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&, StructMap&);
   const std::string& decideNamespace(const std::string& nspace) const;
-  const Config* getConfig() const;
+  const Config& getConfig() const;
 };
 
 } // namespace HeaderToMetadataFilter

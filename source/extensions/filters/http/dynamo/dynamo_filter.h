@@ -25,7 +25,7 @@ namespace Dynamo {
  */
 class DynamoFilter : public Http::StreamFilter {
 public:
-  DynamoFilter(Runtime::Loader& runtime, const DynamoStatsSharedPtr& stats, TimeSource& time_source)
+  DynamoFilter(Runtime::Loader& runtime, DynamoStatsS& stats, TimeSource& time_source)
       : runtime_(runtime), stats_(stats), time_source_(time_source) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
@@ -68,7 +68,7 @@ private:
   void chargeTablePartitionIdStats(const Json::Object& json_body);
 
   Runtime::Loader& runtime_;
-  const DynamoStatsSharedPtr stats_;
+  DynamoStats& stats_;
 
   bool enabled_{};
   std::string operation_{};

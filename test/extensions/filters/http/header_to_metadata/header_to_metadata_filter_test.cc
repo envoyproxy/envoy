@@ -75,12 +75,10 @@ request_rules:
     envoy::extensions::filters::http::header_to_metadata::v3::Config config;
     TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_shared<Config>(config);
-    filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
+    filter_ = std::make_shared<HeaderToMetadataFilter>(*config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
-
-  const Config* getConfig() { return filter_->getConfig(); }
 
   ConfigSharedPtr config_;
   std::shared_ptr<HeaderToMetadataFilter> filter_;
@@ -151,24 +149,6 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   Http::TestRequestTrailerMapImpl incoming_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(incoming_trailers));
   filter_->onDestroy();
-}
-
-TEST_F(HeaderToMetadataTest, ConfigIsCached) {
-  // Global config is empty.
-  initializeFilter("{}");
-  Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
-  std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
-
-  // Setup per route config.
-  envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
-  TestUtility::loadFromYaml(request_config_yaml, config_proto);
-  Config per_route_config(config_proto, true);
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
-              perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
-      .WillOnce(Return(&per_route_config));
-
-  EXPECT_TRUE(getConfig()->doRequest());
-  EXPECT_TRUE(getConfig()->doRequest());
 }
 
 /**

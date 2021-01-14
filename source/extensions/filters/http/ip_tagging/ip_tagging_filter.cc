@@ -60,7 +60,7 @@ void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
-IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
+IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfig& config) : config_(config) {}
 
 IpTaggingFilter::~IpTaggingFilter() = default;
 
@@ -71,14 +71,14 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
                                    (headers.EnvoyInternalRequest()->value() ==
                                     Http::Headers::get().EnvoyInternalRequestValues.True.c_str());
 
-  if ((is_internal_request && config_->requestType() == FilterRequestType::EXTERNAL) ||
-      (!is_internal_request && config_->requestType() == FilterRequestType::INTERNAL) ||
-      !config_->runtime().snapshot().featureEnabled("ip_tagging.http_filter_enabled", 100)) {
+  if ((is_internal_request && config_.requestType() == FilterRequestType::EXTERNAL) ||
+      (!is_internal_request && config_.requestType() == FilterRequestType::INTERNAL) ||
+      !config_.runtime().snapshot().featureEnabled("ip_tagging.http_filter_enabled", 100)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
+      config_.trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");
@@ -91,12 +91,12 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     // If there are use cases with a large set of tags, a way to opt into these stats
     // should be exposed and other observability options like logging tags need to be implemented.
     for (const std::string& tag : tags) {
-      config_->incHit(tag);
+      config_.incHit(tag);
     }
   } else {
-    config_->incNoHit();
+    config_.incNoHit();
   }
-  config_->incTotal();
+  config_.incTotal();
   return Http::FilterHeadersStatus::Continue;
 }
 

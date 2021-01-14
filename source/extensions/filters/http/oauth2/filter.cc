@@ -135,11 +135,10 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
-OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
+OAuth2Filter::OAuth2Filter(FilterConfig& config, std::unique_ptr<OAuth2Client>&& oauth_client,
+                           TimeSource& time_source)
     : validator_(std::make_shared<OAuth2CookieValidator>(time_source)),
-      oauth_client_(std::move(oauth_client)), config_(std::move(config)),
-      time_source_(time_source) {
+      oauth_client_(std::move(oauth_client)), config_(config), time_source_(time_source) {
 
   oauth_client_->setCallbacks(*this);
 }
@@ -193,7 +192,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const absl::string_view path_str = path_header->value().getStringView();
 
   // We should check if this is a sign out request.
-  if (config_->signoutPath().match(path_header->value().getStringView())) {
+  if (config_.signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
   }
 
@@ -204,7 +203,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // correctly but cause a race condition on future requests that have their location set
     // to the callback path.
 
-    if (config_->redirectPathMatcher().match(path_str)) {
+    if (config_.redirectPathMatcher().match(path_str)) {
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
       const auto state =
@@ -215,7 +214,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
       // Avoid infinite redirect storm
-      if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
+      if (config_.redirectPathMatcher().match(state_url.pathAndQueryParams())) {
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -231,7 +230,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   // Save the request headers for later modification if needed.
-  if (config_->forwardBearerToken()) {
+  if (config_.forwardBearerToken()) {
     request_headers_ = &headers;
   }
 
@@ -249,7 +248,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   //
   // The following conditional could be replaced with a regex pattern-match,
   // if we're concerned about strict matching against the callback path.
-  if (!config_->redirectPathMatcher().match(path_str)) {
+  if (!config_.redirectPathMatcher().match(path_str)) {
     Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
         {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
@@ -268,7 +267,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
     const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
-    Formatter::FormatterImpl formatter(config_->redirectUri());
+    Formatter::FormatterImpl formatter(config_.redirectUri());
     const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
                                                *Http::ResponseTrailerMapImpl::create(),
                                                decoder_callbacks_->streamInfo(), "");
@@ -276,12 +275,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
     const std::string new_url =
-        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
-                    config_->clientId(), escaped_redirect_uri, escaped_state);
+        fmt::format(AuthorizationEndpointFormat, config_.authorizationEndpoint(),
+                    config_.clientId(), escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
-    config_->stats().oauth_unauthorized_rq_.inc();
+    config_.stats().oauth_unauthorized_rq_.inc();
 
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -311,11 +310,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  Formatter::FormatterImpl formatter(config_->redirectUri());
+  Formatter::FormatterImpl formatter(config_.redirectUri());
   const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
                                              *Http::ResponseTrailerMapImpl::create(),
                                              decoder_callbacks_->streamInfo(), "");
-  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
+  oauth_client_->asyncGetAccessToken(auth_code_, config_.clientId(), config_.clientSecret(),
                                      redirect_uri);
 
   // pause while we await the next step from the OAuth server
@@ -327,16 +326,16 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   // We can skip OAuth if the supplied HMAC cookie is valid. Apply the OAuth details as headers
   // if we successfully validate the cookie.
-  validator_->setParams(headers, config_->tokenSecret());
+  validator_->setParams(headers, config_.tokenSecret());
   if (validator_->isValid()) {
-    config_->stats().oauth_success_.inc();
-    if (config_->forwardBearerToken() && !validator_->token().empty()) {
+    config_.stats().oauth_success_.inc();
+    if (config_.forwardBearerToken() && !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
     }
     return true;
   }
 
-  for (const auto& matcher : config_->passThroughMatchers()) {
+  for (const auto& matcher : config_.passThroughMatchers()) {
     if (matcher.matchesHeaders(headers)) {
       return true;
     }
@@ -378,16 +377,16 @@ void OAuth2Filter::finishFlow() {
   // We have fully completed the entire OAuth flow, whether through Authorization header or from
   // user redirection to the auth server.
   if (found_bearer_token_) {
-    if (config_->forwardBearerToken()) {
+    if (config_.forwardBearerToken()) {
       setBearerToken(*request_headers_, access_token_);
     }
-    config_->stats().oauth_success_.inc();
+    config_.stats().oauth_success_.inc();
     decoder_callbacks_->continueDecoding();
     return;
   }
 
   std::string token_payload;
-  if (config_->forwardBearerToken()) {
+  if (config_.forwardBearerToken()) {
     token_payload = absl::StrCat(host_, new_expires_, access_token_);
   } else {
     token_payload = absl::StrCat(host_, new_expires_);
@@ -395,7 +394,7 @@ void OAuth2Filter::finishFlow() {
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
-  auto token_secret = config_->tokenSecret();
+  auto token_secret = config_.tokenSecret();
   std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
   const std::string pre_encoded_token =
       Hex::encode(crypto_util.getSha256Hmac(token_secret_vec, token_payload));
@@ -423,7 +422,7 @@ void OAuth2Filter::finishFlow() {
 
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
-  if (config_->forwardBearerToken()) {
+  if (config_.forwardBearerToken()) {
     response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                                       absl::StrCat("BearerToken=", access_token_, cookie_tail));
   }
@@ -431,12 +430,12 @@ void OAuth2Filter::finishFlow() {
   response_headers->setLocation(state_);
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
-  config_->stats().oauth_success_.inc();
+  config_.stats().oauth_success_.inc();
   decoder_callbacks_->continueDecoding();
 }
 
 void OAuth2Filter::sendUnauthorizedResponse() {
-  config_->stats().oauth_failure_.inc();
+  config_.stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
                                      absl::nullopt, EMPTY_STRING);
 }

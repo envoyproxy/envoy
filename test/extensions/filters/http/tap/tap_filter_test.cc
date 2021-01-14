@@ -47,7 +47,7 @@ public:
     }
 
     EXPECT_CALL(*filter_config_, currentConfig()).WillRepeatedly(Return(http_tap_config_));
-    filter_ = std::make_unique<Filter>(filter_config_);
+    filter_ = std::make_unique<Filter>(*filter_config_);
 
     if (has_config) {
       EXPECT_CALL(callbacks_, streamId());

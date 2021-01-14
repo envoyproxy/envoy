@@ -43,7 +43,7 @@ public:
     envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
-    filter_ = std::make_unique<ProxyFilter>(filter_config_);
+    filter_ = std::make_unique<ProxyFilter>(*filter_config_);
     filter_->setDecoderFilterCallbacks(callbacks_);
 
     // Allow for an otherwise strict mock.
@@ -172,7 +172,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Create a second filter for a 2nd request.
-  auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
+  auto filter2 = std::make_unique<ProxyFilter>(*filter_config_);
   filter2->setDecoderFilterCallbacks(callbacks_);
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, getThreadLocalCluster(_));
@@ -211,7 +211,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Create a second filter for a 2nd request.
-  auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
+  auto filter2 = std::make_unique<ProxyFilter>(*filter_config_);
   filter2->setDecoderFilterCallbacks(callbacks_);
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, getThreadLocalCluster(_));

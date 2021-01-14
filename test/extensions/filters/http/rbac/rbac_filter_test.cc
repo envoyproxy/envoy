@@ -54,12 +54,13 @@ public:
   }
 
   RoleBasedAccessControlFilterTest()
-      : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)), filter_(config_) {}
+      : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)),
+        filter_(std::make_shared<RoleBasedAccessControlFilter>(*config_)) {}
 
   void SetUp() override {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-    filter_.setDecoderFilterCallbacks(callbacks_);
+    filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
   void setDestinationPort(uint16_t port) {
@@ -110,7 +111,7 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
-  RoleBasedAccessControlFilter filter_;
+  std::shared_ptr<RoleBasedAccessControlFilter> filter_;
 
   Network::Address::InstanceConstSharedPtr address_;
   std::string requested_server_name_;
@@ -122,15 +123,15 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   setDestinationPort(123);
   setMetadata();
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
-  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 
   Buffer::OwnedImpl data("");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 
   checkAccessLogMetadata(LogResult::Undecided);
 }
@@ -140,15 +141,15 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   setRequestedServerName("www.cncf.io");
   setMetadata();
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 
   Buffer::OwnedImpl data("");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 
   checkAccessLogMetadata(LogResult::Undecided);
 }
@@ -163,7 +164,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Path) {
       {":scheme", "http"},
       {":authority", "host"},
   };
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
@@ -179,7 +180,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, true));
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
 
@@ -205,45 +206,45 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))
       .WillRepeatedly(Return(&per_route_config_));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
 // Log Tests
 TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   config_ = setupConfig(envoy::config::rbac::v3::RBAC::LOG);
-  filter_ = RoleBasedAccessControlFilter(config_);
-  filter_.setDecoderFilterCallbacks(callbacks_);
+  filter_ = std::make_shared<RoleBasedAccessControlFilter>(*config_);
+  filter_->setDecoderFilterCallbacks(callbacks_);
 
   setDestinationPort(123);
   setMetadata();
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
 
   Buffer::OwnedImpl data("");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 
   checkAccessLogMetadata(LogResult::Yes);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   config_ = setupConfig(envoy::config::rbac::v3::RBAC::LOG);
-  filter_ = RoleBasedAccessControlFilter(config_);
-  filter_.setDecoderFilterCallbacks(callbacks_);
+  filter_ = std::make_shared<RoleBasedAccessControlFilter>(*config_);
+  filter_->setDecoderFilterCallbacks(callbacks_);
 
   setDestinationPort(456);
   setMetadata();
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
 
   Buffer::OwnedImpl data("");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 
   checkAccessLogMetadata(LogResult::No);
 }

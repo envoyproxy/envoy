@@ -88,7 +88,7 @@ CsrfFilterConfig::CsrfFilterConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, runtime)) {}
 
-CsrfFilter::CsrfFilter(const CsrfFilterConfigSharedPtr config) : config_(config) {}
+CsrfFilter::CsrfFilter(CsrfFilterConfig& config) : config_(config) {}
 
 Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   determinePolicy();
@@ -105,16 +105,16 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
   const auto source_origin = sourceOriginValue(headers);
   if (source_origin.empty()) {
     is_valid = false;
-    config_->stats().missing_source_origin_.inc();
+    config_.stats().missing_source_origin_.inc();
   }
 
   if (!isValid(source_origin, headers)) {
     is_valid = false;
-    config_->stats().request_invalid_.inc();
+    config_.stats().request_invalid_.inc();
   }
 
   if (is_valid == true) {
-    config_->stats().request_valid_.inc();
+    config_.stats().request_valid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -134,7 +134,7 @@ void CsrfFilter::determinePolicy() {
   if (policy != nullptr) {
     policy_ = policy;
   } else {
-    policy_ = config_->policy();
+    policy_ = config_.policy();
   }
 }
 

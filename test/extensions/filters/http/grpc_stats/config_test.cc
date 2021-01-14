@@ -27,12 +27,12 @@ class GrpcStatsFilterConfigTest : public testing::Test {
 protected:
   void initialize() {
     GrpcStatsFilterConfigFactory factory;
-    Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config_, "stats", context_);
+    cb_ = factory.createFilterFactoryFromProto(config_, "stats", context_);
     Http::MockFilterChainFactoryCallbacks filter_callback;
 
     ON_CALL(filter_callback, addStreamFilter(_)).WillByDefault(testing::SaveArg<0>(&filter_));
     EXPECT_CALL(filter_callback, addStreamFilter(_));
-    cb(filter_callback);
+    cb_(filter_callback);
 
     ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault(testing::ReturnRef(stream_info_));
 
@@ -62,12 +62,13 @@ protected:
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   }
 
-  envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::StreamFilterSharedPtr filter_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config_;
+  Http::FilterFactoryCb cb_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  Http::StreamFilterSharedPtr filter_;
 };
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {

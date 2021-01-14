@@ -46,9 +46,11 @@ protected:
     envoy::extensions::filters::http::gzip::v3::Gzip gzip;
     TestUtility::loadFromJson(json, gzip);
     config_ = std::make_shared<GzipFilterConfig>(gzip, "test.", stats_, runtime_);
-    filter_ = std::make_unique<Common::Compressors::CompressorFilter>(config_);
-    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_ = std::make_unique<Common::Compressors::CompressorFilter>(*config_);
+    encoder_callbacks_ = std::make_shared<NiceMock<Http::MockStreamEncoderFilterCallbacks>>();
+    decoder_callbacks_ = std::make_shared<NiceMock<Http::MockStreamDecoderFilterCallbacks>>();
+    filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
+    filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
   }
 
   void verifyCompressedData(const uint32_t content_length) {
@@ -87,7 +89,7 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
     if (with_trailers) {
       Buffer::OwnedImpl trailers_buffer;
-      EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+      EXPECT_CALL(*encoder_callbacks_, addEncodedData(_, true))
           .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
       Http::TestResponseTrailerMapImpl trailers;
       EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
@@ -158,17 +160,17 @@ protected:
     EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed").value());
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_;
+  NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<GzipFilterConfig> config_;
   std::unique_ptr<Common::Compressors::CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
   Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{stats_store_, "test"};
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
-  Stats::TestUtil::TestStore stats_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  std::shared_ptr<NiceMock<Http::MockStreamEncoderFilterCallbacks>> encoder_callbacks_;
+  std::shared_ptr<NiceMock<Http::MockStreamDecoderFilterCallbacks>> decoder_callbacks_;
 };
 
 // Test if Runtime Feature is Disabled

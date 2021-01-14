@@ -24,7 +24,7 @@ Http::FilterFactoryCb ExternalProcessingFilterConfig::createFilterFactoryFromPro
         context.clusterManager().grpcAsyncClientManager(), grpc_service, context.scope());
 
     callbacks.addStreamFilter(
-        Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
+        Http::StreamFilterSharedPtr{std::make_shared<Filter>(*filter_config, std::move(client))});
   };
 }
 

@@ -13,7 +13,7 @@ FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
     : signer_(std::move(signer)), stats_(Filter::generateStats(stats_prefix, scope)),
       host_rewrite_(host_rewrite) {}
 
-Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
+Filter::Filter(FilterConfig& config) : config_(config) {}
 
 Extensions::Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
 
@@ -27,17 +27,17 @@ FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const auto& host_rewrite = config_->hostRewrite();
+  const auto& host_rewrite = config_.hostRewrite();
   if (!host_rewrite.empty()) {
     headers.setHost(host_rewrite);
   }
 
   try {
-    config_->signer().sign(headers);
-    config_->stats().signing_added_.inc();
+    config_.signer().sign(headers);
+    config_.stats().signing_added_.inc();
   } catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "signing failed: {}", e.what());
-    config_->stats().signing_failed_.inc();
+    config_.stats().signing_failed_.inc();
   }
 
   return Http::FilterHeadersStatus::Continue;

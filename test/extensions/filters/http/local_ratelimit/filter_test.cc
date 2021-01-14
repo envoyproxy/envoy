@@ -57,7 +57,7 @@ public:
     TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, stats_, runtime_,
                                              per_route);
-    filter_ = std::make_shared<Filter>(config_);
+    filter_ = std::make_shared<Filter>(*config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {

@@ -75,7 +75,7 @@ private:
  */
 class Filter : public Http::StreamFilter, public AccessLog::Instance {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
+  Filter(FilterConfig& config) : config_(config) {}
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
@@ -88,7 +88,7 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    HttpTapConfigSharedPtr config = config_->currentConfig();
+    HttpTapConfigSharedPtr config = config_.currentConfig();
     tapper_ = config ? config->createPerRequestTapper(callbacks.streamId()) : nullptr;
   }
 
@@ -112,7 +112,7 @@ public:
            const StreamInfo::StreamInfo& stream_info) override;
 
 private:
-  FilterConfigSharedPtr config_;
+  FilterConfig& config_;
   HttpPerRequestTapperPtr tapper_;
 };
 

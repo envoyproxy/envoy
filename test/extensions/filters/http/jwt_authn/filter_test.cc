@@ -57,7 +57,7 @@ public:
     mock_config_ = ::std::make_shared<NiceMock<MockFilterConfig>>();
 
     mock_verifier_ = std::make_unique<MockVerifier>();
-    filter_ = std::make_unique<Filter>(mock_config_);
+    filter_ = std::make_unique<Filter>(*mock_config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
 
     mock_route_ = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();

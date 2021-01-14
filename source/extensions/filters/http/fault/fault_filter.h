@@ -213,7 +213,7 @@ using AbortHttpAndGrpcStatus =
  */
 class FaultFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  FaultFilter(FaultFilterConfigSharedPtr config);
+  FaultFilter(FaultFilterConfig& config);
   ~FaultFilter() override;
 
   // Http::StreamFilterBase
@@ -270,7 +270,7 @@ private:
   bool maybeSetupDelay(const Http::RequestHeaderMap& request_headers);
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
 
-  FaultFilterConfigSharedPtr config_;
+  FaultFilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Event::TimerPtr delay_timer_;

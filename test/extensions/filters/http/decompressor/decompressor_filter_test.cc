@@ -44,7 +44,7 @@ decompressor_library:
     decompressor_factory_ = decompressor_factory.get();
     config_ = std::make_shared<DecompressorFilterConfig>(decompressor, "test.", stats_, runtime_,
                                                          std::move(decompressor_factory));
-    filter_ = std::make_unique<DecompressorFilter>(config_);
+    filter_ = std::make_unique<DecompressorFilter>(*config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -207,10 +207,10 @@ decompressor_library:
   }
 
   Compression::Decompressor::MockDecompressorFactory* decompressor_factory_{};
-  DecompressorFilterConfigSharedPtr config_;
-  std::unique_ptr<DecompressorFilter> filter_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<Runtime::MockLoader> runtime_;
+  DecompressorFilterConfigSharedPtr config_;
+  std::unique_ptr<DecompressorFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };

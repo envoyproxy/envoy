@@ -123,7 +123,7 @@ std::string SquashFilterConfig::replaceEnv(const std::string& attachment_templat
   return s;
 }
 
-SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm)
+SquashFilter::SquashFilter(SquashFilterConfig& config, Upstream::ClusterManager& cm)
     : config_(config), is_squashing_(false), attachment_poll_period_timer_(nullptr),
       attachment_timeout_timer_(nullptr), in_flight_request_(nullptr),
       create_attachment_callback_(std::bind(&SquashFilter::onCreateAttachmentSuccess, this, _1),
@@ -149,14 +149,14 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
   request->headers().setReferencePath(POST_ATTACHMENT_PATH);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
   request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  request->body().add(config_->attachmentJson());
+  request->body().add(config_.attachmentJson());
 
   is_squashing_ = true;
-  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_.clusterName());
   if (thread_local_cluster != nullptr) {
     in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
         std::move(request), create_attachment_callback_,
-        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+        Http::AsyncClient::RequestOptions().setTimeout(config_.requestTimeout()));
   }
 
   if (in_flight_request_ == nullptr) {
@@ -167,8 +167,7 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
 
   attachment_timeout_timer_ =
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
-  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout(),
-                                         &decoder_callbacks_->scope());
+  attachment_timeout_timer_->enableTimer(config_.attachmentTimeout(), &decoder_callbacks_->scope());
   // Check if the timer expired inline.
   if (!is_squashing_) {
     return Http::FilterHeadersStatus::Continue;
@@ -266,7 +265,7 @@ void SquashFilter::scheduleRetry() {
     attachment_poll_period_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
   }
-  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod(),
+  attachment_poll_period_timer_->enableTimer(config_.attachmentPollPeriod(),
                                              &decoder_callbacks_->scope());
 }
 
@@ -276,11 +275,11 @@ void SquashFilter::pollForAttachment() {
   request->headers().setReferencePath(debug_attachment_path_);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
 
-  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_.clusterName());
   if (thread_local_cluster != nullptr) {
     in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
         std::move(request), check_attachment_callback_,
-        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+        Http::AsyncClient::RequestOptions().setTimeout(config_.requestTimeout()));
   } else {
     scheduleRetry();
   }

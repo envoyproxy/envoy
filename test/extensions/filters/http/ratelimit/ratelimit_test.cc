@@ -59,7 +59,7 @@ public:
                                              http_context_);
 
     client_ = new Filters::Common::RateLimit::MockClient();
-    filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
+    filter_ = std::make_unique<Filter>(*config_, Filters::Common::RateLimit::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(

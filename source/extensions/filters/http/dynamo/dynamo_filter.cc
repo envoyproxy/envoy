@@ -63,7 +63,7 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
       table_descriptor_ = RequestParser::parseTable(operation_, *json_body);
     } catch (const Json::Exception& jsonEx) {
       // Body parsing failed. This should not happen, just put a stat for that.
-      stats_->incCounter({stats_->invalid_req_body_});
+      stats_.incCounter({stats_.invalid_req_body_});
     }
   }
 }
@@ -90,7 +90,7 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
       }
     } catch (const Json::Exception&) {
       // Body parsing failed. This should not happen, just put a stat for that.
-      stats_->incCounter({stats_->invalid_resp_body_});
+      stats_.incCounter({stats_.invalid_resp_body_});
     }
   }
 }
@@ -155,15 +155,15 @@ void DynamoFilter::chargeBasicStats(uint64_t status) {
   if (!operation_.empty()) {
     chargeStatsPerEntity(operation_, "operation", status);
   } else {
-    stats_->incCounter({stats_->operation_missing_});
+    stats_.incCounter({stats_.operation_missing_});
   }
 
   if (!table_descriptor_.table_name.empty()) {
     chargeStatsPerEntity(table_descriptor_.table_name, "table", status);
   } else if (table_descriptor_.is_single_table) {
-    stats_->incCounter({stats_->table_missing_});
+    stats_.incCounter({stats_.table_missing_});
   } else {
-    stats_->incCounter({stats_->multiple_tables_});
+    stats_.incCounter({stats_.multiple_tables_});
   }
 }
 
@@ -173,10 +173,10 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       time_source_.monotonicTime() - start_decode_);
 
   size_t group_index = DynamoStats::groupIndex(status);
-  Stats::StatNameDynamicPool dynamic(stats_->symbolTable());
+  Stats::StatNameDynamicPool dynamic(stats_.symbolTable());
 
   const Stats::StatName entity_type_name =
-      stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
+      stats_.getBuiltin(entity_type, stats_.unknown_entity_type_);
   const Stats::StatName entity_name = dynamic.add(entity);
 
   // TODO(jmarantz): Consider using a similar mechanism to common/http/codes.cc
@@ -184,18 +184,18 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
   const Stats::StatName total_name = dynamic.add(absl::StrCat("upstream_rq_total_", status));
   const Stats::StatName time_name = dynamic.add(absl::StrCat("upstream_rq_time_", status));
 
-  stats_->incCounter({entity_type_name, entity_name, stats_->upstream_rq_total_});
-  const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
-  stats_->incCounter({entity_type_name, entity_name, total_group});
-  stats_->incCounter({entity_type_name, entity_name, total_name});
+  stats_.incCounter({entity_type_name, entity_name, stats_.upstream_rq_total_});
+  const Stats::StatName total_group = stats_.upstream_rq_total_groups_[group_index];
+  stats_.incCounter({entity_type_name, entity_name, total_group});
+  stats_.incCounter({entity_type_name, entity_name, total_name});
 
-  stats_->recordHistogram({entity_type_name, entity_name, stats_->upstream_rq_time_},
-                          Stats::Histogram::Unit::Milliseconds, latency.count());
-  const Stats::StatName time_group = stats_->upstream_rq_time_groups_[group_index];
-  stats_->recordHistogram({entity_type_name, entity_name, time_group},
-                          Stats::Histogram::Unit::Milliseconds, latency.count());
-  stats_->recordHistogram({entity_type_name, entity_name, time_name},
-                          Stats::Histogram::Unit::Milliseconds, latency.count());
+  stats_.recordHistogram({entity_type_name, entity_name, stats_.upstream_rq_time_},
+                         Stats::Histogram::Unit::Milliseconds, latency.count());
+  const Stats::StatName time_group = stats_.upstream_rq_time_groups_[group_index];
+  stats_.recordHistogram({entity_type_name, entity_name, time_group},
+                         Stats::Histogram::Unit::Milliseconds, latency.count());
+  stats_.recordHistogram({entity_type_name, entity_name, time_name},
+                         Stats::Histogram::Unit::Milliseconds, latency.count());
 }
 
 void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
@@ -203,9 +203,8 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   // complete apart of the batch operation. Only the table names will be logged for errors.
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
-    Stats::StatNameDynamicStorage storage(unprocessed_table, stats_->symbolTable());
-    stats_->incCounter(
-        {stats_->error_, storage.statName(), stats_->batch_failure_unprocessed_keys_});
+    Stats::StatNameDynamicStorage storage(unprocessed_table, stats_.symbolTable());
+    stats_.incCounter({stats_.error_, storage.statName(), stats_.batch_failure_unprocessed_keys_});
   }
 }
 
@@ -213,15 +212,15 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
   std::string error_type = RequestParser::parseErrorType(json_body);
 
   if (!error_type.empty()) {
-    Stats::StatNameDynamicPool dynamic(stats_->symbolTable());
+    Stats::StatNameDynamicPool dynamic(stats_.symbolTable());
     if (table_descriptor_.table_name.empty()) {
-      stats_->incCounter({stats_->error_, stats_->no_table_, dynamic.add(error_type)});
+      stats_.incCounter({stats_.error_, stats_.no_table_, dynamic.add(error_type)});
     } else {
-      stats_->incCounter(
-          {stats_->error_, dynamic.add(table_descriptor_.table_name), dynamic.add(error_type)});
+      stats_.incCounter(
+          {stats_.error_, dynamic.add(table_descriptor_.table_name), dynamic.add(error_type)});
     }
   } else {
-    stats_->incCounter({stats_->empty_response_body_});
+    stats_.incCounter({stats_.empty_response_body_});
   }
 }
 
