@@ -49,9 +49,7 @@ message UpdateFailureState {
       "envoy.admin.v2alpha.UpdateFailureState";
 
   // What the component configuration would have been if the update had succeeded.
-  // This field may not be populated by xDS clients due to storage overhead. As
-  // for xDS servers, they may only keep and dump the latest config regardless
-  // it is accepted or rejected.
+  // This field may not be populated by xDS clients due to storage overhead.
   google.protobuf.Any failed_configuration = 1;
 
   // Time of the latest failed update attempt.
