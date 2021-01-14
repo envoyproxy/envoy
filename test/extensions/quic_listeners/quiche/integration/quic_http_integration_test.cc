@@ -310,6 +310,9 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
 }
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndResponseWithBody) {
+  // Use the old nodelay in a random test for coverage. nodelay is a no-op for QUIC.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
+
   initialize();
   sendRequestAndVerifyResponse(default_request_headers_, /*request_size=*/0,
                                default_response_headers_, /*response_size=*/1024,
