@@ -16,6 +16,7 @@ void deleteFragment(const void*, size_t, const Buffer::BufferFragmentImpl* self)
 static void bufferCreateEmpty(benchmark::State& state) {
   uint64_t length = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Buffer::OwnedImpl buffer;
     length += buffer.length();
   }
@@ -29,6 +30,7 @@ static void bufferCreate(benchmark::State& state) {
   const absl::string_view input(data);
   uint64_t length = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Buffer::OwnedImpl buffer(input);
     length += buffer.length();
   }
@@ -42,6 +44,7 @@ static void bufferAddSmallIncrement(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(input);
     if (buffer.length() >= MaxBufferLength) {
       // Keep the test's memory usage from growing too large.
@@ -62,6 +65,7 @@ static void bufferAddString(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(data);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
@@ -79,6 +83,7 @@ static void bufferAddBuffer(benchmark::State& state) {
   const Buffer::OwnedImpl to_add(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(to_add);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
@@ -94,6 +99,7 @@ static void bufferPrependString(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.prepend(data);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
@@ -109,6 +115,7 @@ static void bufferPrependBuffer(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     // The prepend method removes the content from its source buffer. To populate a new source
     // buffer every time without the overhead of a copy, we use an BufferFragment that references
     // (and never deletes) an external string.
@@ -144,6 +151,7 @@ static void bufferDrain(benchmark::State& state) {
 
   size_t drain_cycle = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(to_add);
     buffer.drain(drain_size[drain_cycle]);
     drain_cycle++;
@@ -159,6 +167,7 @@ static void bufferDrainSmallIncrement(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.drain(state.range(0));
     if (buffer.length() == 0) {
       buffer.add(input);
@@ -175,6 +184,7 @@ static void bufferMove(benchmark::State& state) {
   Buffer::OwnedImpl buffer1(input);
   Buffer::OwnedImpl buffer2(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer1.move(buffer2); // now buffer1 has 2 copies of the input, and buffer2 is empty.
     buffer2.move(buffer1, input.size()); // now buffer1 and buffer2 are the same size.
   }
@@ -192,6 +202,7 @@ static void bufferMovePartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer1(input);
   Buffer::OwnedImpl buffer2(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     while (buffer2.length() != 0) {
       buffer1.move(buffer2, 1);
     }
@@ -207,6 +218,7 @@ BENCHMARK(bufferMovePartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 static void bufferReserveCommit(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     auto size = state.range(0);
     Buffer::Reservation reservation = buffer.reserveApproximately(size);
     reservation.commit(size);
@@ -223,6 +235,7 @@ BENCHMARK(bufferReserveCommit)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 static void bufferReserveCommitPartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     auto size = state.range(0);
     Buffer::Reservation reservation = buffer.reserveApproximately(size);
     // Commit one byte from the first slice and nothing from any subsequent slice.
@@ -241,6 +254,7 @@ static void bufferLinearizeSimple(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.drain(buffer.length());
     auto fragment =
         std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), deleteFragment);
@@ -258,6 +272,7 @@ static void bufferLinearizeGeneral(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.drain(buffer.length());
     do {
       auto fragment =
@@ -282,6 +297,7 @@ static void bufferSearch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     result += buffer.search(Pattern.c_str(), Pattern.length(), 0, 0);
   }
   benchmark::DoNotOptimize(result);
@@ -305,6 +321,7 @@ static void bufferSearchPartialMatch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     result += buffer.search(Pattern.c_str(), Pattern.length(), 0, 0);
   }
   benchmark::DoNotOptimize(result);
@@ -324,6 +341,7 @@ static void bufferStartsWith(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     if (!buffer.startsWith({Pattern.c_str(), Pattern.length()})) {
       result++;
     }
@@ -347,6 +365,7 @@ static void bufferStartsWithMatch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     if (buffer.startsWith({Prefix.c_str(), Prefix.length()})) {
       result++;
     }
