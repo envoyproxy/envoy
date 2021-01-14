@@ -17,10 +17,9 @@ public:
   virtual ~BootstrapExtension() = default;
 
   /**
-   * Called when server is done initializing and we have the ServerFactoryContext available.
-   * @param context is the context to use for the extension.
+   * Called when server is done initializing and we have the ServerFactoryContext fully initialized.
    */
-  virtual void onServerInitialized(Configuration::ServerFactoryContext& context) PURE;
+  virtual void onServerInitialized() PURE;
 };
 
 using BootstrapExtensionPtr = std::unique_ptr<BootstrapExtension>;
