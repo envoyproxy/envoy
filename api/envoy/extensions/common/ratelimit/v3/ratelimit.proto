@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.common.ratelimit.v3;
 
 import "envoy/type/v3/ratelimit_unit.proto";
+import "envoy/type/v3/token_bucket.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -91,4 +92,12 @@ message RateLimitDescriptor {
 
   // Optional rate limit override to supply to the ratelimit service.
   RateLimitOverride limit = 2;
+}
+
+message LocalRateLimitDescriptor {
+  // Descriptor entries.
+  repeated v3.RateLimitDescriptor.Entry entries = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // Token Bucket algorithm for local ratelimiting.
+  type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
 }

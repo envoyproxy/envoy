@@ -21,7 +21,7 @@ bool OriginalSrcSocketOption::setOption(
     Network::Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
 
   if (state == envoy::config::core::v3::SocketOption::STATE_PREBIND) {
-    socket.setLocalAddress(src_address_);
+    socket.addressProvider().setLocalAddress(src_address_);
   }
 
   return true;
