@@ -42,7 +42,7 @@ if [[ "$BUILD_REASON" == "PullRequest" ]]; then
     gsutil -h "Cache-Control:no-cache,max-age=0" -mq rsync -dr "${TMP_REDIRECT}" "gs://${GCS_REDIRECT}"
 fi
 
-if [[ -n ${COVERAGE_FAILED} ]]; then
+if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
   echo "##vso[task.logissue type=error]Coverage failed, check artifact at: https://storage.googleapis.com/${GCS_LOCATION}/index.html"
 fi
 
