@@ -63,7 +63,7 @@ ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
 mkdir -p "${ENVOY_DELIVERY_DIR}"
 
 FAIL_GROUP=windows
-if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" =~ "--config=clang-cl" ]]; then
+if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" =~ "clang-cl" ]]; then
   FAIL_GROUP=clang_cl
 fi
 
