@@ -111,7 +111,9 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
         hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
       });
   initialize();
-  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
   http2_options.mutable_initial_stream_window_size()->set_value(65535);
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
