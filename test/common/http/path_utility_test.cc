@@ -16,6 +16,11 @@ namespace Http {
 
 class PathUtilityTest : public testing::Test {
 public:
+  void initializeDeprecatedFeatureEnabled(bool deprecated) {
+    EXPECT_CALL(runtime_.snapshot_,
+                deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
+        .WillRepeatedly(Return(deprecated));
+  }
   // This is an indirect way to build a header entry for
   // PathUtil::canonicalPath(), since we don't have direct access to the
   // HeaderMapImpl constructor.
@@ -33,9 +38,7 @@ public:
 
 // Already normalized path don't change using deprecated path canonicalizer.
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
-  EXPECT_CALL(runtime_.snapshot_,
-              deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
-      .WillRepeatedly(Return(true));
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
 
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
@@ -48,9 +51,7 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
 
 // Invalid paths are rejected using deprecated path canonicalizer.
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
-  EXPECT_CALL(runtime_.snapshot_,
-              deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
-      .WillRepeatedly(Return(true));
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
 
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};
@@ -62,6 +63,8 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
 
 // Already normalized path don't change.
 TEST_F(PathUtilityTest, AlreadyNormalPaths) {
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
+
   EXPECT_CALL(runtime_.snapshot_,
               deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
       .WillRepeatedly(Return(false));
@@ -77,6 +80,8 @@ TEST_F(PathUtilityTest, AlreadyNormalPaths) {
 
 // Invalid paths are rejected.
 TEST_F(PathUtilityTest, InvalidPaths) {
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
+
   EXPECT_CALL(runtime_.snapshot_,
               deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
       .WillRepeatedly(Return(false));
@@ -91,6 +96,12 @@ TEST_F(PathUtilityTest, InvalidPaths) {
 
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeValidPaths) {
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
+      .WillRepeatedly(Return(false));
+
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/a/b/../c", "/a/c"},        // parent dir
       {"/a/b/./c", "/a/b/c"},       // current dir
@@ -113,6 +124,8 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
 
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeCasePath) {
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
+
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/A/B/C", "/A/B/C"},           // not normalize to lower case
       {"/a/b/%2E%2E/c", "/a/c"},      // %2E can be normalized to .
@@ -134,6 +147,8 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, MergeSlashes) {
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
+
   auto mergeSlashes = [this](const std::string& path_value) {
     auto& path_header = pathHeaderEntry(path_value);
     PathUtil::mergeSlashes(headers_);
@@ -156,6 +171,8 @@ TEST_F(PathUtilityTest, MergeSlashes) {
 }
 
 TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
+  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
+
   EXPECT_EQ("", PathUtil::removeQueryAndFragment(""));
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc"));
   EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?"));
