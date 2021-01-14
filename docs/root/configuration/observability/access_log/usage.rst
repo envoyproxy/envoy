@@ -168,7 +168,7 @@ The following command operators are supported:
     Request headers bytes.
 
   TCP
-    Not implemented ("-").
+    Not implemented (0).
 
 %BYTES_RECEIVED%
   HTTP
@@ -258,7 +258,7 @@ The following command operators are supported:
     the request received from the downstream.
 
   TCP
-    Not implemented (0).
+    Not implemented (-).
 
   Renders a numeric value in typed JSON logs.
 
