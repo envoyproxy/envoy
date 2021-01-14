@@ -6,6 +6,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/interval_value.h"
+
 namespace Envoy {
 namespace Random {
 
@@ -46,6 +48,18 @@ public:
    * for example, 7c25513b-0466-4558-a64c-12c6704f37ed
    */
   virtual std::string uuid() PURE;
+
+  /**
+   * @return a random boolean value, with probability `p` equaling true.
+   */
+  bool bernoulli(UnitFloat p) {
+    if (p == UnitFloat::min()) {
+      return false;
+    } else if (p == UnitFloat::max()) {
+      return true;
+    }
+    return random() < static_cast<result_type>(p.value() * static_cast<float>(max()));
+  }
 };
 
 using RandomGeneratorPtr = std::unique_ptr<RandomGenerator>;

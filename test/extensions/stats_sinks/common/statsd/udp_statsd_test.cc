@@ -43,6 +43,8 @@ public:
   std::vector<std::string> buffer_writes;
 };
 
+// Skipping this test as Datagram sockets are not currently supported by UDS on Windows
+#ifndef WIN32
 // Regression test for https://github.com/envoyproxy/envoy/issues/8911
 TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   auto uds_address = std::make_shared<Network::Address::PipeInstance>(
@@ -61,16 +63,17 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   sink.flush(snapshot);
 
   // Start the server.
-  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address);
+  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address, nullptr);
   RELEASE_ASSERT(sock.setBlockingForTest(false).rc_ != -1, "");
   sock.bind(uds_address);
 
   // Do the flush which should have somewhere to write now.
   sink.flush(snapshot);
   Buffer::OwnedImpl receive_buffer;
-  receive_buffer.read(sock.ioHandle(), 32);
+  sock.ioHandle().read(receive_buffer, 32);
   EXPECT_EQ("envoy.test_counter:1|c", receive_buffer.toString());
 }
+#endif
 
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
@@ -171,8 +174,7 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   counter.latch_ = 1;
   snapshot.counters_.push_back({1, counter});
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_))
-      .Times(1);
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
   EXPECT_EQ(writer_ptr->buffer_writes.size(), 1);
   EXPECT_EQ(writer_ptr->buffer_writes.at(0), "envoy.test_counter:1|c");
@@ -253,8 +255,7 @@ TEST(UdpStatsdSinkTest, CheckBufferedWritesWithinBufferSize) {
   snapshot.gauges_.push_back(gauge);
 
   // Expect both metrics to be present in single write
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_))
-      .Times(1);
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
   EXPECT_EQ(writer_ptr->buffer_writes.size(), 1);
   EXPECT_EQ(writer_ptr->buffer_writes.at(0), "envoy.test_counter:1|c\nenvoy.test_gauge:1|g");

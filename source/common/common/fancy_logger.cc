@@ -26,7 +26,11 @@ private:
 SpdLoggerSharedPtr FancyContext::getFancyLogEntry(std::string key)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   absl::ReaderMutexLock l(&fancy_log_lock_);
-  return fancy_log_map_->find(key)->second;
+  auto it = fancy_log_map_->find(key);
+  if (it != fancy_log_map_->end()) {
+    return it->second;
+  }
+  return nullptr;
 }
 
 void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
@@ -67,6 +71,32 @@ void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, s
     }
     it.second->set_pattern(format);
   }
+}
+
+std::string FancyContext::listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  std::string info = "";
+  absl::ReaderMutexLock l(&fancy_log_lock_);
+  for (const auto& it : *fancy_log_map_) {
+    info += fmt::format("   {}: {}\n", it.first, static_cast<int>(it.second->level()));
+  }
+  return info;
+}
+
+void FancyContext::setAllFancyLoggers(spdlog::level::level_enum level)
+    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  absl::ReaderMutexLock l(&fancy_log_lock_);
+  for (const auto& it : *fancy_log_map_) {
+    it.second->set_level(level);
+  }
+}
+
+FancyLogLevelMap FancyContext::getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  FancyLogLevelMap log_levels;
+  absl::ReaderMutexLock l(&fancy_log_lock_);
+  for (const auto& it : *fancy_log_map_) {
+    log_levels[it.first] = it.second->level();
+  }
+  return log_levels;
 }
 
 void FancyContext::initSink() {

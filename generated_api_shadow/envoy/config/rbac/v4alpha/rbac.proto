@@ -100,7 +100,7 @@ message RBAC {
   //    key namespace 'envoy.common'. If no policies match, it is set to `false`.
   //    Other actions do not modify this key.
   //
-  Action action = 1;
+  Action action = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   map<string, Policy> policies = 2;

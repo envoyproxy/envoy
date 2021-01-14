@@ -14,39 +14,18 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/store_impl.h"
-#include "common/stats/symbol_table_creator.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/timespan_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Stats {
-
-class TestSymbolTableHelper {
-public:
-  TestSymbolTableHelper() : symbol_table_(SymbolTableCreator::makeSymbolTable()) {}
-  SymbolTable& symbolTable() { return *symbol_table_; }
-  const SymbolTable& constSymbolTable() const { return *symbol_table_; }
-
-private:
-  SymbolTablePtr symbol_table_;
-};
-
-class TestSymbolTable {
-public:
-  SymbolTable& operator*() { return global_.get().symbolTable(); }
-  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
-  SymbolTable* operator->() { return &global_.get().symbolTable(); }
-  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
-  Envoy::Test::Global<TestSymbolTableHelper> global_;
-};
 
 template <class BaseClass> class MockMetric : public BaseClass {
 public:
@@ -105,7 +84,7 @@ public:
     }
   }
 
-  TestSymbolTable symbol_table_; // Must outlive name_.
+  TestUtil::TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
 
   void setTags(const TagVector& tags) {
@@ -264,9 +243,9 @@ public:
   MockTextReadout();
   ~MockTextReadout() override;
 
-  MOCK_METHOD1(set, void(absl::string_view value));
-  MOCK_CONST_METHOD0(used, bool());
-  MOCK_CONST_METHOD0(value, std::string());
+  MOCK_METHOD(void, set, (absl::string_view value), (override));
+  MOCK_METHOD(bool, used, (), (const, override));
+  MOCK_METHOD(std::string, value, (), (const, override));
 
   bool used_;
   std::string value_;
@@ -282,10 +261,13 @@ public:
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
 
+  SystemTime snapshotTime() const override { return snapshot_time_; }
+
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
   std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
   std::vector<std::reference_wrapper<const TextReadout>> text_readouts_;
+  SystemTime snapshot_time_;
 };
 
 class MockSink : public Sink {
@@ -297,17 +279,15 @@ public:
   MOCK_METHOD(void, onHistogramComplete, (const Histogram& histogram, uint64_t value));
 };
 
-class SymbolTableProvider {
-public:
-  TestSymbolTable global_symbol_table_;
-};
-
-class MockStore : public SymbolTableProvider, public TestUtil::TestStore {
+class MockStore : public TestUtil::TestStore {
 public:
   MockStore();
   ~MockStore() override;
 
   ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
+  ScopePtr scopeFromStatName(StatName name) override {
+    return createScope(symbolTable().toString(name));
+  }
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
   MOCK_METHOD(Counter&, counter, (const std::string&));
@@ -347,7 +327,7 @@ public:
     return textReadout(symbol_table_->toString(name));
   }
 
-  TestSymbolTable symbol_table_;
+  TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };
@@ -356,7 +336,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : public SymbolTableProvider, public TestUtil::TestStore {
+class MockIsolatedStatsStore : public TestUtil::TestStore {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;

@@ -41,6 +41,7 @@ public:
     EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(Return("raw_buffer"));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
     if (include_inline_recv) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -72,6 +73,7 @@ TEST_F(HttpInspectorTest, SkipHttpInspectForTLS) {
   filter_ = std::make_unique<Filter>(cfg_);
 
   EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
   EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(Return("TLS"));
   EXPECT_EQ(filter_->onAccept(cb_), Network::FilterStatus::Continue);
 }
@@ -84,7 +86,7 @@ TEST_F(HttpInspectorTest, InlineReadIoError) {
       }));
   EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  EXPECT_CALL(socket_, close()).Times(1);
+  EXPECT_CALL(socket_, close());
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   // It's arguable if io error should bump the not_found counter
@@ -330,6 +332,17 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
 }
 
+TEST_F(HttpInspectorTest, ReadClosed) {
+  init();
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK));
+  EXPECT_CALL(socket_, close());
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  socket_.close();
+  file_event_callback_(Event::FileReadyType::Closed);
+  EXPECT_EQ(0, cfg_->stats().http2_found_.value());
+}
+
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   init();
 
@@ -567,6 +580,9 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 }
 
 TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
+  // Verify that the http inspector can detect http requests
+  // with large request line even when they are split over
+  // multiple recv calls.
   init();
   absl::string_view method = "GET", http = "/index HTTP/1.0\r";
   std::string spaces(Config::MAX_INSPECT_SIZE - method.size() - http.size(), ' ');
@@ -584,19 +600,21 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
     num_loops = 2;
 #endif
 
-    for (size_t i = 1; i <= num_loops; i++) {
-      size_t len = i;
-      if (num_loops == 2) {
-        len = size_t(Config::MAX_INSPECT_SIZE / (3 - i));
-      }
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&data, len](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= len);
-                memcpy(buffer, data.data(), len);
-                return Api::SysCallSizeResult{ssize_t(len), 0};
-              }));
-    }
+    auto ctr = std::make_shared<size_t>(1);
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+        .Times(num_loops)
+        .WillRepeatedly(Invoke([&data, ctr, num_loops](os_fd_t, void* buffer, size_t length,
+                                                       int) -> Api::SysCallSizeResult {
+          size_t len = (*ctr);
+          if (num_loops == 2) {
+            ASSERT(*ctr != 3);
+            len = size_t(Config::MAX_INSPECT_SIZE / (3 - (*ctr)));
+          }
+          ASSERT(length >= len);
+          memcpy(buffer, data.data(), len);
+          *ctr += 1;
+          return Api::SysCallSizeResult{ssize_t(len), 0};
+        }));
   }
 
   bool got_continue = false;

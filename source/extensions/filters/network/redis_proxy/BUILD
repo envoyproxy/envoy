@@ -120,12 +120,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "requires_trusted_downstream_and_upstream",
     # TODO(#9953) clean up.
-    visibility = [
-        "//:extension_config",
+    extra_visibility = [
         "//test/integration:__subpackages__",
     ],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//include/envoy/upstream:upstream_interface",
         "//source/extensions/common/redis:cluster_refresh_manager_lib",

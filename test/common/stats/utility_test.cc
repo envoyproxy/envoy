@@ -5,7 +5,6 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
-#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "absl/strings/str_cat.h"
@@ -32,7 +31,7 @@ protected:
   using MakeStatFn = std::function<void(Scope& scope, const ElementVec& elements)>;
 
   StatsUtilityTest()
-      : symbol_table_(SymbolTableCreator::makeSymbolTable()), pool_(*symbol_table_),
+      : symbol_table_(std::make_unique<SymbolTableImpl>()), pool_(*symbol_table_),
         tags_(
             {{pool_.add("tag1"), pool_.add("value1")}, {pool_.add("tag2"), pool_.add("value2")}}) {
     switch (GetParam()) {

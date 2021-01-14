@@ -19,7 +19,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    Api::IoCallUint64Result result = buffer.read(callbacks_->ioHandle(), 16384);
+    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, 16384);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
@@ -30,7 +30,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       }
       bytes_read += result.rc_;
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
         break;
       }
     } else {
@@ -56,13 +56,13 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       if (end_stream && !shutdown_) {
         // Ignore the result. This can only fail if the connection failed. In that case, the
         // error will be detected on the next read, and dealt with appropriately.
-        Api::OsSysCallsSingleton::get().shutdown(callbacks_->ioHandle().fd(), ENVOY_SHUT_WR);
+        callbacks_->ioHandle().shutdown(ENVOY_SHUT_WR);
         shutdown_ = true;
       }
       action = PostIoAction::KeepOpen;
       break;
     }
-    Api::IoCallUint64Result result = buffer.write(callbacks_->ioHandle());
+    Api::IoCallUint64Result result = callbacks_->ioHandle().write(buffer);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);

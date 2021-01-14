@@ -18,7 +18,6 @@
 #include "envoy/server/instance.h"
 
 #include "common/common/logger.h"
-#include "common/json/json_loader.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
@@ -45,6 +44,22 @@ public:
                                          Server::Configuration::ServerFactoryContext& server) PURE;
 
   std::string category() const override { return "envoy.stats_sinks"; }
+};
+
+class StatsConfigImpl : public StatsConfig {
+public:
+  StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
+  const std::list<Stats::SinkPtr>& sinks() const override { return sinks_; }
+  std::chrono::milliseconds flushInterval() const override { return flush_interval_; }
+  bool flushOnAdmin() const override { return flush_on_admin_; }
+
+  void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
+
+private:
+  std::list<Stats::SinkPtr> sinks_;
+  std::chrono::milliseconds flush_interval_;
+  bool flush_on_admin_{false};
 };
 
 /**
@@ -99,18 +114,9 @@ public:
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
-  std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
-  std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
-  std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
-  std::chrono::milliseconds wdMegaMissTimeout() const override {
-    return watchdog_megamiss_timeout_;
-  }
-  std::chrono::milliseconds wdKillTimeout() const override { return watchdog_kill_timeout_; }
-  std::chrono::milliseconds wdMultiKillTimeout() const override {
-    return watchdog_multikill_timeout_;
-  }
-
-  double wdMultiKillThreshold() const override { return watchdog_multikill_threshold_; }
+  StatsConfig& statsConfig() override { return *stats_config_; }
+  const Watchdog& mainThreadWatchdogConfig() const override { return *main_thread_watchdog_; }
+  const Watchdog& workerWatchdogConfig() const override { return *worker_watchdog_; }
 
 private:
   /**
@@ -118,17 +124,45 @@ private:
    */
   void initializeTracers(const envoy::config::trace::v3::Tracing& configuration, Instance& server);
 
-  void initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                            Instance& server);
+  /**
+   * Initialize stats configuration.
+   */
+  void initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                             Instance& server);
+
+  /**
+   * Initialize watchdog(s). Call before accessing any watchdog configuration.
+   */
+  void initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                           Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
-  std::list<Stats::SinkPtr> stats_sinks_;
-  std::chrono::milliseconds stats_flush_interval_;
-  std::chrono::milliseconds watchdog_miss_timeout_;
-  std::chrono::milliseconds watchdog_megamiss_timeout_;
-  std::chrono::milliseconds watchdog_kill_timeout_;
-  std::chrono::milliseconds watchdog_multikill_timeout_;
-  double watchdog_multikill_threshold_;
+  std::unique_ptr<StatsConfigImpl> stats_config_;
+  std::unique_ptr<Watchdog> main_thread_watchdog_;
+  std::unique_ptr<Watchdog> worker_watchdog_;
+};
+
+class WatchdogImpl : public Watchdog {
+public:
+  WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdog, Instance& server);
+
+  std::chrono::milliseconds missTimeout() const override { return miss_timeout_; }
+  std::chrono::milliseconds megaMissTimeout() const override { return megamiss_timeout_; }
+  std::chrono::milliseconds killTimeout() const override { return kill_timeout_; }
+  std::chrono::milliseconds multiKillTimeout() const override { return multikill_timeout_; }
+  double multiKillThreshold() const override { return multikill_threshold_; }
+  Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
+  actions() const override {
+    return actions_;
+  }
+
+private:
+  std::chrono::milliseconds miss_timeout_;
+  std::chrono::milliseconds megamiss_timeout_;
+  std::chrono::milliseconds kill_timeout_;
+  std::chrono::milliseconds multikill_timeout_;
+  double multikill_threshold_;
+  Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction> actions_;
 };
 
 /**
@@ -136,7 +170,7 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -159,6 +193,7 @@ private:
     Network::Socket::OptionsSharedPtr socket_options_;
   };
 
+  const bool enable_deprecated_v2_api_;
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
   envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;

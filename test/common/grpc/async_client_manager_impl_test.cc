@@ -5,7 +5,8 @@
 
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -37,10 +38,10 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
   Upstream::MockClusterMockPrioritySet cluster;
-  cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  cluster_maps.active_clusters_.emplace("foo", cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_maps));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi());
 
@@ -64,7 +65,8 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cm_, clusters())
+      .WillOnce(Return(Upstream::ClusterManager::ClusterInfoMaps{cluster_map, {}}));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
@@ -76,6 +78,44 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
+
+#ifdef ENVOY_GOOGLE_GRPC
+  EXPECT_NE(nullptr, async_client_manager_.factoryForGrpcService(grpc_service, scope_, false));
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
+      "Google C++ gRPC client is not linked");
+#endif
+}
+
+TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalChars) {
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
+
+  auto& metadata = *grpc_service.mutable_initial_metadata()->Add();
+  metadata.set_key("illegalcharacter;");
+  metadata.set_value("value");
+
+#ifdef ENVOY_GOOGLE_GRPC
+  EXPECT_THROW_WITH_MESSAGE(
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
+      "Illegal characters in gRPC initial metadata.");
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
+      "Google C++ gRPC client is not linked");
+#endif
+}
+
+TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
+
+  auto& metadata = *grpc_service.mutable_initial_metadata()->Add();
+  metadata.set_key("_legal-character.");
+  metadata.set_value("value");
 
 #ifdef ENVOY_GOOGLE_GRPC
   EXPECT_NE(nullptr, async_client_manager_.factoryForGrpcService(grpc_service, scope_, false));

@@ -31,7 +31,6 @@ envoy_extension_cc_test(
     name = "csrf_filter_integration_test",
     srcs = ["csrf_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.csrf",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",

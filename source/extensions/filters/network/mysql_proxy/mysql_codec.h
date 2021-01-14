@@ -97,16 +97,6 @@ public:
     MysqlResponse = 1,
   };
 
-  PACKED_STRUCT(struct header_fields {
-    uint32_t length_ : 24;
-    uint8_t seq_ : 8;
-  });
-
-  union MySQLHeader {
-    header_fields fields_;
-    uint32_t bits_;
-  };
-
   virtual ~MySQLCodec() = default;
 
   int decode(Buffer::Instance& data, uint8_t seq, uint32_t len) {

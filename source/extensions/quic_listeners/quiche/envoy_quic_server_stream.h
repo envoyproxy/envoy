@@ -1,13 +1,16 @@
 #pragma once
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include "extensions/quic_listeners/quiche/envoy_quic_stream.h"
 
@@ -36,6 +39,7 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
+  bool streamErrorOnInvalidHttpMessage() const override { return false; }
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
@@ -45,9 +49,10 @@ public:
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
+  void Reset(quic::QuicRstStreamErrorCode error) override;
   void OnClose() override;
   void OnCanWrite() override;
-  // quic::QuicServerSessionBase
+  // quic::QuicSpdyServerStreamBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
 
 protected:
@@ -64,6 +69,9 @@ protected:
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
+
+  // Deliver awaiting trailers if body has been delivered.
+  void maybeDecodeTrailers();
 
   Http::RequestDecoder* request_decoder_{nullptr};
 };

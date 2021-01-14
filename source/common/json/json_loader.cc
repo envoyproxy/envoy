@@ -25,7 +25,6 @@
 #include "rapidjson/writer.h"
 
 #include "absl/strings/match.h"
-#include "yaml-cpp/yaml.h"
 
 namespace Envoy {
 namespace Json {

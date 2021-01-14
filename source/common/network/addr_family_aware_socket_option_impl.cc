@@ -7,7 +7,6 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
-#include "common/network/socket_interface_impl.h"
 #include "common/network/socket_option_impl.h"
 
 namespace Envoy {

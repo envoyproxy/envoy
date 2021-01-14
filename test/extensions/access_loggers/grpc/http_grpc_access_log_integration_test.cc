@@ -26,16 +26,18 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void initialize() override {
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
-      accesslog_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*accesslog_cluster);
     });
 
     config_helper_.addConfigModifier(
@@ -128,6 +130,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   testRouterNotFound();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
@@ -138,7 +141,6 @@ identifier:
     cluster: cluster_name
     locality:
       zone: zone_name
-    build_version: {}
     user_agent_name: "envoy"
   log_name: foo
 http_logs:
@@ -157,8 +159,7 @@ http_logs:
         value: 404
       response_code_details: "route_not_found"
       response_headers_bytes: 54
-)EOF",
-                                                  VersionInfo::version())));
+)EOF")));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
@@ -211,7 +212,6 @@ identifier:
     cluster: cluster_name
     locality:
       zone: zone_name
-    build_version: {}
     user_agent_name: "envoy"
   log_name: foo
 http_logs:
@@ -230,8 +230,7 @@ http_logs:
         value: 404
       response_code_details: "route_not_found"
       response_headers_bytes: 54
-)EOF",
-                                                  VersionInfo::version())));
+)EOF")));
   cleanup();
 }
 

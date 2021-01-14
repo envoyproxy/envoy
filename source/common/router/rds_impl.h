@@ -224,7 +224,7 @@ private:
   RouteConfigUpdatePtr& config_update_info_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.

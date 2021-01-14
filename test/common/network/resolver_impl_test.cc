@@ -63,6 +63,20 @@ TEST(ResolverTest, FromProtoAddress) {
   EXPECT_EQ("/foo/bar", resolveProtoAddress(pipe_address)->asString());
 }
 
+TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
+  envoy::config::core::v3::Address internal_listener_address;
+  internal_listener_address.mutable_envoy_internal_address()->set_server_listener_name(
+      "internal_listener_foo");
+  EXPECT_EQ("envoy://internal_listener_foo",
+            resolveProtoAddress(internal_listener_address)->asString());
+}
+
+TEST(ResolverTest, UninitializedInternalAddressFromProtoAddress) {
+  envoy::config::core::v3::Address internal_address;
+  internal_address.mutable_envoy_internal_address();
+  EXPECT_DEATH(resolveProtoAddress(internal_address), "panic");
+}
+
 // Validate correct handling of ipv4_compat field.
 TEST(ResolverTest, FromProtoAddressV4Compat) {
   {
@@ -156,8 +170,7 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException,
-                            "Address must be a socket or pipe: ");
+  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address), EnvoyException, "Address must be set: ");
 }
 
 TEST(ResolverTest, NoSuchResolver) {

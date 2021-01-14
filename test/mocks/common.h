@@ -6,8 +6,6 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
-#include "envoy/common/token_bucket.h"
-#include "envoy/event/timer.h"
 
 #include "common/common/logger.h"
 
@@ -56,14 +54,11 @@ public:
                                       Event::CallbackScheduler& cb_scheduler) override {
     return real_time_.createScheduler(base_scheduler, cb_scheduler);
   }
-  void advanceTimeWait(const Duration& duration) override { real_time_.advanceTimeWait(duration); }
-  void advanceTimeAsync(const Duration& duration) override {
-    real_time_.advanceTimeAsync(duration);
+  void advanceTimeWaitImpl(const Duration& duration) override {
+    real_time_.advanceTimeWaitImpl(duration);
   }
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return real_time_.waitFor(mutex, condvar, duration); // NO_CHECK_FORMAT(real_time)
+  void advanceTimeAsyncImpl(const Duration& duration) override {
+    real_time_.advanceTimeAsyncImpl(duration);
   }
   MOCK_METHOD(SystemTime, systemTime, ());
   MOCK_METHOD(MonotonicTime, monotonicTime, ());

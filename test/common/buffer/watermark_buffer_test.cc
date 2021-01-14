@@ -253,7 +253,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   int bytes_written_total = 0;
   Network::IoSocketHandleImpl io_handle1(pipe_fds[1]);
   while (bytes_written_total < 20) {
-    Api::IoCallUint64Result result = buffer_.write(io_handle1);
+    Api::IoCallUint64Result result = io_handle1.write(buffer_);
     if (!result.ok()) {
       ASSERT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
     } else {
@@ -267,7 +267,7 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
   int bytes_read_total = 0;
   Network::IoSocketHandleImpl io_handle2(pipe_fds[0]);
   while (bytes_read_total < 20) {
-    Api::IoCallUint64Result result = buffer_.read(io_handle2, 20);
+    Api::IoCallUint64Result result = io_handle2.read(buffer_, 20);
     bytes_read_total += result.rc_;
   }
   EXPECT_EQ(2, times_high_watermark_called_);
@@ -463,23 +463,38 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
 
   // Make sure the overflow threshold will be above std::numeric_limits<uint32_t>::max()
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "3"}});
-  buffer1.setWatermarks((std::numeric_limits<uint32_t>::max() / 3) + 1);
+  const uint64_t overflow_multiplier = 3;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.buffer.overflow_multiplier", std::to_string(overflow_multiplier)}});
+  const uint32_t high_watermark_threshold =
+      (std::numeric_limits<uint32_t>::max() / overflow_multiplier) + 1;
+  buffer1.setWatermarks(high_watermark_threshold);
 
   // Add many segments instead of full uint32_t::max to get around std::bad_alloc exception
   const uint32_t segment_denominator = 128;
   const uint32_t big_segment_len = std::numeric_limits<uint32_t>::max() / segment_denominator + 1;
-  const std::string big_segment_str = std::string(big_segment_len, 'a');
   for (uint32_t i = 0; i < segment_denominator; ++i) {
-    buffer1.add(big_segment_str.data(), big_segment_len);
+    Buffer::RawSlice iovecs[2];
+    uint64_t num_reserved = buffer1.reserve(big_segment_len, iovecs, 2);
+    EXPECT_GE(num_reserved, 1);
+    buffer1.commit(iovecs, num_reserved);
   }
-  EXPECT_EQ(1, high_watermark_buffer1);
-  EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.add(TEN_BYTES, 10);
-  EXPECT_EQ(1, high_watermark_buffer1);
-  EXPECT_EQ(0, overflow_watermark_buffer1);
-  EXPECT_EQ(static_cast<uint64_t>(segment_denominator) * big_segment_len + 10, buffer1.length());
   EXPECT_GT(buffer1.length(), std::numeric_limits<uint32_t>::max());
+  EXPECT_LT(buffer1.length(), high_watermark_threshold * overflow_multiplier);
+  EXPECT_EQ(1, high_watermark_buffer1);
+  EXPECT_EQ(0, overflow_watermark_buffer1);
+
+  // Reserve and commit additional space on the buffer beyond the expected
+  // high_watermark_threshold * overflow_multiplier threshold.
+  // Adding high_watermark_threshold * overflow_multiplier - buffer1.length() + 1 bytes
+  Buffer::RawSlice iovecs[2];
+  uint64_t num_reserved = buffer1.reserve(
+      high_watermark_threshold * overflow_multiplier - buffer1.length() + 1, iovecs, 2);
+  EXPECT_GE(num_reserved, 1);
+  buffer1.commit(iovecs, num_reserved);
+  EXPECT_EQ(buffer1.length(), high_watermark_threshold * overflow_multiplier + 1);
+  EXPECT_EQ(1, high_watermark_buffer1);
+  EXPECT_EQ(0, overflow_watermark_buffer1);
 #endif
 }
 

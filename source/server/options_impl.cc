@@ -108,11 +108,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
                                       "Escape c-style escape sequences in the application logs",
                                       cmd, false);
-  TCLAP::ValueArg<bool> log_format_prefix_with_location(
-      "", "log-format-prefix-with-location",
-      "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "
-      "').",
-      false, false, "bool", cmd);
+  TCLAP::SwitchArg enable_fine_grain_logging(
+      "", "enable-fine-grain-logging",
+      "Logger mode: enable file level log control(Fancy Logger)or not", cmd, false);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
@@ -149,13 +147,15 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg cpuset_threads(
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
-  TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
-                                              "Use fake symbol table implementation", false, false,
-                                              "bool", cmd);
-
   TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
                                                   "Comma-separated list of extensions to disable",
                                                   false, "", "string", cmd);
+
+  TCLAP::ValueArg<std::string> socket_path("", "socket-path", "Path to hot restart socket file",
+                                           false, "@envoy_domain_socket", "string", cmd);
+
+  TCLAP::ValueArg<std::string> socket_mode("", "socket-mode", "Socket file permission", false,
+                                           "600", "string", cmd);
 
   cmd.setExceptionHandling(false);
   try {
@@ -177,7 +177,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
-  fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
+
   cpuset_threads_ = cpuset_threads.getValue();
 
   if (log_level.isSet()) {
@@ -187,10 +187,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   log_format_ = log_format.getValue();
-  if (log_format_prefix_with_location.getValue()) {
-    log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
-  }
   log_format_escaped_ = log_format_escaped.getValue();
+  enable_fine_grain_logging_ = enable_fine_grain_logging.getValue();
 
   parseComponentLogLevels(component_log_level.getValue());
 
@@ -259,6 +257,18 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
+  socket_path_ = socket_path.getValue();
+
+  if (socket_path_.at(0) == '@') {
+    socket_mode_ = 0;
+  } else {
+    uint64_t socket_mode_helper;
+    if (!StringUtil::atoull(socket_mode.getValue().c_str(), socket_mode_helper, 8)) {
+      throw MalformedArgvException(
+          fmt::format("error: invalid socket-mode '{}'", socket_mode.getValue()));
+    }
+    socket_mode_ = socket_mode_helper;
+  }
 
   if (drain_strategy.getValue() == "immediate") {
     drain_strategy_ = Server::DrainStrategy::Immediate;
@@ -354,6 +364,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
                                       spdlog::level::to_string_view(logLevel()).size());
   command_line_options->set_log_format(logFormat());
   command_line_options->set_log_format_escaped(logFormatEscaped());
+  command_line_options->set_enable_fine_grain_logging(enableFineGrainLogging());
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
   command_line_options->set_service_node(serviceNodeName());
@@ -388,6 +399,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   for (const auto& e : disabledExtensions()) {
     command_line_options->add_disabled_extensions(e);
   }
+  command_line_options->set_socket_path(socketPath());
+  command_line_options->set_socket_mode(socketMode());
   return command_line_options;
 }
 
@@ -401,7 +414,8 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
       parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
       mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
-      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false) {}
+      mutex_tracing_enabled_(false), cpuset_threads_(false), socket_path_("@envoy_domain_socket"),
+      socket_mode_(0) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {

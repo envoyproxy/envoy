@@ -27,7 +27,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     // In this case the listener handles the connection directly and does not hand it off.
     if (original_local_address) {
       // Restore the local address to the original one.
-      socket.restoreLocalAddress(original_local_address);
+      socket.addressProvider().restoreLocalAddress(original_local_address);
     }
   }
 

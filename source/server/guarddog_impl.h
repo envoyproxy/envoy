@@ -4,9 +4,11 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -15,6 +17,8 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+
+#include "server/watchdog_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -43,16 +47,17 @@ public:
     virtual ~TestInterlockHook() = default;
 
     /**
-     * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs
-     * up to a particular point in time.
+     * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs up to a particular
+     * point in time. Called while the GuardDog mutex is held.
      */
-    virtual void signalFromImpl(MonotonicTime) {}
+    virtual void signalFromImpl() {}
 
     /**
-     * Called from GuardDog tests to block until the implementation has reached
-     * the desired point in time.
+     * Called from GuardDog tests to block until the implementation has reached the desired
+     * condition. Called while the GuardDog mutex is held.
+     * @param mutex The GuardDog's mutex for use by Thread::CondVar::wait.
      */
-    virtual void waitFromTest(Thread::MutexBasicLockable&, MonotonicTime) {}
+    virtual void waitFromTest(Thread::MutexBasicLockable& /*mutex*/) {}
   };
 
   /**
@@ -64,9 +69,11 @@ public:
    *
    * See the configuration documentation for details on the timeout settings.
    */
-  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api,
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
+               Api::Api& api, absl::string_view name,
                std::unique_ptr<TestInterlockHook>&& test_interlock);
-  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api);
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config,
+               Api::Api& api, absl::string_view name);
   ~GuardDogImpl() override;
 
   /**
@@ -75,20 +82,18 @@ public:
   const std::chrono::milliseconds loopIntervalForTest() const { return loop_interval_; }
 
   /**
-   * Test hook to force a step() to catch up with the current simulated
-   * time. This is inlined so that it does not need to be present in the
-   * production binary.
+   * Test hook to force a step() to catch up with the current watchdog state and simulated time.
+   * This is inlined so that it does not need to be present in the production binary.
    */
   void forceCheckForTest() {
     Thread::LockGuard guard(mutex_);
-    MonotonicTime now = time_source_.monotonicTime();
-    loop_timer_->enableTimer(std::chrono::milliseconds(0));
-    test_interlock_hook_->waitFromTest(mutex_, now);
+    dispatcher_->post([this]() { loop_timer_->enableTimer(std::chrono::milliseconds(0)); });
+    test_interlock_hook_->waitFromTest(mutex_);
   }
 
   // Server::GuardDog
-  WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id,
-                                   const std::string& thread_name) override;
+  WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id, const std::string& thread_name,
+                                   Event::Dispatcher& dispatcher) override;
   void stopWatching(WatchDogSharedPtr wd) override;
 
 private:
@@ -100,11 +105,20 @@ private:
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
+  using WatchDogAction = envoy::config::bootstrap::v3::Watchdog::WatchdogAction;
+  // Helper function to invoke all the GuardDogActions registered for an Event.
+  void invokeGuardDogActions(
+      WatchDogAction::WatchdogEvent event,
+      std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_last_checkin_pairs,
+      MonotonicTime now);
+
+  using WatchDogImplSharedPtr = std::shared_ptr<WatchDogImpl>;
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
-               const WatchDogSharedPtr& watch_dog);
+               const WatchDogImplSharedPtr& watch_dog);
 
-    const WatchDogSharedPtr dog_;
+    const WatchDogImplSharedPtr dog_;
+    MonotonicTime last_checkin_;
     absl::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
     bool megamiss_alerted_{};
@@ -129,6 +143,9 @@ private:
   Thread::ThreadPtr thread_;
   Event::DispatcherPtr dispatcher_;
   Event::TimerPtr loop_timer_;
+  using EventToActionsMap = absl::flat_hash_map<WatchDogAction::WatchdogEvent,
+                                                std::vector<Configuration::GuardDogActionPtr>>;
+  EventToActionsMap events_to_actions_;
   Thread::MutexBasicLockable mutex_;
   bool run_thread_ ABSL_GUARDED_BY(mutex_);
 };

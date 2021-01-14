@@ -8,7 +8,8 @@
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/basic_resource_limit.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/test_runtime.h"
 
@@ -33,6 +34,7 @@ class ProxyFilterTest : public testing::Test,
                         public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
   ProxyFilterTest() {
+    cm_.initializeThreadLocalClusters({"fake_cluster"});
     transport_socket_match_ = new NiceMock<Upstream::MockTransportSocketMatcher>(
         Network::TransportSocketFactoryPtr(transport_socket_factory_));
     cm_.thread_local_cluster_.cluster_.info_->transport_socket_matcher_.reset(
@@ -87,7 +89,7 @@ TEST_F(ProxyFilterTest, HttpDefaultPort) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
@@ -109,7 +111,7 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
@@ -131,7 +133,7 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
@@ -158,7 +160,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
@@ -173,7 +175,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
   filter2->setDecoderFilterCallbacks(callbacks_);
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_));
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
@@ -197,7 +199,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
@@ -212,7 +214,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   auto filter2 = std::make_unique<ProxyFilter>(filter_config_);
   filter2->setDecoderFilterCallbacks(callbacks_);
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_));
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
@@ -243,7 +245,7 @@ TEST_F(ProxyFilterTest, NoCluster) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -254,7 +256,7 @@ TEST_F(ProxyFilterTest, NoClusterType) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -267,7 +269,7 @@ TEST_F(ProxyFilterTest, NonDynamicForwardProxy) {
   InSequence s;
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -281,7 +283,7 @@ TEST_F(ProxyFilterTest, HostRewrite) {
   ProxyPerRouteConfig config(proto_config);
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
@@ -309,7 +311,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   ProxyPerRouteConfig config(proto_config);
 
   EXPECT_CALL(callbacks_, route());
-  EXPECT_CALL(cm_, get(_));
+  EXPECT_CALL(cm_, getThreadLocalCluster(_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));

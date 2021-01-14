@@ -93,7 +93,7 @@ would be rendered as the number ``123``.
 Format dictionaries have the following restrictions:
 
 * The dictionary must map strings to strings (specifically, strings to command operators). Nesting
-  is not currently supported.
+  is supported.
 * When using the ``typed_json_format`` command operators will only produce typed output if the
   command operator is the only string that appears in the dictionary value. For example,
   ``"%DURATION%"`` will log a numeric duration value, but ``"%DURATION%.0"`` will log a string
@@ -116,7 +116,9 @@ are noted.
 
 Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
 the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
-strings are rendered as ``""``.
+strings are rendered as ``""``. :ref:`omit_empty_values
+<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option could be used
+to omit empty values entirely.
 
 Unless otherwise noted, command operators produce string outputs for typed JSON logs.
 
@@ -185,6 +187,10 @@ The following command operators are supported:
     HTTP response code. Note that a response code of '0' means that the server never sent the
     beginning of a response. This generally means that the (downstream) client disconnected.
 
+    Note that in the case of 100-continue responses, only the response code of the final headers
+    will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
+    If a 100-continue results in a disconnect, the 100 will be logged.
+
   TCP
     Not implemented ("-").
 
@@ -199,6 +205,13 @@ The following command operators are supported:
 
   TCP
     Not implemented ("-")
+
+.. _config_access_log_format_connection_termination_details:
+
+%CONNECTION_TERMINATION_DETAILS%
+  HTTP and TCP
+    Connection termination details may provide additional information about why the connection was
+    terminated by Envoy for L4 reasons.
 
 %BYTES_SENT%
   HTTP
@@ -309,7 +322,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -319,7 +332,7 @@ The following command operators are supported:
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
@@ -329,7 +342,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
@@ -339,7 +352,7 @@ The following command operators are supported:
   .. note::
 
     This is always the physical remote address of the peer even if the downstream remote address has
-    been inferred from :ref:`proxy proto <envoy_v3_api_field_config.listener.v3.FilterChain.use_proxy_proto>`
+    been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS%
@@ -353,6 +366,15 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
+
+.. _config_access_log_format_connection_id:
+
+%CONNECTION_ID%
+  An identifier for the downstream connection. It can be used to
+  cross-reference TCP access logs across multiple log sinks, or to
+  cross-reference timer-based reports for the same connection. The identifier
+  is unique with high likelihood within an execution, but can duplicate across
+  multiple instances or between restarts.
 
 %GRPC_STATUS%
   gRPC status code which is easy to interpret with text message corresponding with number.
@@ -513,17 +535,27 @@ The following command operators are supported:
   TCP
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
 
+.. _config_access_log_format_downstream_peer_cert_v_start:
+
 %DOWNSTREAM_PEER_CERT_V_START%
   HTTP
     The validity start date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+.. _config_access_log_format_downstream_peer_cert_v_end:
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %HOSTNAME%
   The system hostname.

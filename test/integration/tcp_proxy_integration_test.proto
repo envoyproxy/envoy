@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package test.integration.tcp_proxy;
+
+message InjectDynamicMetadata {
+  string key = 1;
+}

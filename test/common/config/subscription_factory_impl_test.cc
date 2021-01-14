@@ -9,17 +9,18 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/subscription_factory_impl.h"
+#include "common/config/xds_resource.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -37,15 +38,22 @@ namespace {
 class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
-      : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)),
-        subscription_factory_(local_info_, dispatcher_, cm_, random_, validation_visitor_, *api_,
-                              runtime_) {}
+      : http_request_(&cm_.thread_local_cluster_.async_client_),
+        api_(Api::createApiForTest(stats_store_, random_)),
+        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_) {}
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
         config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
         resource_decoder_);
+  }
+
+  SubscriptionPtr collectionSubscriptionFromUrl(const std::string& xds_url) {
+    const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
+    return subscription_factory_.collectionSubscriptionFromUrl(
+        resource_locator, {}, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+        callbacks_, resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -100,6 +108,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
   config.mutable_api_config_source()->add_cluster_names("static_cluster");
   primary_clusters.insert("static_cluster");
@@ -114,6 +123,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
       "static_cluster");
@@ -197,11 +207,29 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
                             "'/blahblah' does not exist")
 }
 
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
+  std::string test_path = TestEnvironment::temporaryDirectory();
+  auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // Unix paths start with /, Windows with c:/.
+  const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
+  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path))->start({});
+}
+
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile){
+    EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah")->start({}),
+                              EnvoyException,
+                              "envoy::api::v2::Path must refer to an existing path in the system: "
+                              "'/blahblah' does not exist")}
+
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(
       envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
@@ -214,6 +242,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   api_config_source->mutable_request_timeout()->set_seconds(5);
@@ -221,9 +250,11 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
+  cm_.initializeThreadLocalClusters({"static_cluster"});
+  EXPECT_CALL(cm_, getThreadLocalCluster("static_cluster"));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(
-      cm_.async_client_,
+      cm_.thread_local_cluster_.async_client_,
       send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5000))));
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
@@ -232,19 +263,22 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
-  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+  cm_.initializeThreadLocalClusters({"static_cluster"});
+  EXPECT_CALL(cm_, getThreadLocalCluster("static_cluster"));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks&,
                               const Http::AsyncClient::RequestOptions&) {
         EXPECT_EQ("POST", request->headers().getMethodValue());
         EXPECT_EQ("static_cluster", request->headers().getHostValue());
-        EXPECT_EQ("/v2/discovery:endpoints", request->headers().getPathValue());
+        EXPECT_EQ("/v3/discovery:endpoints", request->headers().getPathValue());
         return &http_request_;
       }));
   EXPECT_CALL(http_request_, cancel());
@@ -256,6 +290,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
@@ -269,6 +304,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
   envoy::config::core::v3::GrpcService expected_grpc_service;
   expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster");
@@ -286,33 +322,54 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
         return async_client_factory;
       }));
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 
-TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
+// Use of the V2 transport fails by default.
+TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   envoy::config::core::v3::ConfigSource config;
 
   config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   config.mutable_api_config_source()->set_transport_api_version(
       envoy::config::core::v3::ApiVersion::V2);
-  NiceMock<Runtime::MockSnapshot> snapshot;
-  EXPECT_CALL(runtime_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, runtimeFeatureEnabled(_)).WillOnce(Return(true));
-  EXPECT_CALL(snapshot, countDeprecatedFeatureUse());
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
 
+  TestScopedRuntime scoped_runtime;
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
-  EXPECT_LOG_CONTAINS(
-      "warn", "xDS of version v2 has been deprecated", try {
-        subscription_factory_.subscriptionFromConfigSource(
-            config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
-            resource_decoder_);
-      } catch (EnvoyException&){/* expected, we pass an empty configuration  */});
+  EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
+                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+                              callbacks_, resource_decoder_),
+                          EnvoyException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in");
+}
+
+// Use of AUTO transport fails by default. This will encourage folks to upgrade to explicit V3.
+TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
+  envoy::config::core::v3::ConfigSource config;
+
+  config.mutable_api_config_source()->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::AUTO);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+
+  TestScopedRuntime scoped_runtime;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+
+  EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
+                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+                              callbacks_, resource_decoder_),
+                          EnvoyException,
+                          "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }
 
 INSTANTIATE_TEST_SUITE_P(SubscriptionFactoryTestApiConfigSource,

@@ -15,10 +15,11 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
-HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
+HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
+                                         const std::string& socket_path, mode_t socket_mode)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
-  child_address_ = createDomainSocketAddress(restart_epoch_ + 1, "child");
-  bindDomainSocket(restart_epoch_, "parent");
+  child_address_ = createDomainSocketAddress(restart_epoch_ + 1, "child", socket_path, socket_mode);
+  bindDomainSocket(restart_epoch_, "parent", socket_path, socket_mode);
 }
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
@@ -28,7 +29,7 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEvent();
       },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   internal_ = std::make_unique<Internal>(&server);
 }
 
@@ -108,9 +109,9 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
     if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
       if (socket_factory.sharedSocket().has_value()) {
-        // Pass the socket to the new process iff it is already shared across workers.
+        // Pass the socket to the new process if it is already shared across workers.
         wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.sharedSocket()->get().ioHandle().fd());
+            socket_factory.sharedSocket()->get().ioHandle().fdDoNotUse());
       }
       break;
     }

@@ -4,6 +4,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
@@ -26,6 +27,9 @@ namespace Http {
 class CodecClientCallbacks {
 public:
   virtual ~CodecClientCallbacks() = default;
+
+  // Called in onPreDecodeComplete
+  virtual void onStreamPreDecodeComplete() {}
 
   /**
    * Called every time an owned stream is destroyed, whether complete or not.
@@ -61,6 +65,11 @@ public:
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
     connection_->addConnectionCallbacks(cb);
   }
+
+  /**
+   * Return if half-close semantics are enabled on the underlying connection.
+   */
+  bool isHalfCloseEnabled() { return connection_->isHalfCloseEnabled(); }
 
   /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
@@ -118,6 +127,7 @@ public:
 
   Type type() const { return type_; }
 
+  // Note this is the L4 stream info, not L7.
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
 protected:
@@ -172,8 +182,14 @@ private:
     CodecReadFilter(CodecClient& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
       parent_.onData(data);
+      if (end_stream && parent_.isHalfCloseEnabled()) {
+        // Note that this results in the connection closed as if it was closed
+        // locally, it would be more correct to convey the end stream to the
+        // response decoder, but it would require some refactoring.
+        parent_.close();
+      }
       return Network::FilterStatus::StopIteration;
     }
 
@@ -200,7 +216,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     // StreamDecoderWrapper
-    void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
+    void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
     RequestEncoder* encoder_{};
@@ -213,7 +229,7 @@ private:
    * Called when a response finishes decoding. This is called *before* forwarding on to the
    * wrapped decoder.
    */
-  void responseDecodeComplete(ActiveRequest& request);
+  void responsePreDecodeComplete(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);
@@ -245,7 +261,8 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+                  Random::RandomGenerator& random_generator);
 };
 
 } // namespace Http

@@ -261,7 +261,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
-        worker_factory.createWorker(server.overloadManager(), absl::StrCat("worker_", i)));
+        worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
   }
 }
 
@@ -334,7 +334,11 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
-
+  RELEASE_ASSERT(
+      !config.address().has_envoy_internal_address(),
+      fmt::format("listener {} has envoy internal address {}. Internal address cannot be used by "
+                  "listener yet",
+                  config.name(), config.address().envoy_internal_address().DebugString()));
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
@@ -355,7 +359,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   if (!config.name().empty()) {
     name = config.name();
   } else {
-    name = server_.random().uuid();
+    name = server_.api().randomGenerator().uuid();
   }
 
   auto it = error_state_tracker_.find(name);
@@ -392,6 +396,17 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
+
+  // The listener should be updated back to its original state and the warming listener should be
+  // removed.
+  if (existing_warming_listener != warming_listeners_.end() &&
+      existing_active_listener != active_listeners_.end() &&
+      (*existing_active_listener)->blockUpdate(hash)) {
+    warming_listeners_.erase(existing_warming_listener);
+    updateWarmingActiveGauges();
+    stats_.listener_modified_.inc();
+    return true;
+  }
 
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
@@ -869,7 +884,7 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
   return true;
 }
 
-void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
+void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()> callback) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
   workers_started_ = true;
@@ -884,11 +899,13 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     ENVOY_LOG(debug, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-      addListenerToWorker(*worker, absl::nullopt, *listener, [this, listeners_pending_init]() {
-        if (--(*listeners_pending_init) == 0) {
-          stats_.workers_started_.set(1);
-        }
-      });
+      addListenerToWorker(*worker, absl::nullopt, *listener,
+                          [this, listeners_pending_init, callback]() {
+                            if (--(*listeners_pending_init) == 0) {
+                              stats_.workers_started_.set(1);
+                              callback();
+                            }
+                          });
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {
@@ -898,6 +915,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   }
   if (active_listeners_.empty()) {
     stats_.workers_started_.set(1);
+    callback();
   }
 }
 
@@ -1006,11 +1024,14 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
 
-  auto filter_chain_res =
-      std::make_unique<FilterChainImpl>(config_factory.createTransportSocketFactory(
-                                            *message, factory_context_, std::move(server_names)),
-                                        listener_component_factory_.createNetworkFilterFactoryList(
-                                            filter_chain.filters(), *filter_chain_factory_context));
+  auto filter_chain_res = std::make_unique<FilterChainImpl>(
+      config_factory.createTransportSocketFactory(*message, factory_context_,
+                                                  std::move(server_names)),
+      listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
+                                                                 *filter_chain_factory_context),
+      std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)));
+
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;
 }

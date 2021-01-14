@@ -187,6 +187,7 @@ public:
 };
 
 using RawAsyncClientPtr = std::unique_ptr<RawAsyncClient>;
+using RawAsyncClientSharedPtr = std::shared_ptr<RawAsyncClient>;
 
 } // namespace Grpc
 } // namespace Envoy

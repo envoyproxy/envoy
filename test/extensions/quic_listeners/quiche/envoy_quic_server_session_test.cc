@@ -1,8 +1,8 @@
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
@@ -13,7 +13,9 @@
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <string>
 
@@ -59,6 +61,7 @@ public:
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Network::Socket& listen_socket)
       : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
+                                  quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
                                   quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
                                   helper, alarm_factory, &writer, /*owns_writer=*/false,
                                   supported_versions, listen_socket) {}
@@ -90,7 +93,7 @@ public:
   virtual void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) = 0;
 };
 
-class TestQuicCryptoServerStream : public EnvoyQuicCryptoServerStream,
+class TestQuicCryptoServerStream : public quic::QuicCryptoServerStream,
                                    public ProofSourceDetailsSetter {
 public:
   ~TestQuicCryptoServerStream() override = default;
@@ -99,11 +102,11 @@ public:
                                       quic::QuicCompressedCertsCache* compressed_certs_cache,
                                       quic::QuicSession* session,
                                       quic::QuicCryptoServerStreamBase::Helper* helper)
-      : EnvoyQuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
+      : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
 
   bool encryption_established() const override { return true; }
 
-  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
+  const EnvoyQuicProofSourceDetails* ProofSourceDetails() const override { return details_.get(); }
 
   void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
@@ -113,20 +116,20 @@ private:
   std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
 };
 
-class TestEnvoyQuicTlsServerHandshaker : public EnvoyQuicTlsServerHandshaker,
+class TestEnvoyQuicTlsServerHandshaker : public quic::TlsServerHandshaker,
                                          public ProofSourceDetailsSetter {
 public:
   ~TestEnvoyQuicTlsServerHandshaker() override = default;
 
   TestEnvoyQuicTlsServerHandshaker(quic::QuicSession* session,
                                    const quic::QuicCryptoServerConfig& crypto_config)
-      : EnvoyQuicTlsServerHandshaker(session, crypto_config),
+      : quic::TlsServerHandshaker(session, crypto_config),
         params_(new quic::QuicCryptoNegotiatedParameters) {
     params_->cipher_suite = 1;
   }
 
   bool encryption_established() const override { return true; }
-  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
+  const EnvoyQuicProofSourceDetails* ProofSourceDetails() const override { return details_.get(); }
   void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
   }
@@ -147,7 +150,6 @@ public:
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
-          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         quic_connection_(new TestEnvoyQuicServerConnection(
@@ -167,7 +169,8 @@ public:
 
     // Advance time and trigger update of Dispatcher::approximateMonotonicTime()
     // because zero QuicTime is considered uninitialized.
-    time_system_.advanceTimeWait(std::chrono::milliseconds(1));
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(1), *dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
     connection_helper_.GetClock()->Now();
 
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
@@ -199,10 +202,10 @@ public:
       crypto_stream_ = test_crypto_stream;
     }
     quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, crypto_stream);
-    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
         std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
   bool installReadFilter() {
@@ -291,6 +294,10 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
       quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
   auto stream =
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
+
+  // Basic checks.
+  ASSERT_FALSE(envoy_quic_session_.startSecureTransport());
+
   // Receive a GET request on created stream.
   quic::QuicHeaderList headers;
   headers.OnHeaderBlockStart();
@@ -505,23 +512,23 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   stream->encodeData(buffer, false);
   // Stream become write blocked.
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
-  EXPECT_TRUE(stream->flow_controller()->IsBlocked());
+  EXPECT_TRUE(stream->IsFlowControlBlocked());
   EXPECT_FALSE(envoy_quic_session_.IsConnectionFlowControlBlocked());
 
   // Connection shouldn't be closed right away as there is a stream write blocked.
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   // Another write event without updating flow control window shouldn't trigger
   // connection close, but it should update the timer.
   envoy_quic_session_.OnCanWrite();
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
 
   // Timer shouldn't fire at original deadline.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
   EXPECT_CALL(*quic_connection_,
@@ -529,8 +536,8 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
 }
@@ -598,7 +605,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   stream->encodeData(buffer, true);
   // Stream become write blocked.
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
-  EXPECT_TRUE(stream->flow_controller()->IsBlocked());
+  EXPECT_TRUE(stream->IsFlowControlBlocked());
   EXPECT_FALSE(envoy_quic_session_.IsConnectionFlowControlBlocked());
 
   // Connection shouldn't be closed right away as there is a stream write blocked.
@@ -610,8 +617,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
 
   // No timeout set, so alarm shouldn't fire.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(100));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
   // Force close connection.
@@ -640,7 +647,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
 
   // Advance the time a bit and try to close again. The delay close timer
   // shouldn't be rescheduled by this call.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -649,8 +657,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
 }
@@ -669,11 +677,12 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
   // Unblocking the stream shouldn't close the connection as it should be
   // delayed.
-  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   envoy_quic_session_.OnCanWrite();
   // delay close alarm should have been rescheduled.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
   EXPECT_CALL(*quic_connection_,
@@ -681,8 +690,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
 }
@@ -700,7 +709,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
-  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   // The closing behavior should be changed.
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   // Unblocking the stream shouldn't close the connection as it should be
@@ -708,8 +718,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   envoy_quic_session_.OnCanWrite();
 
   // delay close alarm should have been rescheduled.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
   EXPECT_CALL(*quic_connection_,
@@ -717,8 +727,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
 }
@@ -732,7 +742,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
 
   // Advance the time a bit and try to close again. The delay close timer
   // shouldn't be rescheduled by this call.
-  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
@@ -740,16 +751,20 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   // Advance the time to fire connection close timer.
-  time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
 }
 
 TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
-  // Not verifying dummy implementation, just to have coverage.
-  EXPECT_DEATH(envoy_quic_session_.enableHalfClose(true), "");
-  EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
+  testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
+  envoy_quic_session_.set_debug_visitor(&debug_visitor);
+  if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
+    EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  } else {
+    // This is a no-op for pre-HTTP3 versions of QUIC.
+  }
   http_connection_->shutdownNotice();
 }
 
@@ -791,10 +806,8 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   if (!quic_version_[0].UsesTls()) {
     envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   } else {
-    if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
-      EXPECT_CALL(*quic_connection_, SendControlFrame(_));
-    }
-    envoy_quic_session_.OnOneRttKeysAvailable();
+    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+    envoy_quic_session_.OnTlsHandshakeComplete();
   }
   EXPECT_EQ(nullptr, envoy_quic_session_.socketOptions());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().isOpen());
@@ -873,7 +886,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   Buffer::OwnedImpl buffer(response);
   EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
   stream1->encodeData(buffer, false);
-  EXPECT_TRUE(stream1->flow_controller()->IsBlocked());
+  EXPECT_TRUE(stream1->IsFlowControlBlocked());
   EXPECT_FALSE(envoy_quic_session_.IsConnectionFlowControlBlocked());
 
   // Receive another request and send back response to trigger connection level
@@ -939,7 +952,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
     stream1->encodeData(buffer, true);
   }));
   envoy_quic_session_.OnCanWrite();
-  EXPECT_TRUE(stream1->flow_controller()->IsBlocked());
+  EXPECT_TRUE(stream1->IsFlowControlBlocked());
 
   // Update flow control window for stream2.
   quic::QuicWindowUpdateFrame window_update2(quic::kInvalidControlFrameId, stream2->id(),
@@ -970,7 +983,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   }));
   EXPECT_CALL(network_connection_callbacks_, onAboveWriteBufferHighWatermark());
   envoy_quic_session_.OnCanWrite();
-  EXPECT_TRUE(stream2->flow_controller()->IsBlocked());
+  EXPECT_TRUE(stream2->IsFlowControlBlocked());
 
   // Resetting stream3 should lower the buffered bytes, but callbacks will not
   // be triggered because reset callback has been already triggered.
@@ -1078,7 +1091,7 @@ TEST_P(EnvoyQuicServerSessionTest, HeadersContributeToWatermarkGquic) {
           [this]() { http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark(); }));
   EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(2);
   envoy_quic_session_.OnCanWrite();
-  EXPECT_TRUE(stream1->flow_controller()->IsBlocked());
+  EXPECT_TRUE(stream1->IsFlowControlBlocked());
 
   // Buffer more response because of flow control. The buffered bytes become just below connection
   // level high watermark.

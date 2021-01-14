@@ -22,9 +22,9 @@ envoy_cc_test(
         "example_configs_test_setup.sh",
         "//configs:example_configs",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         ":config_test_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
@@ -64,6 +64,7 @@ envoy_cc_test(
         "//source/common/config:api_version_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

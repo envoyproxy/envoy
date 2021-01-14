@@ -23,7 +23,7 @@ public:
       : tls_(tls), api_(api), hooks_(hooks) {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager& overload_manager,
+  WorkerPtr createWorker(uint32_t index, OverloadManager& overload_manager,
                          const std::string& worker_name) override;
 
 private:
@@ -58,6 +58,7 @@ public:
 private:
   void threadRoutine(GuardDog& guard_dog);
   void stopAcceptingConnectionsCb(OverloadActionState state);
+  void rejectIncomingConnectionsCb(OverloadActionState state);
 
   ThreadLocal::Instance& tls_;
   ListenerHooks& hooks_;

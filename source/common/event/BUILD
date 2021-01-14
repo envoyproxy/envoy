@@ -1,6 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_package",
 )
 
@@ -13,15 +16,24 @@ envoy_cc_library(
     srcs = [
         "dispatcher_impl.cc",
         "file_event_impl.cc",
-        "signal_impl.cc",
     ],
-    hdrs = [
-        "signal_impl.h",
-    ],
+    hdrs = select({
+        "//bazel:windows_x86_64": [
+            "win32/signal_impl.h",
+        ],
+        "//conditions:default": [
+            "posix/signal_impl.h",
+        ],
+    }),
+    strip_include_prefix = select({
+        "//bazel:windows_x86_64": "win32",
+        "//conditions:default": "posix",
+    }),
     deps = [
         ":dispatcher_includes",
         ":libevent_scheduler_lib",
         ":real_time_system_lib",
+        ":signal_lib",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:signal_interface",
@@ -30,10 +42,43 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:watcher_lib",
-        "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
+        "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
-        "//source/common/runtime:runtime_features_lib",
+    ] + select({
+        "//bazel:apple": ["//source/common/network:apple_dns_lib"],
+        "//conditions:default": [],
+    }),
+)
+
+envoy_cc_library(
+    name = "signal_lib",
+    deps = envoy_cc_platform_dep("signal_impl_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "signal_impl_lib",
+    srcs = ["posix/signal_impl.cc"],
+    hdrs = ["posix/signal_impl.h"],
+    strip_include_prefix = "posix",
+    deps = [
+        ":dispatcher_includes",
+        "//include/envoy/event:signal_interface",
+        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_win32_library(
+    name = "signal_impl_lib",
+    srcs = ["win32/signal_impl.cc"],
+    hdrs = ["win32/signal_impl.h"],
+    strip_include_prefix = "win32",
+    deps = [
+        ":dispatcher_includes",
+        "//include/envoy/event:signal_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/network:default_socket_interface_lib",
     ],
 )
 
@@ -147,5 +192,17 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "scaled_range_timer_manager_lib",
+    srcs = ["scaled_range_timer_manager_impl.cc"],
+    hdrs = ["scaled_range_timer_manager_impl.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:scaled_range_timer_manager_interface",
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:scope_tracker",
     ],
 )

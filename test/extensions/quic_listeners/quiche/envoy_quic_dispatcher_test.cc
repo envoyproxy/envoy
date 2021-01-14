@@ -1,18 +1,20 @@
 #include <openssl/evp.h>
 
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
 
 #include "quiche/quic/core/quic_dispatcher.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/common/platform/api/quiche_text_utils.h"
+
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <memory>
 
@@ -67,7 +69,6 @@ public:
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
-          SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
@@ -77,7 +78,7 @@ public:
         per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
-        connection_handler_(*dispatcher_),
+        connection_handler_(*dispatcher_, absl::nullopt),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
@@ -93,7 +94,8 @@ public:
 
   void SetUp() override {
     // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
-    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
     EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
         .WillRepeatedly(Return(1024 * 1024));
   }
@@ -128,8 +130,8 @@ public:
     EnvoyQuicClock clock(*dispatcher_);
     Buffer::OwnedImpl payload = generateChloPacketToSend(
         quic_version_, quic_config_, crypto_config_, connection_id_, clock,
-        envoyIpAddressToQuicSocketAddress(listen_socket_->localAddress()->ip()), peer_addr,
-        "test.example.org");
+        envoyIpAddressToQuicSocketAddress(listen_socket_->addressProvider().localAddress()->ip()),
+        peer_addr, "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT(slice.size() == 1);
     auto encrypted_packet = std::make_unique<quic::QuicEncryptedPacket>(
@@ -139,8 +141,8 @@ public:
             quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
 
     envoy_quic_dispatcher_.ProcessPacket(
-        envoyIpAddressToQuicSocketAddress(listen_socket_->localAddress()->ip()), peer_addr,
-        *received_packet);
+        envoyIpAddressToQuicSocketAddress(listen_socket_->addressProvider().localAddress()->ip()),
+        peer_addr, *received_packet);
 
     if (should_buffer) {
       // Incoming CHLO packet is buffered, because ProcessPacket() is called before
@@ -164,10 +166,11 @@ public:
     EXPECT_EQ(1u, connection_handler_.numConnections());
     auto envoy_connection = static_cast<EnvoyQuicServerSession*>(session);
     EXPECT_EQ("test.example.org", envoy_connection->requestedServerName());
-    EXPECT_EQ(peer_addr,
-              envoyIpAddressToQuicSocketAddress(envoy_connection->remoteAddress()->ip()));
-    ASSERT(envoy_connection->localAddress() != nullptr);
-    EXPECT_EQ(*listen_socket_->localAddress(), *envoy_connection->localAddress());
+    EXPECT_EQ(peer_addr, envoyIpAddressToQuicSocketAddress(
+                             envoy_connection->addressProvider().remoteAddress()->ip()));
+    ASSERT(envoy_connection->addressProvider().localAddress() != nullptr);
+    EXPECT_EQ(*listen_socket_->addressProvider().localAddress(),
+              *envoy_connection->addressProvider().localAddress());
   }
 
   void processValidChloPacketAndInitializeFilters(bool should_buffer) {

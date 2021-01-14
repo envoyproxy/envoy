@@ -19,12 +19,11 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/filter/http/filter_config_discovery_impl.h"
+#include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
-#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/request_id_extension_impl.h"
@@ -167,9 +166,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
-        context.dispatcher().timeSource())});
+        *filter_config, context.drainDecision(), context.api().randomGenerator(),
+        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
+        context.overloadManager(), context.dispatcher().timeSource())});
   };
 }
 
@@ -207,7 +206,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
-      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      http1_settings_(Http::Utility::parseHttp1Settings(
+          config.http_protocol_options(), config.stream_error_on_invalid_http_message())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -222,6 +222,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
+      request_headers_timeout_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, request_headers_timeout, RequestHeaderTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
@@ -247,7 +249,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                       0))),
 #endif
       merge_slashes_(config.merge_slashes()),
-      strip_matching_port_(config.strip_matching_host_port()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)) {
@@ -263,13 +264,27 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = absl::nullopt;
   }
 
-  // If we are provided a different request_id_extension implementation to use try and create a new
-  // instance of it, otherwise use default one.
+  if (config.strip_any_host_port() && config.strip_matching_host_port()) {
+    throw EnvoyException(fmt::format(
+        "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
+  }
+
+  if (config.strip_any_host_port()) {
+    strip_port_type_ = Http::StripPortType::Any;
+  } else if (config.strip_matching_host_port()) {
+    strip_port_type_ = Http::StripPortType::MatchingHost;
+  } else {
+    strip_port_type_ = Http::StripPortType::None;
+  }
+
+  // If we are provided a different request_id_extension implementation to use try and create a
+  // new instance of it, otherwise use default one.
   if (config.request_id_extension().has_typed_config()) {
     request_id_extension_ =
         Http::RequestIDExtensionFactory::fromProto(config.request_id_extension(), context_);
   } else {
-    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(context_.random());
+    request_id_extension_ =
+        Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
@@ -562,32 +577,17 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1: {
-    if (context_.runtime().snapshot().runtimeFeatureEnabled(
-            "envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http::Http1::ServerConnectionImpl>(
-          connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
-          callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-          headersWithUnderscoresAction());
-    } else {
-      return std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
-          connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
-          callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-          headersWithUnderscoresAction());
-    }
+    return std::make_unique<Http::Http1::ServerConnectionImpl>(
+        connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
+        callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+        headersWithUnderscoresAction());
   }
   case CodecType::HTTP2: {
-    if (context_.runtime().snapshot().runtimeFeatureEnabled(
-            "envoy.reloadable_features.new_codec_behavior")) {
-      return std::make_unique<Http::Http2::ServerConnectionImpl>(
-          connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
-          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
-    } else {
-      return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
-          connection, callbacks,
-          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
-          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
-    }
+    return std::make_unique<Http::Http2::ServerConnectionImpl>(
+        connection, callbacks,
+        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
+        context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
+        maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
@@ -600,9 +600,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_codec_stats_, http2_codec_stats_,
-        http1_settings_, http2_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
+        http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
@@ -708,9 +708,9 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
-        context.dispatcher().timeSource());
+        *filter_config, context.drainDecision(), context.api().randomGenerator(),
+        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
+        context.overloadManager(), context.dispatcher().timeSource());
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.

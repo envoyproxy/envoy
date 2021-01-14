@@ -2,6 +2,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/stats/utility.h"
 
 namespace Envoy {
@@ -24,28 +25,30 @@ void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   address->sun_family = AF_UNIX;
 }
 
-sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std::string& role) {
+sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std::string& role,
+                                                         const std::string& socket_path,
+                                                         mode_t socket_mode) {
   // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the third
   // starts up it will kill the oldest parent.
   static constexpr uint64_t MaxConcurrentProcesses = 3;
   id = id % MaxConcurrentProcesses;
-
-  // This creates an anonymous domain socket name (where the first byte of the name of \0).
   sockaddr_un address;
   initDomainSocketAddress(&address);
-  StringUtil::strlcpy(&address.sun_path[1],
-                      fmt::format("envoy_domain_socket_{}_{}", role, base_id_ + id).c_str(),
-                      sizeof(address.sun_path) - 1);
-  address.sun_path[0] = 0;
+  Network::Address::PipeInstance addr(fmt::format(socket_path + "_{}_{}", role, base_id_ + id),
+                                      socket_mode, nullptr);
+  memcpy(&address, addr.sockAddr(), addr.sockAddrLen());
+  fchmod(my_domain_socket_, socket_mode);
   return address;
 }
 
-void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role) {
+void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role,
+                                         const std::string& socket_path, mode_t socket_mode) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
   my_domain_socket_ = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-  sockaddr_un address = createDomainSocketAddress(id, role);
+  sockaddr_un address = createDomainSocketAddress(id, role, socket_path, socket_mode);
+  unlink(address.sun_path);
   Api::SysCallIntResult result =
       os_sys_calls.bind(my_domain_socket_, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (result.rc_ != 0) {

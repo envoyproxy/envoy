@@ -10,8 +10,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "file_based_metadata_grpc_credentials_test",
-    srcs = ["file_based_metadata_grpc_credentials_test.cc"],
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
     deps = [
         "//source/extensions/grpc_credentials:well_known_names",

@@ -2,6 +2,7 @@
 
 #include <sys/stat.h>
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -11,6 +12,10 @@
 
 namespace Envoy {
 namespace Api {
+
+struct EnvoyTcpInfo {
+  std::chrono::microseconds tcpi_rtt;
+};
 
 class OsSysCalls {
 public:
@@ -71,6 +76,11 @@ public:
    * return true if the OS supports UDP GSO
    */
   virtual bool supportsUdpGso() const PURE;
+
+  /**
+   * return true if the OS support both IP_TRANSPARENT and IPV6_TRANSPARENT options
+   */
+  virtual bool supportsIpTransparent() const PURE;
 
   /**
    * Release all resources allocated for fd.
@@ -165,6 +175,16 @@ public:
    * @see man 2 accept. The fds returned are configured to be non-blocking.
    */
   virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see man 2 dup(2).
+   */
+  virtual SysCallSocketResult duplicate(os_fd_t oldfd) PURE;
+
+  /**
+   * @see man TCP_INFO. Get the tcp info for the socket.
+   */
+  virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

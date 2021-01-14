@@ -364,6 +364,9 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_);
   EXPECT_EQ(nullptr, handle_);
+  std::string lower_command = absl::AsciiStrToLower(GetParam());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + lower_command + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + lower_command + ".error").value());
 };
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,

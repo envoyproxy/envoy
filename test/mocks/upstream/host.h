@@ -9,7 +9,7 @@
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -98,6 +98,7 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
+  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
   Stats::StatName localityZoneStatName() const override {
     Stats::SymbolTable& symbol_table = *symbol_table_;
     locality_zone_stat_name_ =
@@ -112,7 +113,7 @@ public:
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
-  mutable Stats::TestSymbolTable symbol_table_;
+  mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
@@ -192,12 +193,13 @@ public:
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
+  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
-  mutable Stats::TestSymbolTable symbol_table_;
+  mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 

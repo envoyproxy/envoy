@@ -39,21 +39,30 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
-      stats_(ClusterInfoImpl::generateStats(stats_store_)),
+      stat_names_(stats_store_.symbolTable()),
+      cluster_load_report_stat_names_(stats_store_.symbolTable()),
+      cluster_circuit_breakers_stat_names_(stats_store_.symbolTable()),
+      cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
+      cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
+      stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
-      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
+      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_,
+                                                                  cluster_load_report_stat_names_)),
       request_response_size_stats_(std::make_unique<ClusterRequestResponseSizeStats>(
-          ClusterInfoImpl::generateRequestResponseSizeStats(request_response_size_stats_store_))),
-      timeout_budget_stats_(std::make_unique<ClusterTimeoutBudgetStats>(
-          ClusterInfoImpl::generateTimeoutBudgetStats(timeout_budget_stats_store_))),
-      circuit_breakers_stats_(
-          ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
+          ClusterInfoImpl::generateRequestResponseSizeStats(
+              request_response_size_stats_store_, cluster_request_response_size_stat_names_))),
+      timeout_budget_stats_(
+          std::make_unique<ClusterTimeoutBudgetStats>(ClusterInfoImpl::generateTimeoutBudgetStats(
+              timeout_budget_stats_store_, cluster_timeout_budget_stat_names_))),
+      circuit_breakers_stats_(ClusterInfoImpl::generateCircuitBreakersStats(
+          stats_store_, cluster_circuit_breakers_stat_names_.default_, true,
+          cluster_circuit_breakers_stat_names_)),
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
           circuit_breakers_stats_, absl::nullopt, absl::nullopt)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
-  ON_CALL(*this, prefetchRatio()).WillByDefault(Return(1.0));
+  ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, edsServiceName()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
@@ -88,6 +97,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
+  ON_CALL(*this, lbMaglevConfig()).WillByDefault(ReturnRef(lb_maglev_config_));
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
@@ -105,7 +115,8 @@ MockClusterInfo::MockClusterInfo()
         return *typed_metadata_;
       }));
   ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
-  ON_CALL(*this, upstreamHttpProtocol(_)).WillByDefault(Return(Http::Protocol::Http11));
+  ON_CALL(*this, upstreamHttpProtocol(_))
+      .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

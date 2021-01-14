@@ -35,23 +35,26 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
     } else {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
-      sff_config.set_text_format(fal_config.format());
-      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+      sff_config.mutable_text_format_source()->set_inline_string(fal_config.format());
+      formatter =
+          Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context.api());
     }
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
     formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
-        fal_config.json_format(), false);
+        fal_config.json_format(), false, false);
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       kTypedJsonFormat: {
     envoy::config::core::v3::SubstitutionFormatString sff_config;
     *sff_config.mutable_json_format() = fal_config.typed_json_format();
-    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+    formatter =
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context.api());
     break;
   }
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kLogFormat:
-    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(),
+                                                                          context.api());
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       ACCESS_LOG_FORMAT_NOT_SET:

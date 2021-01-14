@@ -16,24 +16,27 @@ namespace Config {
 class SubscriptionFactoryImpl : public SubscriptionFactory, Logger::Loggable<Logger::Id::config> {
 public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                          Upstream::ClusterManager& cm, Random::RandomGenerator& random,
-                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                          Runtime::Loader& runtime);
+                          Upstream::ClusterManager& cm,
+                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
                                                absl::string_view type_url, Stats::Scope& scope,
                                                SubscriptionCallbacks& callbacks,
                                                OpaqueResourceDecoder& resource_decoder) override;
+  SubscriptionPtr
+  collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
+                                const envoy::config::core::v3::ConfigSource& config,
+                                absl::string_view type_url, Stats::Scope& scope,
+                                SubscriptionCallbacks& callbacks,
+                                OpaqueResourceDecoder& resource_decoder) override;
 
 private:
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
   Upstream::ClusterManager& cm_;
-  Random::RandomGenerator& random_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
-  Runtime::Loader& runtime_;
 };
 
 } // namespace Config

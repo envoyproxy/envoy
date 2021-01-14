@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -39,7 +39,7 @@ message TcpProxy {
           "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight";
 
       // Name of the upstream cluster.
-      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string name = 1 [(validate.rules).string = {min_len: 1}];
 
       // When a request matches the route, the choice of an upstream cluster is
       // determined by its weight. The sum of weights across all entries in the
@@ -67,7 +67,7 @@ message TcpProxy {
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
 
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
-    string hostname = 1 [(validate.rules).string = {min_bytes: 1}];
+    string hostname = 1 [(validate.rules).string = {min_len: 1}];
   }
 
   reserved 6;
@@ -76,7 +76,7 @@ message TcpProxy {
 
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_tcp_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -134,4 +134,10 @@ message TcpProxy {
   // payloads over a shared HTTP/2 tunnel. If this message is absent, the payload
   // will be proxied upstream as per usual.
   TunnelingConfig tunneling_config = 12;
+
+  // The maximum duration of a connection. The duration is defined as the period since a connection
+  // was established. If not set, there is no max duration. When max_downstream_connection_duration
+  // is reached the connection will be closed. Duration must be at least 1ms.
+  google.protobuf.Duration max_downstream_connection_duration = 13
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }

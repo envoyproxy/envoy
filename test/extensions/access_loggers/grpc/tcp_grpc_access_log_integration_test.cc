@@ -29,22 +29,24 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrat
 public:
   TcpGrpcAccessLogIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void initialize() override {
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
-      accesslog_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*accesslog_cluster);
     });
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -128,6 +130,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, TcpGrpcAccessLogIntegrationTest,
 
 // Test a basic full access logging flow.
 TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -148,15 +151,14 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
 
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(waitForAccessLogRequest(
-      fmt::format(R"EOF(
+  ASSERT_TRUE(
+      waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
     cluster: cluster_name
     locality:
       zone: zone_name
-    build_version: {}
     user_agent_name: "envoy"
   log_name: foo
 tcp_logs:
@@ -182,11 +184,11 @@ tcp_logs:
       received_bytes: 3
       sent_bytes: 5
 )EOF",
-                  VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()),
-                  Network::Test::getLoopbackAddressString(ipVersion()))));
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
 }

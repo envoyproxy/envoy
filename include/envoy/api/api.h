@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
@@ -56,9 +57,14 @@ public:
   virtual TimeSource& timeSource() PURE;
 
   /**
-   * @return a constant reference to the root Stats::Scope
+   * @return a reference to the root Stats::Scope
    */
-  virtual const Stats::Scope& rootScope() PURE;
+  virtual Stats::Scope& rootScope() PURE;
+
+  /**
+   * @return a reference to the RandomGenerator.
+   */
+  virtual Random::RandomGenerator& randomGenerator() PURE;
 
   /**
    * @return an optional reference to the ProcessContext

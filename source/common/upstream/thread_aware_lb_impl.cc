@@ -1,6 +1,7 @@
 #include "common/upstream/thread_aware_lb_impl.h"
 
 #include <memory>
+#include <random>
 
 namespace Envoy {
 namespace Upstream {
@@ -121,8 +122,8 @@ void ThreadAwareLoadBalancerBase::refresh() {
     double max_normalized_weight = 0.0;
     normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
                      min_normalized_weight, max_normalized_weight);
-    per_priority_state->current_lb_ =
-        createLoadBalancer(normalized_host_weights, min_normalized_weight, max_normalized_weight);
+    per_priority_state->current_lb_ = createLoadBalancer(
+        std::move(normalized_host_weights), min_normalized_weight, max_normalized_weight);
   }
 
   {
@@ -168,7 +169,6 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
       return host;
     }
   }
-
   return host;
 }
 
@@ -183,6 +183,122 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   lb->per_priority_state_ = per_priority_state_;
 
   return lb;
+}
+
+double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverloadFactor(
+    const Host& host, double weight) const {
+  // TODO(scheler): This will not work if rq_active cluster stat is disabled, need to detect
+  // and alert the user if that's the case.
+
+  const uint32_t overall_active = host.cluster().stats().upstream_rq_active_.value();
+  const uint32_t host_active = host.stats().rq_active_.value();
+
+  const uint32_t total_slots = ((overall_active + 1) * hash_balance_factor_ + 99) / 100;
+  const uint32_t slots =
+      std::max(static_cast<uint32_t>(std::ceil(total_slots * weight)), static_cast<uint32_t>(1));
+
+  if (host.stats().rq_active_.value() > slots) {
+    ENVOY_LOG_MISC(
+        debug,
+        "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
+        "host {} overloaded; overall_active {}, host_weight {}, host_active {} > slots {}",
+        host.address()->asString(), overall_active, weight, host_active, slots);
+  }
+  return static_cast<double>(host.stats().rq_active_.value()) / slots;
+}
+
+HostConstSharedPtr
+ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t hash,
+                                                                        uint32_t attempt) const {
+
+  // This is implemented based on the method described in the paper
+  // https://arxiv.org/abs/1608.01350. For the specified `hash_balance_factor`, requests to any
+  // upstream host are capped at `hash_balance_factor/100` times the average number of requests
+  // across the cluster. When a request arrives for an upstream host that is currently serving at
+  // its max capacity, linear probing is used to identify an eligible host. Further, the linear
+  // probe is implemented using a random jump on hosts ring/table to identify the eligible host
+  // (this technique is as described in the paper https://arxiv.org/abs/1908.08762 - the random jump
+  // avoids the cascading overflow effect when choosing the next host on the ring/table).
+  //
+  // If weights are specified on the hosts, they are respected.
+  //
+  // This is an O(N) algorithm, unlike other load balancers. Using a lower `hash_balance_factor`
+  // results in more hosts being probed, so use a higher value if you require better performance.
+
+  if (normalized_host_weights_.empty()) {
+    return nullptr;
+  }
+
+  HostConstSharedPtr host = hashing_lb_ptr_->chooseHost(hash, attempt);
+  if (host == nullptr) {
+    return nullptr;
+  }
+  const double weight = normalized_host_weights_map_.at(host);
+  double overload_factor = hostOverloadFactor(*host, weight);
+  if (overload_factor <= 1.0) {
+    ENVOY_LOG_MISC(debug,
+                   "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
+                   "selected host #{} (attempt:1)",
+                   host->address()->asString());
+    return host;
+  }
+
+  // When a host is overloaded, we choose the next host in a random manner rather than picking the
+  // next one in the ring. The random sequence is seeded by the hash, so the same input gets the
+  // same sequence of hosts all the time.
+  const uint32_t num_hosts = normalized_host_weights_.size();
+  auto host_index = std::vector<uint32_t>(num_hosts);
+  for (uint32_t i = 0; i < num_hosts; i++) {
+    host_index[i] = i;
+  }
+
+  // Not using Random::RandomGenerator as it does not take a seed. Seeded RNG is a requirement
+  // here as we need the same shuffle sequence for the same hash every time.
+  // Further, not using std::default_random_engine and std::uniform_int_distribution as they
+  // are not consistent across Linux and Windows platforms.
+  const uint64_t seed = hash;
+  std::mt19937 random(seed);
+
+  // generates a random number in the range [0,k) uniformly.
+  auto uniform_int = [](std::mt19937& random, uint32_t k) -> uint32_t {
+    uint32_t x = k;
+    while (x >= k) {
+      x = random() / ((static_cast<uint64_t>(random.max()) + 1u) / k);
+    }
+    return x;
+  };
+
+  HostConstSharedPtr alt_host, least_overloaded_host = host;
+  double least_overload_factor = overload_factor;
+  for (uint32_t i = 0; i < num_hosts; i++) {
+    // The random shuffle algorithm
+    const uint32_t j = uniform_int(random, num_hosts - i);
+    std::swap(host_index[i], host_index[i + j]);
+
+    const uint32_t k = host_index[i];
+    alt_host = normalized_host_weights_[k].first;
+    if (alt_host == host) {
+      continue;
+    }
+
+    const double alt_host_weight = normalized_host_weights_[k].second;
+    overload_factor = hostOverloadFactor(*alt_host, alt_host_weight);
+
+    if (overload_factor <= 1.0) {
+      ENVOY_LOG_MISC(debug,
+                     "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
+                     "selected host #{}:{} (attempt:{})",
+                     k, alt_host->address()->asString(), i + 2);
+      return alt_host;
+    }
+
+    if (least_overload_factor > overload_factor) {
+      least_overloaded_host = alt_host;
+      least_overload_factor = overload_factor;
+    }
+  }
+
+  return least_overloaded_host;
 }
 
 } // namespace Upstream

@@ -99,13 +99,15 @@ public:
   }
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     load_report_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }
 
   void initialize() override {
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
@@ -117,7 +119,7 @@ public:
       load_report_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       load_report_cluster->mutable_circuit_breakers()->Clear();
       load_report_cluster->set_name("load_report");
-      load_report_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*load_report_cluster);
       // Put ourselves in a locality that will be used in
       // updateClusterLoadAssignment()
       auto* locality = bootstrap.mutable_node()->mutable_locality();
@@ -128,6 +130,8 @@ public:
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster_0->set_type(envoy::config::cluster::v3::Cluster::EDS);
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
+      eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
       eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
       eds_cluster_config->set_service_name("service_name_0");
       if (locality_weighted_lb_) {
@@ -242,7 +246,7 @@ public:
   waitForLoadStatsRequest(const std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats>&
                               expected_locality_stats,
                           uint64_t dropped = 0) {
-    auto end_time = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats;
     if (!expected_locality_stats.empty() || dropped != 0) {
       auto* cluster_stats = expected_cluster_stats.Add();
@@ -289,7 +293,7 @@ public:
                                               "StreamLoadStats", apiVersion()),
           loadstats_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
-      if (timeSystem().monotonicTime() >= end_time) {
+      if (!bound.withinBound()) {
         return TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                         loadstats_request.cluster_stats(), true);
       }
@@ -391,6 +395,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
 // Validate the load reports for successful requests as cluster membership
 // changes.
 TEST_P(LoadStatsIntegrationTest, Success) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   waitForLoadStatsStream();
@@ -498,6 +503,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 // weighted LB. This serves as a de facto integration test for locality weighted
 // LB.
 TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   locality_weighted_lb_ = true;
   initialize();
 
@@ -533,6 +539,7 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
 
 // Validate the load reports for requests when all endpoints are non-local.
 TEST_P(LoadStatsIntegrationTest, NoLocalLocality) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   sub_zone_ = "summer";
   initialize();
 
@@ -567,6 +574,7 @@ TEST_P(LoadStatsIntegrationTest, NoLocalLocality) {
 
 // Validate the load reports for successful/error requests make sense.
 TEST_P(LoadStatsIntegrationTest, Error) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   waitForLoadStatsStream();
@@ -593,6 +601,7 @@ TEST_P(LoadStatsIntegrationTest, Error) {
 
 // Validate the load reports for in-progress make sense.
 TEST_P(LoadStatsIntegrationTest, InProgress) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   waitForLoadStatsStream();
@@ -616,6 +625,7 @@ TEST_P(LoadStatsIntegrationTest, InProgress) {
 
 // Validate the load reports for dropped requests make sense.
 TEST_P(LoadStatsIntegrationTest, Dropped) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* thresholds = cluster_0->mutable_circuit_breakers()->add_thresholds();

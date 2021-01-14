@@ -29,7 +29,7 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
@@ -119,6 +119,10 @@ public:
 
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
+  const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
+    return reset_headers_;
+  }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
@@ -129,6 +133,8 @@ public:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_{};
   absl::optional<std::chrono::milliseconds> max_interval_{};
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  std::chrono::milliseconds reset_max_interval_{300000};
 };
 
 class MockInternalRedirectPolicy : public InternalRedirectPolicy {
@@ -157,6 +163,8 @@ public:
   void expectResetRetry();
 
   MOCK_METHOD(bool, enabled, ());
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, parseResetInterval,
+              (const Http::ResponseHeaderMap& response_headers), (const));
   MOCK_METHOD(RetryStatus, shouldRetryHeaders,
               (const Http::ResponseHeaderMap& response_headers, DoRetryCallback callback));
   MOCK_METHOD(bool, wouldRetryFromHeaders, (const Http::ResponseHeaderMap& response_headers));
@@ -182,10 +190,14 @@ public:
   MOCK_METHOD(uint64_t, stage, (), (const));
   MOCK_METHOD(const std::string&, disableKey, (), (const));
   MOCK_METHOD(void, populateDescriptors,
-              (const RouteEntry& route, std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-               const std::string& local_service_cluster, const Http::HeaderMap& headers,
-               const Network::Address::Instance& remote_address,
-               const envoy::config::core::v3::Metadata* dynamic_metadata),
+              (std::vector<Envoy::RateLimit::Descriptor> & descriptors,
+               const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& info),
+              (const));
+  MOCK_METHOD(void, populateLocalDescriptors,
+              (std::vector<Envoy::RateLimit::LocalDescriptor> & descriptors,
+               const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& info),
               (const));
 
   uint64_t stage_{};
@@ -245,10 +257,11 @@ public:
   Stats::StatName statName() const override { return stat_name_.statName(); }
   VirtualClusterStats& stats() const override { return stats_; }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
-  mutable VirtualClusterStats stats_{generateStats(stats_store_)};
+  VirtualClusterStatNames stat_names_{stats_store_.symbolTable()};
+  mutable VirtualClusterStats stats_{generateStats(stats_store_, stat_names_)};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -273,7 +286,7 @@ public:
     return stat_name_->statName();
   }
 
-  mutable Stats::TestSymbolTable symbol_table_;
+  mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   std::string name_{"fake_vhost"};
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
@@ -357,6 +370,9 @@ public:
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxGrpcTimeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutOffset, (), (const));
   MOCK_METHOD(const VirtualCluster*, virtualCluster, (const Http::HeaderMap& headers), (const));
@@ -522,7 +538,7 @@ public:
 
 class MockGenericConnPool : public GenericConnPool {
   MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
-  MOCK_METHOD(bool, cancelAnyPendingRequest, ());
+  MOCK_METHOD(bool, cancelAnyPendingStream, ());
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(bool, initialize,
               (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
@@ -558,7 +574,7 @@ public:
               (std::unique_ptr<GenericUpstream> && upstream,
                Upstream::HostDescriptionConstSharedPtr host,
                const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               const StreamInfo::StreamInfo& info));
+               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;

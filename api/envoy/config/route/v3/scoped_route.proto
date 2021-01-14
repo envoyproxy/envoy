@@ -104,13 +104,16 @@ message ScopedRouteConfiguration {
     repeated Fragment fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
+  // Whether the RouteConfiguration should be loaded on demand.
+  bool on_demand = 4;
+
   // The name assigned to the routing scope.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The resource name to use for a :ref:`envoy_api_msg_service.discovery.v3.DiscoveryRequest` to an
   // RDS server to fetch the :ref:`envoy_api_msg_config.route.v3.RouteConfiguration` associated
   // with this scope.
-  string route_configuration_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string route_configuration_name = 2 [(validate.rules).string = {min_len: 1}];
 
   // The key to match against.
   Key key = 3 [(validate.rules).message = {required: true}];

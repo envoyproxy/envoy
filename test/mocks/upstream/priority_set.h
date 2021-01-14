@@ -38,5 +38,4 @@ public:
       priority_update_cb_helper_;
 };
 } // namespace Upstream
-
 } // namespace Envoy

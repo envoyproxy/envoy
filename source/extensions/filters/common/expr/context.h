@@ -4,10 +4,12 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/grpc/status.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 
 #include "eval/public/cel_value.h"
 #include "eval/public/cel_value_producer.h"
+#include "eval/public/structs/cel_proto_wrapper.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,6 +18,7 @@ namespace Common {
 namespace Expr {
 
 using CelValue = google::api::expr::runtime::CelValue;
+using CelProtoWrapper = google::api::expr::runtime::CelProtoWrapper;
 
 // Symbols for traversing the request properties
 constexpr absl::string_view Request = "request";
@@ -37,6 +40,7 @@ constexpr absl::string_view Protocol = "protocol";
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
+constexpr absl::string_view CodeDetails = "code_details";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
@@ -44,11 +48,15 @@ constexpr absl::string_view GrpcStatus = "grpc_status";
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
 
+// Per-request or per-connection filter state
+constexpr absl::string_view FilterState = "filter_state";
+
 // Connection properties
 constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view MTLS = "mtls";
 constexpr absl::string_view RequestedServerName = "requested_server_name";
 constexpr absl::string_view TLSVersion = "tls_version";
+constexpr absl::string_view ConnectionTerminationDetails = "termination_details";
 constexpr absl::string_view SubjectLocalCertificate = "subject_local_certificate";
 constexpr absl::string_view SubjectPeerCertificate = "subject_peer_certificate";
 constexpr absl::string_view URISanLocalCertificate = "uri_san_local_certificate";
@@ -72,16 +80,24 @@ constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_
 class RequestWrapper;
 
 absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
+absl::optional<CelValue>
+convertHeaderEntry(Protobuf::Arena& arena,
+                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
 
 template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
-  HeadersWrapper(const T* value) : value_(value) {}
+  HeadersWrapper(Protobuf::Arena& arena, const T* value) : arena_(arena), value_(value) {}
   absl::optional<CelValue> operator[](CelValue key) const override {
     if (value_ == nullptr || !key.IsString()) {
       return {};
     }
-    auto out = value_->get(Http::LowerCaseString(std::string(key.StringOrDie().value())));
-    return convertHeaderEntry(out);
+    auto str = std::string(key.StringOrDie().value());
+    if (!Http::validHeaderString(str)) {
+      // Reject key if it is an invalid header string
+      return {};
+    }
+    return convertHeaderEntry(
+        arena_, Http::HeaderUtility::getAllOfHeaderAsString(*value_, Http::LowerCaseString(str)));
   }
   int size() const override { return value_ == nullptr ? 0 : value_->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
@@ -92,9 +108,13 @@ public:
 private:
   friend class RequestWrapper;
   friend class ResponseWrapper;
+  Protobuf::Arena& arena_;
   const T* value_;
 };
 
+// Wrapper for accessing properties from internal data structures.
+// Note that CEL assumes no ownership of the underlying data, so temporary
+// data must be arena-allocated.
 class BaseWrapper : public google::api::expr::runtime::CelMap,
                     public google::api::expr::runtime::CelValueProducer {
 public:
@@ -103,13 +123,21 @@ public:
   const google::api::expr::runtime::CelList* ListKeys() const override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  CelValue Produce(ProtobufWkt::Arena*) override { return CelValue::CreateMap(this); }
+  CelValue Produce(ProtobufWkt::Arena* arena) override {
+    // Producer is unique per evaluation arena since activation is re-created.
+    arena_ = arena;
+    return CelValue::CreateMap(this);
+  }
+
+protected:
+  ProtobufWkt::Arena* arena_;
 };
 
 class RequestWrapper : public BaseWrapper {
 public:
-  RequestWrapper(const Http::RequestHeaderMap* headers, const StreamInfo::StreamInfo& info)
-      : headers_(headers), info_(info) {}
+  RequestWrapper(Protobuf::Arena& arena, const Http::RequestHeaderMap* headers,
+                 const StreamInfo::StreamInfo& info)
+      : headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
@@ -119,9 +147,9 @@ private:
 
 class ResponseWrapper : public BaseWrapper {
 public:
-  ResponseWrapper(const Http::ResponseHeaderMap* headers, const Http::ResponseTrailerMap* trailers,
-                  const StreamInfo::StreamInfo& info)
-      : headers_(headers), trailers_(trailers), info_(info) {}
+  ResponseWrapper(Protobuf::Arena& arena, const Http::ResponseHeaderMap* headers,
+                  const Http::ResponseTrailerMap* trailers, const StreamInfo::StreamInfo& info)
+      : headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
@@ -162,11 +190,20 @@ class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
 public:
   MetadataProducer(const envoy::config::core::v3::Metadata& metadata) : metadata_(metadata) {}
   CelValue Produce(ProtobufWkt::Arena* arena) override {
-    return CelValue::CreateMessage(&metadata_, arena);
+    return CelProtoWrapper::CreateMessage(&metadata_, arena);
   }
 
 private:
   const envoy::config::core::v3::Metadata& metadata_;
+};
+
+class FilterStateWrapper : public BaseWrapper {
+public:
+  FilterStateWrapper(const StreamInfo::FilterState& filter_state) : filter_state_(filter_state) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const StreamInfo::FilterState& filter_state_;
 };
 
 } // namespace Expr

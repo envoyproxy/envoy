@@ -42,6 +42,7 @@ TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
       envoy::extensions::filters::http::cache::v3alpha::CacheConfig());
   EXPECT_THROW(factory_.createFilterFactoryFromProto(config_, "stats", context_), EnvoyException);
 }
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

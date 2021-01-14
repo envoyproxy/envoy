@@ -2,6 +2,8 @@
 
 #include "envoy/server/configuration.h"
 
+#include "common/router/context_impl.h"
+
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "admin.h"
@@ -10,6 +12,7 @@
 #include "instance.h"
 #include "overload_manager.h"
 #include "server_lifecycle_notifier.h"
+#include "transport_socket_factory_context.h"
 
 namespace Envoy {
 namespace Server {
@@ -28,7 +31,6 @@ public:
   MOCK_METHOD(bool, healthCheckFailed, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
-  MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
@@ -43,6 +45,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
+  Router::Context& routerContext() override { return router_context_; }
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
@@ -51,12 +54,12 @@ public:
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<MockTransportSocketFactoryContext> transport_socket_factory_context_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -68,6 +71,7 @@ public:
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
 };
 } // namespace Configuration

@@ -1,15 +1,15 @@
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
+#include "extensions/filters/common/ext_authz/ext_authz.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -36,14 +36,14 @@ public:
 
   void expectBasicHttp() {
     EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
-    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+    connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
     EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
-    EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
+    EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
     EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
-    EXPECT_CALL(callbacks_, streamInfo()).Times(1).WillOnce(ReturnRef(req_info_));
+    EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
-    EXPECT_CALL(req_info_, startTime()).Times(1).WillOnce(Return(SystemTime()));
+    EXPECT_CALL(req_info_, startTime()).WillOnce(Return(SystemTime()));
   }
 
   void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate) {
@@ -57,9 +57,9 @@ public:
     auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
     (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
 
-    CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                       std::move(metadata_context), request, false,
-                                       include_peer_certificate);
+    CheckRequestUtils::createHttpCheck(
+        &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
+        request, /*max_request_bytes=*/0, /*pack_as_bytes=*/false, include_peer_certificate);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -107,8 +107,8 @@ public:
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -124,8 +124,8 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -146,8 +146,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   envoy::service::auth::v3::CheckRequest request_;
 
   // A client supplied EnvoyAuthPartialBody header should be ignored.
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{Headers::get().EnvoyAuthPartialBody.get(), "1"}};
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -155,12 +154,13 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
                                      Protobuf::Map<std::string, std::string>(),
-                                     envoy::config::core::v3::Metadata(), request_, size, false);
+                                     envoy::config::core::v3::Metadata(), request_, size,
+                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
             request_.attributes().request().http().headers().find(
-                Http::Headers::get().EnvoyAuthPartialBody.get()));
+                Headers::get().EnvoyAuthPartialBody.get()));
   EXPECT_TRUE(request_.attributes().request().has_time());
 }
 
@@ -176,11 +176,12 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
-                                     envoy::config::core::v3::Metadata(), request_, size, false);
+                                     envoy::config::core::v3::Metadata(), request_, size,
+                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
-                        Http::Headers::get().EnvoyAuthPartialBody.get()));
+                        Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that check request object has all the request data.
@@ -194,12 +195,55 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
-      envoy::config::core::v3::Metadata(), request_, buffer_->length(), false);
+      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/false,
+      /*include_peer_certificate=*/false);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
   EXPECT_EQ("false", request_.attributes().request().http().headers().at(
-                         Http::Headers::get().EnvoyAuthPartialBody.get()));
+                         Headers::get().EnvoyAuthPartialBody.get()));
+}
+
+// Verify that check request object has all the request data and packed as bytes instead of UTF-8
+// string.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
+  Http::TestRequestHeaderMapImpl headers_;
+  envoy::service::auth::v3::CheckRequest request_;
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  // Fill the buffer with non UTF-8 data.
+  uint8_t raw[2] = {0xc0, 0xc0};
+  Buffer::OwnedImpl raw_buffer(raw, 2);
+  buffer_->drain(buffer_->length());
+  buffer_->add(raw_buffer);
+
+  expectBasicHttp();
+
+  // Setting pack_as_bytes as false and a string field with invalid UTF-8 data makes
+  // calling request_.SerializeToString() below to print an error message to stderr. Interestingly,
+  // request_.SerializeToString() still returns "true" when it is failed to serialize the data.
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/true,
+      /*include_peer_certificate=*/false);
+
+  // TODO(dio): Find a way to test this without using function from testing::internal namespace.
+  testing::internal::CaptureStderr();
+  std::string out;
+  ASSERT_TRUE(request_.SerializeToString(&out));
+  ASSERT_EQ("", testing::internal::GetCapturedStderr());
+
+  // Non UTF-8 data sets raw_body field, instead of body field.
+  ASSERT_EQ(buffer_->length(), request_.attributes().request().http().raw_body().size());
+  ASSERT_EQ(0, request_.attributes().request().http().body().size());
+
+  EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
+            request_.attributes().request().http().raw_body());
+  EXPECT_EQ("false", request_.attributes().request().http().headers().at(
+                         Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
@@ -210,12 +254,12 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
                                                  {":path", "/bar"}};
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(callbacks_, decodingBuffer());
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())

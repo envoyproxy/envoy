@@ -100,9 +100,9 @@ public:
     ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields;
   }
 
-  void setFakeSymbolTableEnabled(bool fake_symbol_table_enabled) {
-    fake_symbol_table_enabled_ = fake_symbol_table_enabled;
-  }
+  void setSocketPath(const std::string& socket_path) { socket_path_ = socket_path; }
+
+  void setSocketMode(mode_t socket_mode) { socket_mode_ = socket_mode; }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -133,6 +133,7 @@ public:
   }
   const std::string& logFormat() const override { return log_format_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
+  bool enableFineGrainLogging() const override { return enable_fine_grain_logging_; }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
@@ -145,7 +146,6 @@ public:
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
-  bool fakeSymbolTableEnabled() const override { return fake_symbol_table_enabled_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
@@ -153,6 +153,8 @@ public:
     return disabled_extensions_;
   }
   uint32_t count() const;
+  const std::string& socketPath() const override { return socket_path_; }
+  mode_t socketMode() const override { return socket_mode_; }
 
   /**
    * disableExtensions parses the given set of extension names of
@@ -198,9 +200,14 @@ private:
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
-  bool fake_symbol_table_enabled_;
   std::vector<std::string> disabled_extensions_;
   uint32_t count_;
+
+  // Initialization added here to avoid integration_admin_test failure caused by uninitialized
+  // enable_fine_grain_logging_.
+  bool enable_fine_grain_logging_ = false;
+  std::string socket_path_;
+  mode_t socket_mode_;
 };
 
 /**

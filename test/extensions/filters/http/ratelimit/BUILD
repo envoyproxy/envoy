@@ -29,7 +29,6 @@ envoy_extension_cc_test(
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
     ],
@@ -52,7 +51,6 @@ envoy_extension_cc_test(
     name = "ratelimit_integration_test",
     srcs = ["ratelimit_integration_test.cc"],
     extension_name = "envoy.filters.http.ratelimit",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

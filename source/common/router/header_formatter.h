@@ -23,7 +23,7 @@ public:
 
   /**
    * @return bool indicating whether the formatted header should be appended to the existing
-   *              headers
+   *              headers or replace any existing values for the header
    */
   virtual bool append() const PURE;
 };

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test.extensions.filters.listener.proxy_protocol;
+
+import "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto";
+import "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.proto";
+import "validate/validate.proto";
+
+message ProxyProtocolTestCase {
+  envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol config = 1
+      [(validate.rules).message.required = true];
+  test.extensions.filters.listener.FilterFuzzTestCase fuzzed = 2
+      [(validate.rules).message.required = true];
+}

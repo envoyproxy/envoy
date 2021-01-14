@@ -37,6 +37,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
+        "//source/extensions/filters/http/admission_control:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -60,7 +61,6 @@ envoy_extension_cc_test(
     name = "admission_control_integration_test",
     srcs = ["admission_control_integration_test.cc"],
     extension_name = "envoy.filters.http.admission_control",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/admission_control:config",
         "//test/integration:http_integration_lib",

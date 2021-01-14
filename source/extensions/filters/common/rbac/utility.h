@@ -2,6 +2,7 @@
 
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/rbac/engine_impl.h"
@@ -43,6 +44,8 @@ std::unique_ptr<RoleBasedAccessControlEngineImpl> createShadowEngine(const Confi
                                          config.shadow_rules(), EnforcementMode::Shadow)
                                    : nullptr;
 }
+
+std::string responseDetail(const std::string& policy_id);
 
 } // namespace RBAC
 } // namespace Common

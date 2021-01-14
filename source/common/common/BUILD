@@ -117,6 +117,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "interval_value",
+    hdrs = ["interval_value.h"],
+)
+
+envoy_cc_library(
     name = "linked_object",
     hdrs = ["linked_object.h"],
     deps = [":assert_lib"],
@@ -137,30 +142,19 @@ envoy_cc_library(
 # Contains minimal code for logging to stderr.
 envoy_cc_library(
     name = "minimal_logger_lib",
-    srcs = ["logger.cc"],
-    hdrs = ["logger.h"],
+    srcs = [
+        "fancy_logger.cc",
+        "logger.cc",
+    ],
+    hdrs = [
+        "fancy_logger.h",
+        "logger.h",
+    ],
     external_deps = ["abseil_synchronization"],
     deps = [
         ":base_logger_lib",
         ":lock_guard_lib",
         ":macros",
-        ":non_copyable",
-    ] + select({
-        "//bazel:android_logger": ["logger_impl_lib_android"],
-        "//conditions:default": ["logger_impl_lib_standard"],
-    }),
-)
-
-envoy_cc_library(
-    name = "fancy_logger_lib",
-    srcs = ["fancy_logger.cc"],
-    hdrs = ["fancy_logger.h"],
-    external_deps = ["abseil_synchronization"],
-    deps = [
-        ":base_logger_lib",
-        ":lock_guard_lib",
-        ":macros",
-        ":minimal_logger_lib",
         ":non_copyable",
     ] + select({
         "//bazel:android_logger": ["logger_impl_lib_android"],
@@ -326,6 +320,7 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
         ":non_copyable",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -416,6 +411,6 @@ envoy_cc_library(
     name = "statusor_lib",
     hdrs = ["statusor.h"],
     deps = [
-        "//third_party/statusor:statusor_lib",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

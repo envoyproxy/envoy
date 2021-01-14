@@ -12,6 +12,8 @@
 #include "common/secret/sds_api.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 
+#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -213,6 +215,25 @@ ContextConfigImpl::ContextConfigImpl(
       }
     }
   }
+
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, alpn_protocols_);
+  Ssl::HandshakerFactory* handshaker_factory;
+  if (config.has_custom_handshaker()) {
+    // If a custom handshaker is configured, derive the factory from the config.
+    const auto& handshaker_config = config.custom_handshaker();
+    handshaker_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
+    handshaker_factory_cb_ = handshaker_factory->createHandshakerCb(
+        handshaker_config.typed_config(), handshaker_factory_context,
+        factory_context.messageValidationVisitor());
+  } else {
+    // Otherwise, derive the config from the default factory.
+    handshaker_factory = HandshakerFactoryImpl::getDefaultHandshakerFactory();
+    handshaker_factory_cb_ = handshaker_factory->createHandshakerCb(
+        *handshaker_factory->createEmptyConfigProto(), handshaker_factory_context,
+        factory_context.messageValidationVisitor());
+  }
+  capabilities_ = handshaker_factory->capabilities();
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -270,6 +291,10 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
   }
 }
 
+Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
+  return handshaker_factory_cb_;
+}
+
 ContextConfigImpl::~ContextConfigImpl() {
   if (tc_update_callback_handle_) {
     tc_update_callback_handle_->remove();
@@ -297,10 +322,8 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
   case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
@@ -314,16 +337,8 @@ const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "ECDHE-ECDSA-AES128-GCM-SHA256:"
     "ECDHE-RSA-AES128-GCM-SHA256:"
 #endif
-    "ECDHE-ECDSA-AES128-SHA:"
-    "ECDHE-RSA-AES128-SHA:"
-    "AES128-GCM-SHA256:"
-    "AES128-SHA:"
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:"
-    "ECDHE-ECDSA-AES256-SHA:"
-    "ECDHE-RSA-AES256-SHA:"
-    "AES256-GCM-SHA384:"
-    "AES256-SHA";
+    "ECDHE-RSA-AES256-GCM-SHA384:";
 
 const std::string ClientContextConfigImpl::DEFAULT_CURVES =
 #ifndef BORINGSSL_FIPS
@@ -387,6 +402,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
       disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
 
@@ -402,12 +418,14 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     }
   }
 
-  if ((config.common_tls_context().tls_certificates().size() +
-       config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
-    throw EnvoyException("No TLS certificates found for server context");
-  } else if (!config.common_tls_context().tls_certificates().empty() &&
-             !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
-    throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
+  if (!capabilities().provides_certificates) {
+    if ((config.common_tls_context().tls_certificates().size() +
+         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
+      throw EnvoyException("No TLS certificates found for server context");
+    } else if (!config.common_tls_context().tls_certificates().empty() &&
+               !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
+      throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
+    }
   }
 
   if (config.has_session_timeout()) {
@@ -477,6 +495,21 @@ ServerContextConfigImpl::getSessionTicketKey(const std::string& key_data) {
   ASSERT(key_data.begin() + pos == key_data.end());
 
   return dst_key;
+}
+
+Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
+        policy) {
+  switch (policy) {
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::LENIENT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::STRICT_STAPLING:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::StrictStapling;
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::MUST_STAPLE:
+    return Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 } // namespace Tls

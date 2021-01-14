@@ -30,7 +30,6 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.router",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/integration:http_integration_lib",

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -14,10 +15,12 @@ public:
    * @param name counter name.
    * @param value target value.
    * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
+   * @param dispatcher the dispatcher to run non-blocking periodically during the wait.
    */
   virtual void
   waitForCounterEq(const std::string& name, uint64_t value,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                   Event::Dispatcher* dispatcher = nullptr) PURE;
 
   /**
    * Wait for a counter to >= a given value.

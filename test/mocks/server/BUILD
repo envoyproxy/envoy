@@ -23,6 +23,7 @@ envoy_cc_mock(
     hdrs = ["admin.h"],
     deps = [
         "//include/envoy/server:admin_interface",
+        "//test/mocks/network:socket_mocks",
         "//test/mocks/server:config_tracker_mocks",
     ],
 )
@@ -33,6 +34,14 @@ envoy_cc_mock(
     hdrs = ["bootstrap_extension_factory.h"],
     deps = [
         "//include/envoy/server:bootstrap_extension_config_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "fatal_action_factory_mocks",
+    hdrs = ["fatal_action_factory.h"],
+    deps = [
+        "//include/envoy/server:fatal_action_interface",
     ],
 )
 
@@ -72,6 +81,16 @@ envoy_cc_mock(
     hdrs = ["watch_dog.h"],
     deps = [
         "//include/envoy/server:watchdog_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "watchdog_config_mocks",
+    srcs = ["watchdog_config.cc"],
+    hdrs = ["watchdog_config.h"],
+    deps = [
+        "//include/envoy/server:configuration_interface",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -150,7 +169,8 @@ envoy_cc_mock(
     srcs = ["overload_manager.cc"],
     hdrs = ["overload_manager.h"],
     deps = [
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
+        "//test/mocks/event:event_mocks",
     ],
 )
 
@@ -162,6 +182,7 @@ envoy_cc_mock(
         "//include/envoy/server:instance_interface",
         "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
+        "//source/common/router:context_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
@@ -186,17 +207,16 @@ envoy_cc_mock(
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
 envoy_cc_mock(
     name = "main_mocks",
-    srcs = ["main.cc"],
     hdrs = ["main.h"],
     deps = [
         "//include/envoy/server:configuration_interface",
-        "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/server/overload:overload_manager_interface",
     ],
 )
 
@@ -205,6 +225,7 @@ envoy_cc_mock(
     srcs = ["factory_context.cc"],
     hdrs = ["factory_context.h"],
     deps = [
+        "//source/common/router:context_lib",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:overload_manager_mocks",
@@ -221,7 +242,7 @@ envoy_cc_mock(
         "//source/common/secret:secret_manager_impl_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/server:config_tracker_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -241,12 +262,15 @@ envoy_cc_mock(
     hdrs = ["health_checker_factory_context.h"],
     deps = [
         "//include/envoy/server:health_checker_config_interface",
+        "//test/mocks:common_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
     ],
 )
 
@@ -256,6 +280,7 @@ envoy_cc_mock(
     hdrs = ["filter_chain_factory_context.h"],
     deps = [
         "//include/envoy/server:filter_config_interface",
+        "//source/common/router:context_lib",
         "//test/mocks/server:factory_context_mocks",
     ],
 )
@@ -292,6 +317,7 @@ envoy_cc_mock(
         "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:filter_chain_factory_context_mocks",
         "//test/mocks/server:guard_dog_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",

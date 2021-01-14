@@ -20,7 +20,7 @@ envoy_cc_mock(
     deps = [
         "//source/extensions/filters/network/rocketmq_proxy:config",
         "//source/extensions/filters/network/rocketmq_proxy/router:router_lib",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -89,6 +89,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.rocketmq_proxy",
     deps = [
         ":utility_lib",
+        "//source/common/network:address_lib",
         "//source/extensions/filters/network/rocketmq_proxy:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",

@@ -179,6 +179,11 @@ public:
   virtual bool logFormatEscaped() const PURE;
 
   /**
+   * @return const bool logger mode: whether to use Fancy Logger.
+   */
+  virtual bool enableFineGrainLogging() const PURE;
+
+  /**
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;
@@ -230,11 +235,6 @@ public:
   virtual bool mutexTracingEnabled() const PURE;
 
   /**
-   * @return whether to use the fake symbol table implementation.
-   */
-  virtual bool fakeSymbolTableEnabled() const PURE;
-
-  /**
    * @return bool indicating whether cpuset size should determine the number of worker threads.
    */
   virtual bool cpusetThreadsEnabled() const PURE;
@@ -249,6 +249,16 @@ public:
    * @return CommandLineOptionsPtr the protobuf representation of the options.
    */
   virtual CommandLineOptionsPtr toCommandLineOptions() const PURE;
+
+  /**
+   * @return the path of socket file.
+   */
+  virtual const std::string& socketPath() const PURE;
+
+  /**
+   * @return the mode of socket file.
+   */
+  virtual mode_t socketMode() const PURE;
 };
 
 } // namespace Server

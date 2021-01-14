@@ -28,7 +28,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: UDP
         address: 127.0.0.1
@@ -62,7 +62,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: UDP
         address: 127.0.0.1
@@ -88,7 +88,7 @@ TEST(XRayTracerConfigTest, ProtocolNotUDPThrows) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: TCP
         address: 127.0.0.1
@@ -113,7 +113,7 @@ TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
   http:
     name: xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
       daemon_endpoint:
         protocol: UDP
         address: 127.0.0.1
@@ -130,6 +130,40 @@ TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
   ASSERT_THROW(factory.createHttpTracer(*message, context), EnvoyException);
+}
+
+TEST(XRayTracerConfigTest, XRayHttpTracerWithSegmentFieldsTypedConfig) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+
+  const std::string yaml_string = R"EOF(
+    http:
+      name: xray
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.trace.v3.XRayConfig
+        daemon_endpoint:
+          protocol: UDP
+          address: 127.0.0.1
+          port_value: 2000
+        segment_name: AwsAppMesh
+        sampling_rule_manifest:
+          filename: "rules.json"
+        segment_fields:
+          origin: AWS::Origin::Name
+          aws:
+            key: value
+            list:
+              - test
+              - test
+    )EOF";
+
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  XRayTracerFactory factory;
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  Tracing::HttpTracerSharedPtr xray_tracer = factory.createHttpTracer(*message, context);
+  ASSERT_NE(nullptr, xray_tracer);
 }
 
 } // namespace

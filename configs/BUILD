@@ -1,31 +1,45 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
-    "envoy_py_test_binary",
 )
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@configs_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_py_test_binary(
+py_binary(
     name = "configgen",
     srcs = ["configgen.py"],
     data = glob([
         "*.yaml",
     ]),
-    external_deps = ["jinja2"],
+    deps = [
+        requirement("Jinja2"),
+        requirement("MarkupSafe"),
+    ],
 )
 
 filegroup(
     name = "configs",
-    srcs = [
-        "google-vrp/envoy-edge.yaml",
-        "google-vrp/envoy-origin.yaml",
-        "original-dst-cluster/proxy_config.yaml",
-    ] + select({
-        "//bazel:apple": [],
-        "//conditions:default": ["freebind/freebind.yaml"],
+    srcs = glob(
+        [
+            "**/*.yaml",
+        ],
+        exclude = [
+            "using_deprecated_config.yaml",
+            "**/*.template.yaml",
+            "freebind/freebind.yaml",
+            "envoy-demo.yaml",
+        ],
+    ) + select({
+        "//bazel:apple": ["envoy-demo.yaml"],
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "envoy-demo.yaml",
+            "freebind/freebind.yaml",
+        ],
     }),
 )
 
@@ -34,11 +48,17 @@ genrule(
     srcs = [
         ":configs",
         "//examples:configs",
+        "//docs:configs",
         "//test/config/integration/certs",
     ],
     outs = ["example_configs.tar"],
-    cmd = "$(location configgen.sh) $(location configgen) $(@D) $(locations :configs) " +
-          "$(locations //examples:configs) $(locations //test/config/integration/certs)",
+    cmd = (
+        "$(location configgen.sh) $(location configgen) $(@D) " +
+        "$(locations :configs) " +
+        "$(locations //examples:configs) " +
+        "$(locations //docs:configs) " +
+        "$(locations //test/config/integration/certs)"
+    ),
     tools = [
         "configgen.sh",
         ":configgen",

@@ -9,6 +9,10 @@ load(
     "envoy_linkstatic",
 )
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_CONFIG_VISIBILITY",
+)
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
@@ -16,12 +20,22 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": [],
+        repository + "//bazel:disable_tcmalloc_on_linux_aarch64": [],
+        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:linux_x86_64": [envoy_external_dep_path("tcmalloc")],
+        repository + "//bazel:linux_aarch64": [envoy_external_dep_path("tcmalloc")],
         "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
-# all envoy targets pass through an envoy-declared starlark function where they can be modified
+# all envoy targets pass through an envoy-declared Starlark function where they can be modified
 # before being passed to a native bazel function.
 def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
     cc_library(
@@ -70,15 +84,31 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
-        # TODO(rgs1): revert this to //:extension_config once
-        # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
-        visibility = ["//visibility:public"],
+        extra_visibility = [],
+        visibility = EXTENSION_CONFIG_VISIBILITY,
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:
         fail("Unknown extension status: " + status)
-    envoy_cc_library(name, tags = tags, visibility = visibility, **kwargs)
+    if "//visibility:public" not in visibility:
+        visibility = visibility + extra_visibility
+
+    ext_name = name + "_envoy_extension"
+    envoy_cc_library(
+        name = name,
+        tags = tags,
+        visibility = visibility,
+        **kwargs
+    )
+    cc_library(
+        name = ext_name,
+        deps = select({
+            ":is_enabled": [":" + name],
+            "//conditions:default": [],
+        }),
+        visibility = visibility,
+    )
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
@@ -93,7 +123,8 @@ def envoy_cc_library(
         tags = [],
         deps = [],
         strip_include_prefix = None,
-        textual_hdrs = None):
+        textual_hdrs = None,
+        defines = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
@@ -118,6 +149,7 @@ def envoy_cc_library(
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
+        defines = defines,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
@@ -127,7 +159,7 @@ def envoy_cc_library(
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,
         visibility = visibility,
-        tags = ["nocompdb"],
+        tags = ["nocompdb"] + tags,
         deps = [":" + name],
         strip_include_prefix = strip_include_prefix,
     )

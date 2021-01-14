@@ -28,8 +28,8 @@ void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
   Network::Connection& latched_conn = conn_data->connection();
   auto upstream =
       std::make_unique<TcpUpstream>(&callbacks_->upstreamToDownstream(), std::move(conn_data));
-  callbacks_->onPoolReady(std::move(upstream), host, latched_conn.localAddress(),
-                          latched_conn.streamInfo());
+  callbacks_->onPoolReady(std::move(upstream), host, latched_conn.addressProvider().localAddress(),
+                          latched_conn.streamInfo(), {});
 }
 
 TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
@@ -43,7 +43,8 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   upstream_conn_data_->connection().write(data, end_stream);
 }
 
-void TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) {
+Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&,
+                                               bool end_stream) {
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
   ASSERT(upstream_request_->routeEntry().connectConfig().has_value());
@@ -64,6 +65,7 @@ void TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_s
       Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
           {{Envoy::Http::Headers::get().Status, "200"}})};
   upstream_request_->decodeHeaders(std::move(headers), false);
+  return Envoy::Http::okStatus();
 }
 
 void TcpUpstream::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {

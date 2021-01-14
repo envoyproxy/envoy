@@ -52,9 +52,9 @@ envoy_extension_cc_test(
     name = "tap_filter_integration_test",
     srcs = ["tap_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.tap",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/http/tap:config",
+        "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

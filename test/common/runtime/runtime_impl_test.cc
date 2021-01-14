@@ -21,8 +21,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -684,6 +685,25 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+TEST_F(StaticLoaderImplTest, InvalidNumerator) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    invalid_numerator:
+      numerator: 111
+      denominator: HUNDRED
+  )EOF");
+  setup();
+
+  envoy::type::v3::FractionalPercent fractional_percent;
+
+  // There is no assertion here - when numerator is invalid
+  // featureEnabled() will just drop debug log line.
+  EXPECT_CALL(generator_, random()).WillOnce(Return(500000));
+  EXPECT_LOG_CONTAINS("debug",
+                      "runtime key 'invalid_numerator': numerator (111) > denominator (100), "
+                      "condition always evaluates to true",
+                      loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent));
+}
+
 TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   // Force the thread to be considered a non-worker thread.
   tls_.registered_ = false;
@@ -828,7 +848,7 @@ public:
                                            generator_, validation_visitor_, *api_);
     loader_->initialize(cm_);
     for (auto* sub : rtds_subscriptions_) {
-      EXPECT_CALL(*sub, start(_));
+      EXPECT_CALL(*sub, start(_, _));
     }
 
     loader_->startRtdsSubscriptions(rtds_init_callback_.AsStdFunction());
@@ -861,6 +881,12 @@ public:
     VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, {}, ""));
   }
 
+  void doDeltaOnConfigRemovalVerifyNoThrow(const std::string& resource_name) {
+    Protobuf::RepeatedPtrField<std::string> removed_resources;
+    *removed_resources.Add() = resource_name;
+    VERBOSE_EXPECT_NO_THROW(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""));
+  }
+
   std::vector<std::string> layers_{"some_resource"};
   std::vector<Config::SubscriptionCallbacks*> rtds_callbacks_;
   std::vector<Config::MockSubscription*> rtds_subscriptions_;
@@ -873,7 +899,8 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
 
   EXPECT_CALL(rtds_init_callback_, Call());
   EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, ""), EnvoyException,
-                            "Unexpected RTDS resource length: 0");
+                            "Unexpected RTDS resource length, number of added recources 0, number "
+                            "of removed recources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -890,7 +917,9 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
 
   EXPECT_CALL(rtds_init_callback_, Call());
   EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException, "Unexpected RTDS resource length: 2");
+                            EnvoyException,
+                            "Unexpected RTDS resource length, number of added recources 2, number "
+                            "of removed recources 0");
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -1016,6 +1045,81 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+// Delta style add and removal successful update.
+TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalSuccess) {
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doDeltaOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+
+  doDeltaOnConfigRemovalVerifyNoThrow("some_resource");
+
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_FALSE(loader_->snapshot().get("baz").has_value());
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(3, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+// Delta style removal failed.
+TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalFailure) {
+  setup();
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doDeltaOnConfigUpdateVerifyNoThrow(runtime);
+
+  // To verify the add succeeded.
+  EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  *removed_resources.Add() = "some_wrong_resource_name";
+  EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, removed_resources, ""),
+                            EnvoyException,
+                            "Unexpected removal of unknown RTDS runtime layer "
+                            "some_wrong_resource_name, expected some_resource");
+
+  // Removal failed, the keys point to the same value before the removal call.
+  EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
+
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
 // Updates with multiple RTDS layers.
 TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   addLayer("another_resource");
@@ -1031,7 +1135,7 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
       foo: bar
       baz: meh
   )EOF");
-  EXPECT_CALL(rtds_init_callback_, Call()).Times(1);
+  EXPECT_CALL(rtds_init_callback_, Call());
   doOnConfigUpdateVerifyNoThrow(runtime, 0);
 
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
@@ -1077,7 +1181,7 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   rtds_layer->set_name("some_resource");
   rtds_layer->mutable_rtds_config();
 
-  EXPECT_CALL(cm_, subscriptionFactory()).Times(1);
+  EXPECT_CALL(cm_, subscriptionFactory());
   LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
                     *api_);
 

@@ -30,23 +30,31 @@
 namespace Envoy {
 namespace Runtime {
 
-void SnapshotImpl::countDeprecatedFeatureUse() const {
-  stats_.deprecated_feature_use_.inc();
+namespace {
+
+void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
+  stats.deprecated_feature_use_.inc();
   // Similar to the above, but a gauge that isn't imported during a hot restart.
-  stats_.deprecated_feature_seen_since_process_start_.inc();
+  stats.deprecated_feature_seen_since_process_start_.inc();
 }
 
+} // namespace
+
 bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_value) const {
-  // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
-  // default_value.
-  if (!getBoolean(key, default_value)) {
-    // If either disallowed by default or configured off, the feature is not enabled.
+  // A deprecated feature is enabled if at least one of the following conditions holds:
+  // 1. A boolean runtime entry <key> doesn't exist, and default_value is true.
+  // 2. A boolean runtime entry <key> exists, with a value of "true".
+  // 3. A boolean runtime entry "envoy.features.enable_all_deprecated_features" with a value of
+  //    "true" exists, and there isn't a boolean runtime entry <key> with a value of "false".
+
+  if (!getBoolean(key,
+                  getBoolean("envoy.features.enable_all_deprecated_features", default_value))) {
     return false;
   }
 
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
-  countDeprecatedFeatureUse();
+  countDeprecatedFeatureUseInternal(stats_);
 
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   return false;
@@ -120,6 +128,18 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
     percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   } else {
     percent = default_value;
+  }
+
+  // When numerator > denominator condition is always evaluates to TRUE
+  // It becomes hard to debug why configuration does not work in case of wrong numerator.
+  // Log debug message that numerator is invalid.
+  uint64_t denominator_value =
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator());
+  if (percent.numerator() > denominator_value) {
+    ENVOY_LOG(debug,
+              "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always "
+              "evaluates to true",
+              key, percent.numerator(), denominator_value);
   }
 
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
@@ -286,7 +306,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Comments are useful for placeholder files with no value.
       const std::string text_file{api.fileSystem().fileReadToEnd(full_path)};
       const auto lines = StringUtil::splitToken(text_file, "\n");
-      for (const auto line : lines) {
+      for (const auto& line : lines) {
         if (!line.empty() && line.front() == '#') {
           continue;
         }
@@ -412,18 +432,19 @@ RtdsSubscription::RtdsSubscription(
     : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
           rtds_layer.rtds_config().resource_api_version(), validation_visitor, "name"),
       parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
-      resource_name_(rtds_layer.name()),
+      stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
 void RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this, resource_decoder_);
+      config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
+      resource_decoder_);
 }
 
 void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                       const std::string&) {
-  validateUpdateSize(resources.size());
+  validateUpdateSize(resources.size(), 0);
   const auto& runtime =
       dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
   if (runtime.name() != resource_name_) {
@@ -438,9 +459,16 @@ void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceR
 
 void RtdsSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(added_resources.size());
-  onConfigUpdate(added_resources, added_resources[0].get().version());
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
+  validateUpdateSize(added_resources.size(), removed_resources.size());
+
+  // This is a singleton subscription, so we can only have the subscribed resource added or removed,
+  // but not both.
+  if (!added_resources.empty()) {
+    onConfigUpdate(added_resources, added_resources[0].get().version());
+  } else {
+    onConfigRemoved(removed_resources);
+  }
 }
 
 void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -453,12 +481,27 @@ void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 
 void RtdsSubscription::start() { subscription_->start({resource_name_}); }
 
-void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
-  if (num_resources != 1) {
+void RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
+                                          uint32_t removed_resources_num) {
+  if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
-    throw EnvoyException(fmt::format("Unexpected RTDS resource length: {}", num_resources));
-    // (would be a return false here)
+    throw EnvoyException(fmt::format("Unexpected RTDS resource length, number of added recources "
+                                     "{}, number of removed recources {}",
+                                     added_resources_num, removed_resources_num));
   }
+}
+
+void RtdsSubscription::onConfigRemoved(
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+  if (removed_resources[0] != resource_name_) {
+    throw EnvoyException(
+        fmt::format("Unexpected removal of unknown RTDS runtime layer {}, expected {}",
+                    removed_resources[0], resource_name_));
+  }
+  ENVOY_LOG(debug, "Clear RTDS snapshot for onConfigUpdate");
+  proto_.Clear();
+  parent_.loadNewSnapshot();
+  init_target_.ready();
 }
 
 void LoaderImpl::loadNewSnapshot() {
@@ -474,7 +517,8 @@ void LoaderImpl::loadNewSnapshot() {
 }
 
 const Snapshot& LoaderImpl::snapshot() {
-  ASSERT(tls_->currentThreadRegistered(), "snapshot can only be called from a worker thread");
+  ASSERT(tls_->currentThreadRegistered(),
+         "snapshot can only be called from a worker thread or after the main thread is registered");
   return tls_->getTyped<Snapshot>();
 }
 
@@ -498,6 +542,8 @@ void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>
 }
 
 Stats::Scope& LoaderImpl::getRootScope() { return store_; }
+
+void LoaderImpl::countDeprecatedFeatureUse() const { countDeprecatedFeatureUseInternal(stats_); }
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";

@@ -16,7 +16,8 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.retry_host_predicates.previous_hosts",
     deps = [
+        "//source/common/network:address_lib",
         "//source/extensions/retry/host/previous_hosts:config",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:host_mocks",
     ],
 )

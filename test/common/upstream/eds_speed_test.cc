@@ -10,6 +10,7 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
+#include "common/config/protobuf_link_hacks.h"
 #include "common/config/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/eds.h"
@@ -24,7 +25,8 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -63,7 +65,7 @@ public:
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
 
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
     cluster_->initialize([this] { initialized_ = true; });
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
     subscription_->start({"fare"});
@@ -76,7 +78,7 @@ public:
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_);
     cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
                                                 std::move(scope), false);
@@ -124,6 +126,7 @@ public:
 
     auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url_);
+    response->set_version_info(fmt::format("version-{}", version_++));
     auto* resource = response->mutable_resources()->Add();
     resource->PackFrom(cluster_load_assignment);
     if (v2_config_) {
@@ -138,11 +141,13 @@ public:
            num_hosts);
   }
 
+  TestDeprecatedV2Api _deprecated_v2_api_;
   State& state_;
   const bool v2_config_;
   const std::string type_url_;
+  uint64_t version_{};
   bool initialized_{};
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::TestStore stats_;
   Config::SubscriptionStats subscription_stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;

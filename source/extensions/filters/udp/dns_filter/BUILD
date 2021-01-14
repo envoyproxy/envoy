@@ -14,11 +14,14 @@ envoy_cc_library(
     srcs = [
         "dns_filter.cc",
         "dns_filter_resolver.cc",
+        "dns_filter_utils.cc",
         "dns_parser.cc",
     ],
     hdrs = [
         "dns_filter.h",
+        "dns_filter_constants.h",
         "dns_filter_resolver.h",
+        "dns_filter_utils.h",
         "dns_parser.h",
     ],
     external_deps = ["ares"],

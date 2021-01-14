@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -32,6 +33,7 @@
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/router/context_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
@@ -59,6 +61,7 @@ namespace Server {
   COUNTER(static_unknown_fields)                                                                   \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
+  GAUGE(seconds_until_first_ocsp_response_expiring, Accumulate)                                    \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
   /* hot_restart_generation is an Accumulate gauge; we omit it here for testing dynamics. */       \
   GAUGE(live, NeverImport)                                                                         \
@@ -112,7 +115,8 @@ public:
    * @param sinks supplies the list of sinks.
    * @param store provides the store being flushed.
    */
-  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
+  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                  TimeSource& time_source);
 
   /**
    * Load a bootstrap config and perform validation.
@@ -162,7 +166,6 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  Envoy::Random::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
@@ -171,11 +174,10 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
+  Router::Context& routerContext() override { return server_.routerContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return server_.statsFlushInterval();
-  }
+  Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
@@ -214,7 +216,8 @@ public:
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context);
+               std::unique_ptr<ProcessContext> process_context,
+               Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   ~InstanceImpl() override;
 
@@ -238,7 +241,6 @@ public:
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
-  Random::RandomGenerator& random() override { return *random_generator_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
@@ -251,20 +253,19 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  ProcessContextOptRef processContext() override { return *process_context_; }
+  Router::Context& routerContext() override { return router_context_; }
+  ProcessContextOptRef processContext() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
 
+  Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
 
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
-  }
-
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return config_.statsFlushInterval();
   }
 
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -324,12 +325,12 @@ private:
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
+  Random::RandomGeneratorPtr random_generator_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  Random::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
@@ -343,7 +344,8 @@ private:
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
-  std::unique_ptr<Server::GuardDog> guard_dog_;
+  std::unique_ptr<Server::GuardDog> main_thread_guard_dog_;
+  std::unique_ptr<Server::GuardDog> worker_guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
@@ -357,12 +359,13 @@ private:
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
-  const std::thread::id main_thread_id_;
   // initialization_time is a histogram for tracking the initialization time across hot restarts
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
+  ListenerHooks& hooks_;
 
   ServerFactoryContextImpl server_contexts_;
 
@@ -383,7 +386,7 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
-  explicit MetricSnapshotImpl(Stats::Store& store);
+  explicit MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }
@@ -396,6 +399,7 @@ public:
   const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
     return text_readouts_;
   }
+  SystemTime snapshotTime() const override { return snapshot_time_; }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
@@ -406,6 +410,7 @@ private:
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
   std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
   std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
+  SystemTime snapshot_time_;
 };
 
 } // namespace Server

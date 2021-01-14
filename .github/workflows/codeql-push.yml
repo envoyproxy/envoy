@@ -21,6 +21,12 @@ jobs:
         # a pull request then we can checkout the head.
         fetch-depth: 2
 
+    - name: Get build targets
+      run: |
+       . .github/workflows/get_build_targets.sh
+       echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
+       echo $BUILD_TARGETS_LOCAL >> $GITHUB_ENV
+       echo 'EOF' >> $GITHUB_ENV
     # If this run was triggered by a pull request event, then checkout
     # the head of the pull request instead of the merge commit.
     - run: git checkout HEAD^2
@@ -47,11 +53,13 @@ jobs:
       run: |
        bazel/setup_clang.sh bin/clang10
        bazelisk shutdown
-       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/http1:codec_lib //source/common/http/http2:codec_lib
+       bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
+       echo -e "Built targets...\n$BUILD_TARGETS"
 
     - name: Clean Artifacts
       run: |
         git clean -xdf
        
     - name: Perform CodeQL Analysis
+      if: env.BUILD_TARGETS != ''
       uses: github/codeql-action/analyze@v1

@@ -56,7 +56,13 @@ envoy_extension_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_mocks",
+        "//test/mocks/upstream:cluster_update_callbacks_handle_mocks",
+        "//test/mocks/upstream:cluster_update_callbacks_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
         "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
@@ -75,7 +81,6 @@ envoy_extension_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
@@ -94,6 +99,7 @@ envoy_cc_mock(
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
         "//source/extensions/filters/network/redis_proxy:router_interface",
+        "//test/test_common:printers_lib",
     ],
 )
 
@@ -153,7 +159,6 @@ envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
     srcs = ["redis_proxy_integration_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",

@@ -10,7 +10,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/health_checker_factory_context.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/health_checker.h"
+#include "test/mocks/upstream/priority_set.h"
+#include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,6 +23,7 @@ namespace {
 using CustomRedisHealthChecker = Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker;
 
 TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -70,6 +73,7 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
 }
 
 TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDeprecated)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -166,8 +170,8 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
   EXPECT_NE(nullptr,
             dynamic_cast<CustomRedisHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
-                    Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, random,
-                    dispatcher, log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
+                    Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
+                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
                     .get()));
 }
 } // namespace

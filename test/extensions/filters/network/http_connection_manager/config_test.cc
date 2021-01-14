@@ -11,6 +11,7 @@
 #include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/request_id_extension_uuid_impl.h"
+#include "common/network/address_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
@@ -22,6 +23,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -96,6 +98,18 @@ http_filters:
                             "Didn't find a registered implementation for name: 'foo'");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, InvalidServerName) {
+  const std::string yaml_string = R"EOF(
+server_name: >
+  foo
+route_config:
+  name: local_route
+stat_prefix: router
+  )EOF";
+
+  EXPECT_THROW(createHttpConnectionManagerConfig(yaml_string), ProtoValidationException);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, RouterInverted) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -115,7 +129,7 @@ http_filters:
 - name: envoy.filters.http.router
 - name: health_check
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
   )EOF";
 
@@ -143,7 +157,7 @@ route_config:
 http_filters:
 - name: health_check
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
   )EOF";
 
@@ -156,6 +170,7 @@ http_filters:
 // When deprecating v2, remove the old style "operation_name: egress" config
 // but retain the rest of the test.
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 codec_type: http1
 server_name: foo
@@ -354,7 +369,6 @@ route_config:
       route:
         cluster: cluster
 tracing:
-  operation_name: ingress
   max_path_tag_length: 128
   provider:                # notice inlined tracing provider configuration
     name: zipkin
@@ -434,6 +448,7 @@ tracing:
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -456,6 +471,7 @@ tracing:
 
 TEST_F(HttpConnectionManagerConfigTest,
        DEPRECATED_FEATURE_TEST(ListenerDirectionOutboundOverride)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -483,6 +499,7 @@ http_filters:
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(ListenerDirectionInboundOverride)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -516,8 +533,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
     unix_sockets: true
   route_config:
     name: local_route
-  tracing:
-    operation_name: ingress
+  tracing: {}
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -547,7 +563,6 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   route_config:
     name: local_route
   tracing:
-    operation_name: ingress
     client_sampling:
       value: 1
     random_sampling:
@@ -582,7 +597,6 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
   route_config:
     name: local_route
   tracing:
-    operation_name: ingress
     client_sampling:
       value: 0.1
     random_sampling:
@@ -702,6 +716,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
 
 // Validate that deprecated idle_timeout is still ingested.
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
+  TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   idle_timeout: 1s
@@ -1026,7 +1041,7 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortDefault) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldStripMatchingPort());
+  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that when configured, we remove port.
@@ -1044,7 +1059,28 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortTrue) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_TRUE(config.shouldStripMatchingPort());
+  EXPECT_EQ(Http::StripPortType::MatchingHost, config.stripPortType());
+}
+
+// Validated that when both strip options are configured, we throw exception.
+TEST_F(HttpConnectionManagerConfigTest, BothStripOptionsAreSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_matching_host_port: true
+  strip_any_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                  filter_config_provider_manager_),
+      EnvoyException,
+      "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set.");
 }
 
 // Validated that when explicitly set false, we don't remove port.
@@ -1062,7 +1098,43 @@ TEST_F(HttpConnectionManagerConfigTest, RemovePortFalse) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_FALSE(config.shouldStripMatchingPort());
+  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
+}
+
+// Validated that when configured, we remove any port.
+TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_any_host_port: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(Http::StripPortType::Any, config.stripPortType());
+}
+
+// Validated that when explicitly set false, we don't remove any port.
+TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_any_host_port: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
 }
 
 // Validated that by default we allow requests with header names containing underscores.
@@ -1194,6 +1266,7 @@ http_filters:
 - name: envoy.filters.http.router
   )EOF";
 
+  context_.server_factory_context_.cluster_manager_.initializeClusters({"cluster"}, {});
   auto proto_config = parseHttpConnectionManagerFromYaml(yaml_string);
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
@@ -1244,7 +1317,7 @@ http_filters:
 access_log:
 - name: accesslog
   typed_config:
-    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
     path: "/dev/null"
   filter: []
   )EOF";
@@ -1273,7 +1346,7 @@ http_filters:
 access_log:
 - name: accesslog
   typed_config:
-    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
     path: "/dev/null"
   filter:
     bad_type: {}
@@ -1303,7 +1376,7 @@ http_filters:
 access_log:
 - name: accesslog
   typed_config:
-    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
     path: "/dev/null"
   filter:
     and_filter:
@@ -1669,66 +1742,6 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   ASSERT_NE(nullptr, request_id_extension);
 }
 
-TEST_F(HttpConnectionManagerConfigTest, LegacyH1Codecs) {
-  const std::string yaml_string = R"EOF(
-codec_type: http1
-server_name: foo
-stat_prefix: router
-route_config:
-  virtual_hosts:
-  - name: service
-    domains:
-    - "*"
-    routes:
-    - match:
-        prefix: "/"
-      route:
-        cluster: cluster
-http_filters:
-- name: envoy.filters.http.router
-  )EOF";
-
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-      proto_config;
-  TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, runtimeFeatureEnabled(_)).WillOnce(Return(false));
-  auto http_connection_manager_factory =
-      HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-          proto_config, context_, filter_callbacks);
-  http_connection_manager_factory();
-}
-
-TEST_F(HttpConnectionManagerConfigTest, LegacyH2Codecs) {
-  const std::string yaml_string = R"EOF(
-codec_type: http2
-server_name: foo
-stat_prefix: router
-route_config:
-  virtual_hosts:
-  - name: service
-    domains:
-    - "*"
-    routes:
-    - match:
-        prefix: "/"
-      route:
-        cluster: cluster
-http_filters:
-- name: envoy.filters.http.router
-  )EOF";
-
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-      proto_config;
-  TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, runtimeFeatureEnabled(_)).WillOnce(Return(false));
-  auto http_connection_manager_factory =
-      HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-          proto_config, context_, filter_callbacks);
-  http_connection_manager_factory();
-}
-
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -1746,7 +1759,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     apply_default_config_without_warming: true
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -1774,7 +1787,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     default_config:
       "@type": type.googleapis.com/google.protobuf.Value
     type_urls:
@@ -1804,11 +1817,11 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     default_config:
-      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -1834,7 +1847,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
@@ -1864,19 +1877,19 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     default_config:
       "@type": type.googleapis.com/udpa.type.v1.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "Error: filter config has type URL envoy.extensions.filters.http.router.v3.Router but "
-      "expect envoy.config.filter.http.health_check.v2.HealthCheck.");
+      "expect envoy.extensions.filters.http.health_check.v3.HealthCheck.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterRequireTypeUrlMissingFactory) {
@@ -1896,7 +1909,7 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     type_urls:
     - type.googleapis.com/google.protobuf.Value
   )EOF";
@@ -1923,12 +1936,12 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     default_config:
-      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
       pass_through_mode: false
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     apply_default_config_without_warming: true
 - name: envoy.filters.http.router
   )EOF";
@@ -1988,14 +2001,14 @@ route_config:
 http_filters:
 - name: foo
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: bar
   config_discovery:
-    config_source: { ads: {} }
+    config_source: { resource_api_version: V3, ads: {} }
     type_urls:
-    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
 - name: envoy.filters.http.router
   )EOF";
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -2144,13 +2157,13 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(1);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
     EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
   }
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(1);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Buffer
     EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }

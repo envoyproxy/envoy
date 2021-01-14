@@ -25,6 +25,9 @@ public:
   void setGrpcService(envoy::config::core::v3::GrpcService& grpc_service,
                       const std::string& cluster_name,
                       Network::Address::InstanceConstSharedPtr address) {
+    // Set a 5 minute timeout to avoid flakes. If this causes a real test timeout the test is
+    // broken and/or should be using simulated time.
+    grpc_service.mutable_timeout()->CopyFrom(Protobuf::util::TimeUtil::SecondsToDuration(300));
     switch (clientType()) {
     case ClientType::EnvoyGrpc:
       grpc_service.mutable_envoy_grpc()->set_cluster_name(cluster_name);
@@ -105,6 +108,17 @@ public:
   if (sotwOrDelta() == (xds)) {                                                                    \
     return;                                                                                        \
   }
+
+// For VersionedGrpcClientIntegrationParamTest, skip when testing with
+// ENVOY_DISABLE_DEPRECATED_FEATURES.
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+#define XDS_DEPRECATED_FEATURE_TEST_SKIP                                                           \
+  if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {                                   \
+    return;                                                                                        \
+  }
+#else
+#define XDS_DEPRECATED_FEATURE_TEST_SKIP
+#endif // ENVOY_DISABLE_DEPRECATED_FEATURES
 
 #ifdef ENVOY_GOOGLE_GRPC
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \

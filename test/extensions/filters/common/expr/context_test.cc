@@ -1,10 +1,14 @@
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
+#include "common/router/string_accessor_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
+#include "extensions/filters/common/expr/cel_state.h"
 #include "extensions/filters/common/expr/context.h"
 
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -23,11 +27,20 @@ namespace {
 constexpr absl::string_view Undefined = "undefined";
 
 TEST(Context, EmptyHeadersAttributes) {
-  HeadersWrapper<Http::RequestHeaderMap> headers(nullptr);
+  Protobuf::Arena arena;
+  HeadersWrapper<Http::RequestHeaderMap> headers(arena, nullptr);
   auto header = headers[CelValue::CreateStringView(Referer)];
   EXPECT_FALSE(header.has_value());
   EXPECT_EQ(0, headers.size());
   EXPECT_TRUE(headers.empty());
+}
+
+TEST(Context, InvalidRequest) {
+  Http::TestRequestHeaderMapImpl header_map{{"referer", "dogs.com"}};
+  Protobuf::Arena arena;
+  HeadersWrapper<Http::RequestHeaderMap> headers(arena, &header_map);
+  auto header = headers[CelValue::CreateStringView("dogs.com\n")];
+  EXPECT_FALSE(header.has_value());
 }
 
 TEST(Context, RequestAttributes) {
@@ -36,10 +49,11 @@ TEST(Context, RequestAttributes) {
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},           {":scheme", "http"},      {":path", "/meow?yes=1"},
       {":authority", "kittens.com"}, {"referer", "dogs.com"},  {"user-agent", "envoy-mobile"},
-      {"content-length", "10"},      {"x-request-id", "blah"},
-  };
-  RequestWrapper request(&header_map, info);
-  RequestWrapper empty_request(nullptr, empty_info);
+      {"content-length", "10"},      {"x-request-id", "blah"}, {"double-header", "foo"},
+      {"double-header", "bar"}};
+  Protobuf::Arena arena;
+  RequestWrapper request(arena, &header_map, info);
+  RequestWrapper empty_request(arena, nullptr, empty_info);
 
   EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
   // "2018-04-03T23:06:09.123Z".
@@ -136,7 +150,7 @@ TEST(Context, RequestAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     // this includes the headers size
-    EXPECT_EQ(138, value.value().Int64OrDie());
+    EXPECT_EQ(170, value.value().Int64OrDie());
   }
 
   {
@@ -160,12 +174,17 @@ TEST(Context, RequestAttributes) {
     ASSERT_TRUE(value.value().IsMap());
     auto& map = *value.value().MapOrDie();
     EXPECT_FALSE(map.empty());
-    EXPECT_EQ(8, map.size());
+    EXPECT_EQ(10, map.size());
 
     auto header = map[CelValue::CreateStringView(Referer)];
     EXPECT_TRUE(header.has_value());
     ASSERT_TRUE(header.value().IsString());
     EXPECT_EQ("dogs.com", header.value().StringOrDie().value());
+
+    auto header2 = map[CelValue::CreateStringView("double-header")];
+    EXPECT_TRUE(header2.has_value());
+    ASSERT_TRUE(header2.value().IsString());
+    EXPECT_EQ("foo,bar", header2.value().StringOrDie().value());
   }
 
   {
@@ -198,9 +217,10 @@ TEST(Context, RequestFallbackAttributes) {
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},
       {":scheme", "http"},
-      {":path", "/meow?yes=1"},
+      {":path", "/meow"},
   };
-  RequestWrapper request(&header_map, info);
+  Protobuf::Arena arena;
+  RequestWrapper request(arena, &header_map, info);
 
   EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
 
@@ -227,12 +247,16 @@ TEST(Context, ResponseAttributes) {
   const std::string grpc_status = "grpc-status";
   Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
   Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}, {grpc_status, "8"}};
-  ResponseWrapper response(&header_map, &trailer_map, info);
-  ResponseWrapper empty_response(nullptr, nullptr, empty_info);
+  Protobuf::Arena arena;
+  ResponseWrapper response(arena, &header_map, &trailer_map, info);
+  ResponseWrapper empty_response(arena, nullptr, nullptr, empty_info);
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
   EXPECT_CALL(info, responseFlags()).WillRepeatedly(Return(0x1));
+
+  const absl::optional<std::string> code_details = "unauthorized";
+  EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
 
   {
     auto value = response[CelValue::CreateStringView(Undefined)];
@@ -270,6 +294,13 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(404, value.value().Int64OrDie());
+  }
+
+  {
+    auto value = response[CelValue::CreateStringView(CodeDetails)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(code_details.value(), value.value().StringOrDie().value());
   }
 
   {
@@ -323,9 +354,20 @@ TEST(Context, ResponseAttributes) {
   }
 
   {
+    auto value = empty_response[CelValue::CreateStringView(Code)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = empty_response[CelValue::CreateStringView(CodeDetails)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
     Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
-    ResponseWrapper response_header_status(&header_map, &trailer_map, info);
+    Protobuf::Arena arena;
+    ResponseWrapper response_header_status(arena, &header_map, &trailer_map, info);
     auto value = response_header_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
@@ -334,7 +376,8 @@ TEST(Context, ResponseAttributes) {
   {
     Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
-    ResponseWrapper response_no_status(&header_map, &trailer_map, info);
+    Protobuf::Arena arena;
+    ResponseWrapper response_no_status(arena, &header_map, &trailer_map, info);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
@@ -344,8 +387,34 @@ TEST(Context, ResponseAttributes) {
     NiceMock<StreamInfo::MockStreamInfo> info_without_code;
     Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
-    ResponseWrapper response_no_status(&header_map, &trailer_map, info_without_code);
+    Protobuf::Arena arena;
+    ResponseWrapper response_no_status(arena, &header_map, &trailer_map, info_without_code);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
+TEST(Context, ConnectionFallbackAttributes) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  ConnectionWrapper connection(info);
+  UpstreamWrapper upstream(info);
+  {
+    auto value = connection[CelValue::CreateStringView(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(ID)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateInt64(1)];
     EXPECT_FALSE(value.has_value());
   }
 }
@@ -370,8 +439,8 @@ TEST(Context, ConnectionAttributes) {
   Network::Address::InstanceConstSharedPtr upstream_local_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 1000, false);
   const std::string sni_name = "kittens.com";
-  EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
-  EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
+  info.downstream_address_provider_->setLocalAddress(local);
+  info.downstream_address_provider_->setRemoteAddress(remote);
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
   EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
@@ -380,6 +449,11 @@ TEST(Context, ConnectionAttributes) {
   const std::string upstream_transport_failure_reason = "ConnectionTermination";
   EXPECT_CALL(info, upstreamTransportFailureReason())
       .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+  EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
+  const absl::optional<std::string> connection_termination_details = "unauthorized";
+  EXPECT_CALL(info, connectionTerminationDetails())
+      .WillRepeatedly(ReturnRef(connection_termination_details));
+
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
 
@@ -536,6 +610,20 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = connection[CelValue::CreateStringView(ID)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(123, value.value().Uint64OrDie());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(ConnectionTerminationDetails)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(connection_termination_details.value(), value.value().StringOrDie().value());
+  }
+
+  {
     auto value = upstream[CelValue::CreateStringView(TLSVersion)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
@@ -596,6 +684,49 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+}
+
+TEST(Context, FilterStateAttributes) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  FilterStateWrapper wrapper(filter_state);
+  ProtobufWkt::Arena arena;
+  wrapper.Produce(&arena);
+
+  const std::string key = "filter_state_key";
+  const std::string serialized = "filter_state_value";
+  const std::string missing = "missing_key";
+
+  auto accessor = std::make_shared<Envoy::Router::StringAccessorImpl>(serialized);
+  filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(missing)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(key)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsBytes());
+    EXPECT_EQ(serialized, value.value().BytesOrDie().value());
+  }
+
+  CelStatePrototype prototype(true, CelStateType::Protobuf,
+                              "type.googleapis.com/google.protobuf.DoubleValue",
+                              StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto cel_state = std::make_shared<CelState>(prototype);
+  ProtobufWkt::DoubleValue v;
+  v.set_value(1.0);
+  cel_state->setValue(v.SerializeAsString());
+  const std::string cel_key = "cel_state_key";
+  filter_state.setData(cel_key, cel_state, StreamInfo::FilterState::StateType::ReadOnly);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(cel_key)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsDouble());
+    EXPECT_EQ(value.value().DoubleOrDie(), 1.0);
   }
 }
 

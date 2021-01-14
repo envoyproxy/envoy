@@ -100,9 +100,18 @@ public:
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
   const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
+  const Http::LowerCaseString& trailersCompressedBytesString() const {
+    CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, Http::LowerCaseString(fmt::format(
+                                                      "{}-compressed-bytes", trailers_prefix_)));
+  }
+  const Http::LowerCaseString& trailersUncompressedBytesString() const {
+    CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, Http::LowerCaseString(fmt::format(
+                                                      "{}-uncompressed-bytes", trailers_prefix_)));
+  }
 
 private:
   const std::string stats_prefix_;
+  const std::string trailers_prefix_;
   const std::string decompressor_stats_prefix_;
   const Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;
   const RequestDirectionConfig request_direction_config_;
@@ -122,12 +131,36 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
+  struct ByteTracker {
+    ByteTracker(const Http::LowerCaseString& compressed_bytes_trailer,
+                const Http::LowerCaseString& uncompressed_bytes_trailer)
+        : compressed_bytes_trailer_(compressed_bytes_trailer),
+          uncompressed_bytes_trailer_(uncompressed_bytes_trailer) {}
+    void chargeBytes(uint64_t compressed_bytes, uint64_t uncompressed_bytes) {
+      total_compressed_bytes_ += compressed_bytes;
+      total_uncompressed_bytes_ += uncompressed_bytes;
+    }
+    void reportTotalBytes(Http::HeaderMap& trailers) const {
+      trailers.addReferenceKey(compressed_bytes_trailer_, total_compressed_bytes_);
+      trailers.addReferenceKey(uncompressed_bytes_trailer_, total_uncompressed_bytes_);
+    }
+
+  private:
+    const Http::LowerCaseString& compressed_bytes_trailer_;
+    const Http::LowerCaseString& uncompressed_bytes_trailer_;
+    uint64_t total_compressed_bytes_{};
+    uint64_t total_uncompressed_bytes_{};
+  };
+  using ByteTrackerOptConstRef = absl::optional<std::reference_wrapper<const ByteTracker>>;
+
   template <class HeaderType>
   Http::FilterHeadersStatus
   maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
@@ -153,10 +186,11 @@ private:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus
-  maybeDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
+  using HeaderMapOptRef = absl::optional<std::reference_wrapper<Http::HeaderMap>>;
+  void decompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                   const Compression::Decompressor::DecompressorPtr& decompressor,
-                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const;
+                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,
+                  ByteTracker& byte_tracker, HeaderMapOptRef trailers) const;
 
   // TODO(junr03): These can be shared between compressor and decompressor.
   template <Http::CustomInlineHeaderRegistry::Type Type>
@@ -201,6 +235,8 @@ private:
   DecompressorFilterConfigSharedPtr config_;
   Compression::Decompressor::DecompressorPtr request_decompressor_{};
   Compression::Decompressor::DecompressorPtr response_decompressor_{};
+  ByteTracker request_byte_tracker_;
+  ByteTracker response_byte_tracker_;
 };
 
 } // namespace Decompressor

@@ -2,6 +2,7 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -37,7 +38,7 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
 
 // TODO(#11622): Implement baggage storage for zipkin spans
 void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
-std::string ZipkinSpan::getBaggage(absl::string_view) { return std::string(); }
+std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
 void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
@@ -80,6 +81,8 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = zipkin_config.collector_cluster();
+  hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
+                                                          : zipkin_config.collector_cluster();
 
   CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
@@ -180,26 +183,22 @@ void ReporterImpl::flushSpans() {
     Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setPath(collector_.endpoint_);
-    message->headers().setHost(driver_.cluster());
+    message->headers().setHost(driver_.hostname());
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 
-    Buffer::InstancePtr body = std::make_unique<Buffer::OwnedImpl>();
-    body->add(request_body);
-    message->body() = std::move(body);
+    message->body().add(request_body);
 
     const uint64_t timeout =
         driver_.runtime().snapshot().getInteger("tracing.zipkin.request_timeout", 5000U);
 
-    if (collector_cluster_.exists()) {
+    if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          driver_.clusterManager()
-              .httpAsyncClientForCluster(collector_cluster_.info()->name())
-              .send(std::move(message), *this,
-                    Http::AsyncClient::RequestOptions().setTimeout(
-                        std::chrono::milliseconds(timeout)));
+          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+              std::move(message), *this,
+              Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
       if (request) {
         active_requests_.add(*request);
       }

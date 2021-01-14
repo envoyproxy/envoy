@@ -27,6 +27,9 @@ DecompressorFilterConfig::DecompressorFilterConfig(
     : stats_prefix_(fmt::format("{}decompressor.{}.{}", stats_prefix,
                                 proto_config.decompressor_library().name(),
                                 decompressor_factory->statsPrefix())),
+      trailers_prefix_(fmt::format("{}-decompressor-{}",
+                                   ThreadSafeSingleton<Http::PrefixValue>::get().prefix(),
+                                   proto_config.decompressor_library().name())),
       decompressor_stats_prefix_(stats_prefix_ + "decompressor_library"),
       decompressor_factory_(std::move(decompressor_factory)),
       request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
@@ -56,7 +59,10 @@ DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     : DirectionConfig(proto_config.common_config(), stats_prefix + "response.", scope, runtime) {}
 
 DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
-    : config_(std::move(config)) {}
+    : config_(std::move(config)), request_byte_tracker_(config_->trailersCompressedBytesString(),
+                                                        config_->trailersUncompressedBytesString()),
+      response_byte_tracker_(config_->trailersCompressedBytesString(),
+                             config_->trailersUncompressedBytesString()) {}
 
 Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                             bool end_stream) {
@@ -82,9 +88,24 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
                              *decoder_callbacks_, headers);
 };
 
-Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool) {
-  return maybeDecompress(config_->requestDirectionConfig(), request_decompressor_,
-                         *decoder_callbacks_, data);
+Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (request_decompressor_) {
+    HeaderMapOptRef trailers;
+    if (end_stream) {
+      trailers = HeaderMapOptRef(std::ref(decoder_callbacks_->addDecodedTrailers()));
+    }
+    decompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_, data,
+               request_byte_tracker_, trailers);
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus DecompressorFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  // Only report if the filter has actually decompressed.
+  if (request_decompressor_) {
+    request_byte_tracker_.reportTotalBytes(trailers);
+  }
+  return Http::FilterTrailersStatus::Continue;
 }
 
 Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -99,29 +120,48 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
                              *encoder_callbacks_, headers);
 }
 
-Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool) {
-  return maybeDecompress(config_->responseDirectionConfig(), response_decompressor_,
-                         *encoder_callbacks_, data);
-}
-
-Http::FilterDataStatus DecompressorFilter::maybeDecompress(
-    const DecompressorFilterConfig::DirectionConfig& direction_config,
-    const Compression::Decompressor::DecompressorPtr& decompressor,
-    Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const {
-  if (decompressor) {
-    Buffer::OwnedImpl output_buffer;
-    decompressor->decompress(input_buffer, output_buffer);
-
-    // Report decompression via stats and logging before modifying the input buffer.
-    direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
-    direction_config.stats().total_uncompressed_bytes_.add(output_buffer.length());
-    ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
-                     direction_config.logString(), input_buffer.length(), output_buffer.length());
-
-    input_buffer.drain(input_buffer.length());
-    input_buffer.add(output_buffer);
+Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (response_decompressor_) {
+    HeaderMapOptRef trailers;
+    if (end_stream) {
+      trailers = HeaderMapOptRef(std::ref(encoder_callbacks_->addEncodedTrailers()));
+    }
+    decompress(config_->responseDirectionConfig(), response_decompressor_, *encoder_callbacks_,
+               data, response_byte_tracker_, trailers);
   }
   return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus DecompressorFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  // Only report if the filter has actually decompressed.
+  if (response_decompressor_) {
+    response_byte_tracker_.reportTotalBytes(trailers);
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
+void DecompressorFilter::decompress(
+    const DecompressorFilterConfig::DirectionConfig& direction_config,
+    const Compression::Decompressor::DecompressorPtr& decompressor,
+    Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,
+    ByteTracker& byte_tracker, HeaderMapOptRef trailers) const {
+  ASSERT(decompressor);
+  Buffer::OwnedImpl output_buffer;
+  decompressor->decompress(input_buffer, output_buffer);
+
+  // Report decompression via stats and logging before modifying the input buffer.
+  byte_tracker.chargeBytes(input_buffer.length(), output_buffer.length());
+  direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
+  direction_config.stats().total_uncompressed_bytes_.add(output_buffer.length());
+  ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
+                   direction_config.logString(), input_buffer.length(), output_buffer.length());
+
+  input_buffer.drain(input_buffer.length());
+  input_buffer.add(output_buffer);
+
+  if (trailers.has_value()) {
+    byte_tracker.reportTotalBytes(trailers.value().get());
+  }
 }
 
 template <>

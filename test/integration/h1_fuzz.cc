@@ -14,7 +14,6 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
                                    bool ignore_response) {
   PERSISTENT_FUZZ_VAR bool initialized = [this]() -> bool {
     initialize();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     return true;
   }();
   UNREFERENCED_PARAMETER(initialized);
@@ -69,7 +68,7 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
       AssertionResult result = fake_upstream_connection->close();
       RELEASE_ASSERT(result, result.message());
     }
-    AssertionResult result = fake_upstream_connection->waitForDisconnect(true);
+    AssertionResult result = fake_upstream_connection->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
   }
   tcp_client->close();

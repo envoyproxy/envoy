@@ -18,7 +18,10 @@ load(
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
-    _envoy_select_new_codecs_in_integration_tests = "envoy_select_new_codecs_in_integration_tests",
+    _envoy_select_wasm = "envoy_select_wasm",
+    _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
+    _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
+    _envoy_select_wasm_wavm = "envoy_select_wasm_wavm",
 )
 load(
     ":envoy_test.bzl",
@@ -32,14 +35,27 @@ load(
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_PACKAGE_VISIBILITY",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
-def envoy_extension_package():
-    # TODO(rgs1): revert this to //:extension_library once
-    # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
-    native.package(default_visibility = ["//visibility:public"])
+def envoy_extension_package(enabled_default = True):
+    native.package(default_visibility = EXTENSION_PACKAGE_VISIBILITY)
+
+    bool_flag(
+        name = "enabled",
+        build_setting_default = enabled_default,
+    )
+
+    native.config_setting(
+        name = "is_enabled",
+        flag_values = {":enabled": "True"},
+    )
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
@@ -104,8 +120,8 @@ def envoy_cmake_external(
     cmake_external(
         name = name,
         cache_entries = select({
-            "@envoy//bazel:opt_build": cache_entries,
-            "//conditions:default": cache_entries_debug,
+            "@envoy//bazel:dbg_build": cache_entries_debug,
+            "//conditions:default": cache_entries,
         }),
         cmake_options = cmake_options,
         # TODO(lizan): Make this always true
@@ -174,7 +190,10 @@ def envoy_google_grpc_external_deps():
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_hot_restart = _envoy_select_hot_restart
-envoy_select_new_codecs_in_integration_tests = _envoy_select_new_codecs_in_integration_tests
+envoy_select_wasm = _envoy_select_wasm
+envoy_select_wasm_wavm = _envoy_select_wasm_wavm
+envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
+envoy_select_wasm_v8 = _envoy_select_wasm_v8
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary

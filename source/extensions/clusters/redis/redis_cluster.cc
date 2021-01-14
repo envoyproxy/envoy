@@ -25,7 +25,7 @@ RedisCluster::RedisCluster(
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api),
+                                       added_via_api, factory_context.dispatcher().timeSource()),
       cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
@@ -43,7 +43,7 @@ RedisCluster::RedisCluster(
           cluster.has_load_assignment()
               ? cluster.load_assignment()
               : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())),
-      local_info_(factory_context.localInfo()), random_(factory_context.random()),
+      local_info_(factory_context.localInfo()), random_(api.randomGenerator()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(info(), api)),
@@ -94,19 +94,22 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
 void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   Upstream::HostVector new_hosts;
+  absl::flat_hash_set<std::string> all_new_hosts;
 
   for (const ClusterSlot& slot : *slots) {
-    new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true));
+    new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true, time_source_));
+    all_new_hosts.emplace(slot.primary()->asString());
     for (auto const& replica : slot.replicas()) {
-      new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false));
+      new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false, time_source_));
+      all_new_hosts.emplace(replica->asString());
     }
   }
 
-  absl::node_hash_map<std::string, Upstream::HostSharedPtr> updated_hosts;
+  Upstream::HostMap updated_hosts;
   Upstream::HostVector hosts_added;
   Upstream::HostVector hosts_removed;
   const bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                                  updated_hosts, all_hosts_);
+                                                  updated_hosts, all_hosts_, all_new_hosts);
   const bool slot_updated =
       lb_factory_ ? lb_factory_->onClusterSlotUpdate(std::move(slots), updated_hosts) : false;
 
@@ -274,9 +277,9 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   Upstream::HostSharedPtr host;
   if (parent_.hosts_.empty()) {
     const int rand_idx = parent_.random_.random() % discovery_address_list_.size();
-    auto it = discovery_address_list_.begin();
-    std::next(it, rand_idx);
-    host = Upstream::HostSharedPtr{new RedisHost(parent_.info(), "", *it, parent_, true)};
+    auto it = std::next(discovery_address_list_.begin(), rand_idx);
+    host = Upstream::HostSharedPtr{
+        new RedisHost(parent_.info(), "", *it, parent_, true, parent_.timeSource())};
   } else {
     const int rand_idx = parent_.random_.random() % parent_.hosts_.size();
     host = parent_.hosts_[rand_idx];
@@ -397,7 +400,8 @@ RedisClusterFactory::createClusterWithConfig(
                               std::move(stats_scope), context.addedViaApi(), nullptr),
                           nullptr);
   }
-  auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>(context.random());
+  auto lb_factory =
+      std::make_shared<RedisClusterLoadBalancerFactory>(context.api().randomGenerator());
   return std::make_pair(std::make_shared<RedisCluster>(
                             cluster, proto_config,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,

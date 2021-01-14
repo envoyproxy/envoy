@@ -59,10 +59,11 @@ Route Scope
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
 A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
 For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
+RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
 along with a :ref:`ScopeKeyBuilder <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.ScopeKeyBuilder>`
-defining the key construction algorithm used by Envoy to look up the scope corresponding to each request.
+defining the key construction algorithm used by Envoy to look up the scope corresponding to each request. 
 
 For example, for the following scoped route configuration, Envoy will look into the "addr" header value, split the header value by ";" first, and use the first value for key 'x-foo-key' as the scope key.
 If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", then "127.0.0.1" will be computed as the scope key to look up for corresponding route configuration.
@@ -106,8 +107,9 @@ Envoy allows retries to be configured both in the :ref:`route configuration
 <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` as well as for specific requests via :ref:`request
 headers <config_http_filters_router_headers_consumed>`. The following configurations are possible:
 
-* **Maximum number of retries**: Envoy will continue to retry any number of times. An exponential
-  backoff algorithm is used between each retry. Additionally, *all retries are contained within the
+* **Maximum number of retries**: Envoy will continue to retry any number of times. The intervals between
+  retries are decided either by an exponential backoff algorithm (the default), or based on feedback
+  from the upstream server via headers (if present). Additionally, *all retries are contained within the
   overall request timeout*. This avoids long request times due to a large number of retries.
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,

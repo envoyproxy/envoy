@@ -5,13 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-proxy
-    volumes:
-      - ./envoy.yaml:/etc/envoy.yaml
     networks:
       - envoymesh
-    expose:
-      - "1999"
-      - "8001"
     ports:
       - "1999:1999"
       - "8001:8001"
@@ -24,10 +19,6 @@ services:
       envoymesh:
         aliases:
           - redis_server
-    expose:
-      - "6379"
-    ports:
-      - "6379:6379"
 
 networks:
   envoymesh: {}

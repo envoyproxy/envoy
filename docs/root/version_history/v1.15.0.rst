@@ -92,7 +92,7 @@ New Features
   are applied to using :ref:`HTTP headers <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * fault: added support for specifying grpc_status code in abort faults using
   :ref:`HTTP header <config_http_filters_fault_injection_http_header>` or abort fault configuration in HTTP fault filter.
-* filter: added `upstram_rq_time` stats to the GPRC stats filter.
+* filter: added `upstream_rq_time` stats to the GPRC stats filter.
   Disabled by default and can be enabled via :ref:`enable_upstream_stats <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.enable_upstream_stats>`.
 * grpc: added support for Google gRPC :ref:`custom channel arguments <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_args>`.
 * grpc-json: added support for streaming response using
@@ -108,7 +108,7 @@ New Features
 * listener: added in place filter chain update flow for tcp listener update which doesn't close connections if the corresponding network filter chain is equivalent during the listener update.
   Can be disabled by setting runtime feature `envoy.reloadable_features.listener_in_place_filterchain_update` to false.
   Also added additional draining filter chain stat for :ref:`listener manager <config_listener_manager_stats>` to track the number of draining filter chains and the number of in place update attempts.
-* logger: added :option:`--log-format-prefix-with-location` command line option to prefix '%v' with file path and line number.
+* logger: added `--log-format-prefix-with-location` command line option to prefix '%v' with file path and line number.
 * lrs: added new *envoy_api_field_service.load_stats.v2.LoadStatsResponse.send_all_clusters* field
   in LRS response, which allows management servers to avoid explicitly listing all clusters it is
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability

@@ -2,10 +2,12 @@
 
 #include <memory>
 
+#include "common/http/message_impl.h"
+
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -62,15 +64,15 @@ public:
 class MockUpstream {
 public:
   MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& response_body)
-      : request_(&mock_cm.async_client_), response_body_(response_body) {
-    ON_CALL(mock_cm.async_client_, send_(_, _, _))
+      : request_(&mock_cm.thread_local_cluster_.async_client_), response_body_(response_body) {
+    ON_CALL(mock_cm.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillByDefault(
             Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               Http::ResponseMessagePtr response_message(
                   new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                       new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-              response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
+              response_message->body().add(response_body_);
               cb.onSuccess(request_, std::move(response_message));
               called_count_++;
               return &request_;

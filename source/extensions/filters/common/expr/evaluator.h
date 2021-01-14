@@ -25,7 +25,7 @@ using ExpressionPtr = std::unique_ptr<Expression>;
 
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.
-ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
+ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers);
@@ -41,7 +41,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 
 // Evaluates an expression for a request. The arena is used to hold intermediate computational
 // results and potentially the final value.
-absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
+absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
                                   const StreamInfo::StreamInfo& info,
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
@@ -51,6 +51,9 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
 // Returns false if the expression fails to evaluate.
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers);
+
+// Returns a string for a CelValue.
+std::string print(CelValue value);
 
 // Thrown when there is an CEL library error.
 class CelException : public EnvoyException {

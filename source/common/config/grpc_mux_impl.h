@@ -19,7 +19,9 @@
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
+#include "common/config/ttl.h"
 #include "common/config/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -47,7 +49,12 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder) override;
+                           OpaqueResourceDecoder& resource_decoder,
+                           const bool use_namespace_matching = false) override;
+
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
@@ -55,6 +62,7 @@ public:
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
+  void registerVersionedTypeUrl(const std::string& type_url);
   void
   onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
                       ControlPlaneStats& control_plane_stats) override;
@@ -76,7 +84,7 @@ private:
                      OpaqueResourceDecoder& resource_decoder, const std::string& type_url,
                      GrpcMuxImpl& parent)
         : resources_(resources), callbacks_(callbacks), resource_decoder_(resource_decoder),
-          type_url_(type_url), parent_(parent), watches_(parent.api_state_[type_url].watches_) {
+          type_url_(type_url), parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
       watches_.emplace(watches_.begin(), this);
     }
 
@@ -110,6 +118,10 @@ private:
 
   // Per muxed API state.
   struct ApiState {
+    ApiState(Event::Dispatcher& dispatcher,
+             std::function<void(const std::vector<std::string>&)> callback)
+        : ttl_(callback, dispatcher, dispatcher.timeSource()) {}
+
     bool paused() const { return pauses_ > 0; }
 
     // Watches on the returned resources for the API;
@@ -122,8 +134,14 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
+    TtlManager ttl_;
   };
 
+  bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
+    return !resource.hasResource() &&
+           resource.version() == apiStateFor(type_url).request_.version_info();
+  }
+  void expiryCallback(const std::string& type_url, const std::vector<std::string>& expired);
   // Request queue management logic.
   void queueDiscoveryRequest(const std::string& queue_item);
 
@@ -133,7 +151,12 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   bool first_stream_request_;
-  absl::node_hash_map<std::string, ApiState> api_state_;
+
+  // Helper function for looking up and potentially allocating a new ApiState.
+  ApiState& apiStateFor(const std::string& type_url);
+
+  absl::node_hash_map<std::string, std::unique_ptr<ApiState>> api_state_;
+
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
 
@@ -142,6 +165,9 @@ private:
   // This string is a type URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+
+  Event::Dispatcher& dispatcher_;
+  bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
@@ -159,8 +185,12 @@ public:
   }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                           OpaqueResourceDecoder&) override {
+                           OpaqueResourceDecoder&, const bool) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
+  }
+
+  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void onWriteable() override {}

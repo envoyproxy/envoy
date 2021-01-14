@@ -21,13 +21,14 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::Return;
 
@@ -41,13 +42,15 @@ public:
   HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
-        timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
+        timer_(new Event::MockTimer()), http_request_(&cm_.thread_local_cluster_.async_client_) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
+    cm_.initializeThreadLocalClusters({"eds_cluster"});
+    EXPECT_CALL(cm_, getThreadLocalCluster("eds_cluster")).Times(AtLeast(0));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_,
@@ -65,8 +68,8 @@ public:
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
                          bool expect_node = false) override {
     UNREFERENCED_PARAMETER(expect_node);
-    EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
-    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
+    EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([this, cluster_names, version](Http::RequestMessagePtr& request,
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
@@ -93,8 +96,8 @@ public:
             }
             expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
           }
-          expected_request +=
-              ",\"type_url\":\"type.googleapis.com/envoy.api.v2.ClusterLoadAssignment\"";
+          expected_request += ",\"type_url\":\"type.googleapis.com/"
+                              "envoy.config.endpoint.v3.ClusterLoadAssignment\"";
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
@@ -129,7 +132,7 @@ public:
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
-                       "envoy.api.v2.ClusterLoadAssignment\",\"cluster_name\":\"" +
+                       "envoy.config.endpoint.v3.ClusterLoadAssignment\",\"cluster_name\":\"" +
                        cluster + "\"},";
     }
     response_json.pop_back();
@@ -139,7 +142,7 @@ public:
     Http::ResponseHeaderMapPtr response_headers{
         new Http::TestResponseHeaderMapImpl{{":status", response_code}}};
     Http::ResponseMessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
-    message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
+    message->body().add(response_json);
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             response_pb, "cluster_name");

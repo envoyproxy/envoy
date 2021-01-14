@@ -13,6 +13,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   LookupContext ctx{};
   ctx.query_rec = domain_query;
   ctx.query_context = std::move(context);
+  ctx.query_context->in_callback_ = false;
   ctx.expiry = std::chrono::duration_cast<std::chrono::seconds>(
                    dispatcher_.timeSource().systemTime().time_since_epoch())
                    .count() +
@@ -58,46 +59,48 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   ENVOY_LOG(trace, "Pending queries: {}", lookups_.size());
 
   // Define the callback that is executed when resolution completes
-  auto resolve_cb = [this, id](Network::DnsResolver::ResolutionStatus status,
-                               std::list<Network::DnsResponse>&& response) -> void {
-    auto ctx_iter = lookups_.find(id);
-
-    // If the context is not in the map, the lookup has timed out and was removed
-    // when the timer executed
-    if (ctx_iter == lookups_.end()) {
-      ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]",
-                reinterpret_cast<intptr_t>(id));
-      return;
-    }
-
-    auto ctx = std::move(ctx_iter->second);
-    lookups_.erase(ctx_iter->first);
-
-    // We are processing the response here, so we did not timeout. Cancel the timer
-    ctx.timeout_timer->disableTimer();
-
-    ENVOY_LOG(trace, "async query status returned. Entries {}", response.size());
-    ASSERT(ctx.resolver_status == DnsFilterResolverStatus::Pending);
-
-    ctx.query_context->resolution_status_ = status;
-    ctx.resolver_status = DnsFilterResolverStatus::Complete;
-
-    // C-ares doesn't expose the TTL in the data available here.
-    if (status == Network::DnsResolver::ResolutionStatus::Success) {
-      ctx.resolved_hosts.reserve(response.size());
-      for (const auto& resp : response) {
-        ASSERT(resp.address_ != nullptr);
-        ENVOY_LOG(trace, "Resolved address: {} for {}", resp.address_->ip()->addressAsString(),
-                  ctx.query_rec->name_);
-        ctx.resolved_hosts.emplace_back(std::move(resp.address_));
-      }
-    }
-    // Invoke the filter callback notifying it of resolved addresses
-    invokeCallback(ctx);
-  };
-
   // Resolve the address in the query and add to the resolved_hosts vector
-  resolver_->resolve(domain_query->name_, lookup_family, resolve_cb);
+  resolver_->resolve(domain_query->name_, lookup_family,
+                     [this, id](Network::DnsResolver::ResolutionStatus status,
+                                std::list<Network::DnsResponse>&& response) -> void {
+                       auto ctx_iter = lookups_.find(id);
+
+                       // If the context is not in the map, the lookup has timed out and was removed
+                       // when the timer executed
+                       if (ctx_iter == lookups_.end()) {
+                         ENVOY_LOG(debug, "Unable to find context for DNS query for ID [{}]",
+                                   reinterpret_cast<intptr_t>(id));
+                         return;
+                       }
+
+                       auto ctx = std::move(ctx_iter->second);
+                       lookups_.erase(ctx_iter->first);
+
+                       // We are processing the response here, so we did not timeout. Cancel the
+                       // timer
+                       ctx.timeout_timer->disableTimer();
+
+                       ENVOY_LOG(trace, "async query status returned for query [{}]. Entries {}",
+                                 ctx.query_context->id_, response.size());
+                       ASSERT(ctx.resolver_status == DnsFilterResolverStatus::Pending);
+
+                       ctx.query_context->in_callback_ = true;
+                       ctx.query_context->resolution_status_ = status;
+                       ctx.resolver_status = DnsFilterResolverStatus::Complete;
+
+                       // C-ares doesn't expose the TTL in the data available here.
+                       if (status == Network::DnsResolver::ResolutionStatus::Success) {
+                         ctx.resolved_hosts.reserve(response.size());
+                         for (const auto& resp : response) {
+                           ASSERT(resp.address_ != nullptr);
+                           ENVOY_LOG(trace, "Resolved address: {} for {}",
+                                     resp.address_->ip()->addressAsString(), ctx.query_rec->name_);
+                           ctx.resolved_hosts.emplace_back(std::move(resp.address_));
+                         }
+                       }
+                       // Invoke the filter callback notifying it of resolved addresses
+                       invokeCallback(ctx);
+                     });
 }
 
 void DnsFilterResolver::onResolveTimeout() {

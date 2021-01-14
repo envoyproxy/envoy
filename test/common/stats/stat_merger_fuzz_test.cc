@@ -24,7 +24,11 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
   // StatMergerDynamicTest.DynamicsWithRealSymbolTable.
   std::string unit_test_encoding;
 
-  for (uint32_t index = 0; index < data.size();) {
+  for (uint32_t index = 0; index < data.size() - 1;) {
+    if (index != 0) {
+      unit_test_encoding += ".";
+    }
+
     // Select component lengths between 1 and 8 bytes inclusive, and ensure it
     // doesn't overrun our buffer.
     //
@@ -32,18 +36,20 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
     // segments, which trigger some inconsistent handling as described in that
     // bug.
     uint32_t num_bytes = (1 + data[index]) & 0x7;
-    num_bytes = std::min(static_cast<uint32_t>(data.size() - 1),
-                         num_bytes); // restrict number up to the size of data
 
     // Carve out the segment and use the 4th bit from the control-byte to
     // determine whether to treat this segment symbolic or not.
-    absl::string_view segment = data.substr(index, num_bytes);
     bool is_symbolic = (data[index] & 0x8) == 0x0;
-    if (index != 0) {
-      unit_test_encoding += ".";
-    }
-    index += num_bytes + 1;
+    ++index;
+    ASSERT(data.size() > index);
+    uint32_t remaining = data.size() - index;
+    num_bytes = std::min(remaining, num_bytes); // restrict number up to the size of data
+
+    absl::string_view segment = data.substr(index, num_bytes);
+    index += num_bytes;
     if (is_symbolic) {
+      absl::string_view::size_type pos = segment.find_first_not_of('.');
+      segment.remove_prefix((pos == absl::string_view::npos) ? segment.size() : pos);
       absl::StrAppend(&unit_test_encoding, segment);
       stat_names.push_back(symbolic_pool.add(segment));
     } else {
@@ -63,17 +69,16 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
     dynamic_map[name] = spans;
   }
   StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
-  FUZZ_ASSERT(name == symbol_table.toString(decoded));
+  std::string decoded_str = symbol_table.toString(decoded);
+  FUZZ_ASSERT(name == decoded_str);
   FUZZ_ASSERT(stat_name == decoded);
 }
 
 // Fuzzer for symbol tables.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  FakeSymbolTableImpl fake_symbol_table;
   SymbolTableImpl symbol_table;
 
   absl::string_view data(reinterpret_cast<const char*>(buf), len);
-  testDynamicEncoding(data, fake_symbol_table);
   testDynamicEncoding(data, symbol_table);
 }
 

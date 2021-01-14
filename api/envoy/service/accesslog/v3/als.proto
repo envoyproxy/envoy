@@ -50,7 +50,7 @@ message StreamAccessLogsMessage {
 
     // The friendly name of the log configured in :ref:`CommonGrpcAccessLogConfig
     // <envoy_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig>`.
-    string log_name = 2 [(validate.rules).string = {min_bytes: 1}];
+    string log_name = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   // Wrapper for batches of HTTP access log entries.

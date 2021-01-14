@@ -19,6 +19,13 @@
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/cluster.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_update_callbacks.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
+#include "test/mocks/upstream/host.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -47,8 +54,8 @@ public:
     EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
-    if (!cluster_exists) {
-      EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
+    if (cluster_exists) {
+      cm_.initializeThreadLocalClusters({"fake_cluster"});
     }
 
     std::unique_ptr<NiceMock<Stats::MockStore>> store =
@@ -1166,7 +1173,8 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
 }
 
 TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
-  tls_.defer_delete = true;
+  cm_.initializeThreadLocalClusters({"fake_cluster"});
+  tls_.defer_delete_ = true;
   std::unique_ptr<NiceMock<Stats::MockStore>> store =
       std::make_unique<NiceMock<Stats::MockStore>>();
   cluster_refresh_manager_ =

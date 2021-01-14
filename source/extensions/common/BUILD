@@ -17,5 +17,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:documentation_url_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
     ],
 )

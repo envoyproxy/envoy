@@ -42,7 +42,7 @@ A few notes on how Envoy does retries:
   retries. Thus if the request timeout is set to 3s, and the first request attempt takes 2.7s, the
   retry (including back-off) has .3s to complete. This is by design to avoid an exponential
   retry/timeout explosion.
-* Envoy uses a fully jittered exponential back-off algorithm for retries with a default base
+* By default, Envoy uses a fully jittered exponential back-off algorithm for retries with a default base
   interval of 25ms. Given a base interval B and retry number N, the back-off for the retry is in
   the range :math:`\big[0, (2^N-1)B\big)`. For example, given the default interval, the first retry
   will be delayed randomly by 0-24ms, the 2nd by 0-74ms, the 3rd by 0-174ms, and so on. The
@@ -51,6 +51,13 @@ A few notes on how Envoy does retries:
   upstream.base_retry_backoff_ms runtime parameter. The back-off intervals can also be modified
   by configuring the retry policy's
   :ref:`retry back-off <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_back_off>`.
+* Envoy can also be configured to use feedback from the upstream server to decide the interval between
+  retries. Response headers like ``Retry-After`` or ``X-RateLimit-Reset`` instruct the client how long
+  to wait before re-trying. The retry policy's
+  :ref:`rate limited retry back off <envoy_v3_api_field_config.route.v3.RetryPolicy.rate_limited_retry_back_off>`
+  strategy can be configured to expect a particular header, and if that header is present in the response Envoy
+  will use its value to decide the back-off. If the header is not present, or if it cannot be parsed
+  successfully, Envoy will use the default exponential back-off algorithm instead.
 
 .. _config_http_filters_router_x-envoy-retry-on:
 

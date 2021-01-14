@@ -114,7 +114,19 @@ envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
     deps = [
-        "//source/common/common:fancy_logger_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "fancy_log_macros_test",
+    srcs = ["log_macros_test.cc"],
+    args = ["--enable-fine-grain-logging"],
+    deps = [
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
@@ -127,10 +139,7 @@ envoy_cc_benchmark_binary(
     name = "logger_speed_test",
     srcs = ["logger_speed_test.cc"],
     external_deps = ["benchmark"],
-    deps = [
-        "//source/common/common:fancy_logger_lib",
-        "//source/common/common:minimal_logger_lib",
-    ],
+    deps = ["//source/common/common:minimal_logger_lib"],
 )
 
 envoy_benchmark_test(
@@ -179,9 +188,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "optref_test",
+    srcs = ["optref_test.cc"],
+)
+
+envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
     deps = [
+        "//source/common/common:interval_value",
         "//source/common/common:random_generator_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:environment_lib",
@@ -196,6 +211,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:utility_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
@@ -253,6 +269,17 @@ envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
+)
+
+envoy_cc_benchmark_binary(
+    name = "re_speed_test",
+    srcs = ["re_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "@com_googlesource_code_re2//:re2",
+    ],
 )
 
 envoy_cc_benchmark_binary(
@@ -328,4 +355,10 @@ envoy_cc_test(
         "//source/common/common:statusor_lib",
         "//source/common/http:status_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "interval_value_test",
+    srcs = ["interval_value_test.cc"],
+    deps = ["//source/common/common:interval_value"],
 )

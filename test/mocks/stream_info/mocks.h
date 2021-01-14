@@ -4,6 +4,7 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/network/socket_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
@@ -21,7 +22,9 @@ public:
 
   // StreamInfo::StreamInfo
   MOCK_METHOD(void, setResponseFlag, (ResponseFlag response_flag));
+  MOCK_METHOD(void, setResponseCode, (uint32_t));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
+  MOCK_METHOD(void, setConnectionTerminationDetails, (absl::string_view));
   MOCK_METHOD(bool, intersectResponseFlags, (uint64_t), (const));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(SystemTime, startTime, (), (const));
@@ -51,6 +54,7 @@ public:
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, responseCodeDetails, (), (const));
+  MOCK_METHOD(const absl::optional<std::string>&, connectionTerminationDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, bytesSent, (), (const));
   MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
@@ -61,15 +65,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
-  MOCK_METHOD(void, setDownstreamLocalAddress, (const Network::Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamLocalAddress, (), (const));
-  MOCK_METHOD(void, setDownstreamDirectRemoteAddress,
-              (const Network::Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamDirectRemoteAddress, (),
-              (const));
-  MOCK_METHOD(void, setDownstreamRemoteAddress, (const Network::Address::InstanceConstSharedPtr&));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamRemoteAddress, (),
-              (const));
+  MOCK_METHOD(const Network::SocketAddressProvider&, downstreamAddressProvider, (), (const));
   MOCK_METHOD(void, setDownstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, downstreamSslConnection, (), (const));
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
@@ -95,6 +91,8 @@ public:
               (const));
   MOCK_METHOD(Http::RequestIDExtensionSharedPtr, getRequestIDExtension, (), (const));
   MOCK_METHOD(void, setRequestIDExtension, (Http::RequestIDExtensionSharedPtr));
+  MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
+  MOCK_METHOD(void, setConnectionID, (uint64_t));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -105,6 +103,7 @@ public:
   absl::optional<std::chrono::nanoseconds> first_upstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> last_upstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> first_upstream_rx_byte_received_;
+  absl::optional<uint64_t> connection_id_;
   absl::optional<std::chrono::nanoseconds> last_upstream_rx_byte_received_;
   absl::optional<std::chrono::nanoseconds> first_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> last_downstream_tx_byte_sent_;
@@ -112,6 +111,7 @@ public:
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  absl::optional<std::string> connection_termination_details_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr upstream_filter_state_;
@@ -119,9 +119,7 @@ public:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   std::string requested_server_name_;

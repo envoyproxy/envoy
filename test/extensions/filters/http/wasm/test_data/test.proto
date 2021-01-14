@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package wasmtest;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+message TestProto {
+  uint64 i = 1;
+  double j = 2;
+  bool k = 3;
+  string s = 4;
+  google.protobuf.Timestamp t = 5;
+  google.protobuf.Any a = 6;
+  TestProto b = 7;
+  repeated string l = 8;
+  map<string, string> m = 9;
+};

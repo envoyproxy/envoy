@@ -20,8 +20,8 @@ AccessLogManagerImpl::~AccessLogManagerImpl() {
 }
 
 void AccessLogManagerImpl::reopen() {
-  for (auto& [log_key, log_file_ptr] : access_logs_) {
-    log_file_ptr->reopen();
+  for (auto& iter : access_logs_) {
+    iter.second->reopen();
   }
 }
 
@@ -47,6 +47,7 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
       thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
+  flush_timer_->enableTimer(flush_interval_msec_);
   open();
 }
 
@@ -205,7 +206,6 @@ void AccessLogFileImpl::write(absl::string_view data) {
 void AccessLogFileImpl::createFlushStructures() {
   flush_thread_ = thread_factory_.createThread([this]() -> void { flushThreadFunc(); },
                                                Thread::Options{"AccessLogFlush"});
-  flush_timer_->enableTimer(flush_interval_msec_);
 }
 
 } // namespace AccessLog

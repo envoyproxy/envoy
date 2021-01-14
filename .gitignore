@@ -1,6 +1,7 @@
 /bazel-*
 BROWSE
 /build
+/build_*
 *.bzlc
 .cache
 .clangd
@@ -35,3 +36,4 @@ CMakeLists.txt
 cmake-build-debug
 /linux
 bazel.output.txt
+*~

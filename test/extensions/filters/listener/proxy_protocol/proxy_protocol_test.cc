@@ -11,8 +11,8 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/tcp_listener_impl.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
@@ -60,13 +60,15 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
-        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+        name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
+        init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, localAddress())
+        .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
-    conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
+    conn_ = dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
@@ -87,6 +89,9 @@ public:
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
+  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+    return absl::nullopt;
+  }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -94,6 +99,8 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  Init::Manager& initManager() override { return *init_manager_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -183,6 +190,7 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
+  BasicResourceLimitImpl open_connections_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
@@ -193,12 +201,12 @@ public:
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
-  BasicResourceLimitImpl open_connections_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  std::unique_ptr<Init::Manager> init_manager_;
 };
 
 // Parameterize the listener socket address version.
@@ -212,8 +220,9 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -225,11 +234,13 @@ TEST_P(ProxyProtocolTest, V1Minimal) {
   expectData("more data");
 
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
   } else {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
   }
-  EXPECT_FALSE(server_connection_->localAddressRestored());
+  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -245,8 +256,9 @@ TEST_P(ProxyProtocolTest, V2Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -257,8 +269,9 @@ TEST_P(ProxyProtocolTest, BasicV6) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1:2:3::4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -276,8 +289,9 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1:2:3::4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -302,6 +316,8 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -344,6 +360,12 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -351,15 +373,19 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, ErrorFIONREAD_1) {
-  // A well formed v4/tcp message, no extensions, but introduce an error on ioctl(...FIONREAD...)
+TEST_P(ProxyProtocolTest, ErrorRecv_1) {
+  // A well formed v4/tcp message, no extensions, but introduce an error on recv()
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -394,6 +420,12 @@ TEST_P(ProxyProtocolTest, ErrorFIONREAD_1) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -420,14 +452,16 @@ TEST_P(ProxyProtocolTest, V2LocalConnection) {
   connect();
   write(buffer, sizeof(buffer));
   expectData("more data");
-  if (server_connection_->remoteAddress()->ip()->version() ==
+  if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
       Envoy::Network::Address::IpVersion::v6) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
-  } else if (server_connection_->remoteAddress()->ip()->version() ==
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
+  } else if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
              Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
   }
-  EXPECT_FALSE(server_connection_->localAddressRestored());
+  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
   disconnect();
 }
 
@@ -439,14 +473,16 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
   connect();
   write(buffer, sizeof(buffer));
   expectData("more data");
-  if (server_connection_->remoteAddress()->ip()->version() ==
+  if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
       Envoy::Network::Address::IpVersion::v6) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
-  } else if (server_connection_->remoteAddress()->ip()->version() ==
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
+  } else if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
              Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
   }
-  EXPECT_FALSE(server_connection_->localAddressRestored());
+  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
   disconnect();
 }
 
@@ -564,8 +600,8 @@ TEST_P(ProxyProtocolTest, V2ParseExtensions) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
-  // A well-formed ipv4/tcp with a TLV extension. An error is created in the ioctl(...FIONREAD...)
+TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
+  // A well-formed ipv4/tcp with a TLV extension. An error is returned on tlv recv()
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
@@ -574,12 +610,13 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _))
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
-        const Api::SysCallIntResult x = os_sys_calls_actual_.ioctl(fd, request, argp);
-        if (x.rc_ == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
-          return Api::SysCallIntResult{-1, x.errno_};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t n, int flags) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
+        if (x.rc_ == sizeof(tlv)) {
+          return Api::SysCallSizeResult{-1, 0};
         } else {
           return x;
         }
@@ -588,11 +625,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
-        return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
@@ -623,6 +655,12 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -664,8 +702,9 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   // the results. Since we must have data we might as well check that we get it.
   expectData("...");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "254.254.254.254");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -685,8 +724,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented1) {
   write(buffer + 20, 17);
 
   expectData("more data");
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -706,8 +746,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented2) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -723,6 +764,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
@@ -770,6 +812,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, 17);
 
@@ -787,6 +835,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // TODO(davinci26): Mocking should not be used to provide real system calls.
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
@@ -834,6 +883,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
   }));
+  EXPECT_CALL(os_sys_calls, accept(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+            return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
+          }));
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -856,8 +911,9 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   expectData("...");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "254.254.254.254");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -880,8 +936,9 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
 
   expectData("moredata");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -1246,11 +1303,13 @@ public:
                                                            nullptr, true)),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
-            socket_->localAddress()->ip()->port())),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
-        filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+            socket_->addressProvider().localAddress()->ip()->port())),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+        name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
+        init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, localAddress())
+        .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
@@ -1284,6 +1343,9 @@ public:
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
+  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+    return absl::nullopt;
+  }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -1291,6 +1353,8 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  Init::Manager& initManager() override { return *init_manager_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -1358,6 +1422,7 @@ public:
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  std::unique_ptr<Init::Manager> init_manager_;
 };
 
 // Parameterize the listener socket address version.
@@ -1371,9 +1436,10 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->asString(), "1.2.3.4:65535");
-  EXPECT_EQ(server_connection_->localAddress()->asString(), "254.254.254.254:1234");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->asString(), "1.2.3.4:65535");
+  EXPECT_EQ(server_connection_->addressProvider().localAddress()->asString(),
+            "254.254.254.254:1234");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -1384,9 +1450,9 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->asString(), "[1:2:3::4]:65535");
-  EXPECT_EQ(server_connection_->localAddress()->asString(), "[5:6::7:8]:1234");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->asString(), "[1:2:3::4]:65535");
+  EXPECT_EQ(server_connection_->addressProvider().localAddress()->asString(), "[5:6::7:8]:1234");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -1405,15 +1471,15 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
             key: "PP2_TYPE_ALPN"
         - tlv_type: 0x1a
           on_tlv_present:
-            key: "PP2_TYPE_CUSTOMER_A"      
+            key: "PP2_TYPE_CUSTOMER_A"
 )EOF";
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   Server::Configuration::MockListenerFactoryContext context;
-  EXPECT_CALL(context, scope()).Times(1);
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
+  EXPECT_CALL(context, scope());
+  EXPECT_CALL(context, messageValidationVisitor());
   Network::ListenerFilterFactoryCb cb =
       factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
 

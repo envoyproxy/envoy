@@ -40,8 +40,8 @@ public:
     uri_ = &uri;
 
     // Check if cluster is configured, fail the request if not.
-    // Otherwise cm_.httpAsyncClientForCluster will throw exception.
-    if (cm_.get(uri.cluster()) == nullptr) {
+    const auto thread_local_cluster = cm_.getThreadLocalCluster(uri.cluster());
+    if (thread_local_cluster == nullptr) {
       ENVOY_LOG(error, "{}: fetch pubkey [uri = {}] failed: [cluster = {}] is not configured",
                 __func__, uri.uri(), uri.cluster());
       complete_ = true;
@@ -58,8 +58,7 @@ public:
                            DurationUtil::durationToMilliseconds(uri.timeout())))
                        .setParentSpan(parent_span)
                        .setChildSpanName("JWT Remote PubKey Fetch");
-    request_ =
-        cm_.httpAsyncClientForCluster(uri.cluster()).send(std::move(message), *this, options);
+    request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
 
   // HTTP async receive methods
@@ -69,9 +68,8 @@ public:
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
     if (status_code == enumToInt(Http::Code::OK)) {
       ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: success", __func__, uri_->uri());
-      if (response->body()) {
-        const auto len = response->body()->length();
-        const auto body = std::string(static_cast<char*>(response->body()->linearize(len)), len);
+      if (response->body().length() != 0) {
+        const auto body = response->bodyAsString();
         auto jwks =
             google::jwt_verify::Jwks::createFrom(body, google::jwt_verify::Jwks::Type::JWKS);
         if (jwks->getStatus() == google::jwt_verify::Status::Ok) {

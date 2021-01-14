@@ -4,6 +4,8 @@
 
 namespace Envoy {
 
+using testing::HasSubstr;
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, HttpTimeoutIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -243,10 +245,13 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
 
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // Trigger per try timeout (but not global timeout).
+  // Trigger per try timeout (but not global timeout) and wait for reset.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(400));
+  ASSERT_TRUE(upstream_request_->waitForReset());
 
-  // Wait for a second request to be sent upstream
+  // Wait for a second request to be sent upstream. Max retry backoff is 25ms so advance time that
+  // much.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(25));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -279,7 +284,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
                                      {"x-forwarded-for", "10.0.0.1"},
                                      {"x-envoy-retry-on", "5xx"},
                                      {"x-envoy-upstream-rq-timeout-ms", "0"},
-                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}});
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "50"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -290,10 +295,13 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
 
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // Trigger per try timeout.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(5));
+  // Trigger per try timeout (but not global timeout) and wait for reset.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(50));
+  ASSERT_TRUE(upstream_request_->waitForReset());
 
-  // Wait for a second request to be sent upstream
+  // Wait for a second request to be sent upstream. Max retry backoff is 25ms so advance time that
+  // much. This is always less than the next request's per try timeout.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(25));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -491,6 +499,48 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Starts a request with a header timeout specified, sleeps for longer than the
+// timeout, and ensures that a timeout is received.
+TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    // This test requires that the downstream be using HTTP1.
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* request_headers_timeout = hcm.mutable_request_headers_timeout();
+        request_headers_timeout->set_seconds(1);
+        request_headers_timeout->set_nanos(0);
+      });
+  initialize();
+
+  const std::string input_request = ("GET / HTTP/1.1\r\n"
+                                     // Omit trailing \r\n that would indicate the end of headers.
+                                     "Host: localhost\r\n");
+  std::string response;
+
+  auto connection_driver = createConnectionDriver(
+      lookupPort("http"), input_request,
+      [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      });
+
+  while (!connection_driver->allBytesSent()) {
+    connection_driver->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  test_server_->waitForGaugeGe("http.config_test.downstream_rq_active", 1);
+  ASSERT_FALSE(connection_driver->closed());
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1001));
+  connection_driver->run();
+
+  // The upstream should send a 40x response and send a local reply.
+  EXPECT_TRUE(connection_driver->closed());
+  EXPECT_THAT(response, AllOf(HasSubstr("408"), HasSubstr("header")));
 }
 
 } // namespace Envoy

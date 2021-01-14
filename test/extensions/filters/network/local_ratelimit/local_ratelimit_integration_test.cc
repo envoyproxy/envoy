@@ -25,7 +25,7 @@ TEST_P(LocalRateLimitIntegrationTest, NoRateLimiting) {
   setup(R"EOF(
 name: ratelimit
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.local_rate_limit.v2alpha.LocalRateLimit
+  "@type": type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit
   stat_prefix: local_rate_limit_stats
   token_bucket:
     max_tokens: 1
@@ -40,7 +40,7 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
   tcp_client->close();
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   EXPECT_EQ(0,
             test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());

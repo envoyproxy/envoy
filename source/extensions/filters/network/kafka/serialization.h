@@ -11,6 +11,7 @@
 
 #include "common/common/byte_order.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 
 #include "extensions/filters/network/kafka/kafka_types.h"
 
@@ -206,7 +207,8 @@ public:
         offset_ += 7;
         // Valid input can have at most 5 bytes.
         if (offset_ >= 5 * 7) {
-          throw EnvoyException("VarUInt32 is too long (5th byte has highest bit set)");
+          ExceptionUtil::throwEnvoyException(
+              "VarUInt32 is too long (5th byte has highest bit set)");
         }
       }
     }
@@ -463,7 +465,7 @@ public:
       if (required_ >= 0) {
         children_ = std::vector<DeserializerType>(required_);
       } else {
-        throw EnvoyException(absl::StrCat("invalid ARRAY length: ", required_));
+        ExceptionUtil::throwEnvoyException(absl::StrCat("invalid ARRAY length: ", required_));
       }
       length_consumed_ = true;
     }
@@ -542,7 +544,8 @@ public:
       if (required >= 1) {
         children_ = std::vector<DeserializerType>(required - 1);
       } else {
-        throw EnvoyException(absl::StrCat("invalid COMPACT_ARRAY length: ", required));
+        ExceptionUtil::throwEnvoyException(
+            absl::StrCat("invalid COMPACT_ARRAY length: ", required));
       }
       length_consumed_ = true;
     }
@@ -625,7 +628,8 @@ public:
         ready_ = true;
       }
       if (required_ < NULL_ARRAY_LENGTH) {
-        throw EnvoyException(fmt::format("invalid NULLABLE_ARRAY length: {}", required_));
+        ExceptionUtil::throwEnvoyException(
+            fmt::format("invalid NULLABLE_ARRAY length: {}", required_));
       }
 
       length_consumed_ = true;

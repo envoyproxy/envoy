@@ -1,0 +1,19 @@
+FROM envoyproxy/envoy-alpine-dev:latest
+
+RUN apk update && apk add py3-pip bash curl
+RUN pip3 install -q Flask==0.11.1 requests==2.18.4
+RUN mkdir /code
+ADD ./service.py /code
+ADD ./start_service.sh /usr/local/bin/start_service.sh
+RUN chmod u+x /usr/local/bin/start_service.sh
+#
+# for discussion on jaeger binary compatibility, and the source of the file, see here:
+#  https://github.com/envoyproxy/envoy/issues/11382#issuecomment-638012072
+#
+RUN echo "4a7d17d4724ee890490bcd6cfdedb12a02316a3d33214348d30979abd201f1ca  /usr/local/lib/libjaegertracing_plugin.so" > /tmp/checksum \
+         && curl -Ls https://github.com/tetratelabs/getenvoy-package/files/3518103/getenvoy-centos-jaegertracing-plugin.tar.gz \
+              | tar zxf - -C /usr/local/lib \
+         && mv /usr/local/lib/libjaegertracing.so.0.4.2 /usr/local/lib/libjaegertracing_plugin.so \
+         && sha256sum -c /tmp/checksum \
+         && rm /tmp/checksum
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/start_service.sh"]

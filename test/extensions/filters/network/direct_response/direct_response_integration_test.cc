@@ -31,10 +31,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DirectResponseIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(DirectResponseIntegrationTest, Hello) {
+TEST_P(DirectResponseIntegrationTest, DirectResponseOnConnection) {
   std::string response;
+  // This test becomes flaky (especially on Windows) if the connection is closed by the server
+  // before the client finishes transmitting the data it writes (resulting in a connection aborted
+  // error when the client reads). Instead, we just initiate the connection and do not send from
+  // the client to avoid this.
   auto connection = createConnectionDriver(
-      lookupPort("listener_0"), "hello",
+      lookupPort("listener_0"), "",
       [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
         response.append(data.toString());
         conn.close(Network::ConnectionCloseType::FlushWrite);

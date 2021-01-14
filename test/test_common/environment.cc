@@ -158,7 +158,8 @@ void TestEnvironment::renameFile(const std::string& old_name, const std::string&
   // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
   // Note MoveFileEx cannot overwrite a directory as documented, nor a symlink, apparently.
   const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
-  ASSERT_NE(0, rc);
+  ASSERT_NE(0, rc) << fmt::format("failed to rename file from  {} to {} with error {}", old_name,
+                                  new_name, ::GetLastError());
 #else
   const int rc = ::rename(old_name.c_str(), new_name.c_str());
   ASSERT_EQ(0, rc);
@@ -267,14 +268,6 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
-const std::string& TestEnvironment::nullDevicePath() {
-#ifdef WIN32
-  CONSTRUCT_ON_FIRST_USE(std::string, "NUL");
-#else
-  CONSTRUCT_ON_FIRST_USE(std::string, "/dev/null");
-#endif
-}
-
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   return runfiles_->Rlocation(workspace);
@@ -305,7 +298,8 @@ std::string TestEnvironment::substitute(const std::string& str,
 
   // Substitute platform specific null device.
   const std::regex null_device_regex(R"(\{\{ null_device_path \}\})");
-  out_json_string = std::regex_replace(out_json_string, null_device_regex, nullDevicePath());
+  out_json_string = std::regex_replace(out_json_string, null_device_regex,
+                                       std::string(Platform::null_device_path).c_str());
 
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex(R"(\{\{ ip_loopback_address \}\})");
@@ -349,8 +343,8 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
 }
 
 std::string TestEnvironment::readFileToStringForTest(const std::string& filename,
-                                                     bool require_existence) {
-  std::ifstream file(filename, std::ios::binary);
+                                                     bool require_existence, bool read_binary) {
+  std::ifstream file(filename, read_binary ? std::ios::binary : std::ios::in);
   if (file.fail()) {
     if (!require_existence) {
       return "";

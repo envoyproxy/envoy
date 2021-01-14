@@ -23,7 +23,10 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const LocalInfo::LocalInfo& local_info)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      local_info_(local_info), transport_api_version_(transport_api_version) {}
+      local_info_(local_info), transport_api_version_(transport_api_version),
+      dispatcher_(dispatcher),
+      enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {}
 
 ScopedResume NewGrpcMuxImpl::pause(const std::string& type_url) {
   return pause(std::vector<std::string>{type_url});
@@ -44,12 +47,36 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
+void NewGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
+
+  TypeUrlMap& type_url_map = typeUrlMap();
+  if (type_url_map.find(type_url) != type_url_map.end()) {
+    return;
+  }
+  // If type_url is v3, earlier_type_url will contain v2 type url.
+  absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
+  // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
+  if (earlier_type_url.has_value()) {
+    type_url_map[earlier_type_url.value()] = type_url;
+    type_url_map[type_url] = earlier_type_url.value();
+  }
+}
+
 void NewGrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
     ControlPlaneStats&) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
+  // If this type url is not watched, try another version type url.
+  if (enable_type_url_downgrade_and_upgrade_ && sub == subscriptions_.end()) {
+    const std::string& type_url = message->type_url();
+    registerVersionedTypeUrl(type_url);
+    TypeUrlMap& type_url_map = typeUrlMap();
+    if (type_url_map.find(type_url) != type_url_map.end()) {
+      sub = subscriptions_.find(type_url_map[type_url]);
+    }
+  }
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
               "Dropping received DeltaDiscoveryResponse (with version {}) for non-existent "
@@ -58,22 +85,13 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     return;
   }
 
-  // When an on-demand request is made a Watch is created using an alias, as the resource name isn't
-  // known at that point. When an update containing aliases comes back, we update Watches with
-  // resource names.
-  for (const auto& r : message->resources()) {
-    if (r.aliases_size() > 0) {
-      AddedRemoved converted = sub->second->watch_map_.convertAliasWatchesToNameWatches(r);
-      sub->second->sub_state_.updateSubscriptionInterest(converted.added_, converted.removed_);
-    }
-  }
-
   kickOffAck(sub->second->sub_state_.handleResponse(*message));
   Memory::Utils::tryShrinkHeap();
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {
   for (auto& [type_url, subscription] : subscriptions_) {
+    UNREFERENCED_PARAMETER(type_url);
     subscription->sub_state_.markStreamFresh();
   }
   trySendDiscoveryRequests();
@@ -112,17 +130,21 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const std::set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
-                                         OpaqueResourceDecoder& resource_decoder) {
+                                         OpaqueResourceDecoder& resource_decoder,
+                                         const bool use_namespace_matching) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url);
-    return addWatch(type_url, resources, callbacks, resource_decoder);
+    if (enable_type_url_downgrade_and_upgrade_) {
+      registerVersionedTypeUrl(type_url);
+    }
+    addSubscription(type_url, use_namespace_matching);
+    return addWatch(type_url, resources, callbacks, resource_decoder, use_namespace_matching);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-  updateWatch(type_url, watch, resources);
+  updateWatch(type_url, watch, resources, use_namespace_matching);
   return std::make_unique<WatchImpl>(type_url, watch, *this);
 }
 
@@ -130,13 +152,32 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                                 const std::set<std::string>& resources) {
+                                 const std::set<std::string>& resources,
+                                 bool creating_namespace_watch) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, resources);
-  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
+  if (creating_namespace_watch) {
+    // This is to prevent sending out of requests that contain prefixes instead of resource names
+    sub->second->sub_state_.updateSubscriptionInterest({}, {});
+  } else {
+    sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_,
+                                                       added_removed.removed_);
+  }
+  // Tell the server about our change in interest, if any.
+  if (sub->second->sub_state_.subscriptionUpdatePending()) {
+    trySendDiscoveryRequests();
+  }
+}
+
+void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
+                                           const std::set<std::string>& for_update) {
+  auto sub = subscriptions_.find(type_url);
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Watch of {} has no subscription to update.", type_url));
+  sub->second->sub_state_.updateSubscriptionInterest(for_update, {});
   // Tell the server about our change in interest, if any.
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
@@ -151,8 +192,10 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
+                                     const bool use_namespace_matching) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                       type_url, local_info_, use_namespace_matching, dispatcher_));
   subscription_ordering_.emplace_back(type_url);
 }
 

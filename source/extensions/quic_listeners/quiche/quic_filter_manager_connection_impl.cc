@@ -11,7 +11,9 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnec
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection.connection_id().Hash()),
-      quic_connection_(&connection), filter_manager_(*this), stream_info_(dispatcher.timeSource()),
+      quic_connection_(&connection), filter_manager_(*this),
+      stream_info_(dispatcher.timeSource(),
+                   connection.connectionSocket()->addressProviderSharedPtr()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
@@ -30,12 +32,21 @@ void QuicFilterManagerConnectionImpl::addReadFilter(Network::ReadFilterSharedPtr
   filter_manager_.addReadFilter(filter);
 }
 
+void QuicFilterManagerConnectionImpl::removeReadFilter(Network::ReadFilterSharedPtr filter) {
+  filter_manager_.removeReadFilter(filter);
+}
+
 bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_.initializeReadFilters();
 }
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
+}
+
+bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() {
+  // Quic doesn't support half close.
+  return false;
 }
 
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
@@ -96,27 +107,6 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
 const Network::ConnectionSocket::OptionsSharedPtr&
 QuicFilterManagerConnectionImpl::socketOptions() const {
   return quic_connection_->connectionSocket()->options();
-}
-
-const Network::Address::InstanceConstSharedPtr&
-QuicFilterManagerConnectionImpl::remoteAddress() const {
-  ASSERT(quic_connection_->connectionSocket() != nullptr,
-         "remoteAddress() should only be called after OnPacketHeader");
-  return quic_connection_->connectionSocket()->remoteAddress();
-}
-
-const Network::Address::InstanceConstSharedPtr&
-QuicFilterManagerConnectionImpl::directRemoteAddress() const {
-  ASSERT(quic_connection_->connectionSocket() != nullptr,
-         "directRemoteAddress() should only be called after OnPacketHeader");
-  return quic_connection_->connectionSocket()->directRemoteAddress();
-}
-
-const Network::Address::InstanceConstSharedPtr&
-QuicFilterManagerConnectionImpl::localAddress() const {
-  ASSERT(quic_connection_->connectionSocket() != nullptr,
-         "localAddress() should only be called after OnPacketHeader");
-  return quic_connection_->connectionSocket()->localAddress();
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {

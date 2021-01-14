@@ -34,8 +34,11 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().ThriftProxy,
         NetworkFilterNames::get().ZooKeeperProxy, NetworkFilterNames::get().SniDynamicForwardProxy,
         NetworkFilterNames::get().KafkaBroker, NetworkFilterNames::get().RocketmqProxy,
-        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac
-        // TODO(jianwendong): cover mongo_proxy, mysql_proxy, postgres_proxy, tcp_proxy.
+        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
+        NetworkFilterNames::get().MongoProxy, NetworkFilterNames::get().MySQLProxy
+        // TODO(jianwendong): add "NetworkFilterNames::get().Postgres" after it supports untrusted
+        // data.
+        // TODO(jianwendong): add fuzz test for "NetworkFilterNames::get().TcpProxy".
     };
     // Check whether each filter is loaded into Envoy.
     // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
@@ -82,11 +85,15 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
@@ -111,14 +118,16 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        pipe_addr_);
+    read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        pipe_addr_);
   }
 }
 
 void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name,
                                                   Protobuf::Message* config_message) {
-  // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
+  // System calls such as reading files are prohibited in this fuzzer. Some inputs that crash the
   // mock/fake objects are also prohibited. We could also avoid fuzzing some unfinished features by
   // checking them here. For now there are only three filters {DirectResponse, LocalRateLimit,
   // HttpConnectionManager} on which we have constraints.

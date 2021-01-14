@@ -9,6 +9,7 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,6 +46,8 @@ public:
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
   static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
+  static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
+                                        const std::vector<Http::LowerCaseString>& rhs);
 };
 
 MATCHER_P(AuthzErrorResponse, status, "") {
@@ -60,10 +63,18 @@ MATCHER_P(AuthzErrorResponse, status, "") {
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
-  if (arg->status != response.status) {
-    return false;
+  const bool equal_status = arg->status == response.status;
+  const bool equal_metadata =
+      TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata);
+  if (!equal_metadata) {
+    *result_listener << "\n"
+                     << "==================Expected response dynamic metadata:==================\n"
+                     << response.dynamic_metadata.DebugString()
+                     << "------------------is not equal to actual dynamic metadata:-------------\n"
+                     << arg->dynamic_metadata.DebugString()
+                     << "=======================================================================\n";
   }
-  return true;
+  return equal_status && equal_metadata;
 }
 
 MATCHER_P(AuthzDeniedResponse, response, "") {
@@ -90,12 +101,15 @@ MATCHER_P(AuthzOkResponse, response, "") {
   }
 
   // Compare headers_to_add.
-  return TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add);
-  ;
+  if (!TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add)) {
+    return false;
+  }
+
+  return TestCommon::compareVectorOfHeaderName(response.headers_to_remove, arg->headers_to_remove);
 }
 
 MATCHER_P(ContainsPairAsHeader, pair, "") {
-  return arg->headers().get(pair.first)->value().getStringView() == pair.second;
+  return arg->headers().get(pair.first)[0]->value().getStringView() == pair.second;
 }
 
 } // namespace ExtAuthz

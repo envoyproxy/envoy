@@ -5,7 +5,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
@@ -70,19 +70,22 @@ TEST(GrpcContextTest, GetGrpcMessage) {
 
 TEST(GrpcContextTest, GetGrpcTimeout) {
   Http::TestRequestHeaderMapImpl empty_headers;
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(empty_headers));
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(empty_headers));
 
   Http::TestRequestHeaderMapImpl empty_grpc_timeout{{"grpc-timeout", ""}};
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(empty_grpc_timeout));
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(empty_grpc_timeout));
 
   Http::TestRequestHeaderMapImpl missing_unit{{"grpc-timeout", "123"}};
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(missing_unit));
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(missing_unit));
 
   Http::TestRequestHeaderMapImpl illegal_unit{{"grpc-timeout", "123F"}};
-  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(illegal_unit));
+  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(illegal_unit));
 
-  Http::TestRequestHeaderMapImpl unit_hours{{"grpc-timeout", "1H"}};
-  EXPECT_EQ(std::chrono::milliseconds(60 * 60 * 1000), Common::getGrpcTimeout(unit_hours));
+  Http::TestRequestHeaderMapImpl unit_hours{{"grpc-timeout", "0H"}};
+  EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(unit_hours));
+
+  Http::TestRequestHeaderMapImpl zero_hours{{"grpc-timeout", "1H"}};
+  EXPECT_EQ(std::chrono::milliseconds(60 * 60 * 1000), Common::getGrpcTimeout(zero_hours));
 
   Http::TestRequestHeaderMapImpl unit_minutes{{"grpc-timeout", "1M"}};
   EXPECT_EQ(std::chrono::milliseconds(60 * 1000), Common::getGrpcTimeout(unit_minutes));

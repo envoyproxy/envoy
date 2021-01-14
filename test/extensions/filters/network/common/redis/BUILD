@@ -18,6 +18,7 @@ envoy_cc_mock(
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//test/test_common:printers_lib",
     ],
 )
 
@@ -55,7 +56,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/common/redis:client_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],

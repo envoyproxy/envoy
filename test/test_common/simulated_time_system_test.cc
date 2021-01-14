@@ -58,8 +58,8 @@ protected:
   }
 
   void advanceMsAndLoop(int64_t delay_ms) {
-    time_system_.advanceTimeAsync(std::chrono::milliseconds(delay_ms));
-    base_scheduler_.run(Dispatcher::RunType::NonBlock);
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(delay_ms), base_scheduler_,
+                                   Dispatcher::RunType::NonBlock);
   }
 
   void advanceSystemMsAndLoop(int64_t delay_ms) {
@@ -124,9 +124,13 @@ TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering) {
     timers_.clear();
   }
 
-  // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
-  // for the same time. Verify that both orderings were observed.
-  EXPECT_THAT(outputs, testing::ElementsAre("p0123", "p0213"));
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
+    // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
+    // for the same time. Verify that both orderings were observed.
+    EXPECT_THAT(outputs, testing::ElementsAre("p0123", "p0213"));
+  } else {
+    EXPECT_THAT(outputs, testing::ElementsAre("p0123"));
+  }
 }
 
 TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering2) {
@@ -150,9 +154,13 @@ TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering2) {
     timers_.clear();
   }
 
-  // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
-  // for the same time. Verify that both orderings were observed.
-  EXPECT_THAT(outputs, testing::ElementsAre("p0p123", "p0p213"));
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
+    // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
+    // for the same time. Verify that both orderings were observed.
+    EXPECT_THAT(outputs, testing::ElementsAre("p0p123", "p0p213"));
+  } else {
+    EXPECT_THAT(outputs, testing::ElementsAre("p0p123"));
+  }
 }
 
 // Timers that are scheduled to execute and but are disabled first do not trigger.
@@ -194,17 +202,17 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   // is delayed since it is rescheduled with a non-zero delta.
   advanceMsAndLoop(5);
   if (activateMode() == ActivateMode::DelayActivateTimers) {
-#ifdef WIN32
-    // Force it to run again to pick up next iteration callbacks.
-    // The event loop runs for a single iteration in NonBlock mode on Windows as a hack to work
-    // around LEVEL trigger fd registrations constantly firing events and preventing the NonBlock
-    // event loop from ever reaching the no-fd event and no-expired timers termination condition. It
-    // is not possible to get consistent event loop behavior since the time system does not override
-    // the base scheduler's run behavior, and libevent does not provide a mode where it runs at most
-    // N iterations before breaking out of the loop for us to prefer over the single iteration mode
-    // used on Windows.
-    advanceMsAndLoop(0);
-#endif
+    if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
+      // Force it to run again to pick up next iteration callbacks.
+      // The event loop runs for a single iteration in NonBlock mode on Windows as a hack to work
+      // around LEVEL trigger fd registrations constantly firing events and preventing the NonBlock
+      // event loop from ever reaching the no-fd event and no-expired timers termination condition.
+      // It is not possible to get consistent event loop behavior since the time system does not
+      // override the base scheduler's run behavior, and libevent does not provide a mode where it
+      // runs at most N iterations before breaking out of the loop for us to prefer over the single
+      // iteration mode used on Windows.
+      advanceMsAndLoop(0);
+    }
     EXPECT_EQ("p013p4", output_);
   } else {
     EXPECT_EQ("p0134", output_);
@@ -244,11 +252,11 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   // re-enabled with a non-zero timeout.
   advanceMsAndLoop(5);
   if (activateMode() == ActivateMode::DelayActivateTimers) {
-#ifdef WIN32
-    // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run again
-    // to pick up next iteration callbacks.
-    advanceMsAndLoop(0);
-#endif
+    if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
+      // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run
+      // again to pick up next iteration callbacks.
+      advanceMsAndLoop(0);
+    }
     EXPECT_THAT(output_, testing::AnyOf("p03p14", "p03p41"));
   } else {
     EXPECT_EQ("p0314", output_);
@@ -289,60 +297,57 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
   // Run an event loop in the background to activate timers.
-  std::atomic<bool> done(false);
-  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
-    while (!done) {
+  absl::Mutex mutex;
+  bool done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {
+    for (;;) {
+      {
+        absl::MutexLock lock(&mutex);
+        if (done) {
+          return;
+        }
+      }
+
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::MutexBasicLockable mutex;
-  Thread::CondVar condvar;
+
   TimerPtr timer = scheduler_->createTimer(
-      [&condvar, &mutex, &done]() {
-        Thread::LockGuard lock(mutex);
+      [&mutex, &done]() {
+        absl::MutexLock lock(&mutex);
         done = true;
-        condvar.notifyOne();
       },
       dispatcher_);
   timer->enableTimer(std::chrono::seconds(60));
 
-  // Wait 50 simulated seconds of simulated time, which won't be enough to
-  // activate the alarm. We'll get a fast automatic timeout in waitFor because
-  // there are no pending timers.
+  // Wait 1ms of real time. waitFor() does not advance simulated time, so this is just going to
+  // verify that we return quickly and nothing has fired.
   {
-    Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(50)));
+    absl::MutexLock lock(&mutex);
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::milliseconds(1)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(50)), time_system_.monotonicTime());
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(0)), time_system_.monotonicTime());
 
-  // Waiting another 20 simulated seconds will activate the alarm after 10,
-  // and the event-loop thread will call the corresponding callback quickly.
+  // Fire the timeout by advancing time and then verify that waitFor() returns without any timeout.
+  time_system_.advanceTimeWait(std::chrono::seconds(60));
   {
-    Thread::LockGuard lock(mutex);
-    // We don't check for the return value of waitFor() as it can spuriously
-    // return timeout even if the condition is satisfied before entering into
-    // the waitFor().
-    //
-    // TODO(jmarantz): just drop the return value in the API.
-    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
+    absl::MutexLock lock(&mutex);
+    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
+  thread->join();
 
   // Waiting a third time, with no pending timeouts, will just sleep out for
   // the max duration and return a timeout.
   done = false;
   {
-    Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(20)));
+    absl::MutexLock lock(&mutex);
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_FALSE(done);
-  EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), time_system_.monotonicTime());
-
-  thread->join();
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
 }
 
 TEST_P(SimulatedTimeSystemTest, Monotonic) {
@@ -440,28 +445,45 @@ TEST_P(SimulatedTimeSystemTest, DuplicateTimer) {
   zero_timer->enableTimer(delay);
   advanceMsAndLoop(1);
   EXPECT_EQ("2", output_);
+}
 
-  // Now set an alarm which requires 10ms of progress and make sure waitFor works.
-  std::atomic<bool> done(false);
-  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
-    while (!done) {
+// Regression test for issues documented in https://github.com/envoyproxy/envoy/pull/6956
+TEST_P(SimulatedTimeSystemTest, DuplicateTimer2) {
+  // Now set an alarm which requires 10s of progress and make sure advanceTimeWait and waitFor
+  // works.
+  absl::Mutex mutex;
+  bool done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {
+    for (;;) {
+      {
+        absl::MutexLock lock(&mutex);
+        if (done) {
+          return;
+        }
+      }
+
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::MutexBasicLockable mutex;
-  Thread::CondVar condvar;
+
   TimerPtr timer = scheduler_->createTimer(
-      [&condvar, &mutex, &done]() {
-        Thread::LockGuard lock(mutex);
+      [&mutex, &done]() {
+        absl::MutexLock lock(&mutex);
         done = true;
-        condvar.notifyOne();
       },
       dispatcher_);
   timer->enableTimer(std::chrono::seconds(10));
 
   {
-    Thread::LockGuard lock(mutex);
-    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
+    absl::MutexLock lock(&mutex);
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
+  }
+  EXPECT_FALSE(done);
+
+  time_system_.advanceTimeWait(std::chrono::seconds(10));
+  {
+    absl::MutexLock lock(&mutex);
+    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);
 
@@ -472,6 +494,22 @@ TEST_P(SimulatedTimeSystemTest, Enabled) {
   TimerPtr timer = scheduler_->createTimer({}, dispatcher_);
   timer->enableTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
+}
+
+TEST_P(SimulatedTimeSystemTest, DeleteTimerFromThread) {
+  TimerPtr timer = scheduler_->createTimer([]() {}, dispatcher_);
+  timer->enableTimer(std::chrono::milliseconds(0));
+  auto thread = Thread::threadFactoryForTest().createThread([&timer]() { timer.reset(); });
+  advanceMsAndLoop(1);
+  thread->join();
+}
+
+TEST_P(SimulatedTimeSystemTest, DeleteTimerFromThread2) {
+  TimerPtr timer = scheduler_->createTimer([]() {}, dispatcher_);
+  timer->enableTimer(std::chrono::milliseconds(1));
+  auto thread = Thread::threadFactoryForTest().createThread([&timer]() { timer.reset(); });
+  advanceMsAndLoop(1);
+  thread->join();
 }
 
 } // namespace

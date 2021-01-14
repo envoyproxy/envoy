@@ -12,6 +12,7 @@
 #include "common/common/non_copyable.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -85,7 +86,7 @@ public:
   void setReferenceKey(const LowerCaseString& key, absl::string_view value);
   void setCopy(const LowerCaseString& key, absl::string_view value);
   uint64_t byteSize() const;
-  const HeaderEntry* get(const LowerCaseString& key) const;
+  HeaderMap::GetResult get(const LowerCaseString& key) const;
   void iterate(HeaderMap::ConstIterateCb cb) const;
   void iterateReverse(HeaderMap::ConstIterateCb cb) const;
   void clear();
@@ -114,6 +115,7 @@ protected:
     HeaderString value_;
     std::list<HeaderEntryImpl>::iterator entry_;
   };
+  using HeaderNode = std::list<HeaderEntryImpl>::iterator;
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
@@ -170,6 +172,10 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
+   * When the list size is greater or equal to the envoy.http.headermap.lazy_map_min_size runtime
+   * feature value (or uint32_t max value if not set), all headers are added to a map, to allow
+   * fast access given a header key. Once the map is initialized, it will be used even if the number
+   * of headers decreases below the threshold.
    *
    * Note: the internal iterators held in fields make this unsafe to copy and move, since the
    * reference to end() is not preserved across a move (see Notes in
@@ -180,42 +186,102 @@ protected:
    */
   class HeaderList : NonCopyable {
   public:
-    HeaderList() : pseudo_headers_end_(headers_.end()) {}
+    using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
+    using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
+
+    HeaderList()
+        : pseudo_headers_end_(headers_.end()),
+          lazy_map_min_size_(static_cast<uint32_t>(Runtime::getInteger(
+              "envoy.http.headermap.lazy_map_min_size", std::numeric_limits<uint32_t>::max()))) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
     }
 
-    template <class Key, class... Value>
-    std::list<HeaderEntryImpl>::iterator insert(Key&& key, Value&&... value) {
+    template <class Key, class... Value> HeaderNode insert(Key&& key, Value&&... value) {
       const bool is_pseudo_header = isPseudoHeader(key);
-      std::list<HeaderEntryImpl>::iterator i =
-          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
-                           std::forward<Key>(key), std::forward<Value>(value)...);
+      HeaderNode i = headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
+                                      std::forward<Key>(key), std::forward<Value>(value)...);
+      if (!lazy_map_.empty()) {
+        lazy_map_[i->key().getStringView()].push_back(i);
+      }
       if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
         pseudo_headers_end_ = i;
       }
       return i;
     }
 
-    std::list<HeaderEntryImpl>::iterator erase(std::list<HeaderEntryImpl>::iterator i) {
+    HeaderNode erase(HeaderNode i, bool remove_from_map) {
       if (pseudo_headers_end_ == i) {
         pseudo_headers_end_++;
+      }
+      if (remove_from_map) {
+        lazy_map_.erase(i->key().getStringView());
       }
       return headers_.erase(i);
     }
 
-    template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
-      headers_.remove_if([&](const HeaderEntryImpl& entry) {
-        const bool to_remove = p(entry);
-        if (to_remove) {
-          if (pseudo_headers_end_ == entry.entry_) {
-            pseudo_headers_end_++;
+    template <class UnaryPredicate> void removeIf(UnaryPredicate p) {
+      if (!lazy_map_.empty()) {
+        // Lazy map is used, iterate over its elements and remove those that satisfy the predicate
+        // from the map and from the list.
+        for (auto map_it = lazy_map_.begin(); map_it != lazy_map_.end();) {
+          auto& values_vec = map_it->second;
+          ASSERT(!values_vec.empty());
+          // The following call to std::remove_if removes the elements that satisfy the
+          // UnaryPredicate and shifts the vector elements, but does not resize the vector.
+          // The call to erase that follows erases the unneeded cells (from remove_pos to the
+          // end) and modifies the vector's size.
+          const auto remove_pos =
+              std::remove_if(values_vec.begin(), values_vec.end(), [&](HeaderNode it) {
+                if (p(*(it->entry_))) {
+                  // Remove the element from the list.
+                  if (pseudo_headers_end_ == it->entry_) {
+                    pseudo_headers_end_++;
+                  }
+                  headers_.erase(it);
+                  return true;
+                }
+                return false;
+              });
+          values_vec.erase(remove_pos, values_vec.end());
+
+          // If all elements were removed from the map entry, erase it.
+          if (values_vec.empty()) {
+            lazy_map_.erase(map_it++);
+          } else {
+            map_it++;
           }
         }
-        return to_remove;
-      });
+      } else {
+        // The lazy map isn't used, iterate over the list elements and remove elements that satisfy
+        // the predicate.
+        headers_.remove_if([&](const HeaderEntryImpl& entry) {
+          const bool to_remove = p(entry);
+          if (to_remove) {
+            if (pseudo_headers_end_ == entry.entry_) {
+              pseudo_headers_end_++;
+            }
+          }
+          return to_remove;
+        });
+      }
     }
+
+    /*
+     * Creates and populates a map if the number of headers is at least the
+     * envoy.http.headermap.lazy_map_min_size runtime feature value.
+     *
+     * @return if a map was created.
+     */
+    bool maybeMakeMap();
+
+    /*
+     * Removes a given key and its values from the HeaderList.
+     *
+     * @return the number of bytes that were removed.
+     */
+    size_t remove(absl::string_view key);
 
     std::list<HeaderEntryImpl>::iterator begin() { return headers_.begin(); }
     std::list<HeaderEntryImpl>::iterator end() { return headers_.end(); }
@@ -223,16 +289,22 @@ protected:
     std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
+    HeaderLazyMap::iterator mapFind(absl::string_view key) { return lazy_map_.find(key); }
+    HeaderLazyMap::iterator mapEnd() { return lazy_map_.end(); }
     size_t size() const { return headers_.size(); }
     bool empty() const { return headers_.empty(); }
     void clear() {
       headers_.clear();
       pseudo_headers_end_ = headers_.end();
+      lazy_map_.clear();
     }
 
   private:
     std::list<HeaderEntryImpl> headers_;
-    std::list<HeaderEntryImpl>::iterator pseudo_headers_end_;
+    HeaderNode pseudo_headers_end_;
+    // The number of headers threshold for lazy map usage.
+    const uint32_t lazy_map_min_size_;
+    HeaderLazyMap lazy_map_;
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);
@@ -241,7 +313,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderEntry* getExisting(const LowerCaseString& key);
+  HeaderMap::NonConstGetResult getExisting(const LowerCaseString& key);
   size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
@@ -296,7 +368,7 @@ public:
     HeaderMapImpl::setCopy(key, value);
   }
   uint64_t byteSize() const override { return HeaderMapImpl::byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override {
+  HeaderMap::GetResult get(const LowerCaseString& key) const override {
     return HeaderMapImpl::get(key);
   }
   void iterate(HeaderMap::ConstIterateCb cb) const override { HeaderMapImpl::iterate(cb); }

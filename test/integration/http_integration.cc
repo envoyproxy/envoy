@@ -20,16 +20,21 @@
 #include "common/common/fmt.h"
 #include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -62,10 +67,11 @@ typeToCodecType(Http::CodecClient::Type type) {
 } // namespace
 
 IntegrationCodecClient::IntegrationCodecClient(
-    Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
-    Upstream::HostDescriptionConstSharedPtr host_description, CodecClient::Type type)
-    : CodecClientProd(type, std::move(conn), host_description, dispatcher), dispatcher_(dispatcher),
-      callbacks_(*this), codec_callbacks_(*this) {
+    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+    Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
+    CodecClient::Type type)
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
+      dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   dispatcher.run(Event::Dispatcher::RunType::Block);
@@ -81,7 +87,7 @@ IntegrationCodecClient::makeHeaderOnlyRequest(const Http::RequestHeaderMap& head
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, true);
+  encoder.encodeHeaders(headers, true).IgnoreError();
   flushWrite();
   return response;
 }
@@ -98,7 +104,7 @@ IntegrationCodecClient::makeRequestWithBody(const Http::RequestHeaderMap& header
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false);
+  encoder.encodeHeaders(headers, false).IgnoreError();
   Buffer::OwnedImpl data(body);
   encoder.encodeData(data, true);
   flushWrite();
@@ -149,7 +155,7 @@ IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
-  encoder.encodeHeaders(headers, false);
+  encoder.encodeHeaders(headers, false).IgnoreError();
   flushWrite();
   return {encoder, std::move(response)};
 }
@@ -221,9 +227,10 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
-  return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
-                                                  downstream_protocol_);
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
+      timeSystem())};
+  return std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                  host_description, downstream_protocol_);
 }
 
 IntegrationCodecClientPtr
@@ -256,9 +263,11 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
-void HttpIntegrationTest::useAccessLog(absl::string_view format) {
+void HttpIntegrationTest::useAccessLog(
+    absl::string_view format,
+    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters) {
   access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format));
+  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format, formatters));
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
@@ -277,8 +286,12 @@ ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrail
   return [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http_protocol_options()
+          ->set_enable_trailers(true);
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
     }
   };
 }
@@ -346,14 +359,39 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
   EXPECT_EQ(response_code, response->headers().getStatusValue());
   expected_headers.iterate([response_headers = &response->headers()](
                                const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    const Http::HeaderEntry* entry =
+    const auto entry =
         response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
-    EXPECT_NE(entry, nullptr);
-    EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+    EXPECT_FALSE(entry.empty());
+    EXPECT_EQ(header.value().getStringView(), entry[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
 
   EXPECT_EQ(response->body(), expected_body);
+}
+
+absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(
+    const std::vector<uint64_t>& upstream_indices,
+    std::chrono::milliseconds connection_wait_timeout,
+    FakeHttpConnectionPtr& fake_upstream_connection) {
+  AssertionResult result = AssertionFailure();
+  int upstream_index = 0;
+  Event::TestTimeSystem::RealTimeBound bound(connection_wait_timeout);
+  // Loop over the upstreams until the call times out or an upstream request is received.
+  while (!result) {
+    upstream_index = upstream_index % upstream_indices.size();
+    result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
+        *dispatcher_, fake_upstream_connection, std::chrono::milliseconds(5),
+        max_request_headers_kb_, max_request_headers_count_);
+    if (result) {
+      return upstream_index;
+    } else if (!bound.withinBound()) {
+      RELEASE_ASSERT(0, "Timed out waiting for new connection.");
+      break;
+    }
+    ++upstream_index;
+  }
+  RELEASE_ASSERT(result, result.message());
+  return {};
 }
 
 absl::optional<uint64_t>
@@ -362,26 +400,8 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   absl::optional<uint64_t> upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    AssertionResult result = AssertionFailure();
-    int upstream_index = 0;
-    Event::TestTimeSystem& time_system = timeSystem();
-    auto end_time = time_system.monotonicTime() + connection_wait_timeout;
-    // Loop over the upstreams until the call times out or an upstream request is received.
-    while (!result) {
-      upstream_index = upstream_index % upstream_indices.size();
-      result = fake_upstreams_[upstream_indices[upstream_index]]->waitForHttpConnection(
-          *dispatcher_, fake_upstream_connection_, std::chrono::milliseconds(5),
-          max_request_headers_kb_, max_request_headers_count_);
-      if (result) {
-        upstream_with_request = upstream_index;
-        break;
-      } else if (time_system.monotonicTime() >= end_time) {
-        result = (AssertionFailure() << "Timed out waiting for new connection.");
-        break;
-      }
-      ++upstream_index;
-    }
-    RELEASE_ASSERT(result, result.message());
+    upstream_with_request = waitForNextUpstreamConnection(upstream_indices, connection_wait_timeout,
+                                                          fake_upstream_connection_);
   }
   // Wait for the next stream on the upstream connection.
   AssertionResult result =
@@ -565,6 +585,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
+  response->waitForHeaders();
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
@@ -802,7 +823,9 @@ void HttpIntegrationTest::testGrpcRetry() {
 }
 
 void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
-                                                       const std::string& via) {
+                                                       const std::string& via,
+                                                       bool disconnect_after_100) {
+  useAccessLog("%RESPONSE_CODE%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -823,12 +846,13 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Verify the Expect header is stripped.
-  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Expect));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect).empty());
   if (via.empty()) {
-    EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Via));
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Via).empty());
   } else {
-    EXPECT_EQ(via,
-              upstream_request_->headers().get(Http::Headers::get().Via)->value().getStringView());
+    EXPECT_EQ(
+        via,
+        upstream_request_->headers().get(Http::Headers::get().Via)[0]->value().getStringView());
   }
 
   if (additional_continue_from_upstream) {
@@ -837,6 +861,15 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
     upstream_request_->encode100ContinueHeaders(
         Http::TestResponseHeaderMapImpl{{":status", "100"}});
   }
+
+  if (disconnect_after_100) {
+    response->waitForContinueHeaders();
+    codec_client_->close();
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("100"));
+    return;
+  }
+
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(12, true);
 
@@ -851,6 +884,7 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   } else {
     EXPECT_EQ(via.c_str(), response->headers().getViaValue());
   }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
 }
 
 void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
@@ -1083,7 +1117,6 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
@@ -1161,7 +1194,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   codec_client_->sendData(*request_encoder_, 0, true);
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)->value(), "a=b; c=d");
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(), "a=b; c=d");
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, false);
@@ -1240,7 +1273,6 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
                                                  {":authority", "host"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest(0);
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
@@ -1274,15 +1306,15 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
 
 void HttpIntegrationTest::testMaxStreamDuration() {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_stream_duration()->MergeFrom(
         ProtobufUtil::TimeUtil::MillisecondsToDuration(200));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
 
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
@@ -1304,18 +1336,18 @@ void HttpIntegrationTest::testMaxStreamDuration() {
 
 void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_stream_duration()->MergeFrom(
         ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
 
   Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{
       {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
   initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto encoder_decoder = codec_client_->startRequest(retriable_header);
@@ -1365,4 +1397,58 @@ std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name
   }
   return "listener.[__1]_0." + stat_name;
 }
+
+void Http2RawFrameIntegrationTest::startHttp2Session() {
+  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
+
+  // Send empty initial SETTINGS frame.
+  auto settings = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+
+  // Read initial SETTINGS frame from the server.
+  readFrame();
+
+  // Send an SETTINGS ACK.
+  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+
+  // read pending SETTINGS and WINDOW_UPDATE frames
+  readFrame();
+  readFrame();
+}
+
+void Http2RawFrameIntegrationTest::beginSession() {
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower outbound frame limits to make tests run faster
+  config_helper_.setDownstreamOutboundFramesLimits(1000, 100);
+  initialize();
+  // Set up a raw connection to easily send requests without reading responses.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
+  startHttp2Session();
+}
+
+Http2Frame Http2RawFrameIntegrationTest::readFrame() {
+  Http2Frame frame;
+  EXPECT_TRUE(tcp_client_->waitForData(frame.HeaderSize));
+  frame.setHeader(tcp_client_->data());
+  tcp_client_->clearData(frame.HeaderSize);
+  auto len = frame.payloadSize();
+  if (len) {
+    EXPECT_TRUE(tcp_client_->waitForData(len));
+    frame.setPayload(tcp_client_->data());
+    tcp_client_->clearData(len);
+  }
+  return frame;
+}
+
+void Http2RawFrameIntegrationTest::sendFrame(const Http2Frame& frame) {
+  ASSERT_TRUE(tcp_client_->connected());
+  ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
+}
+
 } // namespace Envoy

@@ -16,7 +16,8 @@ namespace Api {
 class ValidationImpl : public Impl {
 public:
   ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
-                 Event::TimeSystem& time_system, Filesystem::Instance& file_system);
+                 Event::TimeSystem& time_system, Filesystem::Instance& file_system,
+                 Random::RandomGenerator& random_generator);
 
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,

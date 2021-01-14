@@ -61,7 +61,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:random_generator_lib",  #FIXME
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:api_version_lib",

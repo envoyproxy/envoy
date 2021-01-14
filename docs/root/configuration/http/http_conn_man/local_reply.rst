@@ -49,6 +49,8 @@ The response body content type can be customized. If not specified, the content 
 
 Local reply format can be specified as :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`. It supports :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
 
+Optionally, content-type can be modified further via :ref:`content_type <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.content_type>` field. If not specified, default content-type is `text/plain` for :ref:`text_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.text_format>` and `application/json` for :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`.
+
 Example of a LocalReplyConfig with `body_format` field.
 
 .. code-block::
@@ -63,7 +65,8 @@ Example of a LocalReplyConfig with `body_format` field.
             runtime_key: key_b
     status_code: 401
     body_format_override:
-      text_format: "%LOCAL_REPLY_BODY% %REQ(:path)%"
+      text_format: "<h1>%LOCAL_REPLY_BODY% %REQ(:path)%</h1>"
+      content_type: "text/html; charset=UTF-8"
   - filter:
       status_code_filter:
         comparison:

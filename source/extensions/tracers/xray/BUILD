@@ -44,6 +44,7 @@ envoy_cc_library(
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
+        "//source/common/common:random_generator_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",

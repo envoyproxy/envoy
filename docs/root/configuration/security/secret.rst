@@ -33,6 +33,30 @@ SDS Configuration
 
 *SdsSecretConfig* is used in two fields in :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`. The first field is *tls_certificate_sds_secret_configs* to use SDS to get :ref:`TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`. The second field is *validation_context_sds_secret_config* to use SDS to get :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
 
+.. _sds_key_rotation:
+
+Key rotation
+------------
+
+It's usually preferrable to perform key rotation via gRPC SDS, but when this is not possible or
+desired (e.g. during bootstrap of SDS credentials), SDS allows for filesystem rotation when secrets
+refer to filesystem paths. This currently is supported for the following secret types:
+
+* :ref:`TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`
+* :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+
+By default, directories containing secrets are watched for filesystem move events. For example, a
+key or trusted CA certificates at ``/foo/bar/baz/cert.pem`` will be watched at `/foo/bar/baz`.
+Explicit control over the watched directory is possible by specifying a *watched_directory* path in
+:ref:`TlsCertificate
+<envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.watched_directory>` and
+:ref:`CertificateValidationContext
+<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.watched_directory>`.
+This allows watches to be established at path predecessors, e.g. ``/foo/bar``; this capability is
+useful when implementing common key rotation schemes.
+
+An example of key rotation is provided :ref:`below <xds_certificate_rotation>`.
+
 Example one: static_resource
 -----------------------------
 
@@ -99,7 +123,14 @@ This example shows how to configure secrets fetched from remote SDS servers:
 
     clusters:
       - name: sds_server_mtls
-        http2_protocol_options: {}
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options:
+                connection_keepalive:
+                  interval: 30s
+                  timeout: 5s
         load_assignment:
           cluster_name: sds_server_mtls
           endpoints:
@@ -120,7 +151,11 @@ This example shows how to configure secrets fetched from remote SDS servers:
               private_key:
                 filename: certs/sds_key.pem
       - name: sds_server_uds
-        http2_protocol_options: {}
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options: {}
         load_assignment:
           cluster_name: sds_server_uds
           endpoints:
@@ -142,8 +177,10 @@ This example shows how to configure secrets fetched from remote SDS servers:
                 tls_certificate_sds_secret_configs:
                 - name: client_cert
                   sds_config:
+                    resource_api_version: V3
                     api_config_source:
                       api_type: GRPC
+                      transport_api_version: V3
                       grpc_services:
                         google_grpc:
                           target_uri: unix:/tmp/uds_path
@@ -158,16 +195,20 @@ This example shows how to configure secrets fetched from remote SDS servers:
               tls_certificate_sds_secret_configs:
               - name: server_cert
                 sds_config:
+                  resource_api_version: V3
                   api_config_source:
                     api_type: GRPC
+                    transport_api_version: V3
                     grpc_services:
                       envoy_grpc:
                         cluster_name: sds_server_mtls
               validation_context_sds_secret_config:
                 name: validation_context
                 sds_config:
+                  resource_api_version: V3
                   api_config_source:
                     api_type: GRPC
+                    transport_api_version: V3
                     grpc_services:
                       envoy_grpc:
                         cluster_name: sds_server_uds
@@ -201,16 +242,22 @@ In contrast, :ref:`sds_server_example` requires a restart to reload xDS certific
                 socket_address:
                   address: controlplane
                   port_value: 8443
-      http2_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
       transport_socket:
         name: "envoy.transport_sockets.tls"
         typed_config:
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext"
           common_tls_context:
             tls_certificate_sds_secret_configs:
+              name: tls_sds
               sds_config:
                 path: /etc/envoy/tls_certificate_sds_secret.yaml
             validation_context_sds_secret_config:
+              name: validation_context_sds
               sds_config:
                 path: /etc/envoy/validation_context_sds_secret.yaml
 
@@ -236,6 +283,39 @@ Path to CA certificate bundle for validating the xDS server certificate is given
           trusted_ca:
             filename: /certs/cacert.pem
 
+In the above example, a watch will be established on ``/certs``. File movement in this directory
+will trigger an update. An alternative common key rotation scheme that provides improved atomicity
+is to establish an active symlink ``/certs/current`` and use an atomic move operation to replace the
+symlink. The watch in this case needs to be on the certificate's grandparent directory. Envoy
+supports this scheme via the use of *watched_directory*. Continuing the above examples:
+
+.. code-block:: yaml
+
+    resources:
+      - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        tls_certificate:
+          certificate_chain:
+            filename: /certs/current/sds_cert.pem
+          private_key:
+            filename: /certs/current/sds_key.pem
+          watched_directory:
+            path: /certs
+
+.. code-block:: yaml
+
+    resources:
+      - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+        validation_context:
+          trusted_ca:
+            filename: /certs/current/cacert.pem
+          watched_directory:
+            path: /certs
+
+Secret rotation can be performed with:
+
+.. code-block:: bash
+
+  ln -s <path to new secrets> /certs/new && mv -Tf /certs/new /certs/current
 
 Statistics
 ----------
@@ -258,3 +338,12 @@ For upstream clusters, they are in the *cluster.<CLUSTER_NAME>.client_ssl_socket
 
      ssl_context_update_by_sds, Total number of ssl context has been updated.
      upstream_context_secrets_not_ready, Total number of upstream connections reset due to empty ssl certificate.
+
+SDS has a :ref:`statistics <subscription_statistics>` tree rooted in the *sds.<SECRET_NAME>.*
+namespace. In addition, the following statistics are tracked in this namespace:
+
+.. csv-table::
+     :header: Name, Description
+     :widths: 1, 2
+
+     key_rotation_failed, Total number of filesystem key rotations that failed outside of an SDS update.

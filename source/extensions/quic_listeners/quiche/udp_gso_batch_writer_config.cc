@@ -19,7 +19,13 @@ UdpGsoBatchWriterConfigFactory::createUdpPacketWriterFactory(const Protobuf::Mes
     throw EnvoyException("Error configuring batch writer on platform without support "
                          "for UDP GSO. Reset udp_writer_config to default writer");
   }
+
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
   return std::make_unique<UdpGsoBatchWriterFactory>();
+#else
+  // On non-linux, `supportsUdpGso()` always returns false.
+  NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
 }
 
 std::string UdpGsoBatchWriterConfigFactory::name() const { return GsoBatchWriterName; }

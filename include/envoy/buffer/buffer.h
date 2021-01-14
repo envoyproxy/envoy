@@ -9,7 +9,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/io_handle.h"
 
 #include "common/common/byte_order.h"
 #include "common/common/utility.h"
@@ -30,6 +29,7 @@ struct RawSlice {
   size_t len_ = 0;
 
   bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
+  bool operator!=(const RawSlice& rhs) const { return !(*this == rhs); }
 };
 
 using RawSliceVector = absl::InlinedVector<RawSlice, 16>;
@@ -162,6 +162,14 @@ public:
   getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
 
   /**
+   * Fetch the valid data pointer and valid data length of the first non-zero-length
+   * slice in the buffer.
+   * @return RawSlice the first non-empty slice in the buffer, or {nullptr, 0} if the buffer
+   * is empty.
+   */
+  virtual RawSlice frontSlice() const PURE;
+
+  /**
    * Transfer ownership of the front slice to the caller. Must only be called if the
    * buffer is not empty otherwise the implementation will have undefined behavior.
    * If the underlying slice is immutable then the implementation must create and return
@@ -192,15 +200,6 @@ public:
    * @param length supplies the amount of data to move.
    */
   virtual void move(Instance& rhs, uint64_t length) PURE;
-
-  /**
-   * Read from a file descriptor directly into the buffer.
-   * @param io_handle supplies the io handle to read from.
-   * @param max_length supplies the maximum length to read.
-   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
-   * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
-   */
-  virtual Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) PURE;
 
   /**
    * Reserve space in the buffer.
@@ -247,15 +246,6 @@ public:
   virtual std::string toString() const PURE;
 
   /**
-   * Write the buffer out to a file descriptor.
-   * @param io_handle supplies the io_handle to write to.
-   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
-   * written if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be
-   * used.
-   */
-  virtual Api::IoCallUint64Result write(Network::IoHandle& io_handle) PURE;
-
-  /**
    * Copy an integer out of the buffer.
    * @param start supplies the buffer index to start copying from.
    * @param Size how many bytes to read out of the buffer.
@@ -283,7 +273,7 @@ public:
    * deduced from the size of the type T
    */
   template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
-  T peekInt(uint64_t start = 0) {
+  T peekInt(uint64_t start = 0) const {
     static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
 
     if (length() < start + Size) {
@@ -319,7 +309,7 @@ public:
    * @param start supplies the buffer index to start copying from.
    * @param Size how many bytes to read out of the buffer.
    */
-  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) {
+  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) const {
     return peekInt<T, ByteOrder::LittleEndian, Size>(start);
   }
 
@@ -328,7 +318,7 @@ public:
    * @param start supplies the buffer index to start copying from.
    * @param Size how many bytes to read out of the buffer.
    */
-  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) {
+  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) const {
     return peekInt<T, ByteOrder::BigEndian, Size>(start);
   }
 
@@ -404,6 +394,26 @@ public:
   template <typename T, size_t Size = sizeof(T)> void writeBEInt(T value) {
     writeInt<ByteOrder::BigEndian, T, Size>(value);
   }
+
+  /**
+   * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
+   * watermark. Setting the high watermark to 0 disables watermark functionality.
+   * @param watermark supplies the buffer high watermark size threshold, in bytes.
+   */
+  virtual void setWatermarks(uint32_t watermark) PURE;
+  /**
+   * Returns the configured high watermark. A return value of 0 indicates that watermark
+   * functionality is disabled.
+   */
+  virtual uint32_t highWatermark() const PURE;
+  /**
+   * Determine if the buffer watermark trigger condition is currently set. The watermark trigger is
+   * set when the buffer size exceeds the configured high watermark and is cleared once the buffer
+   * size drops to the low watermark.
+   * @return true if the buffer size once exceeded the high watermark and hasn't since dropped to
+   * the low watermark.
+   */
+  virtual bool highWatermarkTriggered() const PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
@@ -429,6 +439,7 @@ public:
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
+using WatermarkFactorySharedPtr = std::shared_ptr<WatermarkFactory>;
 
 } // namespace Buffer
 } // namespace Envoy

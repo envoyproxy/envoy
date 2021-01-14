@@ -38,16 +38,18 @@ public:
 protected:
   Address::Instance* getServerLoopbackAddress() {
     if (version_ == Address::IpVersion::v4) {
-      return new Address::Ipv4Instance(Network::Test::getLoopbackAddressString(version_),
-                                       server_socket_->localAddress()->ip()->port());
+      return new Address::Ipv4Instance(
+          Network::Test::getLoopbackAddressString(version_),
+          server_socket_->addressProvider().localAddress()->ip()->port());
     }
-    return new Address::Ipv6Instance(Network::Test::getLoopbackAddressString(version_),
-                                     server_socket_->localAddress()->ip()->port());
+    return new Address::Ipv6Instance(
+        Network::Test::getLoopbackAddressString(version_),
+        server_socket_->addressProvider().localAddress()->ip()->port());
   }
 
   SocketSharedPtr createServerSocket(bool bind) {
     // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
-    return std::make_shared<UdpListenSocket>(Network::Test::getAnyAddress(version_),
+    return std::make_shared<UdpListenSocket>(Network::Test::getCanonicalLoopbackAddress(version_),
 #ifdef IP_FREEBIND
                                              SocketOptionFactory::buildIpFreebindOptions(),
 #else
@@ -64,12 +66,7 @@ protected:
     if (version_ == Address::IpVersion::v4) {
       // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
       send_from_addr = std::make_shared<Address::Ipv4Instance>(
-#ifndef __APPLE__
-          "127.1.2.3",
-#else
-          "127.0.0.1",
-#endif
-          server_socket_->localAddress()->ip()->port());
+          "127.0.0.1", server_socket_->addressProvider().localAddress()->ip()->port());
     } else {
       // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
       // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
@@ -81,7 +78,7 @@ protected:
 #else
           "::1",
 #endif
-          server_socket_->localAddress()->ip()->port());
+          server_socket_->addressProvider().localAddress()->ip()->port());
     }
     return send_from_addr;
   }

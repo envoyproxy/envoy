@@ -53,7 +53,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Upstream::ThreadLocalCluster* cluster = config_->clusterManager().get(route_entry->clusterName());
+  Upstream::ThreadLocalCluster* cluster =
+      config_->clusterManager().getThreadLocalCluster(route_entry->clusterName());
   if (!cluster) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -108,9 +109,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     const auto& host_rewrite_header = config->hostRewriteHeader();
     if (!host_rewrite_header.get().empty()) {
-      const auto* header = headers.get(host_rewrite_header);
-      if (header != nullptr) {
-        const auto& header_value = header->value().getStringView();
+      const auto header = headers.get(host_rewrite_header);
+      if (!header.empty()) {
+        // This is an implicitly untrusted header, so per the API documentation only the first
+        // value is used.
+        const auto& header_value = header[0]->value().getStringView();
         headers.setHost(header_value);
       }
     }
@@ -129,17 +132,15 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   switch (result.status_) {
-  case LoadDnsCacheEntryStatus::InCache: {
+  case LoadDnsCacheEntryStatus::InCache:
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache entry already loaded, continuing", *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
-  }
-  case LoadDnsCacheEntryStatus::Loading: {
+  case LoadDnsCacheEntryStatus::Loading:
     ASSERT(cache_load_handle_ != nullptr);
     ENVOY_STREAM_LOG(debug, "waiting to load DNS cache entry", *decoder_callbacks_);
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-  }
-  case LoadDnsCacheEntryStatus::Overflow: {
+  case LoadDnsCacheEntryStatus::Overflow:
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_STREAM_LOG(debug, "DNS cache overflow", *decoder_callbacks_);
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
@@ -147,8 +148,6 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
                                        absl::nullopt, ResponseStrings::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  }
-
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 

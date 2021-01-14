@@ -17,6 +17,8 @@ public:
   ListenerFilterFuzzer() {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
     ON_CALL(cb_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher_));
+    ON_CALL(cb_, dynamicMetadata()).WillByDefault(testing::ReturnRef(metadata_));
+    ON_CALL(Const(cb_), dynamicMetadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
   void fuzz(Network::ListenerFilter& filter,
@@ -29,24 +31,36 @@ private:
   FakeConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
+  uint32_t events_;
+  envoy::config::core::v3::Metadata metadata_;
 };
 
-class FuzzedHeader {
+class FuzzedInputStream {
 public:
-  FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input);
+  FuzzedInputStream(const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
-  // Copies next read into buffer and returns the number of bytes written
-  Api::SysCallSizeResult next(void* buffer, size_t length);
+  FuzzedInputStream(std::vector<uint8_t> buffer, std::vector<size_t> indices);
 
+  // Makes data from the next read available to read()
+  void next();
+
+  // Copies data into buffer and returns the number of bytes written
+  Api::SysCallSizeResult read(void* buffer, size_t length, bool peek);
+
+  // Returns the number of bytes currently available to read()
+  size_t size() const;
+
+  // Returns true if end of stream reached (no more reads)
   bool done();
 
   // Returns true if data field in proto is empty
   bool empty();
 
 private:
-  const int nreads_;            // Number of reads
-  int nread_;                   // Counter of current read
-  std::string header_;          // Construct header from single or multiple reads
+  const int nreads_; // Number of reads
+  int nread_ = 0;    // Counter of current read
+  size_t index_ = 0; // Index of first unread byte
+  std::vector<uint8_t> data_;
   std::vector<size_t> indices_; // Ending indices for each read
 };
 

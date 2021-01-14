@@ -1,7 +1,30 @@
 #include "common/config/well_known_names.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Config {
+
+namespace {
+
+// To allow for more readable regular expressions to be declared below, and to
+// reduce duplication, define a few common pattern substitutions for regex
+// segments.
+std::string expandRegex(const std::string& regex) {
+  return absl::StrReplaceAll(
+      regex, {// Regex to look for either IPv4 or IPv6 addresses plus port number after underscore.
+              {"<ADDRESS>", R"((?:(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[[a-fA-F_\d]+\])_\d+))"},
+              // Cipher names can contain alphanumerics with dashes and
+              // underscores.
+              {"<CIPHER>", R"([\w-]+)"},
+              // A generic name can contain any character except dots.
+              {"<NAME>", R"([^\.]+)"},
+              // Route names may contain dots in addition to alphanumerics and
+              // dashes with underscores.
+              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"}});
+}
+
+} // namespace
 
 TagNameValues::TagNameValues() {
   // Note: the default regexes are defined below in the order that they will typically be matched
@@ -24,99 +47,101 @@ TagNameValues::TagNameValues() {
   // - Typical * notation will be used to denote an arbitrary set of characters.
 
   // *_rq(_<response_code>)
-  addRegex(RESPONSE_CODE, "_rq(_(\\d{3}))$", "_rq_");
+  addRe2(RESPONSE_CODE, R"(_rq(_(\d{3}))$)", "_rq_");
 
   // *_rq_(<response_code_class>)xx
-  addRegex(RESPONSE_CODE_CLASS, "_rq_(\\d)xx$", "_rq_");
+  addRe2(RESPONSE_CODE_CLASS, R"(_rq_((\d))xx$)", "_rq_");
 
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.[<operation_name>.](__partition_id=<last_seven_characters_from_partition_id>)
-  addRegex(DYNAMO_PARTITION_ID,
-           "^http(?=\\.).*?\\.dynamodb\\.table(?=\\.).*?\\."
-           "capacity(?=\\.).*?(\\.__partition_id=(\\w{7}))$",
-           ".dynamodb.table.");
+  addRe2(DYNAMO_PARTITION_ID,
+         R"(^http\.<NAME>\.dynamodb\.table\.<NAME>\.capacity\.<NAME>(\.__partition_id=(\w{7}))$)",
+         ".dynamodb.table.");
 
-  // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)<base_stat> or
+  // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)* or
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.(<operation_name>.)[<partition_id>]
-  addRegex(DYNAMO_OPERATION,
-           "^http(?=\\.).*?\\.dynamodb.(?:operation|table(?="
-           "\\.).*?\\.capacity)(\\.(.*?))(?:\\.|$)",
-           ".dynamodb.");
+  addRe2(DYNAMO_OPERATION,
+         R"(^http\.<NAME>\.dynamodb.(?:operation|table\.<NAME>\.capacity)(\.(<NAME>))(?:\.|$))",
+         ".dynamodb.");
 
-  // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.<base_stat>
-  addRegex(MONGO_CALLSITE,
-           R"(^mongo(?=\.).*?\.collection(?=\.).*?\.callsite\.((.*?)\.).*?query.\w+?$)",
-           ".collection.");
+  // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
+  addRe2(MONGO_CALLSITE, R"(^mongo\.<NAME>\.collection\.<NAME>\.callsite\.((<NAME>)\.)query\.)",
+         ".collection.");
 
-  // http.[<stat_prefix>.]dynamodb.table.(<table_name>.) or
+  // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
-  addRegex(DYNAMO_TABLE, R"(^http(?=\.).*?\.dynamodb.(?:table|error)\.((.*?)\.))", ".dynamodb.");
+  addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
 
-  // mongo.[<stat_prefix>.]collection.(<collection>.)query.<base_stat>
-  addRegex(MONGO_COLLECTION, R"(^mongo(?=\.).*?\.collection\.((.*?)\.).*?query.\w+?$)",
-           ".collection.");
+  // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
+  addRe2(MONGO_COLLECTION, R"(^mongo\.<NAME>\.collection\.((<NAME>)\.).*?query\.)", ".collection.");
 
-  // mongo.[<stat_prefix>.]cmd.(<cmd>.)<base_stat>
-  addRegex(MONGO_CMD, R"(^mongo(?=\.).*?\.cmd\.((.*?)\.)\w+?$)", ".cmd.");
+  // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
+  addRe2(MONGO_CMD, R"(^mongo\.<NAME>\.cmd\.((<NAME>)\.))", ".cmd.");
 
-  // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)<base_stat>
-  addRegex(GRPC_BRIDGE_METHOD, R"(^cluster(?=\.).*?\.grpc(?=\.).*\.((.*?)\.)\w+?$)", ".grpc.");
+  // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
+  addRe2(GRPC_BRIDGE_METHOD, R"(^cluster\.<NAME>\.grpc\.<NAME>\.((<NAME>)\.))", ".grpc.");
 
-  // http.[<stat_prefix>.]user_agent.(<user_agent>.)<base_stat>
-  addRegex(HTTP_USER_AGENT, R"(^http(?=\.).*?\.user_agent\.((.*?)\.)\w+?$)", ".user_agent.");
+  // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
+  addRe2(HTTP_USER_AGENT, R"(^http\.<NAME>\.user_agent\.((<NAME>)\.))", ".user_agent.");
 
-  // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)<base_stat>
-  addRegex(VIRTUAL_CLUSTER, R"(^vhost(?=\.).*?\.vcluster\.((.*?)\.)\w+?$)", ".vcluster.");
+  // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)*
+  addRe2(VIRTUAL_CLUSTER, R"(^vhost\.<NAME>\.vcluster\.((<NAME>)\.))", ".vcluster.");
 
-  // http.[<stat_prefix>.]fault.(<downstream_cluster>.)<base_stat>
-  addRegex(FAULT_DOWNSTREAM_CLUSTER, R"(^http(?=\.).*?\.fault\.((.*?)\.)\w+?$)", ".fault.");
+  // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
+  addRe2(FAULT_DOWNSTREAM_CLUSTER, R"(^http\.<NAME>\.fault\.((<NAME>)\.))", ".fault.");
 
   // listener.[<address>.]ssl.cipher.(<cipher>)
-  addRegex(SSL_CIPHER, R"(^listener(?=\.).*?\.ssl\.cipher(\.(.*?))$)");
+  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.(<CIPHER>))$)");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
-  addRegex(SSL_CIPHER_SUITE, R"(^cluster(?=\.).*?\.ssl\.ciphers(\.(.*?))$)", ".ssl.ciphers.");
+  addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<NAME>\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRegex(GRPC_BRIDGE_SERVICE, R"(^cluster(?=\.).*?\.grpc\.((.*?)\.))", ".grpc.");
+  addRe2(GRPC_BRIDGE_SERVICE, R"(^cluster\.<NAME>\.grpc\.((<NAME>)\.))", ".grpc.");
 
-  // tcp.(<stat_prefix>.)<base_stat>
-  addRegex(TCP_PREFIX, R"(^tcp\.((.*?)\.)\w+?$)");
+  // tcp.(<stat_prefix>.)*
+  addRe2(TCP_PREFIX, R"(^tcp\.((<NAME>)\.))");
 
-  // auth.clientssl.(<stat_prefix>.)<base_stat>
-  addRegex(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((.*?)\.)\w+?$)");
+  // udp.(<stat_prefix>.)*
+  addRe2(UDP_PREFIX, R"(^udp\.((<NAME>)\.))");
 
-  // ratelimit.(<stat_prefix>.)<base_stat>
-  addRegex(RATELIMIT_PREFIX, R"(^ratelimit\.((.*?)\.)\w+?$)");
+  // auth.clientssl.(<stat_prefix>.)*
+  addRe2(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((<NAME>)\.))");
+
+  // ratelimit.(<stat_prefix>.)*
+  addRe2(RATELIMIT_PREFIX, R"(^ratelimit\.((<NAME>)\.))");
 
   // cluster.(<cluster_name>.)*
-  addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
+  addRe2(CLUSTER_NAME, R"(^cluster\.((<NAME>)\.))");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, R"(^listener(?=\.).*?\.http\.((.*?)\.))", ".http.");
+  // The <address> part can be anything here (.*?) for the sake of a simpler
+  // internal state of the regex which performs better.
+  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<NAME>)\.))", ".http.");
 
   // http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, "^http\\.((.*?)\\.)");
+  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^http\.((<NAME>)\.))");
 
   // listener.(<address>.)*
-  addRegex(LISTENER_ADDRESS,
-           R"(^listener\.(((?:[_.[:digit:]]*|[_\[\]aAbBcCdDeEfF[:digit:]]*))\.))");
+  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
 
   // vhost.(<virtual host name>.)*
-  addRegex(VIRTUAL_HOST, "^vhost\\.((.*?)\\.)");
+  addRe2(VIRTUAL_HOST, R"(^vhost\.((<NAME>)\.))");
 
   // mongo.(<stat_prefix>.)*
-  addRegex(MONGO_PREFIX, "^mongo\\.((.*?)\\.)");
+  addRe2(MONGO_PREFIX, R"(^mongo\.((<NAME>)\.))");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
-  addRegex(RDS_ROUTE_CONFIG, R"(^http(?=\.).*?\.rds\.((.*?)\.)\w+?$)", ".rds.");
+  // Note: <route_config_name> can contain dots thus we have to maintain full
+  // match.
+  addRe2(RDS_ROUTE_CONFIG, R"(^http\.<NAME>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
   // listener_manager.(worker_<id>.)*
-  addRegex(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
+  addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
 }
 
-void TagNameValues::addRegex(const std::string& name, const std::string& regex,
-                             const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor(name, regex, substr));
+void TagNameValues::addRe2(const std::string& name, const std::string& regex,
+                           const std::string& substr) {
+  descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
 }
 
 } // namespace Config

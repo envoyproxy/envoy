@@ -39,12 +39,11 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    security_posture = "robust_to_untrusted_downstream",
     # TODO(#9953) clean up.
-    visibility = [
-        "//:extension_config",
+    extra_visibility = [
         "//test/integration:__subpackages__",
     ],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",

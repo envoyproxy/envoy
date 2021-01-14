@@ -22,9 +22,10 @@ envoy_cc_mock(
     name = "mock_lib",
     hdrs = ["mock.h"],
     deps = [
+        "//source/common/http:message_lib",
         "//source/extensions/filters/http/jwt_authn:authenticator_lib",
         "//source/extensions/filters/http/jwt_authn:verifier_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -117,7 +118,6 @@ envoy_extension_cc_test(
     name = "filter_integration_test",
     srcs = ["filter_integration_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -140,6 +140,7 @@ envoy_extension_cc_test(
         ":mock_lib",
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:matchers_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],

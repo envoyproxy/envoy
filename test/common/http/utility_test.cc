@@ -9,7 +9,6 @@
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
@@ -421,6 +420,39 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
   }
 }
 
+TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
+  envoy::config::core::v3::Http1ProtocolOptions http1_options;
+  Protobuf::BoolValue hcm_value;
+
+  // nothing explicitly configured, default to false (i.e. default stream error behavior for HCM)
+  EXPECT_FALSE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  // http1_options.stream_error overrides HCM.stream_error
+  http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  hcm_value.set_value(false);
+  EXPECT_TRUE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  // http1_options.stream_error overrides HCM.stream_error (flip boolean value)
+  http1_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
+  hcm_value.set_value(true);
+  EXPECT_FALSE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  http1_options.clear_override_stream_error_on_invalid_http_message();
+
+  // fallback to HCM.stream_error
+  hcm_value.set_value(true);
+  EXPECT_TRUE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+
+  // fallback to HCM.stream_error (flip boolean value)
+  hcm_value.set_value(false);
+  EXPECT_FALSE(
+      Utility::parseHttp1Settings(http1_options, hcm_value).stream_error_on_invalid_http_message_);
+}
+
 TEST(HttpUtility, getLastAddressFromXFF) {
   {
     const std::string first_address = "192.0.2.10";
@@ -576,6 +608,7 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
+  EXPECT_CALL(callbacks, streamInfo());
   Utility::sendLocalReply(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
@@ -585,6 +618,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
@@ -612,6 +646,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 }
   )EOF";
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), "200");
@@ -630,6 +665,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
 TEST(HttpUtility, RateLimitedGrpcStatus) {
   MockStreamDecoderFilterCallbacks callbacks;
 
+  EXPECT_CALL(callbacks, streamInfo()).Times(testing::AnyNumber());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
@@ -658,6 +694,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
     is_reset = true;
   }));
@@ -670,6 +707,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
+  EXPECT_CALL(callbacks, streamInfo());
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
@@ -716,6 +754,13 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
   EXPECT_EQ(path, "/:/adsf");
 }
 
+TEST(HttpUtility, LocalPathFromFilePath) {
+  EXPECT_EQ("/", Utility::localPathFromFilePath(""));
+  EXPECT_EQ("c:/", Utility::localPathFromFilePath("c:/"));
+  EXPECT_EQ("Z:/foo/bar", Utility::localPathFromFilePath("Z:/foo/bar"));
+  EXPECT_EQ("/foo/bar", Utility::localPathFromFilePath("foo/bar"));
+}
+
 TEST(HttpUtility, TestPrepareHeaders) {
   envoy::config::core::v3::HttpUri http_uri;
   http_uri.set_uri("scheme://dns.name/x/y/z");
@@ -745,6 +790,8 @@ TEST(HttpUtility, ResetReasonToString) {
   EXPECT_EQ("remote reset", Utility::resetReasonToString(Http::StreamResetReason::RemoteReset));
   EXPECT_EQ("remote refused stream reset",
             Utility::resetReasonToString(Http::StreamResetReason::RemoteRefusedStreamReset));
+  EXPECT_EQ("remote error with CONNECT request",
+            Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
 }
 
 // Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
@@ -775,8 +822,8 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   EXPECT_EQ(&testConfig, resolved_filter_config);
 }
 
-// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per filter
-// config.
+// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per
+// filter config.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
@@ -1200,110 +1247,111 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
 TEST(Url, ParsingFails) {
   Utility::Url url;
-  const bool is_connect = true;
-  EXPECT_FALSE(url.initialize("", !is_connect));
-  EXPECT_FALSE(url.initialize("foo", !is_connect));
-  EXPECT_FALSE(url.initialize("http://", !is_connect));
-  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", !is_connect));
-  // Only port value in valid range (1-65535) is allowed.
-  EXPECT_FALSE(url.initialize("http://host.com:65536/path", !is_connect));
-  EXPECT_FALSE(url.initialize("http://host.com:0/path", !is_connect));
-  EXPECT_FALSE(url.initialize("http://host.com:-1/path", !is_connect));
-  EXPECT_FALSE(url.initialize("http://host.com:port/path", !is_connect));
-
-  // Test parsing fails for CONNECT request URLs.
-  EXPECT_FALSE(url.initialize("http://www.foo.com", is_connect));
-  EXPECT_FALSE(url.initialize("foo.com", is_connect));
-  // Only port value in valid range (1-65535) is allowed.
-  EXPECT_FALSE(url.initialize("foo.com:65536", is_connect));
-  EXPECT_FALSE(url.initialize("foo.com:0", is_connect));
-  EXPECT_FALSE(url.initialize("foo.com:-1", is_connect));
-  EXPECT_FALSE(url.initialize("foo.com:port", is_connect));
+  EXPECT_FALSE(url.initialize("", false));
+  EXPECT_FALSE(url.initialize("foo", false));
+  EXPECT_FALSE(url.initialize("http://", false));
+  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", false));
+  EXPECT_FALSE(url.initialize("http://www.foo.com", true));
+  EXPECT_FALSE(url.initialize("foo.com", true));
+  EXPECT_FALSE(url.initialize("http://[notaddress]:80/?query=param", false));
+  EXPECT_FALSE(url.initialize("http://[1::z::2]:80/?query=param", false));
+  EXPECT_FALSE(url.initialize("http://1.2.3.4:65536/?query=param", false));
 }
 
 void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
-                 absl::string_view expected_host_port, absl::string_view expected_path,
-                 uint16_t expected_port) {
+                 absl::string_view expected_host_port, absl::string_view expected_path) {
   Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url, /*is_connect=*/false)) << "Failed to initialize " << raw_url;
+  ASSERT_TRUE(url.initialize(raw_url, false)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.hostAndPort(), expected_host_port);
   EXPECT_EQ(url.pathAndQueryParams(), expected_path);
-  EXPECT_EQ(url.port(), expected_port);
+}
+
+void validateConnectUrl(absl::string_view raw_url) {
+  Utility::Url url;
+  ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
+  EXPECT_TRUE(url.scheme().empty());
+  EXPECT_TRUE(url.pathAndQueryParams().empty());
+  EXPECT_EQ(url.hostAndPort(), raw_url);
+}
+
+void invalidConnectUrl(absl::string_view raw_url) {
+  Utility::Url url;
+  ASSERT_FALSE(url.initialize(raw_url, true)) << "Unexpectedly initialized " << raw_url;
 }
 
 TEST(Url, ParsingTest) {
-  // Test url with no explicit path (with and without port).
-  validateUrl("http://www.host.com", "http", "www.host.com", "/", 80);
-  validateUrl("http://www.host.com:80", "http", "www.host.com", "/", 80);
+  // Test url with no explicit path (with and without port)
+  validateUrl("http://www.host.com", "http", "www.host.com", "/");
+  validateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");
 
   // Test url with "/" path.
-  validateUrl("http://www.host.com:80/", "http", "www.host.com", "/", 80);
-  validateUrl("http://www.host.com/", "http", "www.host.com", "/", 80);
+  validateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
+  validateUrl("http://www.host.com/", "http", "www.host.com", "/");
 
   // Test url with "?".
-  validateUrl("http://www.host.com:80/?", "http", "www.host.com", "/?", 80);
-  validateUrl("http://www.host.com/?", "http", "www.host.com", "/?", 80);
+  validateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?");
+  validateUrl("http://www.host.com/?", "http", "www.host.com", "/?");
 
   // Test url with "?" but without slash.
-  validateUrl("http://www.host.com:80?", "http", "www.host.com", "/?", 80);
-  validateUrl("http://www.host.com?", "http", "www.host.com", "/?", 80);
+  validateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?");
+  validateUrl("http://www.host.com?", "http", "www.host.com", "?");
 
-  // Test url with multi-character path.
-  validateUrl("http://www.host.com:80/path", "http", "www.host.com", "/path", 80);
-  validateUrl("http://www.host.com/path", "http", "www.host.com", "/path", 80);
+  // Test url with multi-character path
+  validateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
+  validateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
 
-  // Test url with multi-character path and ? at the end.
-  validateUrl("http://www.host.com:80/path?", "http", "www.host.com", "/path?", 80);
-  validateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?", 80);
+  // Test url with multi-character path and ? at the end
+  validateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?");
+  validateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?");
 
-  // Test https scheme.
-  validateUrl("https://www.host.com", "https", "www.host.com", "/", 443);
+  // Test https scheme
+  validateUrl("https://www.host.com", "https", "www.host.com", "/");
 
-  // Test url with query parameter.
-  validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com", "/?query=param", 80);
-  validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param", 80);
+  // Test url with query parameter
+  validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
+  validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
 
-  // Test url with query parameter but without slash. It will be normalized.
-  validateUrl("http://www.host.com:80?query=param", "http", "www.host.com", "/?query=param", 80);
-  validateUrl("http://www.host.com?query=param", "http", "www.host.com", "/?query=param", 80);
+  // Test with an ipv4 host address.
+  validateUrl("http://1.2.3.4/?query=param", "http", "1.2.3.4", "/?query=param");
+  validateUrl("http://1.2.3.4:80/?query=param", "http", "1.2.3.4:80", "/?query=param");
 
-  // Test url with multi-character path and query parameter.
-  validateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com",
-              "/path?query=param", 80);
-  validateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param",
-              80);
+  // Test with an ipv6 address
+  validateUrl("http://[1::2:3]/?query=param", "http", "[1::2:3]", "/?query=param");
+  validateUrl("http://[1::2:3]:80/?query=param", "http", "[1::2:3]:80", "/?query=param");
 
-  // Test url with multi-character path and more than one query parameter.
-  validateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com",
-              "/path?query=param&query2=param2", 80);
+  // Test url with query parameter but without slash
+  validateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
+  validateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
+
+  // Test url with multi-character path and query parameter
+  validateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
+              "/path?query=param");
+  validateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
+
+  // Test url with multi-character path and more than one query parameter
+  validateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
+              "/path?query=param&query2=param2");
   validateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
-              "/path?query=param&query2=param2", 80);
-
+              "/path?query=param&query2=param2");
   // Test url with multi-character path, more than one query parameter and fragment
   validateUrl("http://www.host.com:80/path?query=param&query2=param2#fragment", "http",
-              "www.host.com", "/path?query=param&query2=param2#fragment", 80);
+              "www.host.com:80", "/path?query=param&query2=param2#fragment");
   validateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
-              "/path?query=param&query2=param2#fragment", 80);
-
-  // Test url with non-default ports.
-  validateUrl("https://www.host.com:8443", "https", "www.host.com:8443", "/", 8443);
-  validateUrl("http://www.host.com:8080", "http", "www.host.com:8080", "/", 8080);
-}
-
-void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port,
-                        uint16_t expected_port) {
-  Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url, /*is_connect=*/true)) << "Failed to initialize " << raw_url;
-  EXPECT_TRUE(url.scheme().empty());
-  EXPECT_TRUE(url.pathAndQueryParams().empty());
-  EXPECT_EQ(url.hostAndPort(), expected_host_port);
-  EXPECT_EQ(url.port(), expected_port);
+              "/path?query=param&query2=param2#fragment");
 }
 
 TEST(Url, ParsingForConnectTest) {
-  validateConnectUrl("host.com:443", "host.com:443", 443);
-  validateConnectUrl("host.com:80", "host.com:80", 80);
+  validateConnectUrl("host.com:443");
+  validateConnectUrl("host.com:80");
+  validateConnectUrl("1.2.3.4:80");
+  validateConnectUrl("[1:2::3:4]:80");
+
+  invalidConnectUrl("[::12345678]:80");
+  invalidConnectUrl("[1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1]:80");
+  invalidConnectUrl("[1:1]:80");
+  invalidConnectUrl("[:::]:80");
+  invalidConnectUrl("[::1::]:80");
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,

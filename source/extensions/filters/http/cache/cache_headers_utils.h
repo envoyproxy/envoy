@@ -1,8 +1,16 @@
 #pragma once
 
 #include "envoy/common/time.h"
+#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 #include "envoy/http/header_map.h"
 
+#include "common/common/matchers.h"
+#include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
+#include "common/http/headers.h"
+#include "common/protobuf/protobuf.h"
+
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 
@@ -82,9 +90,6 @@ struct ResponseCacheControl {
   OptionalDuration max_age_;
 };
 
-std::ostream& operator<<(std::ostream& os, const OptionalDuration& duration);
-std::ostream& operator<<(std::ostream& os, const RequestCacheControl& request_cache_control);
-std::ostream& operator<<(std::ostream& os, const ResponseCacheControl& response_cache_control);
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs);
 bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs);
 
@@ -94,13 +99,52 @@ public:
   // header_entry is null or malformed.
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
+  // Calculates the age of a cached response
+  static Seconds calculateAge(const Http::ResponseHeaderMap& response_headers,
+                              SystemTime response_time, SystemTime now);
+
   /**
    * Read a leading positive decimal integer value and advance "*str" past the
    * digits read. If overflow occurs, or no digits exist, return
    * absl::nullopt without advancing "*str".
    */
   static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
+
+  // Add to out all header names from the given map that match any of the given rules.
+  static void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
+                                        const std::vector<Matchers::StringMatcherPtr>& ruleset,
+                                        absl::flat_hash_set<absl::string_view>& out);
+
+  // Parses the values of a comma-delimited list as defined per
+  // https://tools.ietf.org/html/rfc7230#section-7.
+  static std::vector<std::string> parseCommaDelimitedList(const Http::HeaderMap::GetResult& entry);
 };
+
+class VaryHeader {
+public:
+  // Checks if the headers contain a non-empty value in the Vary header.
+  static bool hasVary(const Http::ResponseHeaderMap& headers);
+
+  // Creates a single string combining the values of the varied headers from entry_headers.
+  static std::string createVaryKey(const Http::HeaderMap::GetResult& vary_header,
+                                   const Http::RequestHeaderMap& entry_headers);
+
+  // Parses the allow list from the Cache Config into the object's private allow_list_.
+  VaryHeader(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& allow_list);
+
+  // Checks if the headers contain an allowed value in the Vary header.
+  bool isAllowed(const Http::ResponseHeaderMap& headers) const;
+
+  // Returns a header map containing the subset of the original headers that can be varied from the
+  // request.
+  Http::RequestHeaderMapPtr
+  possibleVariedHeaders(const Http::RequestHeaderMap& request_headers) const;
+
+private:
+  // Stores the matching rules that define whether a header is allowed to be varied.
+  std::vector<Matchers::StringMatcherPtr> allow_list_;
+};
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

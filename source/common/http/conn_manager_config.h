@@ -58,6 +58,7 @@ namespace Http {
   COUNTER(downstream_rq_response_before_rq_complete)                                               \
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_timeout)                                                                   \
+  COUNTER(downstream_rq_header_timeout)                                                            \
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
@@ -165,6 +166,18 @@ enum class ForwardClientCertType {
  * information to the next hop.
  */
 enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
+
+/**
+ * Type that indicates how port should be stripped from Host header.
+ */
+enum class StripPortType {
+  // Removes the port from host/authority header only if the port matches with the listener port.
+  MatchingHost,
+  // Removes any port from host/authority header.
+  Any,
+  // Keeps the port in host/authority header as is.
+  None
+};
 
 /**
  * Configuration for what addresses should be considered internal beyond the defaults.
@@ -288,6 +301,12 @@ public:
    *         a disabled request timeout.
    */
   virtual std::chrono::milliseconds requestTimeout() const PURE;
+
+  /**
+   * @return request header timeout for incoming connection manager connections. Zero indicates a
+   *         disabled request header timeout.
+   */
+  virtual std::chrono::milliseconds requestHeadersTimeout() const PURE;
 
   /**
    * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled
@@ -432,9 +451,9 @@ public:
   virtual bool shouldMergeSlashes() const PURE;
 
   /**
-   * @return if the HttpConnectionManager should remove the port from host/authority header
+   * @return port strip type from host/authority header.
    */
-  virtual bool shouldStripMatchingPort() const PURE;
+  virtual StripPortType stripPortType() const PURE;
 
   /**
    * @return the action HttpConnectionManager should take when receiving client request

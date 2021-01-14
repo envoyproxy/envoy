@@ -12,7 +12,8 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/global.h"
@@ -49,7 +50,7 @@ struct ToolConfig {
 private:
   ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
              std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers, int random_value);
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
 };
 
 /**
@@ -110,6 +111,11 @@ private:
    */
   void finalizeHeaders(ToolConfig& tool_config, Envoy::StreamInfo::StreamInfoImpl stream_info);
 
+  /*
+   * Performs direct-response reply actions for a response entry.
+   */
+  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry);
+
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected);
@@ -128,23 +134,28 @@ private:
   bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
-                                 const std::string& expected);
-  bool compareRequestHeaderField(ToolConfig& tool_config,
-                                 const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
-                                  const std::string& expected);
-  bool compareResponseHeaderField(ToolConfig& tool_config,
+  bool compareRequestHeaderFields(ToolConfig& tool_config,
                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareResponseHeaderFields(ToolConfig& tool_config,
+                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  template <typename HeaderMap>
+  bool matchHeaderField(const HeaderMap& header_map,
+                        const envoy::config::route::v3::HeaderMatcher& header,
+                        const std::string test_type);
+
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
    * @param actual holds the actual route returned by the router.
    * @param expected holds the expected parameter value of the route.
+   * @param expect_match negates the expectation if false.
    * @return bool if actual and expected match.
    */
   bool compareResults(const std::string& actual, const std::string& expected,
-                      const std::string& test_type);
+                      const std::string& test_type, const bool expect_match = true);
+
+  void reportFailure(const std::string& actual, const std::string& expected,
+                     const std::string& test_type, const bool expect_match = true);
 
   void printResults();
 

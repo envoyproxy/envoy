@@ -33,7 +33,7 @@ public:
       filters:
        -  name: rbac
           typed_config:
-            "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+            "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
             stat_prefix: tcp.
             rules:
               policies:
@@ -70,7 +70,7 @@ TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
   stat_prefix: tcp.
   rules:
     policies:
@@ -103,7 +103,7 @@ TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
   initializeFilter(R"EOF(
 name: rbac
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
   stat_prefix: tcp.
   rules:
     policies:
@@ -129,6 +129,33 @@ typed_config:
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction) {
+  useListenerAccessLog("%CONNECTION_TERMINATION_DETAILS%");
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    action: DENY
+    policies:
+      "deny all":
+        permissions:
+          - any: true
+        principals:
+          - any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_all]"));
 }
 
 } // namespace RBAC

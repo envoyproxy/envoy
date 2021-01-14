@@ -13,9 +13,11 @@ envoy_basic_cc_library(
     name = "base_includes",
     hdrs = [
         "exception.h",
+        "optref.h",
         "platform.h",
         "pure.h",
     ],
+    external_deps = ["abseil_optional"],
     include_prefix = "envoy/common",
 )
 
@@ -36,6 +38,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "random_generator_interface",
     hdrs = ["random_generator.h"],
+    deps = ["//source/common/common:interval_value"],
 )
 
 envoy_cc_library(

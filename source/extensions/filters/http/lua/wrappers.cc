@@ -1,5 +1,6 @@
 #include "extensions/filters/http/lua/wrappers.h"
 
+#include "common/http/header_utility.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/common/lua/wrappers.h"
@@ -42,10 +43,10 @@ int HeaderMapWrapper::luaAdd(lua_State* state) {
 
 int HeaderMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
-  const Http::HeaderEntry* entry = headers_.get(Http::LowerCaseString(key));
-  if (entry != nullptr) {
-    lua_pushlstring(state, entry->value().getStringView().data(),
-                    entry->value().getStringView().length());
+  const auto value =
+      Http::HeaderUtility::getAllOfHeaderAsString(headers_, Http::LowerCaseString(key));
+  if (value.result().has_value()) {
+    lua_pushlstring(state, value.result().value().data(), value.result().value().length());
     return 1;
   } else {
     return 0;
@@ -128,6 +129,18 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
+  lua_pushstring(state,
+                 stream_info_.downstreamAddressProvider().localAddress()->asString().c_str());
+  return 1;
+}
+
+int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
+  lua_pushstring(
+      state, stream_info_.downstreamAddressProvider().directRemoteAddress()->asString().c_str());
+  return 1;
+}
+
 DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
     : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
 
@@ -190,16 +203,10 @@ int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
 }
 
 int PublicKeyWrapper::luaGet(lua_State* state) {
-  if (public_key_ == nullptr || public_key_.get() == nullptr) {
+  if (public_key_.empty()) {
     lua_pushnil(state);
   } else {
-    auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*public_key_);
-    EVP_PKEY* pkey = wrapper->getEVP_PKEY();
-    if (pkey == nullptr) {
-      lua_pushnil(state);
-    } else {
-      lua_pushlightuserdata(state, public_key_.get());
-    }
+    lua_pushstring(state, public_key_.c_str());
   }
   return 1;
 }

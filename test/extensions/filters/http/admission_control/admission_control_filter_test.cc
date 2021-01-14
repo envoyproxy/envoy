@@ -48,7 +48,8 @@ public:
 class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-             Random::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
+             Random::RandomGenerator& random, Stats::Scope& scope,
+             ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
              MockThreadLocalController& controller, std::shared_ptr<ResponseEvaluator> evaluator)
       : AdmissionControlFilterConfig(proto_config, runtime, random, scope, std::move(tls),
                                      std::move(evaluator)),
@@ -66,7 +67,8 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    auto tls = context_.threadLocal().allocateSlot();
+    auto tls =
+        ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context_.threadLocal());
     evaluator_ = std::make_shared<MockResponseEvaluator>();
 
     return std::make_shared<TestConfig>(proto, runtime_, random_, scope_, std::move(tls),
@@ -98,6 +100,29 @@ public:
     filter_->encodeHeaders(headers, true);
   }
 
+  void verifyProbabilities(int success_rate, double expected_rejection_probability) {
+    // Success rate will be the same as the number of successful requests if the total request count
+    // is 100.
+    constexpr int total_request_count = 100;
+    EXPECT_CALL(controller_, requestCounts())
+        .WillRepeatedly(Return(RequestData(total_request_count, success_rate)));
+    EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
+
+    Http::TestRequestHeaderMapImpl request_headers;
+    uint32_t rejection_count = 0;
+    // Assuming 4 significant figures in rejection probability calculation.
+    const auto accuracy = 1e4;
+    for (int i = 0; i < accuracy; ++i) {
+      EXPECT_CALL(random_, random()).WillRepeatedly(Return(i));
+      if (filter_->decodeHeaders(request_headers, true) != Http::FilterHeadersStatus::Continue) {
+        ++rejection_count;
+      }
+    }
+
+    EXPECT_NEAR(static_cast<double>(rejection_count) / accuracy, expected_rejection_probability,
+                0.01);
+  }
+
 protected:
   std::string stats_prefix_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -114,7 +139,7 @@ enabled:
   default_value: true
   runtime_key: "foo.enabled"
 sampling_window: 10s
-aggression_coefficient:
+aggression:
   default_value: 1.0
   runtime_key: "foo.aggression"
 success_criteria:
@@ -130,7 +155,7 @@ enabled:
   default_value: true
   runtime_key: "foo.enabled"
 sampling_window: 10s
-aggression_coefficient:
+aggression:
   default_value: 1.0
   runtime_key: "foo.aggression"
 success_criteria:
@@ -280,6 +305,51 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
 
   // We expect rejection counter to NOT increment upon success.
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+}
+
+// Validate rejection probabilities.
+TEST_F(AdmissionControlTest, RejectionProbability) {
+  std::string yaml = R"EOF(
+enabled:
+  default_value: true
+  runtime_key: "foo.enabled"
+sampling_window: 10s
+sr_threshold:
+  default_value:
+    value: 100.0
+  runtime_key: "foo.threshold"
+aggression:
+  default_value: 1.0
+  runtime_key: "foo.aggression"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+)EOF";
+
+  auto config = makeConfig(yaml);
+  setupFilter(config);
+
+  verifyProbabilities(100 /* success rate */, 0.0 /* expected rejection probability */);
+  verifyProbabilities(95, 0.05);
+  verifyProbabilities(75, 0.25);
+
+  // Increase aggression and expect higher rejection probabilities for the same values.
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 1.0)).WillRepeatedly(Return(2.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.threshold", 100.0)).WillRepeatedly(Return(100.0));
+  verifyProbabilities(100, 0.0);
+  verifyProbabilities(95, 0.22);
+  verifyProbabilities(75, 0.5);
+
+  // Lower the success rate threshold and expect the rejections to begin at a lower SR and increase
+  // from there.
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 1.0)).WillRepeatedly(Return(1.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.threshold", 100.0)).WillRepeatedly(Return(95.0));
+  verifyProbabilities(100, 0.0);
+  verifyProbabilities(98, 0.0);
+  verifyProbabilities(95, 0.0);
+  verifyProbabilities(90, 0.05);
+  verifyProbabilities(75, 0.20);
+  verifyProbabilities(50, 0.46);
 }
 
 } // namespace

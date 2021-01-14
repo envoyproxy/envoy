@@ -19,6 +19,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
@@ -51,17 +52,81 @@ using PostCb = std::function<void()>;
 using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
 /**
+ * Minimal interface to the dispatching loop used to create low-level primitives. See Dispatcher
+ * below for the full interface.
+ */
+class DispatcherBase {
+public:
+  virtual ~DispatcherBase() = default;
+
+  /**
+   * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
+   * can be used for any file like interface (files, sockets, etc.).
+   * @param fd supplies the fd to watch.
+   * @param cb supplies the callback to fire when the file is ready.
+   * @param trigger specifies whether to edge or level trigger.
+   * @param events supplies a logical OR of FileReadyType events that the file event should
+   *               initially listen on.
+   */
+  virtual FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
+                                       uint32_t events) PURE;
+
+  /**
+   * Allocates a timer. @see Timer for docs on how to use the timer.
+   * @param cb supplies the callback to invoke when the timer fires.
+   */
+  virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
+
+  /**
+   * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
+   * callback.
+   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
+   * event loop.
+   */
+  virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
+
+  /**
+   * Sets a tracked object, which is currently operating in this Dispatcher.
+   * This should be cleared with another call to setTrackedObject() when the object is done doing
+   * work. Calling setTrackedObject(nullptr) results in no object being tracked.
+   *
+   * This is optimized for performance, to avoid allocation where we do scoped object tracking.
+   *
+   * @return The previously tracked object or nullptr if there was none.
+   */
+  virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
+
+  /**
+   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
+   * current thread of execution is on the same thread upon which the dispatcher loop is running.
+   */
+  virtual bool isThreadSafe() const PURE;
+
+  /**
+   * Returns a recently cached MonotonicTime value.
+   */
+  virtual MonotonicTime approximateMonotonicTime() const PURE;
+};
+
+/**
  * Abstract event dispatching loop.
  */
-class Dispatcher {
+class Dispatcher : public DispatcherBase {
 public:
-  virtual ~Dispatcher() = default;
-
   /**
    * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
    * @return const std::string& the name that identifies this dispatcher.
    */
   virtual const std::string& name() PURE;
+
+  /**
+   * Register a watchdog for this dispatcher. The dispatcher is responsible for touching the
+   * watchdog at least once per touch interval. Dispatcher implementations may choose to touch more
+   * often to avoid spurious miss events when processing long callback queues.
+   * @param min_touch_interval Touch interval for the watchdog.
+   */
+  virtual void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
+                                std::chrono::milliseconds min_touch_interval) PURE;
 
   /**
    * Returns a time-source to use with this dispatcher.
@@ -92,7 +157,7 @@ public:
    * @param stream_info info object for the server connection
    * @return Network::ConnectionPtr a server connection that is owned by the caller.
    */
-  virtual Network::ConnectionPtr
+  virtual Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
                          StreamInfo::StreamInfo& stream_info) PURE;
@@ -127,18 +192,6 @@ public:
                     bool use_tcp_for_dns_lookups) PURE;
 
   /**
-   * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
-   * can be used for any file like interface (files, sockets, etc.).
-   * @param fd supplies the fd to watch.
-   * @param cb supplies the callback to fire when the file is ready.
-   * @param trigger specifies whether to edge or level trigger.
-   * @param events supplies a logical OR of FileReadyType events that the file event should
-   *               initially listen on.
-   */
-  virtual FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
-                                       uint32_t events) PURE;
-
-  /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
    */
   virtual Filesystem::WatcherPtr createFilesystemWatcher() PURE;
@@ -148,11 +201,12 @@ public:
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param bind_to_port controls whether the listener binds to a transport port or not.
+   * @param backlog_size controls listener pending connections backlog
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                              Network::ListenerCallbacks& cb,
-                                              bool bind_to_port) PURE;
+                                              Network::TcpListenerCallbacks& cb, bool bind_to_port,
+                                              uint32_t backlog_size) PURE;
 
   /**
    * Creates a logical udp listener on a specific port.
@@ -160,22 +214,8 @@ public:
    * @param cb supplies the udp listener callbacks to invoke for listener events.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
+  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                                     Network::UdpListenerCallbacks& cb) PURE;
-  /**
-   * Allocates a timer. @see Timer for docs on how to use the timer.
-   * @param cb supplies the callback to invoke when the timer fires.
-   */
-  virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
-
-  /**
-   * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
-   * callback.
-   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
-   * event loop.
-   */
-  virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
-
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */
@@ -194,7 +234,7 @@ public:
    * @param cb supplies the callback to invoke when the signal fires.
    * @return SignalEventPtr a signal event that is owned by the caller.
    */
-  virtual SignalEventPtr listenForSignal(int signal_num, SignalCb cb) PURE;
+  virtual SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) PURE;
 
   /**
    * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context
@@ -224,28 +264,6 @@ public:
    * @return the watermark buffer factory for this dispatcher.
    */
   virtual Buffer::WatermarkFactory& getWatermarkFactory() PURE;
-
-  /**
-   * Sets a tracked object, which is currently operating in this Dispatcher.
-   * This should be cleared with another call to setTrackedObject() when the object is done doing
-   * work. Calling setTrackedObject(nullptr) results in no object being tracked.
-   *
-   * This is optimized for performance, to avoid allocation where we do scoped object tracking.
-   *
-   * @return The previously tracked object or nullptr if there was none.
-   */
-  virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
-
-  /**
-   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
-   * current thread of execution is on the same thread upon which the dispatcher loop is running.
-   */
-  virtual bool isThreadSafe() const PURE;
-
-  /**
-   * Returns a recently cached MonotonicTime value.
-   */
-  virtual MonotonicTime approximateMonotonicTime() const PURE;
 
   /**
    * Updates approximate monotonic time to current value.

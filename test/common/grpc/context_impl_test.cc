@@ -5,9 +5,9 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
 
@@ -18,7 +18,7 @@ namespace Grpc {
 
 TEST(GrpcContextTest, ChargeStats) {
   NiceMock<Upstream::MockClusterInfo> cluster;
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool(*symbol_table_);
   const Stats::StatName service = pool.add("service");
   const Stats::StatName method = pool.add("method");
@@ -68,7 +68,7 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   Http::TestRequestHeaderMapImpl headers;
   headers.setPath("/service_name/method_name?a=b");
   const Http::HeaderEntry* path = headers.Path();
-  Stats::TestSymbolTable symbol_table;
+  Stats::TestUtil::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
   absl::optional<Context::RequestStatNames> request_names =
       context.resolveDynamicServiceAndMethod(path);

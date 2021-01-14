@@ -492,7 +492,7 @@ INSTANTIATE_TEST_SUITE_P(
     InjectDataToFilterChainIntegrationTest::testParamsToString);
 
 TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShouldBeUnnoticeable) {
-  enable_half_close_ = true;
+  enableHalfClose(true);
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -515,7 +515,7 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   ASSERT_TRUE(fake_upstream_connection->write("there!", true));
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   tcp_client->waitForData("there!");
   tcp_client->waitForDisconnect();

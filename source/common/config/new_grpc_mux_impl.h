@@ -16,6 +16,7 @@
 #include "common/config/pausable_ack_queue.h"
 #include "common/config/watch_map.h"
 #include "common/grpc/common.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -39,10 +40,16 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder) override;
+                           OpaqueResourceDecoder& resource_decoder,
+                           const bool use_namespace_matching = false) override;
+
+  void requestOnDemandUpdate(const std::string& type_url,
+                             const std::set<std::string>& for_update) override;
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
+
+  void registerVersionedTypeUrl(const std::string& type_url);
 
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
@@ -60,8 +67,10 @@ public:
   void start() override;
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info)
-        : sub_state_(type_url, watch_map_, local_info) {}
+    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
+        : watch_map_(use_namespace_matching),
+          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -108,9 +117,10 @@ private:
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources);
+                   const std::set<std::string>& resources,
+                   const bool creating_namespace_watch = false);
 
-  void addSubscription(const std::string& type_url);
+  void addSubscription(const std::string& type_url, const bool use_namespace_matching);
 
   void trySendDiscoveryRequests();
 
@@ -145,6 +155,9 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+  Event::Dispatcher& dispatcher_;
+
+  const bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

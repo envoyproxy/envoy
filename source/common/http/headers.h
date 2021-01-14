@@ -59,8 +59,10 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
+  const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
@@ -102,7 +104,7 @@ public:
   } CORSValues;
 
   struct {
-    const std::string Default{"identity,deflate,gzip"};
+    const std::string Default{"identity"};
   } GrpcAcceptEncodingValues;
 
   struct {
@@ -119,7 +121,7 @@ using CustomHeaders = ConstSingleton<CustomHeaderValues>;
  */
 class HeaderValues {
 public:
-  const char* prefix() { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
+  const char* prefix() const { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
 
   const LowerCaseString Age{"age"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
@@ -127,11 +129,11 @@ public:
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
+  const LowerCaseString ContentRange{"content-range"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{absl::StrCat(prefix(), "-attempt-count")};
-  const LowerCaseString EnvoyAuthPartialBody{absl::StrCat(prefix(), "-auth-partial-body")};
   const LowerCaseString EnvoyCluster{absl::StrCat(prefix(), "-cluster")};
   const LowerCaseString EnvoyDegraded{absl::StrCat(prefix(), "-degraded")};
   const LowerCaseString EnvoyDownstreamServiceCluster{
@@ -208,6 +210,7 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
+  const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
@@ -303,6 +306,8 @@ public:
   } SchemeValues;
 
   struct {
+    const std::string Brotli{"br"};
+    const std::string Compress{"compress"};
     const std::string Chunked{"chunked"};
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};

@@ -27,12 +27,20 @@ TEST(CurlTest, BuiltWithExpectedFeatures) {
   EXPECT_NE(0, info->features & CURL_VERSION_HTTP2);
   EXPECT_EQ(0, info->features & CURL_VERSION_GSSAPI);
   EXPECT_EQ(0, info->features & CURL_VERSION_KERBEROS5);
+#ifndef WIN32
   EXPECT_NE(0, info->features & CURL_VERSION_UNIX_SOCKETS);
+#else
+  // TODO(wrowe): correct to expected, when curl 7.72 and later is patched
+  // or fixed upstream to include `afunix.h` in place of `sys/un.h` on recent
+  // Windows SDKs (it may be necessary to be more specific because older
+  // SDKs did not provide `afunix.h`)
+  EXPECT_EQ(0, info->features & CURL_VERSION_UNIX_SOCKETS);
+#endif
   EXPECT_EQ(0, info->features & CURL_VERSION_PSL);
   EXPECT_EQ(0, info->features & CURL_VERSION_HTTPS_PROXY);
   EXPECT_EQ(0, info->features & CURL_VERSION_MULTI_SSL);
   EXPECT_EQ(0, info->features & CURL_VERSION_BROTLI);
-  EXPECT_EQ(0, info->features & CURL_VERSION_ALTSVC);
+  EXPECT_NE(0, info->features & CURL_VERSION_ALTSVC);
   EXPECT_EQ(0, info->features & CURL_VERSION_HTTP3);
   EXPECT_NE(0, info->ares_num);
 }

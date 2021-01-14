@@ -140,7 +140,8 @@ int TestRunner::RunTests(int argc, char** argv) {
   Thread::MutexBasicLockable lock;
 
   Server::Options& options = TestEnvironment::getOptions();
-  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false);
+  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false,
+                                options.enableFineGrainLogging());
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;
@@ -151,7 +152,17 @@ int TestRunner::RunTests(int argc, char** argv) {
     file_logger = std::make_unique<Logger::FileSinkDelegate>(
         TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
   }
+
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+  // Fuzz tests may run Envoy tests in fuzzing mode to generate corpora. In this case, we do not
+  // want to fail building the fuzz test because of a failed test run, which can happen when testing
+  // functionality in fuzzing test mode. Dependencies (like RE2) change behavior when in fuzzing
+  // mode, so we do not want to rely on a behavior test when generating a corpus.
+  (void)RUN_ALL_TESTS();
+  return 0;
+#else
   return RUN_ALL_TESTS();
+#endif
 }
 
 } // namespace Envoy

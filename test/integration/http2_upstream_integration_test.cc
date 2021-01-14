@@ -203,6 +203,17 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
 
+TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
+  use_alpn_ = true;
+  simultaneousRequest(1024, 512, 1023, 513);
+}
+
+TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
+  use_alpn_ = true;
+  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
+  simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
+}
+
 void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
@@ -330,18 +341,19 @@ TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
         const std::string access_log_name =
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
-        const std::string yaml_string = R"EOF(
+        const std::string yaml_string = fmt::format(R"EOF(
 name: router
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   upstream_log:
     name: accesslog
     filter:
-      not_health_check_filter: {}
+      not_health_check_filter: {{}}
     typed_config:
-      "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-      path: /dev/null
-  )EOF";
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+  )EOF",
+                                                    Platform::null_device_path);
         TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(1));
       });
 
@@ -372,7 +384,6 @@ typed_config:
 
   // Now send an overly large response body. At some point, too much data will
   // be buffered, the stream will be reset, and the connection will disconnect.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
   ASSERT_TRUE(upstream_request_->waitForReset());
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -406,10 +417,11 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
   // Set max response header count to 200.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_headers_count()->set_value(200);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   Http::TestResponseHeaderMapImpl response_headers(default_response_headers_);
   for (int i = 0; i < 150; i++) {
@@ -458,15 +470,16 @@ TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
         const std::string yaml_string = R"EOF(
 name: router
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   upstream_log:
     name: grpc_accesslog
     filter:
       not_health_check_filter: {}
     typed_config:
-      "@type": type.googleapis.com/envoy.config.accesslog.v2.HttpGrpcAccessLogConfig
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
       common_config:
         log_name: foo
+        transport_api_version: V3
         grpc_service:
           envoy_grpc:
             cluster_name: cluster_0

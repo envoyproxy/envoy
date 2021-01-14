@@ -70,10 +70,12 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
   upstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
-  upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout
+  upstream_rq_per_try_timeout, Counter, Total requests that hit the per try timeout (except when request hedging is enabled)
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
+  upstream_rq_retry_backoff_exponential, Counter, Total retries using the exponential backoff strategy
+  upstream_rq_retry_backoff_ratelimited, Counter, Total retries using the ratelimited backoff strategy
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_success, Counter, Total request retry successes
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
@@ -217,6 +219,15 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds
 
+.. _config_cluster_manager_cluster_stats_tls:
+
+TLS statistics
+--------------
+
+If TLS is used by the cluster the following statistics are rooted at *cluster.<name>.ssl.*:
+
+.. include:: ../../../_include/ssl_stats.rst
+
 .. _config_cluster_manager_cluster_stats_alt_tree:
 
 Alternate tree dynamic HTTP statistics
@@ -265,6 +276,8 @@ the following statistics:
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
 
+.. _config_cluster_manager_cluster_stats_subset_lb:
+
 Load balancer subset statistics
 -------------------------------
 
@@ -281,6 +294,7 @@ decisions. Stats are rooted at *cluster.<name>.* and contain the following stati
   lb_subsets_selected, Counter, Number of times any subset was selected for load balancing
   lb_subsets_fallback, Counter, Number of times the fallback policy was invoked
   lb_subsets_fallback_panic, Counter, Number of times the subset panic mode triggered
+  lb_subsets_single_host_per_subset_duplicate, Gauge, Number of duplicate (unused) hosts when using :ref:`single_host_per_subset <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`
 
 .. _config_cluster_manager_cluster_stats_ring_hash_lb:
 

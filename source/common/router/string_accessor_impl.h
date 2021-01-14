@@ -19,6 +19,8 @@ public:
     return message;
   }
 
+  absl::optional<std::string> serializeAsString() const override { return value_; }
+
 private:
   std::string value_;
 };

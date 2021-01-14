@@ -1,11 +1,13 @@
 #pragma once
 
+#if !defined(__linux__)
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 0
+#else
+#define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
+
 #pragma GCC diagnostic push
-// QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
-// QUICHE allows ignored qualifiers
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 
 // QUICHE doesn't mark override at QuicBatchWriterBase::SupportsReleaseTime()
@@ -122,3 +124,5 @@ private:
 
 } // namespace Quic
 } // namespace Envoy
+
+#endif // defined(__linux__)

@@ -1,25 +1,25 @@
 .. _install_sandboxes_redis_filter:
 
-Redis Filter
+Redis filter
 ============
 
-In this example, we show how a :ref:`Redis filter <config_network_filters_redis_proxy>` can be used with the Envoy proxy. The Envoy proxy configuration includes a Redis filter that routes egress requests to redis server.
+.. sidebar:: Requirements
 
-Running the Sandboxes
-~~~~~~~~~~~~~~~~~~~~~
+   .. include:: _include/docker-env-setup-link.rst
 
-The following documentation runs through the setup of both services.
+   :ref:`redis <start_sandboxes_setup_redis>`
+	Redis client to query the server.
 
-**Step 1: Install Docker**
+In this example, we show how a :ref:`Redis filter <config_network_filters_redis_proxy>` can be used with the Envoy proxy.
 
-Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
+The Envoy proxy configuration includes a Redis filter that routes egress requests to redis server.
 
-A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
+Step 1: Build the sandbox
+*************************
 
-**Step 2: Clone the Envoy repo and start all of our containers**
+Change to the ``examples/redis`` directory.
 
-If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
-or ``git clone https://github.com/envoyproxy/envoy.git``
+Build and start the containers.
 
 Terminal 1
 
@@ -34,9 +34,10 @@ Terminal 1
       Name                   Command               State                             Ports
   ------------------------------------------------------------------------------------------------------------------
   redis_proxy_1   /docker-entrypoint.sh /bin       Up      10000/tcp, 0.0.0.0:1999->1999/tcp, 0.0.0.0:8001->8001/tcp
-  redis_redis_1   docker-entrypoint.sh redis       Up      0.0.0.0:6379->6379/tcp
+  redis_redis_1   docker-entrypoint.sh redis       Up      6379/tcp
 
-**Step 3: Issue Redis commands**
+Step 2: Issue Redis commands
+****************************
 
 Issue Redis commands using your favourite Redis client, such as ``redis-cli``, and verify they are routed via Envoy.
 
@@ -53,7 +54,8 @@ Terminal 1
   $ redis-cli -h localhost -p 1999 get bar
   "bar"
 
-**Step 4: Verify egress stats**
+Step 3: Verify egress stats
+***************************
 
 Go to ``http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command`` and verify the following stats:
 
@@ -61,3 +63,14 @@ Go to ``http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command``
 
   redis.egress_redis.command.get.total: 2
   redis.egress_redis.command.set.total: 2
+
+.. seealso::
+
+   :ref:`Envoy Redis filter <config_network_filters_redis_proxy>`
+      Learn more about using the Envoy Redis filter.
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.
+
+   `Redis <https://redis.io>`_
+      The Redis in-memory data structure store.

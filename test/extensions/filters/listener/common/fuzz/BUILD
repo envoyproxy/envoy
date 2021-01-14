@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -34,5 +35,13 @@ envoy_cc_test_library(
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "fuzzed_input_test",
+    srcs = ["fuzzed_input_test.cc"],
+    deps = [
+        ":listener_filter_fuzzer_lib",
     ],
 )

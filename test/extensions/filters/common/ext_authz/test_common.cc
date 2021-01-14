@@ -6,7 +6,7 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -94,13 +94,19 @@ Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOption
     response->headers().addCopy(Http::LowerCaseString(header.header().key()),
                                 header.header().value());
   }
-  response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+  response->body().add(body);
   return response;
 };
 
 bool TestCommon::compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
   return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
          std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
+}
+
+bool TestCommon::compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
+                                           const std::vector<Http::LowerCaseString>& rhs) {
+  return std::set<Http::LowerCaseString>(lhs.begin(), lhs.end()) ==
+         std::set<Http::LowerCaseString>(rhs.begin(), rhs.end());
 }
 
 } // namespace ExtAuthz

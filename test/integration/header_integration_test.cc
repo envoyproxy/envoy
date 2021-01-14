@@ -188,8 +188,6 @@ public:
 
   void TearDown() override {
     if (eds_connection_ != nullptr) {
-      // Don't ASSERT fail if an EDS reconnect ends up unparented.
-      fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
       AssertionResult result = eds_connection_->close();
       RELEASE_ASSERT(result, result.message());
       result = eds_connection_->waitForDisconnect();
@@ -219,8 +217,10 @@ public:
                   type: EDS
                   eds_cluster_config:
                     eds_config:
+                      resource_api_version: V3
                       api_config_source:
                         api_type: GRPC
+                        transport_api_version: V3
                         grpc_services:
                           envoy_grpc:
                             cluster_name: "eds-cluster"
@@ -255,7 +255,11 @@ public:
                       name: eds-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
-                      http2_protocol_options: {{}}
+                      typed_extension_protocol_options:
+                        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+                          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+                          explicit_http_config:
+                            http2_protocol_options: {{}}
                       connect_timeout: 5s
                       load_assignment:
                         cluster_name: eds-cluster
@@ -361,8 +365,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     }
   }
 
@@ -385,7 +388,7 @@ public:
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
-            TestUtility::parseYaml<API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment)>(fmt::format(
+            TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:

@@ -97,7 +97,7 @@ message AttributeContext {
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
-  // [#next-free-field: 12]
+  // [#next-free-field: 13]
   message HttpRequest {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.auth.v2.AttributeContext.HttpRequest";
@@ -145,6 +145,12 @@ message AttributeContext {
 
     // The HTTP request body.
     string body = 11;
+
+    // The HTTP request body in bytes. This is used instead of
+    // :ref:`body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` when
+    // :ref:`pack_as_bytes <envoy_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>`
+    // is set to true.
+    bytes raw_body = 12;
   }
 
   // The source of a network activity, such as starting a TCP connection.

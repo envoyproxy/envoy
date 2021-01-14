@@ -45,13 +45,13 @@ protected:
       auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       lds_cluster->set_name("lds_cluster");
-      lds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*lds_cluster);
 
       // Add the static cluster to serve RDS.
       auto* rds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       rds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       rds_cluster->set_name("rds_cluster");
-      rds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*rds_cluster);
     });
 
     config_helper_.addConfigModifier(
@@ -60,9 +60,12 @@ protected:
                 http_connection_manager) {
           auto* rds_config = http_connection_manager.mutable_rds();
           rds_config->set_route_config_name(route_table_name_);
+          rds_config->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               rds_config->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
@@ -78,9 +81,11 @@ protected:
       listener_config_.set_name(listener_name_);
       ENVOY_LOG_MISC(error, "listener config: {}", listener_config_.DebugString());
       bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
-      auto* lds_api_config_source =
-          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->mutable_api_config_source();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
       lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
       envoy::config::core::v3::GrpcService* grpc_service =
           lds_api_config_source->add_grpc_services();
       setGrpcService(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
@@ -90,14 +95,9 @@ protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the LDS upstream (fake_upstreams_[1]).
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     // Create the RDS upstream (fake_upstreams_[2]).
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
-    for (auto& upstream : fake_upstreams_) {
-      upstream->set_allow_unexpected_disconnects(true);
-    }
+    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
@@ -156,7 +156,7 @@ protected:
     for (const auto& listener_blob : listener_configs) {
       const auto listener_config =
           TestUtility::parseYaml<envoy::config::listener::v3::Listener>(listener_blob);
-      response.add_resources()->PackFrom(API_DOWNGRADE(listener_config));
+      response.add_resources()->PackFrom(listener_config);
     }
     ASSERT(lds_upstream_info_.stream_by_resource_name_[listener_name_] != nullptr);
     lds_upstream_info_.stream_by_resource_name_[listener_name_]->sendGrpcMessage(response);
@@ -168,7 +168,7 @@ protected:
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     const auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(API_DOWNGRADE(route_configuration));
+    response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);

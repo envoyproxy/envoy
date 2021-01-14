@@ -4,7 +4,7 @@
 
 #include "common/common/assert.h"
 
-#include "extensions/quic_listeners/quiche/envoy_quic_crypto_server_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
 namespace Envoy {
@@ -34,17 +34,7 @@ std::unique_ptr<quic::QuicCryptoServerStreamBase>
 EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
-  switch (connection()->version().handshake_protocol) {
-  case quic::PROTOCOL_QUIC_CRYPTO:
-    return std::make_unique<EnvoyQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
-                                                         this, stream_helper());
-  case quic::PROTOCOL_TLS1_3:
-    return std::make_unique<EnvoyQuicTlsServerHandshaker>(this, *crypto_config);
-  case quic::PROTOCOL_UNSUPPORTED:
-    PANIC(fmt::format("Unknown handshake protocol: {}",
-                      static_cast<int>(connection()->version().handshake_protocol)));
-  }
-  return nullptr;
+  return CreateCryptoServerStream(crypto_config, compressed_certs_cache, this, stream_helper());
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {
@@ -117,15 +107,15 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
-void EnvoyQuicServerSession::OnOneRttKeysAvailable() {
-  quic::QuicServerSessionBase::OnOneRttKeysAvailable();
+void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
+  quic::QuicServerSessionBase::OnTlsHandshakeComplete();
   maybeCreateNetworkFilters();
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
 void EnvoyQuicServerSession::maybeCreateNetworkFilters() {
-  const EnvoyQuicProofSourceDetails* proof_source_details =
-      dynamic_cast<const EnvoyCryptoServerStream*>(GetCryptoStream())->proofSourceDetails();
+  auto proof_source_details =
+      dynamic_cast<const EnvoyQuicProofSourceDetails*>(GetCryptoStream()->ProofSourceDetails());
   ASSERT(proof_source_details != nullptr,
          "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.");
 

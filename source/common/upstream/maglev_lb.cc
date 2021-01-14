@@ -9,13 +9,6 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
                          double max_normalized_weight, uint64_t table_size,
                          bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats)
     : table_size_(table_size), stats_(stats) {
-  // TODO(mattklein123): The Maglev table must have a size that is a prime number for the algorithm
-  // to work. Currently, the table size is not user configurable. In the future, if the table size
-  // is made user configurable, we will need proper error checking that the user cannot configure a
-  // size that is not prime (the result is going to be an infinite loop with some inputs which is
-  // not good!).
-  ASSERT(Primes::isPrime(table_size));
-
   // We can't do anything sensible with no hosts.
   if (normalized_host_weights.empty()) {
     return;
@@ -102,14 +95,25 @@ uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
 MaglevLoadBalancer::MaglevLoadBalancer(
     const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config, uint64_t table_size)
+    const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& config,
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
       scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),
-      table_size_(table_size),
+      table_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), table_size,
+                                                           MaglevTable::DefaultTableSize)
+                         : MaglevTable::DefaultTableSize),
       use_hostname_for_hashing_(
           common_config.has_consistent_hashing_lb_config()
               ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
-              : false) {}
+              : false),
+      hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)) {
+  ENVOY_LOG(debug, "maglev table size: {}", table_size_);
+  // The table size must be prime number.
+  if (!Primes::isPrime(table_size_)) {
+    throw EnvoyException("The table size of maglev must be prime number");
+  }
+}
 
 MaglevLoadBalancerStats MaglevLoadBalancer::generateStats(Stats::Scope& scope) {
   return {ALL_MAGLEV_LOAD_BALANCER_STATS(POOL_GAUGE(scope))};

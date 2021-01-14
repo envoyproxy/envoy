@@ -8,6 +8,8 @@
 
 #include "common/config/metadata.h"
 #include "common/config/utility.h"
+#include "common/http/header_utility.h"
+#include "common/network/address_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
@@ -18,7 +20,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -80,18 +82,18 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalPortVariable)
   // Validate for IPv4 address
   auto address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
-  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  stream_info.downstream_address_provider_->setLocalAddress(address);
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "8443");
 
   // Validate for IPv6 address
   address =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
-  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  stream_info.downstream_address_provider_->setLocalAddress(address);
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "9443");
 
   // Validate for Pipe
   address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
-  EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+  stream_info.downstream_address_provider_->setLocalAddress(address);
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_PORT", "");
 }
 
@@ -615,6 +617,21 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  envoy::config::core::v3::Metadata metadata;
+  ProtobufWkt::Struct struct_obj;
+
+  auto& fields_map = *struct_obj.mutable_fields();
+  fields_map["foo"] = ValueUtil::stringValue("bar");
+  (*metadata.mutable_filter_metadata())["envoy.lb"] = struct_obj;
+
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  testFormatting(stream_info, "DYNAMIC_METADATA([\"envoy.lb\", \"foo\"])", "bar");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateSharedPtr filter_state(
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
@@ -940,7 +957,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 }
 
 TEST(HeaderParserTest, EvaluateHeaders) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -957,7 +974,7 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV3Yaml(ymal).request_headers_to_add());
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
   Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -965,8 +982,71 @@ request_headers_to_add:
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
 }
 
+TEST(HeaderParserTest, EvaluateHeadersWithNullStreamInfo) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-client-ip"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    append: true
+  - header:
+      key: "x-client-ip-port"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+    append: true
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  req_header_parser->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-client-ip-port"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", header_map.get_("x-client-ip"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("x-client-ip-port"));
+}
+
+TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> headers_values;
+
+  auto& first_entry = *headers_values.Add();
+  first_entry.set_key("key");
+
+  // This tests when we have "StreamInfoHeaderFormatter", but stream info is null.
+  first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
+
+  HeaderParserPtr req_header_parser_add = HeaderParser::configure(headers_values, /*append=*/true);
+  req_header_parser_add->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& set_entry = *headers_values.Add();
+  set_entry.set_key("key");
+  set_entry.set_value("great");
+
+  HeaderParserPtr req_header_parser_set = HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_set->evaluateHeaders(header_map, nullptr);
+  EXPECT_TRUE(header_map.has("key"));
+  EXPECT_EQ("great", header_map.get_("key"));
+
+  headers_values.Clear();
+  auto& empty_entry = *headers_values.Add();
+  empty_entry.set_key("empty");
+  empty_entry.set_value("");
+
+  HeaderParserPtr req_header_parser_empty =
+      HeaderParser::configure(headers_values, /*append=*/false);
+  req_header_parser_empty->evaluateHeaders(header_map, nullptr);
+  EXPECT_FALSE(header_map.has("empty"));
+}
+
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -979,7 +1059,7 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV3Yaml(ymal).request_headers_to_add());
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
   Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
@@ -992,7 +1072,7 @@ request_headers_to_add:
 }
 
 TEST(HeaderParserTest, EvaluateStaticHeaders) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -1005,7 +1085,7 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV3Yaml(ymal).request_headers_to_add());
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
   Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -1115,7 +1195,7 @@ request_headers_to_remove: ["x-nope"]
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -1144,7 +1224,7 @@ request_headers_to_add:
 )EOF";
 
   // Disable append mode.
-  envoy::config::route::v3::Route route = parseRouteFromV3Yaml(ymal);
+  envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
   route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
@@ -1266,11 +1346,10 @@ response_headers_to_remove: ["x-nope"]
 
   // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
   // combine set-cookie headers
-  std::vector<absl::string_view> out;
-  Http::HeaderUtility::getAllOfHeader(header_map, "set-cookie", out);
+  const auto out = header_map.get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
-  ASSERT_EQ(out[0], "foo");
-  ASSERT_EQ(out[1], "bar");
+  ASSERT_EQ(out[0]->value().getStringView(), "foo");
+  ASSERT_EQ(out[1]->value().getStringView(), "bar");
 }
 
 TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {

@@ -9,7 +9,7 @@
 
 namespace Envoy {
 
-// helper functions to build API responses
+// Helper functions to build API responses.
 envoy::config::cluster::v3::Cluster XdsFuzzTest::buildCluster(const std::string& name) {
   return ConfigHelper::buildCluster(name, "ROUND_ROBIN", api_version_);
 };
@@ -33,7 +33,7 @@ XdsFuzzTest::buildRouteConfig(const std::string& route_name) {
   return ConfigHelper::buildRouteConfig(route_name, "cluster_0", api_version_);
 }
 
-// helper functions to send API responses
+// Helper functions to send API responses.
 void XdsFuzzTest::updateListener(
     const std::vector<envoy::config::listener::v3::Listener>& listeners,
     const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
@@ -69,7 +69,7 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
 
-  // avoid listeners draining during the test
+  // Avoid listeners draining during the test.
   drain_time_ = std::chrono::seconds(60);
 
   if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
@@ -80,7 +80,7 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
 }
 
 /**
- * initialize an envoy configured with a fully dynamic bootstrap with ADS over gRPC
+ * Initialize an envoy configured with a fully dynamic bootstrap with ADS over gRPC.
  */
 void XdsFuzzTest::initialize() {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -110,7 +110,7 @@ void XdsFuzzTest::close() {
 }
 
 /**
- * @return true iff listener_name is in listeners_ (and removes it from the vector)
+ * @return true iff listener_name is in listeners_ (and removes it from listeners_)
  */
 bool XdsFuzzTest::eraseListener(const std::string& listener_name) {
   const auto orig_size = listeners_.size();
@@ -129,7 +129,25 @@ bool XdsFuzzTest::hasRoute(const std::string& route_name) {
 }
 
 /**
- * send an xDS response to add a listener and update state accordingly
+ * Log the current state of the verifier and the test server for debugging purposes to see
+ * discrepancies.
+ */
+void XdsFuzzTest::logState() {
+  ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})", verifier_.numWarming(),
+                 test_server_->gauge("listener_manager.total_listeners_warming")->value(),
+                 verifier_.numActive(),
+                 test_server_->gauge("listener_manager.total_listeners_active")->value(),
+                 verifier_.numDraining(),
+                 test_server_->gauge("listener_manager.total_listeners_draining")->value());
+  ENVOY_LOG_MISC(
+      debug, "added {} ({}), modified {} ({}), removed {} ({})", verifier_.numAdded(),
+      test_server_->counter("listener_manager.listener_added")->value(), verifier_.numModified(),
+      test_server_->counter("listener_manager.listener_modified")->value(), verifier_.numRemoved(),
+      test_server_->counter("listener_manager.listener_removed")->value());
+}
+
+/**
+ * Send an xDS response to add a listener and update state accordingly.
  */
 void XdsFuzzTest::addListener(const std::string& listener_name, const std::string& route_name) {
   ENVOY_LOG_MISC(debug, "Adding {} with reference to {}", listener_name, route_name);
@@ -140,8 +158,8 @@ void XdsFuzzTest::addListener(const std::string& listener_name, const std::strin
 
   updateListener(listeners_, {listener}, {});
 
-  // use waitForAck instead of compareDiscoveryRequest as the client makes additional
-  // discoveryRequests at launch that we might not want to respond to yet
+  // Use waitForAck instead of compareDiscoveryRequest as the client makes additional
+  // DiscoveryRequests at launch that we might not want to respond to yet.
   EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
   if (removed) {
     verifier_.listenerUpdated(listener);
@@ -151,7 +169,7 @@ void XdsFuzzTest::addListener(const std::string& listener_name, const std::strin
 }
 
 /**
- * send an xDS response to remove a listener and update state accordingly
+ * Send an xDS response to remove a listener and update state accordingly.
  */
 void XdsFuzzTest::removeListener(const std::string& listener_name) {
   ENVOY_LOG_MISC(debug, "Removing {}", listener_name);
@@ -166,7 +184,7 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
 }
 
 /**
- * send an xDS response to add a route and update state accordingly
+ * Send an xDS response to add a route and update state accordingly.
  */
 void XdsFuzzTest::addRoute(const std::string& route_name) {
   ENVOY_LOG_MISC(debug, "Adding {}", route_name);
@@ -183,7 +201,7 @@ void XdsFuzzTest::addRoute(const std::string& route_name) {
 }
 
 /**
- * wait for a specific ACK, ignoring any other ACKs that are made in the meantime
+ * Wait for a specific ACK, ignoring any other ACKs that are made in the meantime.
  * @param the expected API type url of the ack
  * @param the expected version number
  * @return AssertionSuccess() if the ack was received, else an AssertionError()
@@ -211,12 +229,12 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
 }
 
 /**
- * run the sequence of actions defined in the fuzzed protobuf
+ * Run the sequence of actions defined in the fuzzed protobuf.
  */
 void XdsFuzzTest::replay() {
   initialize();
 
-  // set up cluster
+  // Set up cluster.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
@@ -227,9 +245,9 @@ void XdsFuzzTest::replay() {
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "0");
 
-  // the client will not subscribe to the RouteConfiguration type URL until it receives a listener,
+  // The client will not subscribe to the RouteConfiguration type URL until it receives a listener,
   // and the ACKS it sends back seem to be an empty type URL so just don't check them until a
-  // listener is added
+  // listener is added.
   bool sent_listener = false;
 
   for (const auto& action : actions_) {
@@ -268,7 +286,7 @@ void XdsFuzzTest::replay() {
       break;
     }
     if (sent_listener) {
-      // wait for all of the updates to take effect
+      // Wait for all of the updates to take effect.
       test_server_->waitForGaugeEq("listener_manager.total_listeners_warming",
                                    verifier_.numWarming(), timeout_);
       test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive(),
@@ -284,19 +302,7 @@ void XdsFuzzTest::replay() {
       test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_,
                                      timeout_);
     }
-    ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
-                   verifier_.numWarming(),
-                   test_server_->gauge("listener_manager.total_listeners_warming")->value(),
-                   verifier_.numActive(),
-                   test_server_->gauge("listener_manager.total_listeners_active")->value(),
-                   verifier_.numDraining(),
-                   test_server_->gauge("listener_manager.total_listeners_draining")->value());
-    ENVOY_LOG_MISC(debug, "added {} ({}), modified {} ({}), removed {} ({})", verifier_.numAdded(),
-                   test_server_->counter("listener_manager.listener_added")->value(),
-                   verifier_.numModified(),
-                   test_server_->counter("listener_manager.listener_modified")->value(),
-                   verifier_.numRemoved(),
-                   test_server_->counter("listener_manager.listener_removed")->value());
+    logState();
   }
 
   verifyState();
@@ -304,7 +310,7 @@ void XdsFuzzTest::replay() {
 }
 
 /**
- * verify that each listener in the verifier has a matching listener in the config dump
+ * Verify that each listener in the verifier has a matching listener in the config dump.
  */
 void XdsFuzzTest::verifyListeners() {
   ENVOY_LOG_MISC(debug, "Verifying listeners");
@@ -318,14 +324,12 @@ void XdsFuzzTest::verifyListeners() {
       return listener.name() == rep.listener.name();
     });
 
-    // there should be a listener of the same name in the dump
+    // There should be a listener of the same name in the dump.
     if (listener_dump == dump.end()) {
       throw EnvoyException(fmt::format("Expected to find {} in config dump", rep.listener.name()));
     }
 
-    ENVOY_LOG_MISC(debug, "warm {}, active {}, drain: {}", listener_dump->has_warming_state(),
-                   listener_dump->has_active_state(), listener_dump->has_draining_state());
-    // the state should match
+    // The state should match.
     switch (rep.state) {
     case XdsVerifier::DRAINING:
       FUZZ_ASSERT(listener_dump->has_draining_state());
@@ -345,7 +349,7 @@ void XdsFuzzTest::verifyListeners() {
 void XdsFuzzTest::verifyRoutes() {
   auto dump = getRoutesConfigDump();
 
-  // go through routes in verifier and make sure each is in the config dump
+  // Go through routes in verifier and make sure each is in the config dump.
   auto routes = verifier_.routes();
   FUZZ_ASSERT(routes.size() == dump.size());
   for (const auto& route : routes) {
@@ -382,10 +386,10 @@ envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
-std::vector<envoy::api::v2::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump() {
+std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump() {
   auto map = test_server_->server().admin().getConfigTracker().getCallbacksMap();
 
-  // there is no route config dump before envoy has a route
+  // There is no route config dump before envoy has a route.
   if (map.find("routes") == map.end()) {
     return {};
   }
@@ -393,11 +397,11 @@ std::vector<envoy::api::v2::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump
   auto message_ptr = map.at("routes")();
   auto dump = dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
 
-  // since the route config dump gives the RouteConfigurations as an Any, go through and cast them
-  // back to RouteConfigurations
-  std::vector<envoy::api::v2::RouteConfiguration> dump_routes;
+  // Since the route config dump gives the RouteConfigurations as an Any, go through and cast them
+  // back to RouteConfigurations.
+  std::vector<envoy::config::route::v3::RouteConfiguration> dump_routes;
   for (const auto& route : dump.dynamic_route_configs()) {
-    envoy::api::v2::RouteConfiguration dyn_route;
+    envoy::config::route::v3::RouteConfiguration dyn_route;
     route.route_config().UnpackTo(&dyn_route);
     dump_routes.push_back(dyn_route);
   }

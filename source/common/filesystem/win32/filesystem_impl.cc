@@ -26,39 +26,66 @@ FileImplWin32::~FileImplWin32() {
   }
 }
 
-void FileImplWin32::openFile(FlagSet in) {
-  const auto flags_and_mode = translateFlag(in);
-  fd_ = ::open(path_.c_str(), flags_and_mode.flags_, flags_and_mode.pmode_);
+Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
+  if (isOpen()) {
+    return resultSuccess(true);
+  }
+
+  auto flags = translateFlag(in);
+  fd_ = CreateFileA(path_.c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
+                    flags.creation_, 0, NULL);
+  if (fd_ == INVALID_HANDLE) {
+    return resultFailure(false, ::GetLastError());
+  }
+  return resultSuccess(true);
 }
 
-ssize_t FileImplWin32::writeFile(absl::string_view buffer) {
-  return ::_write(fd_, buffer.data(), buffer.size());
+Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
+  DWORD bytes_written;
+  BOOL result = WriteFile(fd_, buffer.data(), buffer.length(), &bytes_written, NULL);
+  if (result == 0) {
+    return resultFailure<ssize_t>(-1, ::GetLastError());
+  }
+  return resultSuccess<ssize_t>(bytes_written);
+};
+
+Api::IoCallBoolResult FileImplWin32::close() {
+  ASSERT(isOpen());
+
+  BOOL result = CloseHandle(fd_);
+  fd_ = INVALID_HANDLE;
+  if (result == 0) {
+    return resultFailure(false, ::GetLastError());
+  }
+  return resultSuccess(true);
 }
 
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
-  int out = 0;
-  int pmode = 0;
+  DWORD access = 0;
+  DWORD creation = OPEN_EXISTING;
+
   if (in.test(File::Operation::Create)) {
-    out |= _O_CREAT;
-    pmode |= _S_IREAD | _S_IWRITE;
+    creation = OPEN_ALWAYS;
   }
 
+  if (in.test(File::Operation::Write)) {
+    access = GENERIC_WRITE;
+  }
+
+  // Order of tests matter here. There reason for that
+  // is that `FILE_APPEND_DATA` should not be used together
+  // with `GENERIC_WRITE`. If both of them are used the file
+  // is not opened in append mode.
   if (in.test(File::Operation::Append)) {
-    out |= _O_APPEND;
+    access = FILE_APPEND_DATA;
   }
 
-  if (in.test(File::Operation::Read) && in.test(File::Operation::Write)) {
-    out |= _O_RDWR;
-  } else if (in.test(File::Operation::Read)) {
-    out |= _O_RDONLY;
-  } else if (in.test(File::Operation::Write)) {
-    out |= _O_WRONLY;
+  if (in.test(File::Operation::Read)) {
+    access |= GENERIC_READ;
   }
 
-  return {out, pmode};
+  return {access, creation};
 }
-
-bool FileImplWin32::closeFile() { return ::_close(fd_) != -1; }
 
 FilePtr InstanceImplWin32::createFile(const std::string& path) {
   return std::make_unique<FileImplWin32>(path);
@@ -78,11 +105,19 @@ bool InstanceImplWin32::directoryExists(const std::string& path) {
 }
 
 ssize_t InstanceImplWin32::fileSize(const std::string& path) {
-  struct _stat info;
-  if (::_stat(path.c_str(), &info) != 0) {
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, NULL);
+  if (fd == INVALID_HANDLE) {
     return -1;
   }
-  return info.st_size;
+  ssize_t result = 0;
+  LARGE_INTEGER lFileSize;
+  BOOL bGetSize = GetFileSizeEx(fd, &lFileSize);
+  CloseHandle(fd);
+  if (!bGetSize) {
+    return -1;
+  }
+  result += lFileSize.QuadPart;
+  return result;
 }
 
 std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
@@ -90,19 +125,37 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
     throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
 
-  std::ios::sync_with_stdio(false);
-
-  // On Windows, we need to explicitly set the file mode as binary. Otherwise,
-  // 0x1a will be treated as EOF
-  std::ifstream file(path, std::ios_base::binary);
-  if (file.fail()) {
+  // In integration tests (and potentially in production) we rename config files and this creates
+  // sharing violation errors while reading the file from a different thread. This is why we need to
+  // add `FILE_SHARE_DELETE` to the sharing mode.
+  auto fd = CreateFileA(path.c_str(), GENERIC_READ,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, OPEN_EXISTING, 0,
+                        NULL);
+  if (fd == INVALID_HANDLE) {
+    auto last_error = ::GetLastError();
+    if (last_error == ERROR_FILE_NOT_FOUND) {
+      throw EnvoyException(absl::StrCat("Invalid path: ", path));
+    }
     throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
-
-  std::stringstream file_string;
-  file_string << file.rdbuf();
-
-  return file_string.str();
+  DWORD buffer_size = 100;
+  DWORD bytes_read = 0;
+  std::vector<uint8_t> complete_buffer;
+  do {
+    std::vector<uint8_t> buffer(buffer_size);
+    if (!ReadFile(fd, buffer.data(), buffer_size, &bytes_read, NULL)) {
+      auto last_error = ::GetLastError();
+      if (last_error == ERROR_FILE_NOT_FOUND) {
+        CloseHandle(fd);
+        throw EnvoyException(absl::StrCat("Invalid path: ", path));
+      }
+      CloseHandle(fd);
+      throw EnvoyException(absl::StrCat("unable to read file: ", path));
+    }
+    complete_buffer.insert(complete_buffer.end(), buffer.begin(), buffer.begin() + bytes_read);
+  } while (bytes_read == buffer_size);
+  CloseHandle(fd);
+  return std::string(complete_buffer.begin(), complete_buffer.end());
 }
 
 PathSplitResult InstanceImplWin32::splitPathFromFilename(absl::string_view path) {

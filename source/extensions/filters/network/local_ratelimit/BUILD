@@ -22,9 +22,9 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
-        "//source/common/common:thread_synchronizer_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg_cc_proto",
     ],
 )

@@ -18,6 +18,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "extensions/transport_sockets/tls/ocsp/ocsp.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -40,7 +41,11 @@ namespace Tls {
   COUNTER(fail_verify_no_cert)                                                                     \
   COUNTER(fail_verify_error)                                                                       \
   COUNTER(fail_verify_san)                                                                         \
-  COUNTER(fail_verify_cert_hash)
+  COUNTER(fail_verify_cert_hash)                                                                   \
+  COUNTER(ocsp_staple_failed)                                                                      \
+  COUNTER(ocsp_staple_omitted)                                                                     \
+  COUNTER(ocsp_staple_responses)                                                                   \
+  COUNTER(ocsp_staple_requests)
 
 /**
  * Wrapper struct for SSL stats. @see stats_macros.h
@@ -98,6 +103,7 @@ public:
   size_t daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
+  absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
@@ -158,17 +164,21 @@ protected:
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
 
-  Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
+  Envoy::Ssl::CertificateDetailsPtr
+  certificateDetails(X509* cert, const std::string& path,
+                     const Ocsp::OcspResponseWrapper* ocsp_response) const;
 
   struct TlsContext {
-    // Each certificate specified for the context has its own SSL_CTX. SSL_CTXs
+    // Each certificate specified for the context has its own SSL_CTX. `SSL_CTXs`
     // are identical with the exception of certificate material, and can be
     // safely substituted via SSL_set_SSL_CTX() during the
     // SSL_CTX_set_select_certificate_cb() callback following ClientHello.
     bssl::UniquePtr<SSL_CTX> ssl_ctx_;
     bssl::UniquePtr<X509> cert_chain_;
     std::string cert_chain_file_path_;
+    Ocsp::OcspResponseWrapperPtr ocsp_response_;
     bool is_ecdsa_{};
+    bool is_must_staple_{};
     Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
 
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
@@ -209,6 +219,7 @@ protected:
   const Stats::StatName ssl_versions_;
   const Stats::StatName ssl_curves_;
   const Stats::StatName ssl_sigalgs_;
+  const Ssl::HandshakerCapabilities capabilities_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
@@ -232,10 +243,17 @@ private:
   bool session_keys_single_use_{false};
 };
 
+enum class OcspStapleAction { Staple, NoStaple, Fail, ClientNotCapable };
+
 class ServerContextImpl : public ContextImpl, public Envoy::Ssl::ServerContext {
 public:
   ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                     const std::vector<std::string>& server_names, TimeSource& time_source);
+
+  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
+  // ClientHello details. This is made public for use by custom TLS extensions who want to
+  // manually create and use this as a client hello callback.
+  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
 
 private:
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
@@ -245,13 +263,14 @@ private:
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
   bool isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
-  // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
-  // ClientHello details.
-  enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
+  bool isClientOcspCapable(const SSL_CLIENT_HELLO* ssl_client_hello);
+  OcspStapleAction ocspStapleAction(const ServerContextImpl::TlsContext& ctx,
+                                    bool client_ocsp_capable);
 
   SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
+  const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
 };
 
 } // namespace Tls

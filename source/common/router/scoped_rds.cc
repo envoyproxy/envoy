@@ -101,11 +101,11 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
       Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
-          rds_config_source.resource_api_version(),
+          scoped_rds.scoped_rds_config_source().resource_api_version(),
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
-      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
+      stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
       route_config_provider_manager_(route_config_provider_manager) {
   const auto resource_name = getResourceName();
@@ -121,19 +121,102 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
   });
 }
 
+// Constructor for RdsRouteConfigProviderHelper when scope is eager loading.
+// Initialize RdsRouteConfigProvider by default.
 ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProviderHelper(
     ScopedRdsConfigSubscription& parent, std::string scope_name,
     envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     Init::Manager& init_manager)
-    : parent_(parent), scope_name_(scope_name),
-      route_provider_(std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
-          parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
-              rds, parent_.factory_context_, parent_.stat_prefix_, init_manager))),
+    : parent_(parent), scope_name_(scope_name), on_demand_(false) {
+  initRdsConfigProvider(rds, init_manager);
+}
 
-      rds_update_callback_handle_(route_provider_->subscription().addUpdateCallback([this]() {
-        // Subscribe to RDS update.
-        parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
-      })) {}
+// Constructor for RdsRouteConfigProviderHelper when scope is on demand.
+// Leave the RdsRouteConfigProvider uninitialized.
+ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProviderHelper(
+    ScopedRdsConfigSubscription& parent, std::string scope_name)
+    : parent_(parent), scope_name_(scope_name), on_demand_(true) {
+  parent_.stats_.on_demand_scopes_.inc();
+}
+
+// When on demand callback is received from main thread, there are 4 cases.
+// 1. Scope is not found, post a scope not found callback back to worker thread.
+// 2. Scope is found but route provider has not been initialized, create route provider.
+// 3. After route provider has been initialized, if RouteConfiguration has been fetched,
+// post scope found callback to worker thread.
+// 4. After route provider has been initialized, if RouteConfiguration is null,
+// cache the callback and wait for RouteConfiguration to come.
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdateCallback(
+    std::function<void()> callback) {
+  // If RouteConfiguration has been initialized, run the callback to continue in filter chain,
+  // otherwise cache it and wait for the route table to be initialized. If RouteConfiguration hasn't
+  // been initialized, routeConfig() return a shared_ptr to NullConfigImpl. The name of
+  // NullConfigImpl is an empty string.
+  if (route_provider_ != nullptr && !routeConfig()->name().empty()) {
+    callback();
+    return;
+  }
+  on_demand_update_callbacks_.push_back(callback);
+  // Initialize the rds provider if it has not been initialized. There is potential race here
+  // because other worker threads may also post callback to on demand update the RouteConfiguration
+  // associated with this scope. If rds provider has been initialized, just wait for
+  // RouteConfiguration to be updated.
+  maybeInitRdsConfigProvider();
+}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::runOnDemandUpdateCallback() {
+  for (auto& callback : on_demand_update_callbacks_) {
+    callback();
+  }
+  on_demand_update_callbacks_.clear();
+}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigProvider(
+    envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+    Init::Manager& init_manager) {
+  route_provider_ = std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
+      parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
+          rds, parent_.factory_context_, parent_.stat_prefix_, init_manager));
+
+  rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
+    // Subscribe to RDS update.
+    parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
+  });
+  parent_.stats_.active_scopes_.inc();
+}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConfigProvider() {
+  // If the route provider have been initialized, return and wait for rds config update.
+  if (route_provider_ != nullptr) {
+    return;
+  }
+
+  // Create a init_manager to create a rds provider.
+  // No transitive warming dependency here because only on demand update reach this point.
+  std::unique_ptr<Init::ManagerImpl> srds_init_mgr =
+      std::make_unique<Init::ManagerImpl>(fmt::format("SRDS on demand init manager."));
+  std::unique_ptr<Cleanup> srds_initialization_continuation =
+      std::make_unique<Cleanup>([this, &srds_init_mgr] {
+        Init::WatcherImpl noop_watcher(
+            fmt::format("SRDS on demand ConfigUpdate watcher: {}", scope_name_),
+            []() { /*Do nothing.*/ });
+        srds_init_mgr->initialize(noop_watcher);
+      });
+  // Create route provider.
+  envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
+  rds.mutable_config_source()->MergeFrom(parent_.rds_config_source_);
+  rds.set_route_config_name(
+      parent_.scoped_route_map_[scope_name_]->configProto().route_configuration_name());
+  initRdsConfigProvider(rds, *srds_init_mgr);
+  ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
+  // If RouteConfiguration hasn't been initialized, routeConfig() return a shared_ptr to
+  // NullConfigImpl. The name of NullConfigImpl is an empty string.
+  if (routeConfig()->name().empty()) {
+    return;
+  }
+  // If RouteConfiguration has been initialized, apply update to all the threads.
+  parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
+}
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
@@ -148,14 +231,24 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
     const std::string scope_name = scoped_route_config.name();
-    // TODO(stevenzzz): Creating a new RdsRouteConfigProvider likely expensive, migrate RDS to
-    // config-provider-framework to make it light weight.
     rds.set_route_config_name(scoped_route_config.route_configuration_name());
-    auto rds_config_provider_helper =
-        std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
-    auto scoped_route_info = std::make_shared<ScopedRouteInfo>(
-        std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
-    route_provider_by_scope_.insert({scope_name, std::move(rds_config_provider_helper)});
+    std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
+    std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
+    if (scoped_route_config.on_demand() == false) {
+      // For default scopes, create a rds helper with rds provider initialized.
+      rds_config_provider_helper =
+          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
+      scoped_route_info = std::make_shared<ScopedRouteInfo>(
+          std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
+    } else {
+      // For on demand scopes, create a rds helper with rds provider uninitialized.
+      rds_config_provider_helper =
+          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
+      // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not loaded.
+      scoped_route_info =
+          std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
+    }
+    route_provider_by_scope_[scope_name] = std::move(rds_config_provider_helper);
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
     updated_scopes.push_back(scoped_route_info);
@@ -164,6 +257,9 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
               scoped_route_info->scopeName(), version_info);
   }
 
+  // scoped_route_info of both eager loading and on demand scopes will be propagated to work
+  // threads. Upon a scoped RouteConfiguration miss, if the scope exists, an on demand update
+  // callback will be posted to main thread.
   if (!updated_scopes.empty()) {
     applyConfigUpdate([updated_scopes](ConfigProvider::ConfigConstSharedPtr config)
                           -> ConfigProvider::ConfigConstSharedPtr {
@@ -274,6 +370,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   }
+  stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
 }
 
@@ -294,6 +391,8 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
     thread_local_scoped_config->addOrUpdateRoutingScopes({new_scoped_route_info});
     return config;
   });
+  // The data plane may wait for the route configuration to come back.
+  route_provider_by_scope_[scope_name]->runOnDemandUpdateCallback();
 }
 
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
@@ -328,6 +427,7 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash = scope_name_by_hash_;
   absl::erase_if(scope_name_by_hash, [&updated_or_removed_scopes](const auto& key_name) {
     auto const& [key, name] = key_name;
+    UNREFERENCED_PARAMETER(key);
     return updated_or_removed_scopes.contains(name);
   });
   absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>
@@ -361,6 +461,36 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     }
   }
   return clean_removed_resources;
+}
+
+void ScopedRdsConfigSubscription::onDemandRdsUpdate(
+    std::shared_ptr<Router::ScopeKey> scope_key, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallback&& route_config_updated_cb,
+    std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription) {
+  factory_context_.dispatcher().post([this, &thread_local_dispatcher, scope_key,
+                                      route_config_updated_cb, weak_subscription]() {
+    // If the subscription has been destroyed, return immediately.
+    if (!weak_subscription.lock()) {
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+      return;
+    }
+
+    auto iter = scope_name_by_hash_.find(scope_key->hash());
+    // Return to filter chain if we can't find the scope.
+    // The scope may have been destroyed when callback reach the main thread.
+    if (iter == scope_name_by_hash_.end()) {
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+      return;
+    }
+    // Wrap the thread local dispatcher inside the callback.
+    std::function<void()> thread_local_updated_callback = [route_config_updated_cb,
+                                                           &thread_local_dispatcher]() {
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(true); });
+    };
+    std::string scope_name = iter->second;
+    // On demand initialization inside main thread.
+    route_provider_by_scope_[scope_name]->addOnDemandUpdateCallback(thread_local_updated_callback);
+  });
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(

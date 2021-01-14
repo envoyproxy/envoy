@@ -34,7 +34,9 @@ RingHashLoadBalancer::RingHashLoadBalancer(
       use_hostname_for_hashing_(
           common_config.has_consistent_hashing_lb_config()
               ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
-              : false) {
+              : false),
+      hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)) {
   // It's important to do any config validation here, rather than deferring to Ring's ctor,
   // because any exceptions thrown here will be caught and handled properly.
   if (min_ring_size_ > max_ring_size_) {

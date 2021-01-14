@@ -104,9 +104,9 @@ public:
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
+  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Random::RandomGenerator& random() override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
@@ -170,9 +170,9 @@ public:
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
+  Router::Context& routerContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Random::RandomGenerator& random() override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
@@ -305,13 +305,19 @@ public:
   Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
     return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
   }
+  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
+    return udp_listener_worker_router_
+               ? Network::UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_)
+               : absl::nullopt;
+  }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
-  Init::Manager& initManager();
+  uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
+  Init::Manager& initManager() override;
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
@@ -371,6 +377,7 @@ private:
   const bool added_via_api_;
   const bool workers_started_;
   const uint64_t hash_;
+  const uint32_t tcp_backlog_size_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   // A target is added to Server's InitManager if workers_started_ is false.
@@ -391,7 +398,8 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
-  Network::ConnectionBalancerPtr connection_balancer_;
+  Network::UdpListenerWorkerRouterPtr udp_listener_worker_router_;
+  Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
 

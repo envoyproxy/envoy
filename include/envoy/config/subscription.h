@@ -53,6 +53,8 @@ public:
    */
   virtual const Protobuf::Message& resource() const PURE;
 
+  virtual absl::optional<std::chrono::milliseconds> ttl() const PURE;
+
   /**
    * @return bool does the xDS discovery response have a set resource payload?
    */
@@ -146,7 +148,10 @@ public:
    * @param removed_resources names of resources that this fetch instructed to be removed.
    * @param system_version_info aggregate response data "version", for debugging.
    * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
-   *        are accepted. Accepted changes have their version_info reflected in subsequent requests.
+   * @param use_namespace_matching if the resources should me matched on their namespaces, rather
+   * than unique names. This is used when a collection of resources (e.g. virtual hosts in VHDS) is
+   * being updated. Accepted changes have their version_info reflected in subsequent
+   * requests.
    */
   virtual void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
@@ -174,8 +179,11 @@ public:
    * Start a configuration subscription asynchronously. This should be called once and will continue
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
+   * @param use_namespace_matching if the subscription is for a collection of resources. In such a
+   * case a namespace watch will be created.
    */
-  virtual void start(const std::set<std::string>& resource_names) PURE;
+  virtual void start(const std::set<std::string>& resource_names,
+                     const bool use_namespace_matching = false) PURE;
 
   /**
    * Update the resources to fetch.
@@ -183,6 +191,12 @@ public:
    * be passed to std::set_difference, which must be given sorted collections.
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+
+  /**
+   * Creates a discovery request for resources.
+   * @param add_these_names resource ids for inclusion in the discovery request.
+   */
+  virtual void requestOnDemandUpdate(const std::set<std::string>& add_these_names) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

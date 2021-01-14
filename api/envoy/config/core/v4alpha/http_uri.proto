@@ -27,7 +27,7 @@ message HttpUri {
   //
   //    uri: https://www.googleapis.com/oauth2/v1/certs
   //
-  string uri = 1 [(validate.rules).string = {min_bytes: 1}];
+  string uri = 1 [(validate.rules).string = {min_len: 1}];
 
   // Specify how `uri` is to be fetched. Today, this requires an explicit
   // cluster, but in the future we may support dynamic cluster creation or
@@ -45,7 +45,7 @@ message HttpUri {
     //
     //    cluster: jwks_cluster
     //
-    string cluster = 2 [(validate.rules).string = {min_bytes: 1}];
+    string cluster = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   // Sets the maximum duration in milliseconds that a response can take to arrive upon request.
