@@ -395,29 +395,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
     return true;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
-    return Http::HeaderUtility::shouldCloseConnection(client_->protocol(), *response_headers_);
-  }
-
-  if (response_headers_->Connection()) {
-    const bool close =
-        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-    if (close) {
-      return true;
-    }
-  }
-
-  if (response_headers_->ProxyConnection() && protocol_ < Http::Protocol::Http2) {
-    const bool close =
-        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-    if (close) {
-      return true;
-    }
-  }
-
-  return false;
+  return Http::HeaderUtility::shouldCloseConnection(client_->protocol(), *response_headers_);
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
