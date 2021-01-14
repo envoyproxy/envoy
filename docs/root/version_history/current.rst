@@ -104,21 +104,9 @@ New Features
 * ratelimit: added :ref:`body <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.raw_body>` field to support custom response bodies for non-OK responses from the external ratelimit service.
 * router: added support for regex rewrites during HTTP redirects using :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RedirectAction.regex_rewrite>`.
 * router: added :ref:`allow_post field <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.ConnectConfig.allow_post>` for allowing POST payload as raw TCP.
-* sds: improved support for atomic :ref:`key rotations <xds_certificate_rotation>` and added configurable rotation triggers for
-  :ref:`TlsCertificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.watched_directory>` and
-  :ref:`CertificateValidationContext <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.watched_directory>`.
-* signal: added an extension point for custom actions to run on the thread that has encountered a fatal error. Actions are configurable via :ref:`fatal_actions <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.fatal_actions>`.
-* start_tls: :ref:`transport socket<envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>` which starts in clear-text but may programatically be converted to use tls.
-* tcp: added a new :ref:`envoy.overload_actions.reject_incoming_connections <config_overload_manager_overload_actions>` action to reject incoming TCP connections.
 * tcp_proxy: add support for converting raw TCP streams into HTTP/1.1 CONNECT requests. See :ref:`upgrade documentation <tunneling-tcp-over-http>` for details.
 * tcp_proxy: added a :ref:`use_post field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post>` for using HTTP/2 POST to proxy TCP streams.
 * tcp_proxy: added a :ref:`headers_to_add field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.headers_to_add>` for setting additional headers to the HTTP requests for TCP proxing.
-* thrift_proxy: added a new :ref: `payload_passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>` option to skip decoding body in the Thrift message.
-* tls: added support for RSA certificates with 4096-bit keys in FIPS mode.
-* tracing: added SkyWalking tracer.
-* tracing: added support for setting the hostname used when sending spans to a Zipkin collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_hostname>` field.
-* xds: added support for resource TTLs. A TTL is specified on the :ref:`Resource <envoy_api_msg_Resource>`. For SotW, a :ref:`Resource <envoy_api_msg_Resource>` can be embedded
-  in the list of resources to specify the TTL.
 
 Deprecated
 ----------
