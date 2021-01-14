@@ -22,7 +22,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace LocalRateLimitFilter {
 struct ActiveFilter {
-  ActiveFilter(const ConfigSharedPtr& config) : filter_(config) {
+  ActiveFilter(const ConfigSharedPtr& config) : filter_(*config) {
     filter_.initializeReadFilterCallbacks(read_filter_callbacks_);
   }
 
