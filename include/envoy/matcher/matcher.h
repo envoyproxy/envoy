@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/factory_context.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -71,7 +72,9 @@ using ActionFactoryCb = std::function<ActionPtr()>;
 
 class ActionFactory : public Config::TypedFactory {
 public:
-  virtual ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config) PURE;
+  virtual ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
+                        Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.composite.v3;
 
+import "google/protobuf/any.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -18,4 +20,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Composite {
   // List of permissible types that may be provided via the matching API.
   repeated string type_url = 1;
+}
+
+message CompositeAction {
+  google.protobuf.Any typed_config = 1;
 }
