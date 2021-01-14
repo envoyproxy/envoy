@@ -1327,7 +1327,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
         EXPECT_EQ(proto->a(), "foo");
         auto mock_extension = std::make_unique<MockBootstrapExtension>();
         EXPECT_CALL(*mock_extension, onServerInitialized())
-            .WillOnce(Invoke([](Configuration::ServerFactoryContext& ctx) {
+            .WillOnce(Invoke([]() {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();
             }));
