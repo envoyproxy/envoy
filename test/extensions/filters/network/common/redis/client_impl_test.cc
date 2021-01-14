@@ -147,7 +147,7 @@ public:
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_username_;
   std::string auth_password_;
-  bool legacy_nodelay_;
+  bool legacy_nodelay_{};
 };
 
 TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
@@ -342,6 +342,7 @@ TEST_F(RedisClientImplTest, Basic) {
 }
 
 TEST_F(RedisClientImplTest, BasicLegacyNodelay) {
+  legacy_nodelay_ = true;
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.always_nodelay", "false"}});
