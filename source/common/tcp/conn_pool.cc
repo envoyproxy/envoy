@@ -6,6 +6,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -31,7 +32,10 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
                                    host->cluster().stats().upstream_cx_tx_bytes_total_,
                                    host->cluster().stats().upstream_cx_tx_bytes_buffered_,
                                    &host->cluster().stats().bind_errors_, nullptr});
-  connection_->noDelay(true);
+
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    connection_->noDelay(true);
+  }
   connection_->connect();
 }
 
