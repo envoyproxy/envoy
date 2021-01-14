@@ -138,5 +138,5 @@ encapsulating it in an HTTP CONNECT or HTTP POST request, and a second one liste
 stripping the CONNECT headers (not needed for POST request), and forwarding the original TCP
 upstream, in this case to google.com.
 
-Envoy waits for the HTTP tunnel to be established (i.e. a successful response to the  CONNECT
-request is received), before start streaming the downstream TCP data to the upstream.
+Envoy waits for the HTTP tunnel to be established (i.e. a successful response to the  CONNECT request is received),
+before start streaming the downstream TCP data to the upstream.
