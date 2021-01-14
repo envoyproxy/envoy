@@ -1064,7 +1064,7 @@ TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
         "16");
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
-        ProtoEq(ValueUtil::stringValue("16")));
+        ProtoEq(ValueUtil::numberValue(16)));
   }
   {
     HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
@@ -1073,7 +1073,7 @@ TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
         "10");
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
-        ProtoEq(ValueUtil::stringValue("10")));
+        ProtoEq(ValueUtil::numberValue(10)));
   }
   {
     HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
@@ -1082,7 +1082,7 @@ TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
         "23");
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
-        ProtoEq(ValueUtil::stringValue("23")));
+        ProtoEq(ValueUtil::numberValue(23)));
   }
 }
 

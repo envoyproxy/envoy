@@ -225,14 +225,14 @@ The following command operators are supported:
     Response headers bytes.
 
   TCP
-    Not implemented ("-").
+    Not implemented (0).
 
 %RESPONSE_TRAILERS_BYTES%
   HTTP
     Response trailers bytes.
 
   TCP
-    Not implemented ("-").
+    Not implemented (0).
 
 %BYTES_SENT%
   HTTP
@@ -258,7 +258,7 @@ The following command operators are supported:
     the request received from the downstream.
 
   TCP
-    Not implemented ("-").
+    Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
 

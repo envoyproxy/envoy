@@ -248,9 +248,9 @@ public:
                                  const StreamInfo::StreamInfo&, absl::string_view) const override;
 
 private:
-  std::string extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
-                                     const Http::ResponseHeaderMap& response_headers,
-                                     const Http::ResponseTrailerMap& response_trailers) const;
+  uint64_t extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
+                                  const Http::ResponseHeaderMap& response_headers,
+                                  const Http::ResponseTrailerMap& response_trailers) const;
   HeaderType header_type_;
 };
 

@@ -967,22 +967,19 @@ ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http:
 HeadersByteSizeFormatter::HeadersByteSizeFormatter(const HeaderType header_type)
     : header_type_(header_type) {}
 
-std::string HeadersByteSizeFormatter::extractHeadersByteSize(
+uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
     const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers) const {
-  std::string val;
   switch (header_type_) {
   case HeaderType::RequestHeaders:
-    val = absl::StrCat(request_headers.byteSize());
-    break;
+    return request_headers.byteSize();
   case HeaderType::ResponseHeaders:
-    val = absl::StrCat(response_headers.byteSize());
-    break;
+    return response_headers.byteSize();
   case HeaderType::ResponseTrailers:
-    val = absl::StrCat(response_trailers.byteSize());
-    break;
+    return response_trailers.byteSize();
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  return val;
 }
 
 absl::optional<std::string>
@@ -990,7 +987,7 @@ HeadersByteSizeFormatter::format(const Http::RequestHeaderMap& request_headers,
                                  const Http::ResponseHeaderMap& response_headers,
                                  const Http::ResponseTrailerMap& response_trailers,
                                  const StreamInfo::StreamInfo&, absl::string_view) const {
-  return extractHeadersByteSize(request_headers, response_headers, response_trailers);
+  return absl::StrCat(extractHeadersByteSize(request_headers, response_headers, response_trailers));
 }
 
 ProtobufWkt::Value
@@ -998,8 +995,8 @@ HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_head
                                       const Http::ResponseHeaderMap& response_headers,
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo&, absl::string_view) const {
-  std::string val = extractHeadersByteSize(request_headers, response_headers, response_trailers);
-  return ValueUtil::stringValue(val);
+  return ValueUtil::numberValue(
+      extractHeadersByteSize(request_headers, response_headers, response_trailers));
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
