@@ -342,7 +342,7 @@ Reservation OwnedImpl::reserveApproximately(uint64_t length) {
     Slice slice(size);
     reservation_slices.push_back(slice.reserve(size));
     reservation_owned_slices.emplace_back(std::make_unique<SliceDataImpl>(std::move(slice)));
-    bytes_remaining -= std::min(reservation_slices.back().len_, bytes_remaining);
+    bytes_remaining -= std::min<uint64_t>(reservation_slices.back().len_, bytes_remaining);
     reserved += reservation_slices.back().len_;
 
     ASSERT(reservation_slices.size() <= reservation.MAX_SLICES_,
