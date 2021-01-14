@@ -62,8 +62,7 @@ public:
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD(void, start,
-              (const std::set<std::string>& resources, const bool use_prefix_matching));
+  MOCK_METHOD(void, start, (const std::set<std::string>& resources));
   MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names));
   MOCK_METHOD(void, requestOnDemandUpdate, (const std::set<std::string>& add_these_names));
 };
@@ -76,7 +75,7 @@ public:
   MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder));
+               OpaqueResourceDecoder& resource_decoder, bool use_namespace_matching));
   MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -163,6 +162,14 @@ public:
   MOCK_METHOD(std::string, configType, ());
   MOCK_METHOD(std::string, name, (), (const));
   MOCK_METHOD(std::string, category, (), (const));
+};
+
+class MockContextProvider : public ContextProvider {
+public:
+  MockContextProvider();
+  ~MockContextProvider() override;
+
+  MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
 };
 
 } // namespace Config

@@ -61,6 +61,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
+    "envoy.reloadable_features.always_nodelay",
     "envoy.reloadable_features.consume_all_retry_headers",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
@@ -88,6 +89,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.unify_grpc_handling",
+    "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
 };
 
@@ -107,8 +109,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
-    // TODO(yanavlasov) flip true after all tests for upstream flood checks are implemented
-    "envoy.reloadable_features.upstream_http2_flood_checks",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
 };
