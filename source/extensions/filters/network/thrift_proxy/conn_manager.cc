@@ -31,8 +31,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
     // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
     // request, close. The special case for oneway requests allows them to complete before the
     // ConnectionManager is destroyed.
-    if (stopped_) {
-      ASSERT(!rpcs_.empty());
+    if (stopped_ && !rpcs_.empty()) {
       MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
       ASSERT(metadata.hasMessageType());
       if (metadata.messageType() == MessageType::Oneway) {
@@ -181,9 +180,11 @@ bool ConnectionManager::passthroughEnabled() const {
     return false;
   }
 
-  // This is called right after the metadata has been parsed, and the ActiveRpc being processed must
-  // be in the rpcs_ list.
-  ASSERT(!rpcs_.empty());
+  // If a local response was sent, the rpcs list has been cleared.
+  if (rpcs_.empty()) {
+    return false;
+  }
+
   return (*rpcs_.begin())->passthroughSupported();
 }
 
@@ -303,6 +304,8 @@ void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
 }
 
 FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderFilter* filter) {
+  FilterStatus ret = FilterStatus::Continue;
+
   ASSERT(filter_action_ != nullptr);
 
   if (!local_response_sent_) {
@@ -323,8 +326,9 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderF
     for (; entry != decoder_filters_.end(); entry++) {
       const FilterStatus status = filter_action_((*entry)->handle_.get());
       if (local_response_sent_) {
-        // The filter called sendLocalReply: stop processing filters and return
-        // FilterStatus::Continue irrespective of the current result.
+        // The filter called sendLocalReply: stop processing filters.
+        ret = FilterStatus::StopIteration;
+        finalizeRequest();
         break;
       }
 
@@ -337,7 +341,7 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderF
   filter_action_ = nullptr;
   filter_context_.reset();
 
-  return FilterStatus::Continue;
+  return ret;
 }
 
 FilterStatus ConnectionManager::ActiveRpc::transportBegin(MessageMetadataSharedPtr metadata) {
