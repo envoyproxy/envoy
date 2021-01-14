@@ -131,6 +131,8 @@ TagNameValues::TagNameValues() {
   addRe2(MONGO_PREFIX, R"(^mongo\.((<NAME>)\.))");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
+  // Note: <route_config_name> can contain dots thus we have to maintain full
+  // match.
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<NAME>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
   // listener_manager.(worker_<id>.)*

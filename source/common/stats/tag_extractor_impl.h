@@ -28,13 +28,7 @@ struct Counters {
   uint32_t missed_{};
 };
 
-#define PERF_TAG_COUNTERS                                                                          \
-  ~TagExtractorImplBase() override {                                                               \
-    std::cout << fmt::format("TagStats for {} tag extractor: skipped {}, matched {}, missing {}",  \
-                             name_, counters_->skipped_, counters_->matched_, counters_->missed_)  \
-              << std::endl;                                                                        \
-  }                                                                                                \
-  std::unique_ptr<Counters> counters_
+#define PERF_TAG_COUNTERS std::unique_ptr<Counters> counters_
 
 #define PERF_TAG_INIT counters_ = std::make_unique<Counters>()
 #define PERF_TAG_INC(member) ++(counters_->member)
@@ -65,6 +59,13 @@ public:
 
   TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                        absl::string_view substr = "");
+#ifdef ENVOY_PERF_ANNOTATION
+  ~TagExtractorImplBase() override {
+    std::cout << fmt::format("TagStats for {} tag extractor: skipped {}, matched {}, missing {}",
+                             name_, counters_->skipped_, counters_->matched_, counters_->missed_)
+              << std::endl;
+  }
+#endif
   std::string name() const override { return name_; }
   absl::string_view prefixToken() const override { return prefix_; }
 
