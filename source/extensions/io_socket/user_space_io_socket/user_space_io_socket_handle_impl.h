@@ -12,13 +12,13 @@
 #include "common/common/logger.h"
 #include "common/network/io_socket_error_impl.h"
 
-#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space_io_socket/peer_buffer.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_file_event_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpaceIoSocket {
 /**
  * Network::IoHandle implementation which provides a buffer as data source. It is designed to used
  * by Network::ConnectionImpl. Some known limitations include
@@ -26,16 +26,16 @@ namespace BufferedIoSocket {
  * 2. It doesn't support socket options. Wrap this in ConnectionSocket and implement the socket
  * getter/setter options.
  * 3. It doesn't support UDP interface.
- * 4. The peer BufferedIoSocket must be scheduled in the same thread to avoid data race because
- *    BufferedIoSocketHandle mutates the state of peer handle and no lock is introduced.
+ * 4. The peer UserSpaceIoSocket must be scheduled in the same thread to avoid data race because
+ *    UserSpaceIoSocketHandle mutates the state of peer handle and no lock is introduced.
  */
-class BufferedIoSocketHandleImpl final : public Network::IoHandle,
+class UserSpaceIoSocketHandleImpl final : public Network::IoHandle,
                                          public UserspaceIoHandle,
                                          protected Logger::Loggable<Logger::Id::io> {
 public:
-  BufferedIoSocketHandleImpl();
+  UserSpaceIoSocketHandleImpl();
 
-  ~BufferedIoSocketHandleImpl() override;
+  ~UserSpaceIoSocketHandleImpl() override;
 
   // Network::IoHandle
   os_fd_t fdDoNotUse() const override {
@@ -159,7 +159,7 @@ private:
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};
 };
-} // namespace BufferedIoSocket
+} // namespace UserSpaceIoSocket
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

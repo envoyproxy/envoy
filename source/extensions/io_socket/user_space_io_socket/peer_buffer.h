@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpaceIoSocket {
 
 /**
  * The interface for the peer as a writer and supplied read status query.
@@ -61,7 +61,7 @@ public:
    */
   virtual bool isReadable() const PURE;
 };
-} // namespace BufferedIoSocket
+} // namespace UserSpaceIoSocket
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

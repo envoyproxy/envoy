@@ -4,8 +4,8 @@
 
 #include "common/event/dispatcher_impl.h"
 
-#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space_io_socket/peer_buffer.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_file_event_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpaceIoSocket {
 namespace {
 
 using testing::NiceMock;
@@ -323,7 +323,7 @@ TEST_F(UserSpaceFileEventImplTest, EventClosedIsTriggeredByManullyActivate) {
   }
 }
 } // namespace
-} // namespace BufferedIoSocket
+} // namespace UserSpaceIoSocket
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

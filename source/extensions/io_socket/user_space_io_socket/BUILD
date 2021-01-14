@@ -37,12 +37,12 @@ envoy_cc_extension(
 )
 
 envoy_cc_extension(
-    name = "buffered_io_socket_handle_lib",
+    name = "user_space_io_socket_handle_lib",
     srcs = [
-        "buffered_io_socket_handle_impl.cc",
+        "user_space_io_socket_handle_impl.cc",
     ],
     hdrs = [
-        "buffered_io_socket_handle_impl.h",
+        "user_space_io_socket_handle_impl.h",
     ],
     security_posture = "unknown",
     status = "alpha",

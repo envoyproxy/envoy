@@ -7,13 +7,13 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
 
-#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
+#include "extensions/io_socket/user_space_io_socket/peer_buffer.h"
 
 namespace Envoy {
 
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpaceIoSocket {
 
 // This class maintains the ephemeral events and enabled events.
 // getAndClearEphemeralEvents
@@ -38,7 +38,7 @@ private:
   uint32_t enabled_events_{};
 };
 
-// A FileEvent implementation which is used to drive BufferedIoSocketHandle.
+// A FileEvent implementation which is used to drive UserSpaceIoSocketHandle.
 // Declare the class final to safely call virtual function setEnabled in constructor.
 class UserSpaceFileEventImpl final : public Event::FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
@@ -68,7 +68,7 @@ private:
   // Supplies readable and writable status.
   UserspaceIoHandle& io_source_;
 };
-} // namespace BufferedIoSocket
+} // namespace UserSpaceIoSocket
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

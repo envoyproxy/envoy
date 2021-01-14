@@ -1,4 +1,4 @@
-#include "extensions/io_socket/buffered_io_socket/buffered_io_socket_handle_impl.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_io_socket_handle_impl.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
@@ -8,7 +8,7 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_file_event_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -16,24 +16,24 @@ namespace Envoy {
 
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpaceIoSocket {
 namespace {
 Api::SysCallIntResult makeInvalidSyscallResult() {
   return Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP};
 }
 } // namespace
 
-BufferedIoSocketHandleImpl::BufferedIoSocketHandleImpl()
+UserSpaceIoSocketHandleImpl::UserSpaceIoSocketHandleImpl()
     : pending_received_data_([&]() -> void { this->onBelowLowWatermark(); },
                              [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}) {}
 
-BufferedIoSocketHandleImpl::~BufferedIoSocketHandleImpl() {
+UserSpaceIoSocketHandleImpl::~UserSpaceIoSocketHandleImpl() {
   if (!closed_) {
     close();
   }
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
     if (peer_handle_) {
@@ -52,9 +52,9 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::close() {
   return Api::ioCallUint64ResultNoError();
 }
 
-bool BufferedIoSocketHandleImpl::isOpen() const { return !closed_; }
+bool UserSpaceIoSocketHandleImpl::isOpen() const { return !closed_; }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::readv(uint64_t max_length,
                                                           Buffer::RawSlice* slices,
                                                           uint64_t num_slice) {
   if (!isOpen()) {
@@ -89,7 +89,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::readv(uint64_t max_length,
   return {bytes_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffer,
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::read(Buffer::Instance& buffer,
                                                          uint64_t max_length) {
   if (!isOpen()) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
@@ -109,7 +109,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::read(Buffer::Instance& buffe
   return {max_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                            uint64_t num_slice) {
   // Empty input is allowed even though the peer is shutdown.
   bool is_input_empty = true;
@@ -157,7 +157,7 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::writev(const Buffer::RawSlic
   return {bytes_written, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buffer) {
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::write(Buffer::Instance& buffer) {
   // Empty input is allowed even though the peer is shutdown.
   if (buffer.length() == 0) {
     return Api::ioCallUint64ResultNoError();
@@ -199,23 +199,23 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::write(Buffer::Instance& buff
   return {total_bytes_to_write, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
                                                             const Network::Address::Ip*,
                                                             const Network::Address::Instance&) {
   return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::recvmsg(Buffer::RawSlice*, const uint64_t,
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::recvmsg(Buffer::RawSlice*, const uint64_t,
                                                             uint32_t, RecvMsgOutput&) {
   return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::recvmmsg(RawSliceArrays&, uint32_t,
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::recvmmsg(RawSliceArrays&, uint32_t,
                                                              RecvMsgOutput&) {
   return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
-Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
+Api::IoCallUint64Result UserSpaceIoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   if (!isOpen()) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_INVAL),
                                Network::IoSocketError::deleteIoError)};
@@ -238,52 +238,52 @@ Api::IoCallUint64Result BufferedIoSocketHandleImpl::recv(void* buffer, size_t le
   return {max_bytes_to_read, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
-bool BufferedIoSocketHandleImpl::supportsMmsg() const { return false; }
+bool UserSpaceIoSocketHandleImpl::supportsMmsg() const { return false; }
 
-bool BufferedIoSocketHandleImpl::supportsUdpGro() const { return false; }
+bool UserSpaceIoSocketHandleImpl::supportsUdpGro() const { return false; }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::bind(Network::Address::InstanceConstSharedPtr) {
+Api::SysCallIntResult UserSpaceIoSocketHandleImpl::bind(Network::Address::InstanceConstSharedPtr) {
   return makeInvalidSyscallResult();
 }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::listen(int) { return makeInvalidSyscallResult(); }
+Api::SysCallIntResult UserSpaceIoSocketHandleImpl::listen(int) { return makeInvalidSyscallResult(); }
 
-Network::IoHandlePtr BufferedIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
+Network::IoHandlePtr UserSpaceIoSocketHandleImpl::accept(struct sockaddr*, socklen_t*) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 Api::SysCallIntResult
-BufferedIoSocketHandleImpl::connect(Network::Address::InstanceConstSharedPtr) {
+UserSpaceIoSocketHandleImpl::connect(Network::Address::InstanceConstSharedPtr) {
   // Buffered Io handle should always be considered as connected.
   // Use write or read to determine if peer is closed.
   return {0, 0};
 }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::setOption(int, int, const void*, socklen_t) {
+Api::SysCallIntResult UserSpaceIoSocketHandleImpl::setOption(int, int, const void*, socklen_t) {
   return makeInvalidSyscallResult();
 }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::getOption(int, int, void*, socklen_t*) {
+Api::SysCallIntResult UserSpaceIoSocketHandleImpl::getOption(int, int, void*, socklen_t*) {
   return makeInvalidSyscallResult();
 }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::setBlocking(bool) {
+Api::SysCallIntResult UserSpaceIoSocketHandleImpl::setBlocking(bool) {
   return makeInvalidSyscallResult();
 }
 
-absl::optional<int> BufferedIoSocketHandleImpl::domain() { return absl::nullopt; }
+absl::optional<int> UserSpaceIoSocketHandleImpl::domain() { return absl::nullopt; }
 
-Network::Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::localAddress() {
+Network::Address::InstanceConstSharedPtr UserSpaceIoSocketHandleImpl::localAddress() {
   // TODO(lambdai): Rewrite when caller accept error as the return value.
-  throw EnvoyException(fmt::format("getsockname failed for BufferedIoSocketHandleImpl"));
+  throw EnvoyException(fmt::format("getsockname failed for UserSpaceIoSocketHandleImpl"));
 }
 
-Network::Address::InstanceConstSharedPtr BufferedIoSocketHandleImpl::peerAddress() {
+Network::Address::InstanceConstSharedPtr UserSpaceIoSocketHandleImpl::peerAddress() {
   // TODO(lambdai): Rewrite when caller accept error as the return value.
-  throw EnvoyException(fmt::format("getsockname failed for BufferedIoSocketHandleImpl"));
+  throw EnvoyException(fmt::format("getsockname failed for UserSpaceIoSocketHandleImpl"));
 }
 
-void BufferedIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
+void UserSpaceIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                      Event::FileReadyCb cb,
                                                      Event::FileTriggerType trigger,
                                                      uint32_t events) {
@@ -293,13 +293,13 @@ void BufferedIoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatch
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(dispatcher, cb, events, *this);
 }
 
-Network::IoHandlePtr BufferedIoSocketHandleImpl::duplicate() {
+Network::IoHandlePtr UserSpaceIoSocketHandleImpl::duplicate() {
   // duplicate() is supposed to be used on listener io handle while this implementation doesn't
   // support listen.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-void BufferedIoSocketHandleImpl::activateFileEvents(uint32_t events) {
+void UserSpaceIoSocketHandleImpl::activateFileEvents(uint32_t events) {
   if (user_file_event_) {
     user_file_event_->activate(events);
   } else {
@@ -307,7 +307,7 @@ void BufferedIoSocketHandleImpl::activateFileEvents(uint32_t events) {
   }
 }
 
-void BufferedIoSocketHandleImpl::enableFileEvents(uint32_t events) {
+void UserSpaceIoSocketHandleImpl::enableFileEvents(uint32_t events) {
   if (user_file_event_) {
     user_file_event_->setEnabled(events);
   } else {
@@ -315,9 +315,9 @@ void BufferedIoSocketHandleImpl::enableFileEvents(uint32_t events) {
   }
 }
 
-void BufferedIoSocketHandleImpl::resetFileEvents() { user_file_event_.reset(); }
+void UserSpaceIoSocketHandleImpl::resetFileEvents() { user_file_event_.reset(); }
 
-Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
+Api::SysCallIntResult UserSpaceIoSocketHandleImpl::shutdown(int how) {
   // Support only shutdown write.
   ASSERT(how == ENVOY_SHUT_WR);
   ASSERT(!closed_);
@@ -329,7 +329,7 @@ Api::SysCallIntResult BufferedIoSocketHandleImpl::shutdown(int how) {
   }
   return {0, 0};
 }
-} // namespace BufferedIoSocket
+} // namespace UserSpaceIoSocket
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

@@ -1,15 +1,15 @@
-#include "extensions/io_socket/buffered_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_file_event_impl.h"
 
 #include <cstdint>
 
 #include "common/common/assert.h"
 
-#include "extensions/io_socket/buffered_io_socket/peer_buffer.h"
+#include "extensions/io_socket/user_space_io_socket/peer_buffer.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace BufferedIoSocket {
+namespace UserSpaceIoSocket {
 
 UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                                uint32_t events, UserspaceIoHandle& io_source)
@@ -83,7 +83,7 @@ void UserSpaceFileEventImpl::poll(uint32_t events) {
   }
   activate(filter_enabled);
 }
-} // namespace BufferedIoSocket
+} // namespace UserSpaceIoSocket
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy
