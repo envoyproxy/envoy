@@ -6,6 +6,7 @@
 
 #include "common/http/filter_manager.h"
 #include "common/matcher/exact_map_matcher.h"
+#include "common/matcher/matcher.h"
 #include "common/stream_info/filter_state_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
@@ -155,6 +156,28 @@ Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestMatchingTree() {
   return tree;
 }
 
+struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
+
+Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestMatchingTreeCustomAction() {
+  auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
+      std::make_unique<HttpRequestHeadersDataInput>("match-header"), absl::nullopt);
+
+  tree->addChild("match", Matcher::OnMatch<HttpMatchingData>{
+                              []() { return std::make_unique<TestAction>(); }, nullptr});
+
+  return tree;
+}
+
+Matcher::MatchTreeSharedPtr<HttpMatchingData> createResponseMatchingTreeCustomAction() {
+  auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
+      std::make_unique<HttpResponseHeadersDataInput>("match-header"), absl::nullopt);
+
+  tree->addChild("match", Matcher::OnMatch<HttpMatchingData>{
+                              []() { return std::make_unique<TestAction>(); }, nullptr});
+
+  return tree;
+}
+
 Matcher::MatchTreeSharedPtr<HttpMatchingData> createRequestAndResponseMatchingTree() {
   auto tree = std::make_shared<Matcher::ExactMapMatcher<HttpMatchingData>>(
       std::make_unique<HttpResponseHeadersDataInput>("match-header"), absl::nullopt);
@@ -248,6 +271,78 @@ TEST_F(FilterManagerTest, MatchTreeSkipActionRequestAndResponseHeaders) {
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*headers, false);
   filter_manager_->decodeData(data, true);
+  filter_manager_->destroyFilters();
+}
+
+// Verify that we propagate custom match actions to a decoding filter.
+TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingHeaders) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new MockStreamDecoderFilter());
+  EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*decoder_filter, onMatchCallback(_));
+  EXPECT_CALL(*decoder_filter, decodeHeaders(_, _));
+  EXPECT_CALL(*decoder_filter, decodeComplete());
+  EXPECT_CALL(*decoder_filter, onDestroy());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter, createRequestMatchingTreeCustomAction());
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"match-header", "match"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*grpc_headers, true);
+  filter_manager_->destroyFilters();
+}
+
+// Verify that we propagate custom match actions exactly once to a dual filter.
+TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
+  initialize();
+
+  std::shared_ptr<MockStreamFilter> filter(new MockStreamFilter());
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        ResponseHeaderMapPtr headers{new TestResponseHeaderMapImpl{
+            {":status", "200"}, {"match-header", "match"}, {"content-type", "application/grpc"}}};
+        filter->decoder_callbacks_->encodeHeaders(std::move(headers), true, "details");
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*filter, onDestroy());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamFilter(filter, createResponseMatchingTreeCustomAction());
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"match-header", "match"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(*filter, onMatchCallback(_));
+  filter_manager_->decodeHeaders(*grpc_headers, true);
   filter_manager_->destroyFilters();
 }
 } // namespace
