@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "common/event/scaled_range_timer_manager_impl.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/config/overload/v3/overload.pb.validate.h"
@@ -374,7 +375,7 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
 ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() { return *tls_; }
 Event::ScaledRangeTimerManagerFactory OverloadManagerImpl::scaledTimerFactory() {
   return [this](Event::Dispatcher& dispatcher) {
-    auto manager = createScaledRangeTimerManager(dispatcher);
+    auto manager = createScaledRangeTimerManager(dispatcher, timer_minimums_);
     registerForAction(OverloadActionNames::get().ReduceTimeouts, dispatcher,
                       [manager = manager.get()](OverloadActionState scale_state) {
                         manager->setScaleFactor(
@@ -387,9 +388,10 @@ Event::ScaledRangeTimerManagerFactory OverloadManagerImpl::scaledTimerFactory() 
   };
 }
 
-Event::ScaledRangeTimerManagerPtr
-OverloadManagerImpl::createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
-  return std::make_unique<Event::ScaledRangeTimerManagerImpl>(dispatcher, timer_minimums_);
+Event::ScaledRangeTimerManagerPtr OverloadManagerImpl::createScaledRangeTimerManager(
+    Event::Dispatcher& dispatcher,
+    const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr& timer_minimums) const {
+  return std::make_unique<Event::ScaledRangeTimerManagerImpl>(dispatcher, timer_minimums);
 }
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure,

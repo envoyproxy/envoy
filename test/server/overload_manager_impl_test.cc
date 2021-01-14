@@ -1,6 +1,8 @@
 #include <chrono>
+#include <initializer_list>
 
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
@@ -25,17 +27,23 @@ using testing::_;
 using testing::AllOf;
 using testing::AnyNumber;
 using testing::ByMove;
+using testing::DoAll;
 using testing::FloatNear;
 using testing::Invoke;
 using testing::InvokeArgument;
 using testing::MockFunction;
 using testing::NiceMock;
+using testing::Pointee;
 using testing::Property;
 using testing::Return;
+using testing::SaveArg;
+using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
 namespace Server {
 namespace {
+
+using TimerType = Event::ScaledRangeTimerManager::TimerType;
 
 class FakeResourceMonitor : public ResourceMonitor {
 public:
@@ -121,12 +129,15 @@ public:
   }
 
   MOCK_METHOD(Event::ScaledRangeTimerManagerPtr, createScaledRangeTimerManager,
-              (Event::Dispatcher&), (const, override));
+              (Event::Dispatcher&,
+               const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr&),
+              (const, override));
 
 private:
-  Event::ScaledRangeTimerManagerPtr
-  createDefaultScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
-    return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher);
+  Event::ScaledRangeTimerManagerPtr createDefaultScaledRangeTimerManager(
+      Event::Dispatcher& dispatcher,
+      const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr& timer_minimums) const {
+    return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher, timer_minimums);
   }
 };
 
@@ -493,17 +504,29 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             saturation_threshold: 1.0
   )YAML";
 
+// These are the timer types according to the reduced timeouts config above.
+constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
+    {TimerType::HttpDownstreamIdleConnectionTimeout,
+     Event::AbsoluteMinimum(std::chrono::seconds(2))},
+    {TimerType::HttpDownstreamIdleStreamTimeout,
+     Event::ScaledMinimum(UnitFloat(0.1))},
+};
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));
 
   auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+
+  Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr timer_minimums;
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager})));
+      .WillOnce(
+          DoAll(SaveArg<1>(&timer_minimums),
+                Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager}))));
 
   Event::MockDispatcher mock_dispatcher;
   auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
 
   EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
+  EXPECT_THAT(timer_minimums, Pointee(UnorderedElementsAreArray(kReducedTimeoutsMinimums)));
 }
 
 TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {

@@ -124,8 +124,9 @@ public:
 
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
-  virtual Event::ScaledRangeTimerManagerPtr
-  createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const;
+  virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
+      Event::Dispatcher& dispatcher,
+      const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr& timer_minimums) const;
 
 private:
   using FlushEpochId = uint64_t;
