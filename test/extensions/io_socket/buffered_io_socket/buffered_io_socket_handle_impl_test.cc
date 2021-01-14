@@ -45,8 +45,8 @@ public:
   BufferedIoSocketHandleTest() : buf_(1024) {
     io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
     io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_->setWritablePeer(io_handle_peer_.get());
-    io_handle_peer_->setWritablePeer(io_handle_.get());
+    io_handle_->setPeerHandle(io_handle_peer_.get());
+    io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
   ~BufferedIoSocketHandleTest() override = default;
@@ -949,8 +949,8 @@ public:
   BufferedIoSocketHandleNotImplementedTest() {
     io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
     io_handle_peer_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    io_handle_->setWritablePeer(io_handle_peer_.get());
-    io_handle_peer_->setWritablePeer(io_handle_.get());
+    io_handle_->setPeerHandle(io_handle_peer_.get());
+    io_handle_peer_->setPeerHandle(io_handle_.get());
   }
 
   ~BufferedIoSocketHandleNotImplementedTest() override {

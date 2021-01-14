@@ -83,17 +83,17 @@ public:
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
   void onBelowLowWatermark() {
-    if (writable_peer_) {
+    if (peer_handle_) {
       ENVOY_LOG(debug, "Socket {} switches to low watermark. Notify {}.", static_cast<void*>(this),
-                static_cast<void*>(writable_peer_));
-      writable_peer_->onPeerBufferLowWatermark();
+                static_cast<void*>(peer_handle_));
+      peer_handle_->onPeerBufferLowWatermark();
     }
   }
   void onAboveHighWatermark() {
     // Low to high is checked by peer after peer writes data.
   }
 
-  // WritablePeer
+  // `UserspaceIoHandle`
   void setWriteEnd() override {
     receive_data_end_stream_ = true;
     setNewDataAvailable();
@@ -107,7 +107,7 @@ public:
     }
   }
   void onPeerDestroy() override {
-    writable_peer_ = nullptr;
+    peer_handle_ = nullptr;
     write_shutdown_ = true;
   }
   void onPeerBufferLowWatermark() override {
@@ -118,22 +118,21 @@ public:
   bool isWritable() const override { return !pending_received_data_.highWatermarkTriggered(); }
   bool isPeerShutDownWrite() const override { return receive_data_end_stream_; }
   bool isPeerWritable() const override {
-    return writable_peer_ != nullptr && !writable_peer_->isPeerShutDownWrite() &&
-           writable_peer_->isWritable();
+    return peer_handle_ != nullptr && !peer_handle_->isPeerShutDownWrite() &&
+           peer_handle_->isWritable();
   }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 
-  // `UserspaceIoHandle`
   bool isReadable() const override {
     return isPeerShutDownWrite() || pending_received_data_.length() > 0;
   }
 
   // Set the peer which will populate the owned pending_received_data.
-  void setWritablePeer(WritablePeer* writable_peer) {
+  void setPeerHandle(UserspaceIoHandle* peer_handle) {
     // Swapping writable peer is undefined behavior.
-    ASSERT(!writable_peer_);
+    ASSERT(!peer_handle_);
     ASSERT(!write_shutdown_);
-    writable_peer_ = writable_peer;
+    peer_handle_ = peer_handle;
   }
 
 private:
@@ -155,7 +154,7 @@ private:
   Buffer::WatermarkBuffer pending_received_data_;
 
   // Destination of the write(). The value remains non-null until the peer is closed.
-  WritablePeer* writable_peer_{nullptr};
+  UserspaceIoHandle* peer_handle_{nullptr};
 
   // The flag whether the peer is valid. Any write attempt must check this flag.
   bool write_shutdown_{false};

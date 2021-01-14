@@ -27,8 +27,8 @@ public:
   BufferedIoSocketHandlePlatformTest() {
     first_io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
     second_io_handle_ = std::make_unique<BufferedIoSocketHandleImpl>();
-    first_io_handle_->setWritablePeer(second_io_handle_.get());
-    second_io_handle_->setWritablePeer(first_io_handle_.get());
+    first_io_handle_->setPeerHandle(second_io_handle_.get());
+    second_io_handle_->setPeerHandle(first_io_handle_.get());
   }
 
   ~BufferedIoSocketHandlePlatformTest() override {

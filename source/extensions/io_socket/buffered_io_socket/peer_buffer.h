@@ -9,11 +9,11 @@ namespace IoSocket {
 namespace BufferedIoSocket {
 
 /**
- * The interface for the writer.
+ * The interface for the peer as a writer and supplied read status query.
  */
-class WritablePeer {
+class UserspaceIoHandle {
 public:
-  virtual ~WritablePeer() = default;
+  virtual ~UserspaceIoHandle() = default;
 
   /**
    * Set the flag to indicate no further write from peer.
@@ -55,14 +55,6 @@ public:
    * Raised by the peer when the peer switch from high water mark to low.
    */
   virtual void onPeerBufferLowWatermark() PURE;
-};
-
-/**
- * The interface for the peer as a writer and supplied read status query.
- */
-class UserspaceIoHandle : public WritablePeer {
-public:
-  ~UserspaceIoHandle() override = default;
 
   /**
    * @return true if the pending receive buffer is not empty or read_end is set.
