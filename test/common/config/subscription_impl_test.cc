@@ -20,6 +20,24 @@ enum class SubscriptionType {
   Filesystem,
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const SubscriptionType sub, std::ostream* os) {
+  (*os) << ([sub]() -> absl::string_view {
+    switch (sub) {
+    case SubscriptionType::Grpc:
+      return "Grpc";
+    case SubscriptionType::DeltaGrpc:
+      return "DeltaGrpc";
+    case SubscriptionType::Http:
+      return "Http";
+    case SubscriptionType::Filesystem:
+      return "Filesystem";
+    default:
+      return "unknown";
+    }
+  })();
+}
+
 class SubscriptionImplTest : public testing::TestWithParam<SubscriptionType> {
 public:
   SubscriptionImplTest() : SubscriptionImplTest(std::chrono::milliseconds(0)) {}
