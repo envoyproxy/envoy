@@ -10,6 +10,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
+#include "common/matcher/matcher.h"
 #include "common/runtime/runtime_features.h"
 
 namespace Envoy {

@@ -297,11 +297,7 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDecodingHeaders) {
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
-<<<<<<< HEAD
-      .WillByDefault(Return(absl::make_optional(std::ref(*grpc_headers))));
-=======
       .WillByDefault(Return(makeOptRef(*grpc_headers)));
->>>>>>> master
   filter_manager_->createFilterChain();
 
   filter_manager_->requestHeadersInitialized();

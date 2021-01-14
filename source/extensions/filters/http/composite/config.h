@@ -33,29 +33,38 @@ class CompositeAction
     : public Matcher::ActionBase<envoy::extensions::filters::http::composite::v3::CompositeAction> {
 
 public:
-  explicit CompositeAction(Http::FilterFactoryCb& cb) : cb_(cb) {}
+  explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
+
+  void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const { cb_(callbacks); }
 
 private:
-  Http::FilterFactoryCb& cb_;
+  const Http::FilterFactoryCb cb_;
 };
 
 class CompositeMatchActionFactory : public Matcher::ActionFactory {
+public:
   Matcher::ActionFactoryCb
   createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
                         Server::Configuration::FactoryContext& context) override {
-    const auto action_config = MessageUtil::downcastAndValidate<
-        envoy::extensions::filters::http::composite::v3::CompositeAction>(
+    const auto& action_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::filters::http::composite::v3::CompositeAction&>(
         config, context.messageValidationVisitor());
 
-    auto& factory = getAndCheckFactory(action_config.typed_config());
+    auto& factory = Config::Utility::getAndCheckFactoryByType<
+        Server::Configuration::NamedHttpFilterConfigFactory>(action_config.typed_config());
 
     auto message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), context.messageValidationVisitor(), factory)
+        action_config.typed_config(), context.messageValidationVisitor(), factory);
 
-        auto factory_cb = factory.createFilterFactoryFromProto(action_config.typed_config(),
-                                                               stats_prefix, context);
+    auto factory_cb = factory.createFilterFactoryFromProto(*message, stats_prefix, context);
 
-    return [factory_cb]() { return std::make_unique<CompositeAction>(factory_cb); }
+    return [factory_cb]() { return std::make_unique<CompositeAction>(factory_cb); };
+  }
+
+  std::string name() const override { return "composite-action"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::http::composite::v3::CompositeAction>();
   }
 };
 

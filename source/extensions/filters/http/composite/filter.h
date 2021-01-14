@@ -15,7 +15,7 @@ using FactoryMap = absl::flat_hash_map<std::string, Http::FilterFactoryCb>;
 
 class Filter : public Http::PassThroughFilter {
 public:
-  explicit Filter(FactoryMap factories) : factories_(std::move(factories)) {}
+  Filter() : decoded_headers_(false), encoded_headers_(false) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     decoded_headers_ = true;
@@ -39,10 +39,55 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  void onMatchCallback(const Matcher::Action&) override {}
+  struct FilterAccumulator : public Http::FilterChainFactoryCallbacks {
+    FilterAccumulator(Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                      Http::StreamEncoderFilterCallbacks& encoder_callbacks)
+        : decoder_callbacks_(decoder_callbacks), encoder_callbacks_(encoder_callbacks) {}
+    Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
+    Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
+    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
+      decoder_callbacks_.addStreamDecoderFilter(filter);
+    }
+    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr,
+                                Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
+      // TODO(snowp): We should be able to support this.
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+
+    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
+      encoder_callbacks_.addStreamEncoderFilter(filter);
+    }
+
+    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr,
+                                Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
+      // TODO(snowp): We should be able to support this.
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+
+    void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
+      decoder_callbacks_.addStreamFilter(filter);
+    }
+
+    void addStreamFilter(Http::StreamFilterSharedPtr,
+                         Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
+      // TODO(snowp): We should be able to support this.
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+
+    void addAccessLogHandler(AccessLog::InstanceSharedPtr) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
+  };
+
+  void onMatchCallback(const Matcher::Action& action) override {
+    ASSERT(!decoded_headers_);
+    const auto& composite_action = action.getTyped<CompositeAction>();
+
+    FilterAccumulator acc(*decoder_callbacks_, *encoder_callbacks_);
+    composite_action.createFilters(acc);
+  }
 
 private:
-  const FactoryMap factories_;
   bool decoded_headers_ : 1;
   bool encoded_headers_ : 1;
 };

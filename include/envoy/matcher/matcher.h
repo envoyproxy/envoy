@@ -8,12 +8,18 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/server/factory_context.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class FactoryContext;
+}
+} // namespace Server
+
 namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
@@ -61,9 +67,9 @@ public:
   /**
    * Helper to convert this action to its underlying type.
    */
-  template <class T> T& getTyped() {
-    ASSERT(dynamic_cast<T*>(this) != nullptr);
-    return static_cast<T&>(*this);
+  template <class T> const T& getTyped() const {
+    ASSERT(dynamic_cast<const T*>(this) != nullptr);
+    return static_cast<const T&>(*this);
   }
 };
 
@@ -215,7 +221,7 @@ public:
    */
   virtual DataInputPtr<DataType>
   createDataInput(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                  Server::Configuration::FactoryContext& context) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

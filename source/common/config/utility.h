@@ -334,6 +334,18 @@ public:
     return Registry::FactoryRegistry<Factory>::getFactoryByType(getFactoryType(typed_config));
   }
 
+  template <class Factory>
+  static Factory& getAndCheckFactoryByType(const ProtobufWkt::Any& typed_config) {
+    auto* factory = getFactoryByType<Factory>(typed_config);
+
+    if (factory == nullptr) {
+      ExceptionUtil::throwEnvoyException(fmt::format(
+          "Didn't find a registered implementation for type: '{}'", getFactoryType(typed_config)));
+    }
+
+    return *factory;
+  }
+
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
    * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
