@@ -33,6 +33,10 @@ public:
 
 // Already normalized path don't change using deprecated path canonicalizer.
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
+  EXPECT_CALL(runtime_.snapshot_,
+              deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
+      .WillRepeatedly(Return(true));
+
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
     auto& path_header = pathHeaderEntry(path);
@@ -44,6 +48,10 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
 
 // Invalid paths are rejected using deprecated path canonicalizer.
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
+  EXPECT_CALL(runtime_.snapshot_,
+              deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
+      .WillRepeatedly(Return(true));
+
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {
