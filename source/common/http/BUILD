@@ -446,9 +446,9 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//source/common/chromium_url",
         "//source/common/common:logger_lib",
-        "//include/envoy/runtime:runtime_interface",
     ],
 )
 
