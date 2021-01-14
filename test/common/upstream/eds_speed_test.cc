@@ -65,7 +65,7 @@ public:
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
 
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
     subscription_->start({"fare"});
@@ -86,7 +86,7 @@ public:
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
         grpc_mux_, *eds_callbacks_, resource_decoder_, subscription_stats_, type_url_, dispatcher_,
-        std::chrono::milliseconds(), false);
+        std::chrono::milliseconds(), false, false);
   }
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure

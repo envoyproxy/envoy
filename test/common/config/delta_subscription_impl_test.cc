@@ -149,7 +149,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(
       xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,
-      dispatcher, std::chrono::milliseconds(12345), false);
+      dispatcher, std::chrono::milliseconds(12345), false, false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 

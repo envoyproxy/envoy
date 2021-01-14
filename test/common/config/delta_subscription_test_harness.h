@@ -45,9 +45,10 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_);
-    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        xds_context_, callbacks_, resource_decoder_, stats_,
-        Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false);
+    subscription_ =
+        std::make_unique<GrpcSubscriptionImpl>(xds_context_, callbacks_, resource_decoder_, stats_,
+                                               Config::TypeUrl::get().ClusterLoadAssignment,
+                                               dispatcher_, init_fetch_timeout, false, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 

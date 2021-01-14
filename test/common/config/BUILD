@@ -439,6 +439,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "context_provider_impl_test",
+    srcs = ["context_provider_impl_test.cc"],
+    deps = [
+        ":xds_test_utility_lib",
+        "//source/common/config:context_provider_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
     deps = [

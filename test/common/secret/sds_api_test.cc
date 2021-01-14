@@ -105,11 +105,11 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   envoy::config::core::v3::ConfigSource config_source;
 
-  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
                         &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                 Stats::Scope&, Config::SubscriptionCallbacks& cbs,
-                                Config::OpaqueResourceDecoder&) -> Config::SubscriptionPtr {
+                                Config::OpaqueResourceDecoder&, bool) -> Config::SubscriptionPtr {
         return std::make_unique<Config::FilesystemSubscriptionImpl>(*dispatcher_, sds_config_path,
                                                                     cbs, resource_decoder, stats,
                                                                     validation_visitor_, *api_);
@@ -134,7 +134,7 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
 TEST_F(SdsApiTest, BadConfigSource) {
   ::testing::InSequence s;
   envoy::config::core::v3::ConfigSource config_source;
-  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
         throw EnvoyException("bad config");
         return nullptr;

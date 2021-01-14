@@ -117,8 +117,7 @@ private:
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   void updateWatch(const std::string& type_url, Watch* watch,
-                   const std::set<std::string>& resources,
-                   const bool creating_namespace_watch = false);
+                   const std::set<std::string>& resources, bool creating_namespace_watch = false);
 
   void addSubscription(const std::string& type_url, const bool use_namespace_matching);
 

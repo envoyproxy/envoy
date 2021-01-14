@@ -33,7 +33,7 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, 
       cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, false);
 }
 
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

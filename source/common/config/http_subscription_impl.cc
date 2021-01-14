@@ -43,7 +43,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 }
 
 // Config::Subscription
-void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names, const bool) {
+void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       handleFailure(Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
