@@ -481,9 +481,9 @@ config_setting(
 alias(
     name = "fuzzing_engine",
     actual = select({
-        "@envoy//bazel:libfuzzer": "@rules_fuzzing//fuzzing/engines:libfuzzer",
-        "@envoy//bazel:honggfuzz": "@rules_fuzzing//fuzzing/engines:honggfuzz",
-        "@envoy//bazel:oss_fuzz": "@rules_fuzzing_oss_fuzz//:oss_fuzz_engine",
+        ":libfuzzer": "@rules_fuzzing//fuzzing/engines:libfuzzer",
+        ":honggfuzz": "@rules_fuzzing//fuzzing/engines:honggfuzz",
+        ":oss_fuzz": "@rules_fuzzing_oss_fuzz//:oss_fuzz_engine",
         "//conditions:default": "//test/fuzz:fuzz_runner_engine",
     }),
 )
