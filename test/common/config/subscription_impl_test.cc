@@ -19,6 +19,8 @@ enum class SubscriptionType {
   Http,
   Filesystem,
 };
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const SubscriptionType sub, std::ostream* os) {
   (*os) << ([sub]() -> absl::string_view {
     switch (sub) {
@@ -30,6 +32,8 @@ void PrintTo(const SubscriptionType sub, std::ostream* os) {
       return "Http";
     case SubscriptionType::Filesystem:
       return "Filesystem";
+    default:
+      return "unknown";
     }
   })();
 }

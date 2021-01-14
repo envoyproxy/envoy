@@ -4286,6 +4286,7 @@ public:
   std::list<uint32_t> codec_index_{};
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const GrpcHealthCheckerImplTestBase::ResponseSpec& spec, std::ostream* os) {
   (*os) << "(headers{" << absl::StrJoin(spec.response_headers, ",", absl::PairFormatter(":"))
         << "},";
