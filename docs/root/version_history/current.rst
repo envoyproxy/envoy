@@ -15,6 +15,9 @@ Minor Behavior Changes
   are very frequent. This change can be disabled by setting the `envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`
   feature flag to false. If setting this flag to false is required in a deployment please open an
   issue against the project.
+* http: allow to use path canonicalizer from `googleurl <https://quiche.googlesource.com/googleurl>`_
+  instead of `//source/common/chromium_url` by setting `envoy.deprecated_features.use_forked_chromium_url`
+  flag to false.
 
 Bug Fixes
 ---------
