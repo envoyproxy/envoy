@@ -20,8 +20,15 @@
 #include "common/event/libevent_scheduler.h"
 #include "common/signal/fatal_error_handler.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Event {
+
+// The tracked object stack likely won't grow larger than this initial
+// reservation; this should make appends constant time since the stack
+// shouldn't have to grow larger.
+inline constexpr size_t ExpectedMaxTrackedObjectStackDepth = 10;
 
 /**
  * libevent implementation of Event::Dispatcher.
@@ -138,7 +145,8 @@ private:
   std::vector<DeferredDeletablePtr>* current_to_delete_;
   Thread::MutexBasicLockable post_lock_;
   std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
-  std::vector<const ScopeTrackedObject*> tracked_object_stack_;
+  absl::InlinedVector<const ScopeTrackedObject*, ExpectedMaxTrackedObjectStackDepth>
+      tracked_object_stack_;
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
   WatchdogRegistrationPtr watchdog_registration_;

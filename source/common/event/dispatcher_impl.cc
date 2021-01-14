@@ -38,12 +38,6 @@
 
 namespace Envoy {
 namespace Event {
-namespace {
-// The tracked object stack likely won't grow larger than this initial
-// reservation; this should make appends constant time since the stack
-// shouldn't have to grow larger.
-constexpr size_t ExpectedMaxTrackedObjectStackDepth = 10;
-} // namespace
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
@@ -57,7 +51,6 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
-  tracked_object_stack_.reserve(ExpectedMaxTrackedObjectStackDepth);
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
   base_scheduler_.registerOnPrepareCallback(
@@ -329,16 +322,13 @@ void DispatcherImpl::pushTrackedObject(const ScopeTrackedObject* object) {
   ASSERT(isThreadSafe());
   ASSERT(object != nullptr);
   tracked_object_stack_.push_back(object);
+  ASSERT(tracked_object_stack_.size() <= ExpectedMaxTrackedObjectStackDepth);
 }
 
 void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object) {
   ASSERT(isThreadSafe());
   ASSERT(expected_object != nullptr);
-  if (tracked_object_stack_.empty()) {
-    ASSERT(!expected_object,
-           "Tracked object stack is empty yet we expected a non-null tracked object on the top.");
-    return;
-  }
+  RELEASE_ASSERT(!tracked_object_stack_.empty(), "Tracked Object Stack is empty, nothing to pop!");
 
   const ScopeTrackedObject* top = tracked_object_stack_.back();
   tracked_object_stack_.pop_back();
