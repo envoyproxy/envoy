@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/matcher/matcher.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "common/matcher/matcher.h"
 
@@ -29,7 +30,8 @@ public:
   TestDataInputFactory(absl::string_view factory_name, absl::string_view data)
       : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
 
-  DataInputPtr<TestData> createDataInput(const Protobuf::Message&) override {
+  DataInputPtr<TestData> createDataInput(const Protobuf::Message&,
+                                         ProtobufMessage::ValidationVisitor&) override {
     return std::make_unique<TestInput>(
         DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, value_});
   }

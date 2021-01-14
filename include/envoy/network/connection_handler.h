@@ -9,6 +9,8 @@
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 
+#include "common/common/interval_value.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -98,7 +100,7 @@ public:
    * Set the fraction of connections the listeners should reject.
    * @param reject_fraction a value between 0 (reject none) and 1 (reject all).
    */
-  virtual void setListenerRejectFraction(float reject_fraction) PURE;
+  virtual void setListenerRejectFraction(UnitFloat reject_fraction) PURE;
 
   /**
    * @return the stat prefix used for per-handler stats.

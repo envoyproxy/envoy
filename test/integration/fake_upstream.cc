@@ -85,7 +85,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
-                          parent_.connection().localAddress()->asString());
+                          parent_.connection().addressProvider().localAddress()->asString());
   }
 
   parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
@@ -375,6 +375,24 @@ void FakeHttpConnection::onGoAway(Http::GoAwayErrorCode code) {
   // Usually indicates connection level errors, no operations are needed since
   // the connection will be closed soon.
   ENVOY_LOG(info, "FakeHttpConnection receives GOAWAY: ", code);
+}
+
+void FakeHttpConnection::encodeGoAway() {
+  ASSERT(type_ == Type::HTTP2);
+
+  shared_connection_.connection().dispatcher().post([this]() { codec_->goAway(); });
+}
+
+void FakeHttpConnection::encodeProtocolError() {
+  ASSERT(type_ == Type::HTTP2);
+
+  Http::Http2::ServerConnectionImpl* codec =
+      dynamic_cast<Http::Http2::ServerConnectionImpl*>(codec_.get());
+  ASSERT(codec != nullptr);
+  shared_connection_.connection().dispatcher().post([codec]() {
+    Http::Status status = codec->protocolErrorForTest();
+    ASSERT(Http::getStatusCode(status) == Http::StatusCode::CodecProtocolError);
+  });
 }
 
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
