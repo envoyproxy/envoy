@@ -49,7 +49,9 @@ public:
 
 class WasmServiceExtension : public Server::BootstrapExtension, Logger::Loggable<Logger::Id::wasm> {
 public:
-  WasmServiceExtension(const envoy::extensions::wasm::v3::WasmService& config, Server::Configuration::ServerFactoryContext& context) : config_(config), context_(context) {}
+  WasmServiceExtension(const envoy::extensions::wasm::v3::WasmService& config,
+                       Server::Configuration::ServerFactoryContext& context)
+      : config_(config), context_(context) {}
   WasmService& wasmService() {
     ASSERT(wasm_service_ != nullptr);
     return *wasm_service_;
