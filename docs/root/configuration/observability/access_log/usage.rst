@@ -258,7 +258,7 @@ The following command operators are supported:
     the request received from the downstream.
 
   TCP
-    Not implemented (-).
+    Not implemented ("-").
 
   Renders a numeric value in typed JSON logs.
 
