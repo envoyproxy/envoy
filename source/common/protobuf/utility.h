@@ -166,17 +166,17 @@ public:
   // Based on MessageUtil::hash() defined below.
   template <class ProtoType>
   static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
-    // message doesn't hash to different values.
     std::string text;
     {
-      // For memory safety, the StringOutputStream needs to be destroyed before
-      // we read the string.
-      Protobuf::io::StringOutputStream string_stream(&text);
-      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
-      coded_stream.SetSerializationDeterministic(true);
+      Protobuf::TextFormat::Printer printer;
+      printer.SetExpandAny(true);
+      printer.SetUseFieldNumber(true);
+      printer.SetSingleLineMode(true);
+      printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
-        message.SerializeToCodedStream(&coded_stream);
+        std::string text_message;
+        printer.PrintToString(message, &text_message);
+        absl::StrAppend(&text, text_message);
       }
     }
     return HashUtil::xxHash64(text);
