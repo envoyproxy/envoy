@@ -206,19 +206,17 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
   this->config_.set_use_post(true);
   this->setupUpstream();
 
-  // TCP over POST is not supported by HTTP/1.
-  if (!this->is_http2_) {
-    EXPECT_DEATH(this->upstream_->setRequestEncoder(this->encoder_, false), "");
-    return;
-  }
-
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
   expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, "POST"},
       {Http::Headers::get().Host, this->config_.hostname()},
       {Http::Headers::get().Path, "/"},
-      {Http::Headers::get().Scheme, Http::Headers::get().SchemeValues.Http},
   });
+
+  if (this->is_http2_) {
+    expected_headers->addReference(Http::Headers::get().Scheme,
+                                   Http::Headers::get().SchemeValues.Http);
+  }
 
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);

@@ -300,12 +300,16 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   request_encoder_->getStream().addCallbacks(*this);
 
   ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
-  ASSERT(!config_.use_post());
 
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, "CONNECT"},
+      {Http::Headers::get().Method, config_.use_post() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.hostname()},
   });
+
+  if (config_.use_post()) {
+    // Path is required for POST requests.
+    headers->addReference(Http::Headers::get().Path, "/");
+  }
 
   for (const auto& header : config_.headers_to_add()) {
     if (header.append().value()) {
