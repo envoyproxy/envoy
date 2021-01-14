@@ -11,8 +11,8 @@ namespace HttpFilters {
 namespace Composite {
 
 Http::FilterFactoryCb CompositeFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::composite::v3::Composite&,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    const envoy::extensions::filters::http::composite::v3::Composite&, const std::string&,
+    Server::Configuration::FactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>());
@@ -22,8 +22,7 @@ Http::FilterFactoryCb CompositeFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the composite filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(CompositeFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(CompositeFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Composite
 } // namespace HttpFilters

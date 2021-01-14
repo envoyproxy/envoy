@@ -1,13 +1,13 @@
 #pragma once
 
-#include "common/protobuf/utility.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.validate.h"
-
-#include "common/matcher/matcher.h"
-
 #include "envoy/http/filter.h"
 #include "envoy/server/factory_context.h"
+
+#include "common/matcher/matcher.h"
+#include "common/protobuf/utility.h"
+
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -40,9 +40,9 @@ private:
 };
 
 class CompositeMatchActionFactory : public Matcher::ActionFactory {
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
-                                        const std::string& stats_prefix,
-                                        Server::Configuration::FactoryContext& context) override {
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
+                        Server::Configuration::FactoryContext& context) override {
     const auto action_config = MessageUtil::downcastAndValidate<
         envoy::extensions::filters::http::composite::v3::CompositeAction>(
         config, context.messageValidationVisitor());

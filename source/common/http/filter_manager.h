@@ -977,25 +977,27 @@ public:
   }
 
   void addStreamFilterAfter(StreamFilterSharedPtr filter, ActiveStreamDecoderFilter& wrapper) {
-    auto decoder_filter_itr = decoder_filters_.insert(wrapper.entry()++, std::make_unique<ActiveStreamDecoderFilter>(
-                                                   *this, filter, nullptr, true));
+    auto decoder_filter_itr = decoder_filters_.insert(
+        wrapper.entry()++,
+        std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, true));
 
     ASSERT(wrapper.dual_filter_itr_ != encoder_filters_.end());
-    auto encoder_filter_itr = encoder_filters_.insert(wrapper.dual_filter_itr_++, std::make_unique<ActiveStreamEncoderFilter>(
-                                                            *this, filter, nullptr, true));
+    auto encoder_filter_itr = encoder_filters_.insert(
+        wrapper.dual_filter_itr_++,
+        std::make_unique<ActiveStreamEncoderFilter>(*this, filter, nullptr, true));
 
     decoder_filter_itr->get()->dual_filter_itr_ = encoder_filter_itr;
   }
 
   void addStreamDecoderFilterAfter(StreamDecoderFilterSharedPtr filter,
                                    ActiveStreamDecoderFilter& wrapper) {
-    decoder_filters_.insert(
-        wrapper.entry()++, std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, false));
+    decoder_filters_.insert(wrapper.entry()++, std::make_unique<ActiveStreamDecoderFilter>(
+                                                   *this, filter, nullptr, false));
   }
   void addStreamEncoderFilterAfter(StreamEncoderFilterSharedPtr filter,
                                    ActiveStreamEncoderFilter& wrapper) {
-    encoder_filters_.insert(
-        wrapper.entry()++, std::make_unique<ActiveStreamEncoderFilter>(*this, filter, nullptr, false));
+    encoder_filters_.insert(wrapper.entry()++, std::make_unique<ActiveStreamEncoderFilter>(
+                                                   *this, filter, nullptr, false));
   }
   /**
    * Marks local processing as complete.

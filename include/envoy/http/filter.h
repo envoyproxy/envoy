@@ -572,7 +572,8 @@ public:
    * Adds a new stream filter immediately following the current filter. May not be called after
    * headers have continued past the current filter.
    *
-   * The filter will be added as a dual filter, e.g. it will serve as both a decoding and encoding filter.
+   * The filter will be added as a dual filter, e.g. it will serve as both a decoding and encoding
+   * filter.
    */
   virtual void addStreamFilter(StreamFilterSharedPtr filter) PURE;
 
