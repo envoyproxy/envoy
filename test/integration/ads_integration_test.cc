@@ -1489,7 +1489,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientTypeDelta, XdsTpAdsIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),
+                     // There should be no variation across clients.
+                     testing::Values(Grpc::ClientType::EnvoyGrpc),
                      // Only delta xDS is supported for XdsTp
                      testing::Values(Grpc::SotwOrDelta::Delta)));
 
