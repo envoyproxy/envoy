@@ -36,7 +36,7 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
     auto& path_header = pathHeaderEntry(path);
-    const auto result = PathUtil::canonicalPath(headers_);
+    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
     EXPECT_TRUE(result) << "original path: " << path;
     EXPECT_EQ(path_header.value().getStringView(), absl::string_view(path));
   }
@@ -48,7 +48,7 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {
     pathHeaderEntry(path);
-    EXPECT_FALSE(PathUtil::canonicalPath(headers_)) << "original path: " << path;
+    EXPECT_FALSE(PathUtil::canonicalPath(headers_, &runtime_)) << "original path: " << path;
   }
 }
 
@@ -77,7 +77,7 @@ TEST_F(PathUtilityTest, InvalidPaths) {
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {
     pathHeaderEntry(path);
-    EXPECT_FALSE(PathUtil::canonicalPath(headers_)) << "original path: " << path;
+    EXPECT_FALSE(PathUtil::canonicalPath(headers_, &runtime_)) << "original path: " << path;
   }
 }
 
