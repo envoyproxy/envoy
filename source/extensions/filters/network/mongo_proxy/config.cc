@@ -46,7 +46,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
           stats](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
         stat_prefix, context.scope(), context.runtime(), access_log, fault_config,
-        context.drainDecision(), context.dispatcher().timeSource(), emit_dynamic_metadata, stats));
+        context.drainDecision(), context.dispatcher().timeSource(), emit_dynamic_metadata, *stats));
   };
 }
 

@@ -20,7 +20,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())) {}
 
-ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(config)) {}
+ProxyFilter::ProxyFilter(ProxyFilterConfig& config) : config_(config) {}
 
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
@@ -33,7 +33,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::Continue;
   }
 
-  circuit_breaker_ = config_->cache().canCreateDnsRequest(absl::nullopt);
+  circuit_breaker_ = config_.cache().canCreateDnsRequest(absl::nullopt);
 
   if (circuit_breaker_ == nullptr) {
     ENVOY_CONN_LOG(debug, "pending request overflow", read_callbacks_->connection());
@@ -41,9 +41,9 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  uint32_t default_port = config_->port();
+  uint32_t default_port = config_.port();
 
-  auto result = config_->cache().loadDnsCacheEntry(sni, default_port, *this);
+  auto result = config_.cache().loadDnsCacheEntry(sni, default_port, *this);
 
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
