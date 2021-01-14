@@ -21,7 +21,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.ext_proc]
 
 // The External Processing filter allows an external service to act on HTTP traffic in a flexible way.
-// It communicates with an external gRPC service that can use it to do a variety of things
+
+// **Current Implementation Status:**
+// At this time, the filter will send a "request_headers" message to the server when the
+// filter is invoked from the downstream, and apply any header mutations returned by the
+// server. No other part of the protocol is implemented yet.
+
+// As designed, the filter supports up to six different processing steps, which are in the
+// process of being implemented:
+// * Request headers: IMPLEMENTED
+// * Request body: NOT IMPLEMENTED
+// * Request trailers: NOT IMPLEMENTED
+// * Response headers: NOT IMPLEMENTED
+// * Response body: NOT IMPLEMENTED
+// * Response trailers: NOT IMPLEMENTED
+
+// The filter communicates with an external gRPC service that can use it to do a variety of things
 // with the request and response:
 //
 // * Access and modify the HTTP headers on the request, response, or both

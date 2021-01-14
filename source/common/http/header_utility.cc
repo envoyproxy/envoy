@@ -309,5 +309,10 @@ Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& h
   return Http::okStatus();
 }
 
+bool HeaderUtility::isRemovableHeader(absl::string_view header) {
+  return (header.empty() || header[0] != ':') &&
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
+}
+
 } // namespace Http
 } // namespace Envoy

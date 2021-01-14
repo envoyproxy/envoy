@@ -67,6 +67,12 @@ public:
    * @throws DecodeException when parsing fails.
    */
   static xds::core::v3::ResourceLocator decodeUrl(absl::string_view resource_url);
+
+  /**
+   * @param resource_name resource name.
+   * @return bool does resource_name have a xdstp: scheme?
+   */
+  static bool hasXdsTpScheme(absl::string_view resource_name);
 };
 
 } // namespace Config

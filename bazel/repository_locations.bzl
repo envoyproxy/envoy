@@ -49,11 +49,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "3ff9995a5dd3d0e703e602ca3ebd9366de2b5752",
-        sha256 = "a4c74ce9a62b1c907329d248d4c225abfae8646bc77db8d72de65726632d3571",
+        version = "f2a7f9ba09660beacfebcd37fc977480ec9a8f50",
+        sha256 = "ca9975f6d5370843167b9646028ca7a0b546f8821f217c9d9d2e033a94a35f31",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2020-12-21",
+        release_date = "2021-01-04",
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -505,13 +505,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",
         project_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
-        version = "4d095f048889d4fc3b8d4579aa80ca4290319802",
-        sha256 = "7af66e0674340932683ab4f04ea6f03e2550849a54741738d94310b84d396a2c",
+        version = "22160afc7e67b9becce3198f8a6a321f01a3cef8",
+        sha256 = "d761b6442f600b628f5e420b601824757dfdbea6c12ac86cd59dbaa53d20d343",
         strip_prefix = "grpc-httpjson-transcoding-{version}",
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2020-11-13",
+        release_date = "2021-01-06",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
@@ -713,6 +713,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -734,6 +735,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -912,6 +914,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
@@ -931,6 +934,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",

@@ -364,6 +364,58 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   testEnvoyProxying1xx(true);
 }
 
+// Verifies that we can construct a match tree with a filter, and that we are able to skip
+// filter invocation through the match tree.
+TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  config_helper_.addFilter(R"EOF(
+name: matcher
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+  extension_config:
+    name: set-response-code
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+      code: 403
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: match-header
+      exact_match_map:
+        map:
+          match:
+            action:
+              name: skip
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+    response->waitForEndStream();
+    EXPECT_THAT(response->headers(), HttpStatusIs("403"));
+  }
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForEndStream();
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
+}
+
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
 // pending request is not sent on a connection that has been half-closed.
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
@@ -1209,6 +1261,14 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
   testEnvoyHandling100Continue(false, "foo");
 }
 
+// Pick a random test and use the old nodelay for coverage. This test can be
+// removed when the code path is removed.
+TEST_P(IntegrationTest, ViaAppendWith100ContinueWithOldNodelay) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
+  config_helper_.addConfigModifier(setVia("foo"));
+  testEnvoyHandling100Continue(false, "foo");
+}
+
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is
 // sent by Envoy, it will wait for response acknowledgment (via FIN/RST) from the client before
 // closing the socket (with a timeout for ensuring cleanup).
@@ -1645,10 +1705,13 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   EXPECT_FALSE(absl::StrContains(data, "onnection")) << data;
   ASSERT_TRUE(fake_upstream_connection->write(
       "HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n"));
-  // The response will be rejected because chunked headers are not allowed with CONNECT upgrades.
-  // Envoy will send a local reply due to the invalid upstream response.
-  tcp_client->waitForDisconnect(false);
-  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 503 Service Unavailable\r\n"));
+  tcp_client->waitForData("\r\n\r\n", false);
+  EXPECT_TRUE(absl::StartsWith(tcp_client->data(), "HTTP/1.1 200 OK\r\n")) << tcp_client->data();
+  // Make sure the following payload is proxied without chunks or any other modifications.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\npayload"), &data));
+
+  tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
@@ -1743,6 +1806,119 @@ TEST_P(IntegrationTest, ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverride
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+TEST_P(IntegrationTest, Preconnect) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_preconnect_policy()
+        ->mutable_predictive_preconnect_ratio()
+        ->set_value(1.5);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < 5; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
+
+  setUpstreamCount(5);
+  initialize();
+
+  std::list<IntegrationCodecClientPtr> clients;
+  std::list<Http::RequestEncoder*> encoders;
+  std::list<IntegrationStreamDecoderPtr> responses;
+  std::vector<FakeHttpConnectionPtr> fake_connections{15};
+
+  int upstream_index = 0;
+  for (uint32_t i = 0; i < 10; ++i) {
+    // Start a new request.
+    clients.push_back(makeHttpConnection(lookupPort("http")));
+    auto encoder_decoder = clients.back()->startRequest(default_request_headers_);
+    encoders.push_back(&encoder_decoder.first);
+    responses.push_back(std::move(encoder_decoder.second));
+
+    // For each HTTP request, a new connection will be established, as none of
+    // the streams are closed so no connections can be reused.
+    waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                  TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+    ++upstream_index;
+
+    // For every other connection, an extra connection should be preconnected.
+    if (i % 2 == 0) {
+      waitForNextUpstreamConnection(std::vector<uint64_t>({0, 1, 2, 3, 4}),
+                                    TestUtility::DefaultTimeout, fake_connections[upstream_index]);
+      ++upstream_index;
+    }
+  }
+
+  // Clean up.
+  while (!clients.empty()) {
+    clients.front()->close();
+    clients.pop_front();
+  }
+}
+
+TEST_P(IntegrationTest, RandomPreconnect) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_preconnect_policy()
+        ->mutable_predictive_preconnect_ratio()
+        ->set_value(1.5);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
+    for (int i = 0; i < 5; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+    }
+  });
+
+  setUpstreamCount(5);
+  TestRandomGenerator rand;
+  autonomous_upstream_ = true;
+  initialize();
+
+  std::list<IntegrationCodecClientPtr> clients;
+  std::list<Http::RequestEncoder*> encoders;
+  std::list<IntegrationStreamDecoderPtr> responses;
+  const uint32_t num_requests = 50;
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    if (rand.random() % 5 <= 3) { // Bias slightly towards more connections
+      // Start a new request.
+      clients.push_back(makeHttpConnection(lookupPort("http")));
+      auto encoder_decoder = clients.back()->startRequest(default_request_headers_);
+      encoders.push_back(&encoder_decoder.first);
+      responses.push_back(std::move(encoder_decoder.second));
+    } else if (!clients.empty()) {
+      // Finish up a request.
+      clients.front()->sendData(*encoders.front(), 0, true);
+      encoders.pop_front();
+      responses.front()->waitForEndStream();
+      responses.pop_front();
+      clients.front()->close();
+      clients.pop_front();
+    }
+  }
+  // Clean up.
+  while (!clients.empty()) {
+    clients.front()->sendData(*encoders.front(), 0, true);
+    encoders.pop_front();
+    responses.front()->waitForEndStream();
+    responses.pop_front();
+    clients.front()->close();
+    clients.pop_front();
+  }
 }
 
 } // namespace Envoy
