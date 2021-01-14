@@ -81,7 +81,7 @@ public:
     return impl_.createScaledTimer(minimum, std::move(cb));
   }
 
-  TimerPtr createScaledTimer(ScaledRangeTimerManager::TimerType timer_type, TimerCb cb) override {
+  TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override {
     return impl_.createScaledTimer(timer_type, std::move(cb));
   }
 

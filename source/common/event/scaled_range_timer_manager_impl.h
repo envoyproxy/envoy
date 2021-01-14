@@ -23,17 +23,14 @@ namespace Event {
  */
 class ScaledRangeTimerManagerImpl : public ScaledRangeTimerManager {
 public:
-  using TimerTypeMap = absl::flat_hash_map<TimerType, ScaledTimerMinimum>;
-  using TimerTypeMapConstSharedPtr = std::shared_ptr<const TimerTypeMap>;
-
   // Takes a Dispatcher and a map from timer type to scaled minimum value.
   ScaledRangeTimerManagerImpl(Dispatcher& dispatcher,
-                              const TimerTypeMapConstSharedPtr& timer_minimums = nullptr);
+                              const ScaledTimerTypeMapConstSharedPtr& timer_minimums = nullptr);
   ~ScaledRangeTimerManagerImpl() override;
 
   // ScaledRangeTimerManager impl
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override;
-  TimerPtr createTimer(TimerType timer_type, TimerCb callback) override;
+  TimerPtr createTimer(ScaledTimerType timer_type, TimerCb callback) override;
   void setScaleFactor(UnitFloat scale_factor) override;
 
 private:
@@ -122,7 +119,7 @@ private:
   void onQueueTimerFired(Queue& queue);
 
   Dispatcher& dispatcher_;
-  const TimerTypeMapConstSharedPtr timer_minimums_;
+  const ScaledTimerTypeMapConstSharedPtr timer_minimums_;
   UnitFloat scale_factor_;
   absl::flat_hash_set<std::unique_ptr<Queue>, Hash, Eq> queues_;
 };

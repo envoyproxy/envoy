@@ -126,7 +126,7 @@ protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
   virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
       Event::Dispatcher& dispatcher,
-      const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr& timer_minimums) const;
+      const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const;
 
 private:
   using FlushEpochId = uint64_t;
@@ -173,7 +173,7 @@ private:
   absl::node_hash_map<std::string, Resource> resources_;
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
-  Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr timer_minimums_;
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;

@@ -24,7 +24,6 @@ envoy_cc_library(
     hdrs = ["thread_local_overload_state.h"],
     deps = [
         "//include/envoy/event:scaled_range_timer_manager_interface",
-        "//include/envoy/event:scaled_timer_minimum",
         "//include/envoy/event:timer_interface",
         "//include/envoy/thread_local:thread_local_object",
         "//source/common/common:interval_value",

@@ -207,8 +207,7 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   return createTimerInternal(cb);
 }
 
-TimerPtr DispatcherImpl::createScaledTimer(ScaledRangeTimerManager::TimerType timer_type,
-                                           TimerCb cb) {
+TimerPtr DispatcherImpl::createScaledTimer(ScaledTimerType timer_type, TimerCb cb) {
   ASSERT(isThreadSafe());
   return scaled_timer_manager_->createTimer(timer_type, std::move(cb));
 }

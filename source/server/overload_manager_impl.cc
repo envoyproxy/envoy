@@ -21,8 +21,6 @@
 namespace Envoy {
 namespace Server {
 
-using TimerTypeMap = Event::ScaledRangeTimerManagerImpl::TimerTypeMap;
-
 /**
  * Thread-local copy of the state of each configured overload action.
  */
@@ -122,31 +120,31 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
   return scope.gaugeFromStatName(stat_name.statName(), import_mode);
 }
 
-Event::ScaledRangeTimerManager::TimerType parseTimerType(
+Event::ScaledTimerType parseTimerType(
     envoy::config::overload::v3::ScaleTimersOverloadActionConfig::TimerType config_timer_type) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
 
   switch (config_timer_type) {
   case Config::HTTP_DOWNSTREAM_CONNECTION_IDLE:
-    return Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleConnectionTimeout;
+    return Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout;
   case Config::HTTP_DOWNSTREAM_STREAM_IDLE:
-    return Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleStreamTimeout;
+    return Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout;
   default:
     throw EnvoyException(fmt::format("Unknown timer type {}", config_timer_type));
   }
 }
 
-TimerTypeMap parseTimerMinimums(const ProtobufWkt::Any& typed_config,
-                                ProtobufMessage::ValidationVisitor& validation_visitor) {
+Event::ScaledTimerTypeMap
+parseTimerMinimums(const ProtobufWkt::Any& typed_config,
+                   ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
   const Config action_config =
       MessageUtil::anyConvertAndValidate<Config>(typed_config, validation_visitor);
 
-  TimerTypeMap timer_map;
+  Event::ScaledTimerTypeMap timer_map;
 
   for (const auto& scale_timer : action_config.timer_scale_factors()) {
-    const Event::ScaledRangeTimerManager::TimerType timer_type =
-        parseTimerType(scale_timer.timer());
+    const Event::ScaledTimerType timer_type = parseTimerType(scale_timer.timer());
 
     const Event::ScaledTimerMinimum minimum =
         scale_timer.has_min_timeout()
@@ -296,7 +294,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     }
 
     if (name == OverloadActionNames::get().ReduceTimeouts) {
-      timer_minimums_ = std::make_shared<TimerTypeMap>(
+      timer_minimums_ = std::make_shared<const Event::ScaledTimerTypeMap>(
           parseTimerMinimums(action.typed_config(), validation_visitor));
     } else if (action.has_typed_config()) {
       throw EnvoyException(fmt::format(
@@ -390,7 +388,7 @@ Event::ScaledRangeTimerManagerFactory OverloadManagerImpl::scaledTimerFactory() 
 
 Event::ScaledRangeTimerManagerPtr OverloadManagerImpl::createScaledRangeTimerManager(
     Event::Dispatcher& dispatcher,
-    const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr& timer_minimums) const {
+    const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const {
   return std::make_unique<Event::ScaledRangeTimerManagerImpl>(dispatcher, timer_minimums);
 }
 

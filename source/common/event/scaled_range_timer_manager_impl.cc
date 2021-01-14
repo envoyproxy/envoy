@@ -138,10 +138,10 @@ private:
 };
 
 ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(
-    Dispatcher& dispatcher, const TimerTypeMapConstSharedPtr& timer_minimums)
+    Dispatcher& dispatcher, const ScaledTimerTypeMapConstSharedPtr& timer_minimums)
     : dispatcher_(dispatcher),
       timer_minimums_(timer_minimums != nullptr ? timer_minimums
-                                                : std::make_shared<TimerTypeMap>()),
+                                                : std::make_shared<ScaledTimerTypeMap>()),
       scale_factor_(1.0) {}
 
 ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
@@ -150,7 +150,7 @@ ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   ASSERT(queues_.empty());
 }
 
-TimerPtr ScaledRangeTimerManagerImpl::createTimer(TimerType timer_type, TimerCb callback) {
+TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerType timer_type, TimerCb callback) {
   const auto minimum_it = timer_minimums_->find(timer_type);
   const Event::ScaledTimerMinimum minimum =
       minimum_it != timer_minimums_->end()

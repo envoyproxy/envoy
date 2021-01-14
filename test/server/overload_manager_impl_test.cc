@@ -43,7 +43,7 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-using TimerType = Event::ScaledRangeTimerManager::TimerType;
+using TimerType = Event::ScaledTimerType;
 
 class FakeResourceMonitor : public ResourceMonitor {
 public:
@@ -129,14 +129,13 @@ public:
   }
 
   MOCK_METHOD(Event::ScaledRangeTimerManagerPtr, createScaledRangeTimerManager,
-              (Event::Dispatcher&,
-               const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr&),
+              (Event::Dispatcher&, const Event::ScaledTimerTypeMapConstSharedPtr&),
               (const, override));
 
 private:
   Event::ScaledRangeTimerManagerPtr createDefaultScaledRangeTimerManager(
       Event::Dispatcher& dispatcher,
-      const Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr& timer_minimums) const {
+      const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const {
     return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher, timer_minimums);
   }
 };
@@ -515,7 +514,7 @@ TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
 
   auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
 
-  Event::ScaledRangeTimerManagerImpl::TimerTypeMapConstSharedPtr timer_minimums;
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums;
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
       .WillOnce(
           DoAll(SaveArg<1>(&timer_minimums),

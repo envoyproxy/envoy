@@ -1311,10 +1311,8 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
   DispatcherPtr dispatcher =
       api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
 
-  EXPECT_CALL(*manager,
-              createTypedTimer_(ScaledRangeTimerManager::TimerType::UnscaledRealTimerForTest, _));
-  dispatcher->createScaledTimer(ScaledRangeTimerManager::TimerType::UnscaledRealTimerForTest,
-                                []() {});
+  EXPECT_CALL(*manager, createTypedTimer_(ScaledTimerType::UnscaledRealTimerForTest, _));
+  dispatcher->createScaledTimer(ScaledTimerType::UnscaledRealTimerForTest, []() {});
 }
 
 class DispatcherWithWatchdogTest : public testing::Test {

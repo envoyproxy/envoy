@@ -630,13 +630,10 @@ TEST_F(ScaledRangeTimerManagerTest, LooksUpConfiguredMinimums) {
     MOCK_METHOD(TimerPtr, createScaledTimer, (ScaledTimerMinimum, TimerCb));
   };
 
-  const ScaledRangeTimerManagerImpl::TimerTypeMap timer_types{
-      {ScaledRangeTimerManager::TimerType::UnscaledRealTimerForTest,
-       ScaledMinimum(UnitFloat::max())},
-      {ScaledRangeTimerManager::TimerType::HttpDownstreamIdleConnectionTimeout,
-       ScaledMinimum(UnitFloat(0.3))},
-      {ScaledRangeTimerManager::TimerType::HttpDownstreamIdleStreamTimeout,
-       ScaledMinimum(UnitFloat(0.6))},
+  const ScaledTimerTypeMap timer_types{
+      {ScaledTimerType::UnscaledRealTimerForTest, ScaledMinimum(UnitFloat::max())},
+      {ScaledTimerType::HttpDownstreamIdleConnectionTimeout, ScaledMinimum(UnitFloat(0.3))},
+      {ScaledTimerType::HttpDownstreamIdleStreamTimeout, ScaledMinimum(UnitFloat(0.6))},
   };
 
   TestScaledRangeTimerManager manager(dispatcher_,

@@ -5,7 +5,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/scaled_range_timer_manager.h"
-#include "envoy/event/scaled_timer_minimum.h"
 #include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local_object.h"
 

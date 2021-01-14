@@ -4,6 +4,7 @@
 
 #include "common/common/interval_value.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -64,6 +65,20 @@ public:
 private:
   absl::variant<ScaledMinimum, AbsoluteMinimum> impl_;
 };
+
+enum class ScaledTimerType {
+  // Timers created with this type will never be scaled. This should only be used for testing.
+  UnscaledRealTimerForTest,
+  // The amount of time an HTTP connection to a downstream client can remain idle (no streams). This
+  // corresponds to the HTTP_DOWNSTREAM_CONNECTION_IDLE TimerType in overload.proto.
+  HttpDownstreamIdleConnectionTimeout,
+  // The amount of time an HTTP stream from a downstream client can remain idle. This corresponds to
+  // the HTTP_DOWNSTREAM_STREAM_IDLE TimerType in overload.proto.
+  HttpDownstreamIdleStreamTimeout,
+};
+
+using ScaledTimerTypeMap = absl::flat_hash_map<ScaledTimerType, ScaledTimerMinimum>;
+using ScaledTimerTypeMapConstSharedPtr = std::shared_ptr<const ScaledTimerTypeMap>;
 
 } // namespace Event
 } // namespace Envoy

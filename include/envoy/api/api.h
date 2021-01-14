@@ -6,6 +6,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/process_context.h"
 #include "envoy/stats/store.h"

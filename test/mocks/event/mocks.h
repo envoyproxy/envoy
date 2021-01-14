@@ -90,8 +90,7 @@ public:
     return timer;
   }
 
-  Event::TimerPtr createScaledTimer(ScaledRangeTimerManager::TimerType timer_type,
-                                    Event::TimerCb cb) override {
+  Event::TimerPtr createScaledTimer(ScaledTimerType timer_type, Event::TimerCb cb) override {
     auto timer = Event::TimerPtr{createScaledTypedTimer_(timer_type, cb)};
     // Assert that the timer is not null to avoid confusing test failures down the line.
     ASSERT(timer != nullptr);
@@ -140,8 +139,7 @@ public:
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
-  MOCK_METHOD(Timer*, createScaledTypedTimer_,
-              (ScaledRangeTimerManager::TimerType timer_type, Event::TimerCb cb));
+  MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
@@ -202,11 +200,11 @@ public:
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
     return TimerPtr{createTimer_(minimum, std::move(callback))};
   }
-  TimerPtr createTimer(ScaledRangeTimerManager::TimerType timer_type, TimerCb callback) override {
+  TimerPtr createTimer(ScaledTimerType timer_type, TimerCb callback) override {
     return TimerPtr{createTypedTimer_(timer_type, std::move(callback))};
   }
   MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
-  MOCK_METHOD(Timer*, createTypedTimer_, (ScaledRangeTimerManager::TimerType, TimerCb));
+  MOCK_METHOD(Timer*, createTypedTimer_, (ScaledTimerType, TimerCb));
   MOCK_METHOD(void, setScaleFactor, (UnitFloat), (override));
 };
 

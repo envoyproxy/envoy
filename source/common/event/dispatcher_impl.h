@@ -71,7 +71,7 @@ public:
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
-  TimerPtr createScaledTimer(ScaledRangeTimerManager::TimerType timer_type, TimerCb cb) override;
+  TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override;
   TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override;
 
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;

@@ -123,7 +123,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   if (config_.idleTimeout()) {
     connection_idle_timer_ = read_callbacks_->connection().dispatcher().createScaledTimer(
-        Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleConnectionTimeout,
+        Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
@@ -630,7 +630,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ =
         connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
-            Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleStreamTimeout,
+            Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
             [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
@@ -1055,7 +1055,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ =
               connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
-                  Event::ScaledRangeTimerManager::TimerType::HttpDownstreamIdleStreamTimeout,
+                  Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
                   [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {
