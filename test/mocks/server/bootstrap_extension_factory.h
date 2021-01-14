@@ -12,8 +12,7 @@ public:
   MockBootstrapExtension();
   ~MockBootstrapExtension() override;
 
-  MOCK_METHOD(void, onServerInitialized, (Configuration::ServerFactoryContext & context),
-              (override));
+  MOCK_METHOD(void, onServerInitialized, (), (override));
 };
 
 namespace Configuration {

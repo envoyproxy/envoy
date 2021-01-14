@@ -49,17 +49,18 @@ public:
 
 class WasmServiceExtension : public Server::BootstrapExtension, Logger::Loggable<Logger::Id::wasm> {
 public:
-  WasmServiceExtension(const envoy::extensions::wasm::v3::WasmService& config) : config_(config) {}
+  WasmServiceExtension(const envoy::extensions::wasm::v3::WasmService& config, Server::Configuration::ServerFactoryContext& context) : config_(config), context_(context) {}
   WasmService& wasmService() {
     ASSERT(wasm_service_ != nullptr);
     return *wasm_service_;
   }
-  void onServerInitialized(Server::Configuration::ServerFactoryContext& context) override;
+  void onServerInitialized() override;
 
 private:
   void createWasm(Server::Configuration::ServerFactoryContext& context);
 
   envoy::extensions::wasm::v3::WasmService config_;
+  Server::Configuration::ServerFactoryContext& context_;
   WasmServicePtr wasm_service_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };

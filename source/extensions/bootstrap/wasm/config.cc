@@ -14,9 +14,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
-void WasmServiceExtension::onServerInitialized(
-    Server::Configuration::ServerFactoryContext& context) {
-  createWasm(context);
+void WasmServiceExtension::onServerInitialized() {
+  createWasm(context_);
 }
 
 void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContext& context) {
@@ -70,7 +69,7 @@ WasmFactory::createBootstrapExtension(const Protobuf::Message& config,
       MessageUtil::downcastAndValidate<const envoy::extensions::wasm::v3::WasmService&>(
           config, context.messageValidationContext().staticValidationVisitor());
 
-  return std::make_unique<WasmServiceExtension>(typed_config);
+  return std::make_unique<WasmServiceExtension>(typed_config, context);
 }
 
 // /**

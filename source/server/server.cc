@@ -571,7 +571,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // Now that we are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
-    bootstrap_extension->onServerInitialized(serverFactoryContext());
+    bootstrap_extension->onServerInitialized();
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
