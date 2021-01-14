@@ -59,7 +59,9 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfig& config)
-    : config_(config), response_decoder_(*this), upstream_callbacks_(callbacks) {}
+    : config_(config), response_decoder_(*this), upstream_callbacks_(callbacks) {
+  header_parser_ = Envoy::Router::HeaderParser::configure(config_.headers_to_add());
+}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
@@ -278,14 +280,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  for (const auto& header : config_.headers_to_add()) {
-    if (header.append().value()) {
-      headers->addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
-    } else {
-      headers->setCopy(Http::LowerCaseString(header.header().key()), header.header().value());
-    }
-  }
-
+  header_parser_->evaluateHeaders(*headers, nullptr /*stream_info*/);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());
@@ -311,14 +306,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
     headers->addReference(Http::Headers::get().Path, "/");
   }
 
-  for (const auto& header : config_.headers_to_add()) {
-    if (header.append().value()) {
-      headers->addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
-    } else {
-      headers->setCopy(Http::LowerCaseString(header.header().key()), header.header().value());
-    }
-  }
-
+  header_parser_->evaluateHeaders(*headers, nullptr /*stream_info*/);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());

@@ -8,6 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/codec_client.h"
+#include "common/router/header_parser.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -153,6 +154,7 @@ protected:
 
   Http::RequestEncoder* request_encoder_{};
   const TunnelingConfig config_;
+  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
 
 private:
   class DecoderShim : public Http::ResponseDecoder {
