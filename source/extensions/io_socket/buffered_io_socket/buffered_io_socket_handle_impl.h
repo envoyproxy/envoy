@@ -101,7 +101,9 @@ public:
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
-      user_file_event_->poll(Event::FileReadyType::Read);
+      user_file_event_->poll(Event::FileReadyType::Read |
+                             // Closed ready type is defined as `end of stream`
+                             (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
     }
   }
   void onPeerDestroy() override {

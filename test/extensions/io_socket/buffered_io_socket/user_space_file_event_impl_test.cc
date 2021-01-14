@@ -203,6 +203,7 @@ TEST_F(UserSpaceFileEventImplTest, ActivateDedup) {
 
 TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   // IO is neither readable nor writable.
+
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
@@ -246,6 +247,46 @@ TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+TEST_F(UserSpaceFileEventImplTest, PollTriggeredOnlyEnabledEvents) {
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
+      Event::FileReadyType::Read | Event::FileReadyType::Closed, io_source_);
+  {
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  // All 3 ready types are polled. However, only enabled events are triggered.
+  {
+    user_file_event_->poll(Event::FileReadyType::Read | Event::FileReadyType::Write |
+                           Event::FileReadyType::Closed);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read | Event::FileReadyType::Closed));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Below events contains Read but not Closed. The callback sees Read.
+  {
+    user_file_event_->poll(Event::FileReadyType::Read);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  {
+    user_file_event_->poll(Event::FileReadyType::Read | Event::FileReadyType::Write);
+    EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  // Below ready types has no overlap with enabled. No callback is triggered.
+  {
+    user_file_event_->poll(Event::FileReadyType::Write);
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  {
+    user_file_event_->poll(0);
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
