@@ -1479,6 +1479,8 @@ public:
       lds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       lds_config->mutable_api_config_source()->set_api_type(
           envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+      lds_config->mutable_api_config_source()->set_transport_api_version(
+          envoy::config::core::v3::V3);
     });
     AdsIntegrationTest::initialize();
   }
