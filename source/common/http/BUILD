@@ -448,7 +448,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//source/common/chromium_url",
         "//source/common/common:logger_lib",
-        "//source/common/runtime:runtime_features_lib",
+        "//include/envoy/runtime:runtime_interface",
     ],
 )
 

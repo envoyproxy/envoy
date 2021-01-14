@@ -2,7 +2,6 @@
 
 #include "common/common/logger.h"
 #include "common/http/deprecated_path_canonicalizer.h"
-#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
