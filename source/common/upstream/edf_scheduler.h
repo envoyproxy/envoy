@@ -138,9 +138,9 @@ public:
         ++offset_;
       }
       // Now offset_ == wheel_size_
-      bool spreaded =
+      bool spread =
           spreadDistantEntries(distant_entries_, wheel_, current_lower_boundary_, per_slot_range_);
-      if (!spreaded) {
+      if (!spread) {
         // FIX-ME: repeatedly spread until distant entries are empty.
         return nullptr;
       }
@@ -188,9 +188,9 @@ private:
         ++offset_;
       }
       // Now offset_ == wheel_size_
-      bool spreaded =
+      bool spread =
           spreadDistantEntries(distant_entries_, wheel_, current_lower_boundary_, per_slot_range_);
-      if (!spreaded) {
+      if (!spread) {
         // FIX-ME: repeatedly spread until distant entries are empty.
         return std::make_pair<bool, EdfEntry*>(false, nullptr);
       }
