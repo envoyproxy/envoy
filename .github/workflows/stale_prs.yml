@@ -1,0 +1,31 @@
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *'
+
+jobs:
+  prune_stale_prs:
+    name: Prune Stale Prs
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Prune Stale Prs
+      uses: actions/stale@v3.0.14
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        # This should only affect stale prs, which are allowed 14 days total inactivity.
+        days-before-stale: 10
+        days-before-close: 4
+        stale-pr-message: >
+          This pull request has been automatically marked as stale because it has not had
+          activity in the last 10 days. It will be closed in 4 days if no further activity occurs. Please
+          feel free to give a status update now, ping for review, or re-open when it's ready.
+          Thank you for your contributions!
+        close-pr-message: >
+          This pull request has been automatically closed because it has not had
+          activity in the last 14 days. Please feel free to give a status update now, ping for review, or re-open when it's ready.
+          Thank you for your contributions!
+        stale-pr-label: 'stale'
+        exempt-pr-labels: 'no stalebot'
+        operations-per-run: 500
+        ascending: true
