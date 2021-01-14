@@ -13,6 +13,7 @@
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/tracked_watermark_buffer.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -35,24 +36,33 @@ public:
   // Object of this class hold the state determining the IoHandle which
   // should return EAGAIN from the `writev` call.
   struct IoHandleMatcher {
-    bool shouldReturnEgain(uint32_t port) const {
+    bool shouldReturnEgain(uint32_t src_port, uint32_t dst_port) const {
       absl::ReaderMutexLock lock(&mutex_);
-      return port == port_ && writev_returns_egain_;
+      return writev_returns_egain_ && (src_port == src_port_ || dst_port == dst_port_);
     }
 
+    // Source port to match. The port specified should be associated with a listener.
     void setSourcePort(uint32_t port) {
       absl::WriterMutexLock lock(&mutex_);
-      port_ = port;
+      src_port_ = port;
+    }
+
+    // Destination port to match. The port specified should be associated with a listener.
+    void setDestinationPort(uint32_t port) {
+      absl::WriterMutexLock lock(&mutex_);
+      dst_port_ = port;
     }
 
     void setWritevReturnsEgain() {
       absl::WriterMutexLock lock(&mutex_);
+      ASSERT(src_port_ != 0 || dst_port_ != 0);
       writev_returns_egain_ = true;
     }
 
   private:
     mutable absl::Mutex mutex_;
-    uint32_t port_ ABSL_GUARDED_BY(mutex_) = 0;
+    uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
+    uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
     bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
   };
 
@@ -63,7 +73,8 @@ public:
             [writev_matcher = writev_matcher_](
                 Envoy::Network::TestIoSocketHandle* io_handle, const Buffer::RawSlice*,
                 uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-              if (writev_matcher->shouldReturnEgain(io_handle->localAddress()->ip()->port())) {
+              if (writev_matcher->shouldReturnEgain(io_handle->localAddress()->ip()->port(),
+                                                    io_handle->peerAddress()->ip()->port())) {
                 return Api::IoCallUint64Result(
                     0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                        Network::IoSocketError::deleteIoError));
@@ -199,8 +210,7 @@ void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num
   waitForNextUpstreamRequest();
 
   // Make Envoy's writes into the upstream connection to return EAGAIN
-  writev_matcher_->setSourcePort(
-      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
 
   auto buf = serializeFrames(frame, num_frames);
 
@@ -302,8 +312,7 @@ Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
   EXPECT_TRUE(upstream_request_->waitForData(*dispatcher_, 1));
 
   // Make Envoy's writes into the upstream connection to return EAGAIN
-  writev_matcher_->setSourcePort(
-      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
 
   auto buf = serializeFrames(Http2Frame::makePingFrame(), frame_count);
 
@@ -355,6 +364,9 @@ TEST_P(Http2FloodMitigationTest, 404) {
 
 // Verify that the server can detect flood of response DATA frames
 TEST_P(Http2FloodMitigationTest, Data) {
+  auto buffer_factory = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+  setServerBufferFactory(buffer_factory);
+
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
@@ -369,9 +381,10 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // to accumulate in the transport socket buffer.
   writev_matcher_->setWritevReturnsEgain();
 
-  const auto request = Http2Frame::makeRequest(
-      1, "host", "/test/long/url",
-      {Http2Frame::Header("response_data_blocks", "1000"), Http2Frame::Header("no_trailers", "0")});
+  const auto request = Http2Frame::makeRequest(1, "host", "/test/long/url",
+                                               {Http2Frame::Header("response_data_blocks", "1000"),
+                                                Http2Frame::Header("response_size_bytes", "1"),
+                                                Http2Frame::Header("no_trailers", "0")});
   sendFrame(request);
 
   // Wait for connection to be flooded with outbound DATA frames and disconnected.
@@ -384,6 +397,25 @@ TEST_P(Http2FloodMitigationTest, Data) {
   ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
   // Verify that the flood check was triggered
   EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+
+  // The factory will be used to create 4 buffers: the input and output buffers for request and
+  // response pipelines.
+  EXPECT_EQ(4, buffer_factory->numBuffersCreated());
+
+  // Expect at least 1000 1 byte data frames in the output buffer. Each data frame comes with a
+  // 9-byte frame header; 10 bytes per data frame, 10000 bytes total. The output buffer should also
+  // contain response headers, which should be less than 100 bytes.
+  EXPECT_LE(10000, buffer_factory->maxBufferSize());
+  EXPECT_GE(10100, buffer_factory->maxBufferSize());
+
+  // The response pipeline input buffer could end up with the full upstream response in 1 go, but
+  // there are no guarantees of that being the case.
+  EXPECT_LE(10000, buffer_factory->sumMaxBufferSizes());
+  // The max size of the input and output buffers used in the response pipeline is around 10kb each.
+  EXPECT_GE(22000, buffer_factory->sumMaxBufferSizes());
+  // Verify that all buffers have watermarks set.
+  EXPECT_THAT(buffer_factory->highWatermarkRange(),
+              testing::Pair(1024 * 1024 * 1024, 1024 * 1024 * 1024));
 }
 
 // Verify that the server can detect flood triggered by a DATA frame from a decoder filter call
@@ -1502,8 +1534,7 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
 
   // Make Envoy's writes into the upstream connection to return EAGAIN, preventing proxying of the
   // METADATA frames
-  writev_matcher_->setSourcePort(
-      fake_upstream_connection_->connection().remoteAddress()->ip()->port());
+  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
 
   writev_matcher_->setWritevReturnsEgain();
 

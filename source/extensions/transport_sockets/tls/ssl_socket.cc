@@ -212,7 +212,9 @@ void SslSocket::drainErrorQueue() {
                                         ERR_func_error_string(err), ":",
                                         ERR_reason_error_string(err)));
   }
-  ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+  if (!failure_reason_.empty()) {
+    ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+  }
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }

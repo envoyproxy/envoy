@@ -460,6 +460,7 @@ public:
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
+using WatermarkFactorySharedPtr = std::shared_ptr<WatermarkFactory>;
 
 /**
  * Holds an in-progress addition to a buffer.

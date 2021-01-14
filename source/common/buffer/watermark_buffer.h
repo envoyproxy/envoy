@@ -48,10 +48,11 @@ public:
   // than the low watermark callbacks.
   bool highWatermarkTriggered() const override { return above_high_watermark_called_; }
 
-private:
-  void checkHighAndOverflowWatermarks();
+protected:
+  virtual void checkHighAndOverflowWatermarks();
   void checkLowWatermark();
 
+private:
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
   std::function<void()> above_overflow_watermark_;

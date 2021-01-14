@@ -167,7 +167,8 @@ RawSlice OwnedImpl::frontSlice() const {
   // Ignore zero-size slices and return the first slice with data.
   for (const auto& slice : slices_) {
     if (slice.dataSize() > 0) {
-      return RawSlice{const_cast<uint8_t*>(slice.data()), slice.dataSize()};
+      return RawSlice{const_cast<uint8_t*>(slice.data()),
+                      static_cast<absl::Span<uint8_t>::size_type>(slice.dataSize())};
     }
   }
 

@@ -217,6 +217,7 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+
     HttpProtocolIntegrationTest::initialize();
   }
 
@@ -313,7 +314,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectTerminationIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-using Params = std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type>;
+using Params = std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type, bool>;
 
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public testing::TestWithParam<Params>,
@@ -323,17 +324,25 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())) {}
 
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
-    return fmt::format("{}_{}",
-                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-                       std::get<1>(p.param) == FakeHttpConnection::Type::HTTP1 ? "HTTP1Upstream"
-                                                                               : "HTTP2Upstream");
+    return fmt::format(
+        "{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+        std::get<1>(p.param) == FakeHttpConnection::Type::HTTP1 ? "HTTP1Upstream" : "HTTP2Upstream",
+        std::get<2>(p.param) ? "WaitConnectResponse" : "DoNotWaitConnectResponse");
   }
 
   void SetUp() override {
+    wait_for_connect_response_ = std::get<2>(GetParam());
     enableHalfClose(true);
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(std::get<1>(GetParam()));
 
+    if (wait_for_connect_response_) {
+      config_helper_.addRuntimeOverride(
+          "envoy.reloadable_features.http_upstream_wait_connect_response", "true");
+    } else {
+      config_helper_.addRuntimeOverride(
+          "envoy.reloadable_features.http_upstream_wait_connect_response", "false");
+    }
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
@@ -354,6 +363,7 @@ public:
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
   }
+  bool wait_for_connect_response_{};
 };
 
 TEST_P(TcpTunnelingIntegrationTest, Basic) {
@@ -782,9 +792,7 @@ TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
-// TODO(irozzo): temporarily disabled as a protocol error is thrown when
-// transfer-encoding header is received in CONNECT responses.
-TEST_P(TcpTunnelingIntegrationTest, DISABLED_TransferEncodingHeaderIgnoredHttp1) {
+TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     return;
   }
@@ -802,20 +810,103 @@ TEST_P(TcpTunnelingIntegrationTest, DISABLED_TransferEncodingHeaderIgnoredHttp1)
 
   // Send upgrade headers downstream, fully establishing the connection.
   ASSERT_TRUE(
-      fake_upstream_connection->write("HTTP/1.1 299 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
+      fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n"));
 
   // Now send some data and close the TCP client.
-  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(
+      fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("hello")));
+
+  // Close connections.
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->close();
+}
+
+TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponseIsReceived) {
+  if (!wait_for_connect_response_) {
+    return;
+  }
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send some data straight away.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Wait a bit, no data should go through.
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  tcp_client->close();
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    // If the upstream now sends 'end stream' the connection is fully closed.
+    upstream_request_->encodeData(0, true);
+  }
+}
+
+TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsReceived) {
+  if (!wait_for_connect_response_) {
+    return;
+  }
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Send some data straight away.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait a bit, no data should go through.
+  ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
+
+  tcp_client->close();
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+}
+
+TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
 }
 
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                        testing::Values(FakeHttpConnection::Type::HTTP1,
-                                       FakeHttpConnection::Type::HTTP2)),
+                                       FakeHttpConnection::Type::HTTP2),
+                       testing::Values(false, true)),
     TcpTunnelingIntegrationTest::paramsToString);
 
 } // namespace

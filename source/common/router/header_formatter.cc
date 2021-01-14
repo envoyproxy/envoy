@@ -236,26 +236,26 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.downstreamRemoteAddress()->asString();
+      return stream_info.downstreamAddressProvider().remoteAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
-          *stream_info.downstreamRemoteAddress());
+          *stream_info.downstreamAddressProvider().remoteAddress());
     };
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.downstreamLocalAddress()->asString();
+      return stream_info.downstreamAddressProvider().localAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
-          *stream_info.downstreamLocalAddress());
+          *stream_info.downstreamAddressProvider().localAddress());
     };
   } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return StreamInfo::Utility::formatDownstreamAddressJustPort(
-          *stream_info.downstreamLocalAddress());
+          *stream_info.downstreamAddressProvider().localAddress());
     };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
