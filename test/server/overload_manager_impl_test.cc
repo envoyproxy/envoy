@@ -508,8 +508,7 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
 constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
     {TimerType::HttpDownstreamIdleConnectionTimeout,
      Event::AbsoluteMinimum(std::chrono::seconds(2))},
-    {TimerType::HttpDownstreamIdleStreamTimeout,
-     Event::ScaledMinimum(UnitFloat(0.1))},
+    {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
 };
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));

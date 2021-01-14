@@ -2,7 +2,6 @@
 
 #include <chrono>
 
-#include "common/event/scaled_range_timer_manager_impl.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/config/overload/v3/overload.pb.validate.h"
@@ -10,6 +9,7 @@
 
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
