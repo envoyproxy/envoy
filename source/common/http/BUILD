@@ -184,6 +184,8 @@ envoy_cc_library(
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -247,6 +249,7 @@ envoy_cc_library(
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:quic_codec_factory_lib",
         "//source/common/http/http3:well_known_names",
+        "//source/common/http/match_wrapper:config",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_rds_lib",

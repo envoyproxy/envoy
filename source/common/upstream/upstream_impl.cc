@@ -76,37 +76,6 @@ getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
   return nullptr;
 }
 
-// TODO(alyssawilk) move this to the new config library in a follow-up.
-uint64_t
-parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-              std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl> options) {
-  uint64_t features = 0;
-
-  if (options) {
-    if (options->use_http2_) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (options->use_downstream_protocol_) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-  } else {
-    if (config.has_http2_protocol_options()) {
-      features |= ClusterInfoImpl::Features::HTTP2;
-    }
-    if (config.protocol_selection() ==
-        envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL) {
-      features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
-    }
-  }
-  if (config.close_connections_on_host_health_failure()) {
-    features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
-  }
-  if (options->use_alpn_) {
-    features |= ClusterInfoImpl::Features::USE_ALPN;
-  }
-  return features;
-}
-
 Network::TcpKeepaliveConfig
 parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
   const envoy::config::core::v3::TcpKeepalive& options =
@@ -758,7 +727,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                                   ? std::make_unique<OptionalClusterStats>(
                                         config, *stats_scope_, factory_context.clusterManager())
                                   : nullptr),
-      features_(parseFeatures(config, http_protocol_options_)),
+      features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
+          config, *http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
@@ -1414,12 +1384,11 @@ void PriorityStateManager::updateClusterPrioritySet(
   }
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
-                                                   HostVector& current_priority_hosts,
-                                                   HostVector& hosts_added_to_current_priority,
-                                                   HostVector& hosts_removed_from_current_priority,
-                                                   HostMap& updated_hosts,
-                                                   const HostMap& all_hosts) {
+bool BaseDynamicClusterImpl::updateDynamicHostList(
+    const HostVector& new_hosts, HostVector& current_priority_hosts,
+    HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
+    HostMap& updated_hosts, const HostMap& all_hosts,
+    const absl::flat_hash_set<std::string>& all_new_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -1444,8 +1413,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
-  absl::node_hash_set<std::string> existing_hosts_for_current_priority(
+  absl::flat_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
+  // Keep track of hosts we're adding (or replacing)
+  absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     if (updated_hosts.count(host->address()->asString())) {
@@ -1479,6 +1450,17 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       // so do that here.
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
+      }
+      if (existing_host->second->weight() != host->weight()) {
+        existing_host->second->weight(host->weight());
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild")) {
+          // We do full host set rebuilds so that load balancers can do pre-computation of data
+          // structures based on host weight. This may become a performance problem in certain
+          // deployments so it is runtime feature guarded and may also need to be configurable
+          // and/or dynamic in the future.
+          hosts_changed = true;
+        }
       }
 
       hosts_changed |=
@@ -1515,10 +1497,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
-      existing_host->second->weight(host->weight());
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
     } else {
+      new_hosts_for_current_priority.emplace(host->address()->asString());
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
@@ -1575,7 +1557,18 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     erase_from =
         std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&updated_hosts, &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                       [&all_new_hosts, &new_hosts_for_current_priority, &updated_hosts,
+                        &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                         if (all_new_hosts.contains(p->address()->asString()) &&
+                             !new_hosts_for_current_priority.contains(p->address()->asString())) {
+                           // If the address is being completely deleted from this priority, but is
+                           // referenced from another priority, then we assume that the other
+                           // priority will perform an in-place update to re-use the existing Host.
+                           // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
+                           // instead remove it immediately from this priority.
+                           return false;
+                         }
+
                          if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
                                p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
                            if (p->weight() > max_host_weight) {

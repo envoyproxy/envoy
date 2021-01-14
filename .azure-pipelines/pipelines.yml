@@ -54,6 +54,7 @@ stages:
           - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
             workingDirectory: $(Build.SourcesDirectory)
             env:
+              AZP_BRANCH: $(Build.SourceBranch)
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -303,6 +304,7 @@ stages:
           - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
             workingDirectory: $(Build.SourcesDirectory)
             env:
+              AZP_BRANCH: $(Build.SourceBranch)
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -321,7 +323,6 @@ stages:
             workingDirectory: $(Build.SourcesDirectory)
             env:
               AZP_BRANCH: $(Build.SourceBranch)
-              AZP_SHA1: $(Build.SourceVersion)
 
   - stage: verify
     dependsOn: ["docker"]
@@ -384,6 +385,11 @@ stages:
         pool:
           vmImage: "windows-latest"
         steps:
+          - task: Cache@2
+            inputs:
+              key: '"windows.release" | ./WORKSPACE | **/*.bzl'
+              path: $(Build.StagingDirectory)/repository_cache
+            continueOnError: true
           - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
             displayName: "Run Windows CI"
             env:
