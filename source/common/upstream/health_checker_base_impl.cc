@@ -450,7 +450,7 @@ void HealthCheckEventLoggerImpl::createHealthCheckEvent(
   callback(event);
 
   // Make sure the type enums make it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+  const auto json = MessageUtil::getJsonStringFromMessageOrDie(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }

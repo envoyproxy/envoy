@@ -1418,7 +1418,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
   ProtobufWkt::Struct json;
   TestUtility::jsonConvert(bootstrap, json);
   // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
-  TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
+  TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessageOrDie(json, false), bootstrap);
   // Verify we don't do a camel case conversion.
   EXPECT_EQ("foo", json.fields()
                        .at("cluster_manager")

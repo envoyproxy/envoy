@@ -144,7 +144,7 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   const auto output_struct = struct_formatter_.format(
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
-  const std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
+  const std::string log_line = MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
@@ -1006,7 +1006,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     return absl::nullopt;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessage(value, false, true);
+  std::string json = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
   truncate(json, max_length_);
   return json;
 }

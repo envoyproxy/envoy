@@ -362,7 +362,7 @@ tap_config:
   startAdminRequest(admin_request_yaml);
 
   ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+                                 MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addFilter(admin_filter_config_);
   new_config_helper.renameListener("foo");
   new_config_helper.setLds("1");

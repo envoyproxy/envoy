@@ -95,7 +95,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(
+              MessageUtil::getJsonStringFromMessageOrDie(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
@@ -129,7 +129,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(
+              MessageUtil::getJsonStringFromMessageOrDie(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
@@ -158,7 +158,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(
+              MessageUtil::getJsonStringFromMessageOrDie(
                   proto_config.has_typed_config()
                       ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                       : static_cast<const Protobuf::Message&>(
