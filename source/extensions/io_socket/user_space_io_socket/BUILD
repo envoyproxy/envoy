@@ -35,22 +35,3 @@ envoy_cc_extension(
         "//source/common/event:dispatcher_includes",
     ],
 )
-
-envoy_cc_extension(
-    name = "user_space_io_socket_handle_lib",
-    srcs = [
-        "user_space_io_socket_handle_impl.cc",
-    ],
-    hdrs = [
-        "user_space_io_socket_handle_impl.h",
-    ],
-    security_posture = "unknown",
-    status = "alpha",
-    undocumented = True,
-    deps = [
-        ":peer_buffer_lib",
-        ":users_space_file_event_lib",
-        "//source/common/event:dispatcher_includes",
-        "//source/common/network:default_socket_interface_lib",
-    ],
-)
