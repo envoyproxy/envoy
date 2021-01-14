@@ -536,6 +536,17 @@ TEST_P(IntegrationTest, TestSmuggling) {
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
     EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
+  {
+    // Verify that sending `Transfer-Encoding: chunked` as a second header is detected and triggers
+    // the "no Transfer-Encoding + Content-Length" check.
+    std::string response;
+    const std::string request =
+        "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
+        "identity\r\ncontent-length: 36\r\ntransfer-encoding: chunked \r\n\r\n" +
+        smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  }
 }
 
 TEST_P(IntegrationTest, TestPipelinedResponses) {
