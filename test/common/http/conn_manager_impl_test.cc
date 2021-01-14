@@ -439,7 +439,8 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
 
 // Filters observe normalized paths, not the original path, when path
 // normalization is configured.
-TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
+TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSanitizedPath) {
+  TestScopedRuntime scoped_runtime;
   setup(false, "");
   // Enable path sanitizer
   normalize_path_ = true;

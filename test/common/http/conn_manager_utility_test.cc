@@ -1376,7 +1376,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizeEmptyPath) {
   TestRequestHeaderMapImpl original_headers;
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_TRUE(ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
+  EXPECT_TRUE(ConnectionManagerUtility::maybeNormalizePath(header_map, config_, &runtime_));
   EXPECT_EQ(original_headers, header_map);
 }
 
@@ -1387,7 +1387,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
   original_headers.setPath("/xyz/../a");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_, &runtime_);
   EXPECT_EQ(original_headers, header_map);
 }
 
@@ -1398,7 +1398,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
   original_headers.setPath("/xyz");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_, &runtime_);
   EXPECT_EQ(original_headers, header_map);
 }
 
@@ -1409,7 +1409,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   original_headers.setPath("/xyz/../abc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_, &runtime_);
   EXPECT_EQ(header_map.getPathValue(), "/abc");
 }
 
@@ -1421,7 +1421,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
   original_headers.setPath("/xyz///abc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_, &runtime_);
   EXPECT_EQ(header_map.getPathValue(), "/xyz///abc");
 }
 
@@ -1433,7 +1433,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
   original_headers.setPath("/xyz///abc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_, &runtime_);
   EXPECT_EQ(header_map.getPathValue(), "/xyz/abc");
 }
 
@@ -1445,7 +1445,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
   original_headers.setPath("/xyz/..//abc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_, &runtime_);
   EXPECT_EQ(header_map.getPathValue(), "/xyz/../abc");
 }
 

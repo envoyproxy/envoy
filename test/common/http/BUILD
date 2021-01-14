@@ -377,7 +377,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:path_utility_lib",
-        "//test/test_common:test_runtime_lib",
+        "//test/mocks/runtime:runtime_mocks",
     ],
 )
 

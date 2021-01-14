@@ -3,10 +3,13 @@
 
 #include "common/http/path_utility.h"
 
-#include "test/test_common/test_runtime.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -25,6 +28,7 @@ public:
     return *headers_.Host();
   }
   TestRequestHeaderMapImpl headers_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 // Already normalized path don't change using deprecated path canonicalizer.
@@ -50,14 +54,14 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
 
 // Already normalized path don't change.
 TEST_F(PathUtilityTest, AlreadyNormalPaths) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.use_forked_chromium_url", "false"}});
+  EXPECT_CALL(runtime_.snapshot_,
+              deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
+      .WillRepeatedly(Return(false));
 
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
     auto& path_header = pathHeaderEntry(path);
-    const auto result = PathUtil::canonicalPath(headers_);
+    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
     EXPECT_TRUE(result) << "original path: " << path;
     EXPECT_EQ(path_header.value().getStringView(), absl::string_view(path));
   }
@@ -65,9 +69,9 @@ TEST_F(PathUtilityTest, AlreadyNormalPaths) {
 
 // Invalid paths are rejected.
 TEST_F(PathUtilityTest, InvalidPaths) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.use_forked_chromium_url", "false"}});
+  EXPECT_CALL(runtime_.snapshot_,
+              deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
+      .WillRepeatedly(Return(false));
 
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};

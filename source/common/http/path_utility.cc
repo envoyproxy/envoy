@@ -14,8 +14,10 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
-  if (Runtime::runtimeFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url")) {
+absl::optional<std::string> canonicalizePath(absl::string_view original_path,
+                                             Runtime::Loader* runtime) {
+  if (runtime && runtime->snapshot().deprecatedFeatureEnabled(
+                     "envoy.deprecated_features.use_forked_chromium_url", /*default_value=*/true)) {
     return DeprecatedPathCanonicalizer::canonicalizePath(original_path);
   }
   std::string canonical_path;
@@ -32,7 +34,7 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 } // namespace
 
 /* static */
-bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
+bool PathUtil::canonicalPath(RequestHeaderMap& headers, Runtime::Loader* runtime) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
@@ -40,8 +42,8 @@ bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   auto normalized_path_opt = canonicalizePath(
       query_pos == original_path.npos
           ? original_path
-          : absl::string_view(original_path.data(), query_pos) // '?' is not included
-  );
+          : absl::string_view(original_path.data(), query_pos), // '?' is not included
+      runtime);
 
   if (!normalized_path_opt.has_value()) {
     return false;
