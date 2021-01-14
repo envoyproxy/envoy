@@ -421,6 +421,11 @@ stages:
         pool:
           vmImage: "windows-latest"
         steps:
+          - task: Cache@2
+            inputs:
+              key: '"windows.release" | ./WORKSPACE | **/*.bzl'
+              path: $(Build.StagingDirectory)/repository_cache
+            continueOnError: true
           - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
             displayName: "Run Windows clang-cl CI"
             env:
