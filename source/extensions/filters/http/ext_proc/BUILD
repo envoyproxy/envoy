@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
     ],
 )
 

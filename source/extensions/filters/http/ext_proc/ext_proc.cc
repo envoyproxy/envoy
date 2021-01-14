@@ -9,6 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::service::ext_proc::v3alpha::ImmediateResponse;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
@@ -66,8 +67,8 @@ void Filter::onReceiveMessage(
         }
       }
     } else if (response->has_immediate_response()) {
-      // To be implemented later. Leave stream open to allow people to implement
-      // correct servers that don't break us.
+      ENVOY_LOG(debug, "Returning immediate response from processor");
+      sendImmediateResponse(response->immediate_response());
       message_valid = true;
     }
     request_state_ = FilterState::IDLE;
@@ -127,6 +128,23 @@ void Filter::onGrpcClose() {
     // Nothing to do otherwise
     break;
   }
+}
+
+void Filter::sendImmediateResponse(const ImmediateResponse& response) {
+  const auto status_code = response.has_status() ? response.status().code() : 200;
+  const auto grpc_status =
+      response.has_grpc_status()
+          ? absl::optional<Grpc::Status::GrpcStatus>(response.grpc_status().status())
+          : absl::nullopt;
+
+  decoder_callbacks_->sendLocalReply(
+      static_cast<Http::Code>(status_code), response.body(),
+      [&response](Http::ResponseHeaderMap& headers) {
+        if (response.has_headers()) {
+          MutationUtils::applyHeaderMutations(response.headers(), headers);
+        }
+      },
+      grpc_status, response.details());
 }
 
 } // namespace ExternalProcessing
