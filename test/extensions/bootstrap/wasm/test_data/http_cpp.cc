@@ -20,6 +20,7 @@ WASM_EXPORT(void, proxy_on_tick, (uint32_t)) {
   headers.push_back(std::make_pair<std::string, std::string>(":method", "GET"));
   headers.push_back(std::make_pair<std::string, std::string>(":path", "/"));
   headers.push_back(std::make_pair<std::string, std::string>(":authority", "example.com"));
+  headers.push_back(std::make_pair<std::string, std::string>("x-test", "test"));
   HeaderStringPairs trailers;
   uint32_t token;
   WasmResult result = makeHttpCall("wasm_cluster", headers, "", trailers, 10000, &token);

@@ -74,8 +74,12 @@ TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
 
   // Expect the filter to send us an HTTP request
   ASSERT_TRUE(wasm_connection_->waitForNewStream(*dispatcher_, wasm_request_));
-
   ASSERT_TRUE(wasm_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ("test", wasm_request_->headers()
+                        .get(Envoy::Http::LowerCaseString("x-test"))[0]
+                        ->value()
+                        .getStringView());
 
   // Respond back to the filter.
   Http::TestResponseHeaderMapImpl response_headers{
