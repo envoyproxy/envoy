@@ -14,6 +14,8 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         # This should only affect stale issues, which are allowed 30 days total inactivity.
+        # When https://github.com/actions/stale/issues/214 lands, https://github.com/envoyproxy/envoy/pull/14704
+        # can be reverted in favor of one file with two sets of timeouts.
         days-before-stale: 30
         days-before-close: 7
         stale-issue-message: >
