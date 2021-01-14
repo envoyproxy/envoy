@@ -537,7 +537,8 @@ TEST_P(IntegrationTest, TestSmuggling) {
     EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
-    // Test the case of multiple TE headers
+    // Verify that sending `Transfer-Encoding: chunked` as a second header is detected and triggers
+    // the "no Transfer-Encoding + Content-Length" check.
     std::string response;
     const std::string request =
         "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
