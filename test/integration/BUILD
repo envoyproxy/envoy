@@ -1510,6 +1510,10 @@ envoy_cc_test(
     srcs = [
         "listener_lds_integration_test.cc",
     ],
+    args = [
+        "-l",
+        "debug",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
@@ -1526,7 +1530,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
-    args = ["-l", "debug"]
 )
 
 envoy_cc_test(

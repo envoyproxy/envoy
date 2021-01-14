@@ -586,9 +586,9 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                    nullptr);
 }
 
-std::string
-MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message, const bool block_print,
-                                      const bool always_print_primitive_fields) {
+std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
+                                                  const bool block_print,
+                                                  const bool always_print_primitive_fields) {
 
   auto json_or_error = getJsonStringFromMessage(message, false, always_print_primitive_fields);
   if (!json_or_error.ok()) {

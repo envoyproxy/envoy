@@ -144,7 +144,8 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   const auto output_struct = struct_formatter_.format(
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
-  const std::string log_line = MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
+  const std::string log_line =
+      MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
