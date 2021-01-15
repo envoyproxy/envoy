@@ -34,12 +34,12 @@ message Filter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
+  // [#protodoc-extension: Filter]
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof config_type {
     // Filter specific configuration which depends on the filter being
     // instantiated. See the supported filters for further documentation.
-    // [#protodoc-extension: Filter]
     google.protobuf.Any typed_config = 4;
 
     // Configuration source specifier for an extension configuration discovery
