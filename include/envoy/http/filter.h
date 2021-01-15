@@ -355,8 +355,8 @@ public:
    * When using this callback, filters should generally only return
    * FilterDataStatus::StopIterationNoBuffer from their decodeData() call, since use of this method
    * indicates that a filter does not wish to participate in standard HTTP connection manager
-   * buffering and continuation and will perform any necessary buffering and continuation on
-   * its own.
+   * buffering and continuation and will perform any necessary buffering and continuation on its
+   * own.
    *
    * This callback is different from addDecodedData() in that the specified data and end_stream
    * status will be propagated directly to further filters in the filter chain. This is different
@@ -369,8 +369,8 @@ public:
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
    * If called in any other context, an assertion will be triggered.
    *
-   * When called in decodeData, the trailers map will be initialized to an empty map and returned
-   * by reference. Calling this function more than once is invalid.
+   * When called in decodeData, the trailers map will be initialized to an empty map and returned by
+   * reference. Calling this function more than once is invalid.
    *
    * @return a reference to the newly created trailers map.
    */
@@ -410,9 +410,8 @@ public:
   /**
    * Called with 100-Continue headers to be encoded.
    *
-   * This is not folded into encodeHeaders because most Envoy users and filters will not be
-   * proxying 100-continue and with it split out, can ignore the complexity of multiple
-   * encodeHeaders calls.
+   * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
+   * 100-continue and with it split out, can ignore the complexity of multiple encodeHeaders calls.
    *
    * This must not be invoked more than once per request.
    *
