@@ -25,10 +25,7 @@ class GrpcWebFilterIntegrationTest : public testing::TestWithParam<TestParams>,
                                      public HttpIntegrationTest {
 public:
   GrpcWebFilterIntegrationTest()
-      : HttpIntegrationTest(std::get<1>(GetParam()), std::get<0>(GetParam())),
-        downstream_protocol_{std::get<1>(GetParam())},
-        http2_skip_encoding_empty_trailers_{std::get<2>(GetParam())},
-        content_type_{std::get<3>(GetParam())}, accept_{std::get<4>(GetParam())} {}
+      : HttpIntegrationTest(std::get<1>(GetParam()), std::get<0>(GetParam())) {}
 
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -148,10 +145,10 @@ public:
         std::get<4>(params.param) == text ? "AcceptText" : "AcceptBinary");
   }
 
-  const Envoy::Http::CodecClient::Type downstream_protocol_;
-  const bool http2_skip_encoding_empty_trailers_;
-  const ContentType content_type_;
-  const Accept accept_;
+  const Envoy::Http::CodecClient::Type downstream_protocol_{std::get<1>(GetParam())};
+  const bool http2_skip_encoding_empty_trailers_{std::get<2>(GetParam())};
+  const ContentType content_type_{std::get<3>(GetParam())};
+  const Accept accept_{std::get<4>(GetParam())};
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -234,7 +231,8 @@ TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnectWithLargeBody) {
   const std::string local_reply_body = std::string(2 * MAX_GRPC_MESSAGE_LENGTH, 'a');
   const std::string local_reply_config_yaml = fmt::format(R"EOF(
 body_format:
-  text_format: "{}"
+  text_format_source:
+    inline_string: "{}"
 )EOF",
                                                           local_reply_body);
   testUpstreamDisconnect(local_reply_body, local_reply_config_yaml);
