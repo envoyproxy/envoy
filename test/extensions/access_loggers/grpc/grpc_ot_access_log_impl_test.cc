@@ -21,11 +21,7 @@ using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-
-// opentelemetry::proto::logs::v1::LogRecord,
-// opentelemetry::proto::logs::v1::ResourceLogs /*TCP*/,
-// opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
-// opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -35,6 +31,9 @@ namespace {
 
 constexpr std::chrono::milliseconds FlushInterval(10);
 constexpr int BUFFER_SIZE_BYTES = 0;
+const std::string ZONE_NAME = "zone_name";
+const std::string CLUSTER_NAME = "cluster_name";
+const std::string NODE_NAME = "node_name";
 
 // A helper test class to mock and intercept GrpcOpenTelemetryAccessLoggerImpl streams.
 class GrpcOpenTelemetryAccessLoggerImplTestHelper {
@@ -45,8 +44,9 @@ public:
 
   GrpcOpenTelemetryAccessLoggerImplTestHelper(LocalInfo::MockLocalInfo& local_info,
                                               Grpc::MockAsyncClient* async_client) {
-    // EXPECT_CALL(local_info, node());
-    (void)local_info;
+    EXPECT_CALL(local_info, zoneName()).WillOnce(ReturnRef(ZONE_NAME));
+    EXPECT_CALL(local_info, clusterName()).WillOnce(ReturnRef(CLUSTER_NAME));
+    EXPECT_CALL(local_info, nodeName()).WillOnce(ReturnRef(NODE_NAME));
     EXPECT_CALL(*async_client, startRaw(_, _, _, _))
         .WillOnce(
             Invoke([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
@@ -97,11 +97,22 @@ public:
 TEST_F(GrpcOpenTelemetryAccessLoggerImplTest, LogHttp) {
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
-    - instrumentation_library_logs:
-      - instrumentation_library:
-          name: "envoy"
-          version: "v1"
-        logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test_log_name"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+    instrumentation_library_logs:
+      - logs:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
@@ -112,11 +123,22 @@ TEST_F(GrpcOpenTelemetryAccessLoggerImplTest, LogHttp) {
 TEST_F(GrpcOpenTelemetryAccessLoggerImplTest, LogTcp) {
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
-    - instrumentation_library_logs:
-      - instrumentation_library:
-          name: "envoy"
-          version: "v1"
-        logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test_log_name"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+    instrumentation_library_logs:
+      - logs:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
@@ -161,11 +183,22 @@ TEST_F(GrpcOpenTelemetryAccessLoggerCacheImplTest, LoggerCreation) {
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
-    - instrumentation_library_logs:
-      - instrumentation_library:
-          name: "envoy"
-          version: "v1"
-        logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test-log"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+    instrumentation_library_logs:
+      - logs:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
