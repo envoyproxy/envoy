@@ -60,6 +60,12 @@ protected:
   getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                   const std::string& name, Server::Configuration::FactoryContext& factory_context,
                   const std::string& stat_prefix);
+  virtual void validateTypeUrl(const std::string& filter_config_name, absl::string_view type_url,
+                               bool is_terminal) const PURE;
+  std::set<std::string>
+  validateConfigSource(const std::string& filter_config_name,
+                       const envoy::config::core::v3::ExtensionConfigSource& config_source,
+                       bool is_terminal) const;
 
 private:
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
@@ -221,16 +227,16 @@ public:
   virtual ~FilterConfigProviderManagerImpl() = default;
 
   FilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
-      const envoy::config::core::v3::ConfigSource& config_source,
-      const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-      bool apply_without_warming) override {
-    auto subscription =
-        getSubscription(config_source, filter_config_name, factory_context, stat_prefix);
+      const envoy::config::core::v3::ExtensionConfigSource& config_source,
+      const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
+      const std::string& stat_prefix, bool is_terminal) override {
+    auto require_type_urls = validateConfigSource(filter_config_name, config_source, is_terminal);
+    auto subscription = getSubscription(config_source.config_source(), filter_config_name,
+                                        factory_context, stat_prefix);
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
-    if (!apply_without_warming) {
+    if (!config_source.apply_default_config_without_warming()) {
       factory_context.initManager().add(subscription->initTarget());
     }
     auto provider = std::make_unique<DynamicFilterConfigProviderImpl<FactoryCb>>(
@@ -239,8 +245,13 @@ public:
           return instantiateFilterFactory(proto_config, stat_prefix, factory_context);
         });
     // Ensure the subscription starts if it has not already.
-    if (apply_without_warming) {
+    if (config_source.apply_default_config_without_warming()) {
       factory_context.initManager().add(provider->initTarget());
+    }
+    // Apply default config if requested.
+    if (config_source.has_default_config()) {
+      provider->validateConfig(config_source.default_config());
+      provider->onConfigUpdate(config_source.default_config(), "", nullptr);
     }
     return provider;
   }
@@ -254,7 +265,7 @@ public:
 protected:
   virtual FactoryCb
   instantiateFilterFactory(const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
-                           Server::Configuration::FactoryContext& factory_context) = 0;
+                           Server::Configuration::FactoryContext& factory_context) const PURE;
 };
 
 class HttpFilterConfigProviderManagerImpl
@@ -262,7 +273,9 @@ class HttpFilterConfigProviderManagerImpl
 protected:
   Http::FilterFactoryCb
   instantiateFilterFactory(const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
-                           Server::Configuration::FactoryContext& factory_context) override;
+                           Server::Configuration::FactoryContext& factory_context) const override;
+  void validateTypeUrl(const std::string& filter_config_name, absl::string_view type_url,
+                       bool is_terminal) const override;
 };
 
 class NetworkFilterConfigProviderManagerImpl
@@ -270,7 +283,9 @@ class NetworkFilterConfigProviderManagerImpl
 protected:
   Network::FilterFactoryCb
   instantiateFilterFactory(const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
-                           Server::Configuration::FactoryContext& factory_context) override;
+                           Server::Configuration::FactoryContext& factory_context) const override;
+  void validateTypeUrl(const std::string& filter_config_name, absl::string_view type_url,
+                       bool is_terminal) const override;
 };
 
 } // namespace Filter

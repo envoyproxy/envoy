@@ -61,6 +61,23 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::g
   }
 }
 
+std::set<std::string> FilterConfigProviderManagerImplBase::validateConfigSource(
+    const std::string& filter_config_name,
+    const envoy::config::core::v3::ExtensionConfigSource& config_source, bool is_terminal) const {
+  if (config_source.apply_default_config_without_warming() && !config_source.has_default_config()) {
+    throw EnvoyException(
+        fmt::format("Error: filter config {} applied without warming but has no default config.",
+                    filter_config_name));
+  }
+  std::set<std::string> require_type_urls;
+  for (const auto& type_url : config_source.type_urls()) {
+    auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+    require_type_urls.emplace(factory_type_url);
+    validateTypeUrl(filter_config_name, factory_type_url, is_terminal);
+  }
+  return require_type_urls;
+}
+
 FilterConfigSubscription::FilterConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
@@ -163,7 +180,7 @@ FilterConfigSubscription::~FilterConfigSubscription() {
 
 Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::instantiateFilterFactory(
     const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& factory_context) {
+    Server::Configuration::FactoryContext& factory_context) const {
   auto& factory = Config::Utility::getAndCheckFactoryByType<
       Server::Configuration::NamedHttpFilterConfigFactory>(proto_config);
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
@@ -171,14 +188,40 @@ Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::instantiateFilterFact
   return factory.createFilterFactoryFromProto(*message, stat_prefix, factory_context);
 }
 
+void HttpFilterConfigProviderManagerImpl::validateTypeUrl(const std::string& filter_config_name,
+                                                          absl::string_view type_url,
+                                                          bool is_terminal) const {
+  auto* factory = Registry::FactoryRegistry<
+      Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(type_url);
+  if (factory == nullptr) {
+    throw EnvoyException(
+        fmt::format("Error: no factory found for a required type URL {}.", type_url));
+  }
+  Config::Utility::validateTerminalFilters(filter_config_name, factory->name(), "http",
+                                           factory->isTerminalFilter(), is_terminal);
+}
+
 Network::FilterFactoryCb NetworkFilterConfigProviderManagerImpl::instantiateFilterFactory(
     const ProtobufWkt::Any& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& factory_context) {
+    Server::Configuration::FactoryContext& factory_context) const {
   auto& factory = Config::Utility::getAndCheckFactoryByType<
       Server::Configuration::NamedNetworkFilterConfigFactory>(proto_config);
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config, factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
   return factory.createFilterFactoryFromProto(*message, factory_context);
+}
+
+void NetworkFilterConfigProviderManagerImpl::validateTypeUrl(const std::string& filter_config_name,
+                                                             absl::string_view type_url,
+                                                             bool is_terminal) const {
+  auto* factory = Registry::FactoryRegistry<
+      Server::Configuration::NamedNetworkFilterConfigFactory>::getFactoryByType(type_url);
+  if (factory == nullptr) {
+    throw EnvoyException(
+        fmt::format("Error: no factory found for a required type URL {}.", type_url));
+  }
+  Config::Utility::validateTerminalFilters(filter_config_name, factory->name(), "network",
+                                           factory->isTerminalFilter(), is_terminal);
 }
 
 } // namespace Filter
