@@ -134,7 +134,7 @@ def FormatCommentWithAnnotations(comment, type_name=''):
     formatted_extension = FormatExtension(extension)
   formatted_extension_type = ''
   if annotations.EXTENSION_TYPE_ANNOTATION in comment.annotations:
-    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE 8)"
+    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE 8)\n\n"
   return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_type
 
 
@@ -228,7 +228,7 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
     formatted_extension = FormatExtension(extension)
   formatted_extension_type = ''
   if annotations.EXTENSION_TYPE_ANNOTATION in source_code_info.file_level_annotations:
-    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE 8)"
+    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE 8)\n\n"
   if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
     return anchor + FormatHeader(
         style, source_code_info.file_level_annotations[
