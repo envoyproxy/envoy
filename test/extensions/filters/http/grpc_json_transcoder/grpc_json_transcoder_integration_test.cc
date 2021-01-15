@@ -939,7 +939,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
-              enable_strict_request_validation : true
+              strict_http_request_validation : true
             )EOF";
   config_helper_.addFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
@@ -990,7 +990,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
-              enable_strict_request_validation : true
+              strict_http_request_validation : true
               ignore_unknown_query_parameters : true
             )EOF";
   config_helper_.addFilter(

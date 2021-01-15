@@ -194,5 +194,5 @@ message GrpcJsonTranscoder {
   // gRPC requests will still silently pass through without transcoding.
   //
   // Defaults to false for backwards compatibility.
-  bool enable_strict_request_validation = 11;
+  bool strict_http_request_validation = 11;
 }

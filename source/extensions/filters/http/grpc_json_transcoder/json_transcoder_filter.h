@@ -102,7 +102,7 @@ public:
    */
   bool convertGrpcStatus() const;
 
-  bool enable_strict_request_validation_{false};
+  bool strict_http_request_validation_{false};
 
 private:
   /**

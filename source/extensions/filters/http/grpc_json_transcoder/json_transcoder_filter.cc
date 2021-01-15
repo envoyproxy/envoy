@@ -216,7 +216,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
-  enable_strict_request_validation_ = proto_config.enable_strict_request_validation();
+  strict_http_request_validation_ = proto_config.strict_http_request_validation();
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -417,7 +417,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   if (!status.ok()) {
     ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.error_message());
 
-    if (config_.enable_strict_request_validation_) {
+    if (config_.strict_http_request_validation_) {
       ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
       error_ = true;
       decoder_callbacks_->sendLocalReply(
