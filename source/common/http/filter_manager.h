@@ -978,7 +978,7 @@ public:
         ++wrapper.entry(),
         std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, true));
 
-    filter->setDecoderFilterCallbacks(*decoder_filter_itr->get());
+    filter->setDecoderFilterCallbacks(**decoder_filter_itr);
 
     ASSERT(wrapper.dual_filter_itr_ != encoder_filters_.end());
     auto encoder_filter_itr = encoder_filters_.insert(
@@ -987,7 +987,7 @@ public:
 
     decoder_filter_itr->get()->dual_filter_itr_ = encoder_filter_itr;
 
-    filter->setEncoderFilterCallbacks(*encoder_filter_itr->get());
+    filter->setEncoderFilterCallbacks(**encoder_filter_itr);
   }
 
   void addStreamDecoderFilterAfter(StreamDecoderFilterSharedPtr filter,
@@ -996,7 +996,7 @@ public:
         ++wrapper.entry(),
         std::make_unique<ActiveStreamDecoderFilter>(*this, filter, nullptr, false));
 
-    filter->setDecoderFilterCallbacks(*itr->get());
+    filter->setDecoderFilterCallbacks(**itr);
   }
   void addStreamEncoderFilterAfter(StreamEncoderFilterSharedPtr filter,
                                    ActiveStreamEncoderFilter& wrapper) {
