@@ -39,7 +39,7 @@ public:
                                     envoy::config::core::v3::ApiVersion transport_api_version);
 
 private:
-  void initRoot();
+  void initMessageRoot(const std::string& log_name, const LocalInfo::LocalInfo& local_info);
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
   void addEntry(opentelemetry::proto::logs::v1::ResourceLogs&& entry) override;
@@ -47,8 +47,6 @@ private:
   void initMessage() override;
   void clearMessage() override;
 
-  const std::string log_name_;
-  const LocalInfo::LocalInfo& local_info_;
   opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;
 };
 
@@ -57,10 +55,6 @@ class GrpcOpenTelemetryAccessLoggerCacheImpl
           GrpcOpenTelemetryAccessLoggerImpl,
           envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig> {
 public:
-  // Inherited constructor.
-  // using Common::GrpcAccessLoggerCache<GrpcOpenTelemetryAccessLoggerImpl,
-  //                                     envoy::extensions::access_loggers::grpc::v3::
-  //                                         CommonGrpcAccessLogConfig>::GrpcAccessLoggerCache;
   GrpcOpenTelemetryAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
                                          Stats::Scope& scope, ThreadLocal::SlotAllocator& tls,
                                          const LocalInfo::LocalInfo& local_info);

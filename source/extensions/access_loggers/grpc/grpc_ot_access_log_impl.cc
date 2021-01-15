@@ -30,17 +30,33 @@ GrpcOpenTelemetryAccessLoggerImpl::GrpcOpenTelemetryAccessLoggerImpl(
           Grpc::VersionedMethods("opentelemetry.proto.collector.logs.v1.LogsService.Export",
                                  "opentelemetry.proto.collector.logs.v1.LogsService.Export")
               .getMethodDescriptorForVersion(transport_api_version),
-          transport_api_version),
-      log_name_(log_name), local_info_(local_info) {
-  initRoot();
+          transport_api_version) {
+  initMessageRoot(log_name, local_info);
 }
 
+namespace {
+
+opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& key,
+                                                             const std::string& value) {
+  opentelemetry::proto::common::v1::KeyValue keyValue;
+  keyValue.set_key(key);
+  keyValue.mutable_value()->set_string_value(value);
+  return keyValue;
+}
+
+} // namespace
+
 // See comment about the structure of repeated fields in the header file.
-void GrpcOpenTelemetryAccessLoggerImpl::initRoot() {
-  root_ = message_.add_resource_logs()->add_instrumentation_library_logs();
-  // No reason to clear and refill these every time.
-  root_->mutable_instrumentation_library()->set_name("envoy");
-  root_->mutable_instrumentation_library()->set_version("v1");
+// TODO(itamarkam): allow user configurable attributes.
+void GrpcOpenTelemetryAccessLoggerImpl::initMessageRoot(const std::string& log_name,
+                                                        const LocalInfo::LocalInfo& local_info) {
+  auto* resource_logs = message_.add_resource_logs();
+  root_ = resource_logs->add_instrumentation_library_logs();
+  auto* resource = resource_logs->mutable_resource();
+  *resource->add_attributes() = getStringKeyValue("log_name", log_name);
+  *resource->add_attributes() = getStringKeyValue("zone_name", local_info.zoneName());
+  *resource->add_attributes() = getStringKeyValue("cluster_name", local_info.clusterName());
+  *resource->add_attributes() = getStringKeyValue("node_name", local_info.nodeName());
 }
 
 void GrpcOpenTelemetryAccessLoggerImpl::addEntry(
@@ -55,12 +71,8 @@ void GrpcOpenTelemetryAccessLoggerImpl::addEntry(
 
 bool GrpcOpenTelemetryAccessLoggerImpl::isEmpty() { return root_->logs().empty(); }
 
-void GrpcOpenTelemetryAccessLoggerImpl::initMessage() {
-  // auto* resource = message_.mutable_resource_logs(0)->mutable_resource();
-  // resource->add_attributes() ..
-  (void)log_name_;
-  (void)local_info_;
-}
+// The message is already initialized in the c'tor, and only the logs are cleared.
+void GrpcOpenTelemetryAccessLoggerImpl::initMessage() {}
 
 void GrpcOpenTelemetryAccessLoggerImpl::clearMessage() { root_->clear_logs(); }
 
