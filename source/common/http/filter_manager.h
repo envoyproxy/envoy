@@ -1003,7 +1003,7 @@ public:
     auto itr = encoder_filters_.insert(
         ++wrapper.entry(),
         std::make_unique<ActiveStreamEncoderFilter>(*this, filter, nullptr, false));
-    filter->setEncoderFilterCallbacks(*itr->get());
+    filter->setEncoderFilterCallbacks(**itr);
   }
   /**
    * Marks local processing as complete.
