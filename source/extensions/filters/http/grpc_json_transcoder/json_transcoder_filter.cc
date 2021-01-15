@@ -316,10 +316,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) const {
 
-  if (disabled_) {
-    return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
-                                "JsonTranscoderFilter for this route is disabled");
-  }
+  ASSERT(!disabled_);
 
   if (Grpc::Common::isGrpcRequestHeaders(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
