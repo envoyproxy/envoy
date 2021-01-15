@@ -49,12 +49,9 @@ protected:
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<Envoy::Tracing::MockConfig> mock_tracing_config_;
   Event::SimulatedTimeSystem time_system_;
-
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
-
   envoy::config::trace::v3::SkyWalkingConfig config_;
   std::string test_string = "ABCDEFGHIJKLMN";
-
   DriverPtr driver_;
 };
 

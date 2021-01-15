@@ -46,8 +46,9 @@ public:
     span->startSpan(seed + "#OPERATION");
     span->setPeer(seed + "#ADDRESS");
 
-    if (!do_sample)
+    if (!do_sample) {
       span->setSkipAnalysis();
+    }
 
     span->endSpan();
 
@@ -73,8 +74,9 @@ public:
       segment_context = segment_context_factory->create(previous_span_context);
     } else {
       segment_context = segment_context_factory->create();
-      if (!sampled)
+      if (!sampled) {
         segment_context->setSkipAnalysis();
+      }
     }
 
     return segment_context;
@@ -93,8 +95,9 @@ public:
     span_store->addTag(seed + "#TAG_KEY_B", seed + "#TAG_VALUE_B");
     span_store->addTag(seed + "#TAG_KEY_C", seed + "#TAG_VALUE_C");
 
-    if (!sample)
+    if (!sample) {
       span_store->setSkipAnalysis();
+    }
 
     span_store->endSpan();
 

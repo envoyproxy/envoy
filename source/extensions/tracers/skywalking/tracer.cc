@@ -28,8 +28,9 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 void Span::setSampled(bool do_sample) {
   // Sampling status is always true on SkyWalking. But with disabling skip_analysis,
   // this span can't be analyzed.
-  if (!do_sample)
+  if (!do_sample) {
     span_entity_->setSkipAnalysis();
+  }
 }
 
 void Span::log(SystemTime, const std::string& event) { span_entity_->addLog(EMPTY_STRING, event); }

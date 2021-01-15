@@ -57,23 +57,16 @@ public:
 
 protected:
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
-
   NiceMock<Event::MockDispatcher>& mock_dispatcher_ = context_.server_factory_context_.dispatcher_;
   NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
       context_.server_factory_context_.api_.random_;
   Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
-
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
-
   NiceMock<Grpc::MockAsyncClient>* mock_client_ptr_{nullptr};
-
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
-
   NiceMock<Event::MockTimer>* timer_;
   Event::TimerCb timer_cb_;
-
   std::string test_string = "ABCDEFGHIJKLMN";
-
   SkyWalkingTracerStats tracing_stats_{
       SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
   TraceSegmentReporterPtr reporter_;
@@ -232,6 +225,13 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
   EXPECT_EQ(7U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
   EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
   EXPECT_EQ(3U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+}
+
+TEST_F(TraceSegmentReporterTest, CallAsyncCallbackAndNothingTodo) {
+  setupTraceSegmentReporter("{}");
+  reporter_->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
+  reporter_->onReceiveTrailingMetadata(std::make_unique<Http::TestResponseTrailerMapImpl>());
+  reporter_->onReceiveMessage(std::make_unique<Commands>());
 }
 
 } // namespace
