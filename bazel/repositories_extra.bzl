@@ -98,8 +98,14 @@ def _python_deps():
         # use_category = ["test"],
     )
     pip3_import(
-        name = "fuzzing_py_deps",
+        name = "fuzzing_pip3",
         requirements = "@rules_fuzzing//fuzzing:requirements.txt",
+
+        # project_name = "Abseil Python Common Libraries",
+        # project_url = "https://github.com/abseil/abseil-py",
+        # version = "0.11.0",
+        # release_date = "2020-10-27",
+        # use_category = ["test"],
     )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
