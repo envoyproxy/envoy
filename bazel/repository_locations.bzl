@@ -56,6 +56,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/{version}.tar.gz"],
         release_date = "2021-01-11",
         use_category = ["test_only"],
+        implied_untracked_deps = [
+            "rules_fuzzing_oss_fuzz",
+        ],
     ),
     envoy_build_tools = dict(
         project_name = "envoy-build-tools",
