@@ -31,8 +31,8 @@ static_resources:
               routes:
                 - match:
                     prefix: "/"
-                    - headers:
-                        name: ":method"
+                    headers:
+                      - name: ":method"
                         exact_match: "POST"
                   route:
                     cluster: service_google
