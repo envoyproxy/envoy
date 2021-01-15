@@ -46,11 +46,12 @@ public:
 protected:
   template <class RequestType, class ResponseType>
   void testTranscoding(Http::RequestHeaderMap&& request_headers, const std::string& request_body,
-                       const std::vector<std::string>& grpc_request_messages,
+                       const std::vector<std::string>& expected_grpc_request_messages,
                        const std::vector<std::string>& grpc_response_messages,
-                       const Status& grpc_status, Http::HeaderMap&& response_headers,
-                       const std::string& response_body, bool full_response = true,
-                       bool always_send_trailers = false) {
+                       const Status& grpc_status, Http::HeaderMap&& expected_response_headers,
+                       const std::string& expected_response_body, bool full_response = true,
+                       bool always_send_trailers = false,
+                       const std::string expected_upstream_request_body = "") {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response;
@@ -64,8 +65,9 @@ protected:
       response = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    if (!grpc_request_messages.empty()) {
+    if (!expected_grpc_request_messages.empty() || expected_upstream_request_body.length() != 0) {
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
       ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
@@ -75,19 +77,26 @@ protected:
         dump += " ";
       }
 
-      Grpc::Decoder grpc_decoder;
-      std::vector<Grpc::Frame> frames;
-      EXPECT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames)) << dump;
-      EXPECT_EQ(grpc_request_messages.size(), frames.size());
+      if (!expected_grpc_request_messages.empty()) {
+        Grpc::Decoder grpc_decoder;
+        std::vector<Grpc::Frame> frames;
+        ASSERT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames)) << dump;
+        EXPECT_EQ(expected_grpc_request_messages.size(), frames.size());
 
-      for (size_t i = 0; i < grpc_request_messages.size(); ++i) {
-        RequestType actual_message;
-        if (frames[i].length_ > 0) {
-          EXPECT_TRUE(actual_message.ParseFromString(frames[i].data_->toString()));
+        for (size_t i = 0; i < expected_grpc_request_messages.size(); ++i) {
+          RequestType actual_message;
+          if (frames[i].length_ > 0) {
+            ASSERT_TRUE(actual_message.ParseFromString(frames[i].data_->toString()));
+          }
+          RequestType expected_message;
+          ASSERT_TRUE(
+              TextFormat::ParseFromString(expected_grpc_request_messages[i], &expected_message));
+          EXPECT_THAT(actual_message, ProtoEq(expected_message));
         }
-        RequestType expected_message;
-        EXPECT_TRUE(TextFormat::ParseFromString(grpc_request_messages[i], &expected_message));
-        EXPECT_THAT(actual_message, ProtoEq(expected_message));
+      }
+
+      if (expected_upstream_request_body.length() != 0) {
+        EXPECT_EQ(expected_upstream_request_body, upstream_request_->body().toString());
       }
 
       Http::TestResponseHeaderMapImpl response_headers;
@@ -129,7 +138,7 @@ protected:
       EXPECT_TRUE(response->headers().get(Http::LowerCaseString("trailer")).empty());
     }
 
-    response_headers.iterate(
+    expected_response_headers.iterate(
         [response = response.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
           Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
           if (entry.value() == UnexpectedHeaderValue) {
@@ -140,11 +149,11 @@ protected:
           }
           return Http::HeaderMap::Iterate::Continue;
         });
-    if (!response_body.empty()) {
+    if (!expected_response_body.empty()) {
       if (full_response) {
-        EXPECT_EQ(response_body, response->body());
+        EXPECT_EQ(expected_response_body, response->body());
       } else {
-        EXPECT_TRUE(absl::StartsWith(response->body(), response_body));
+        EXPECT_TRUE(absl::StartsWith(response->body(), expected_response_body));
       }
     }
 
@@ -878,6 +887,98 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
       "{\"id\":\"20\",\"theme\":\"\xC3\x28\"}", {}, {""}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "400"}}, R"(Encountered non UTF-8 code points)",
       false);
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableStrictRequestValidation) {
+  HttpIntegrationTest::initialize();
+
+  // Transcoding does not occur from a request with the gRPC content type.
+  // The contents in the body do not matter, they are passed through to upstream.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/shelves/100"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/grpc"}},
+      R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "", true, false, R"({ "theme" : "Children")");
+
+  // Transcoding does not occur when unknown path is called.
+  // HTTP Request to is passed directly to gRPC backend.
+  // gRPC response is passed directly to HTTP client.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/unknown/path"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "", true, false, R"({ "theme" : "Children")");
+
+  // Transcoding does not occur when unknown query param is included.
+  // HTTP Request to is passed directly to gRPC backend.
+  // gRPC response is passed directly to HTTP client.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/shelves/100?unknown=1"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "", true, false, R"({ "theme" : "Children")");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
+  const std::string filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              enable_strict_request_validation : true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+
+  // Transcoding does not occur from a request with the gRPC content type.
+  // The contents in the body do not matter, they are passed through to upstream.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/shelves/100"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/grpc"}},
+      R"({ "theme" : "Children")", {}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "", true, false, R"({ "theme" : "Children")");
+
+  // Transcoding does not occur when unknown path is called.
+  // The request is rejected.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/unknown/path"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({ "theme" : "Children")", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}},
+      "Bad request: Could not resolve /unknown/path to a method.", true, false, "");
+
+  // Transcoding does not occur when unknown query param is included.
+  // The request is rejected.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/shelves/100?unknown=1"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({ "theme" : "Children")", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}},
+      "Bad request: Could not find field \"unknown\" in the type \"bookstore.GetShelfRequest\".",
+      true, false, "");
 }
 
 } // namespace

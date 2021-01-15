@@ -216,6 +216,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
+  enable_strict_request_validation_ = proto_config.enable_strict_request_validation();
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -308,10 +309,6 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input, TranscoderPtr& transcoder,
     MethodInfoSharedPtr& method_info) {
-  if (Grpc::Common::isGrpcRequestHeaders(headers)) {
-    return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
-                                "Request headers has application/grpc content-type");
-  }
   const std::string method(headers.getMethodValue());
   std::string path(headers.getPathValue());
   std::string args;
@@ -327,7 +324,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
   if (!method_info) {
-    return ProtobufUtil::Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method");
+    return ProtobufUtil::Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method.");
   }
 
   auto status = methodToRequestInfo(method_info, &request_info);
@@ -409,13 +406,29 @@ JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : confi
 
 Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
+  if (Grpc::Common::isGrpcRequestHeaders(headers)) {
+    ENVOY_LOG(debug, "Request headers has application/grpc content-type. Request is passed through "
+                     "without transcoding.");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   const auto status =
       config_.createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
-
   if (!status.ok()) {
-    // If transcoder couldn't be created, it might be a normal gRPC request, so the filter will
-    // just pass-through the request to upstream.
-    return Http::FilterHeadersStatus::Continue;
+    ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.error_message());
+
+    if (config_.enable_strict_request_validation_) {
+      ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
+      error_ = true;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::BadRequest, absl::StrCat("Bad request: ", status.error_message().ToString()),
+          nullptr, absl::nullopt,
+          absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
+      return Http::FilterHeadersStatus::StopIteration;
+    } else {
+      ENVOY_LOG(debug, "Request is passed through without transcoding.");
+      return Http::FilterHeadersStatus::Continue;
+    }
   }
 
   if (method_->request_type_is_http_body_) {
