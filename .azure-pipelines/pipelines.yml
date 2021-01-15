@@ -68,7 +68,6 @@ stages:
               ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
               GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-              COVERAGE_FAILED: $(CoverageFailed)
 
       - job: dependencies
         dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
