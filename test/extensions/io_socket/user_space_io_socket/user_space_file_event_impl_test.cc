@@ -25,6 +25,17 @@ using testing::NiceMock;
 using testing::Return;
 
 constexpr auto event_rw = Event::FileReadyType::Read | Event::FileReadyType::Write;
+constexpr auto event_all =
+    Event::FileReadyType::Read | Event::FileReadyType::Write | Event::FileReadyType::Closed;
+constexpr uint32_t events_all_combination[] = {
+    Event::FileReadyType::Read,
+    Event::FileReadyType::Write,
+    Event::FileReadyType::Closed,
+    Event::FileReadyType::Read | Event::FileReadyType::Write,
+    Event::FileReadyType::Read | Event::FileReadyType::Closed,
+    Event::FileReadyType::Write | Event::FileReadyType::Closed,
+    Event::FileReadyType::Read | Event::FileReadyType::Write | Event::FileReadyType::Closed};
+
 class MockReadyCb {
 public:
   MOCK_METHOD(void, called, (uint32_t));
@@ -64,8 +75,7 @@ protected:
 };
 
 TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
-  for (const auto current_event : {Event::FileReadyType::Read, Event::FileReadyType::Write,
-                                   Event::FileReadyType::Read | Event::FileReadyType::Write}) {
+  for (const auto current_event : events_all_combination) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
     clearEventExpectation();
     if (current_event & Event::FileReadyType::Read) {
@@ -73,6 +83,9 @@ TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
     }
     if (current_event & Event::FileReadyType::Write) {
       setWritable();
+    }
+    if (current_event & Event::FileReadyType::Closed) {
+      setWriteEnd();
     }
     MockReadyCb ready_cb;
     auto user_file_event = std::make_unique<UserSpaceFileEventImpl>(
@@ -179,6 +192,22 @@ TEST_F(UserSpaceFileEventImplTest, ActivateWillSchedule) {
   }
 }
 
+TEST_F(UserSpaceFileEventImplTest, SuccessPollWillSchedule) {
+  // IO is neither readable nor writable.
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_all, io_source_);
+  {
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  for (const auto current_event : events_all_combination) {
+    SCOPED_TRACE(absl::StrCat("current event:", current_event));
+    user_file_event_->poll(current_event);
+    EXPECT_CALL(ready_cb_, called(current_event));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 TEST_F(UserSpaceFileEventImplTest, ActivateDedup) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
@@ -201,9 +230,38 @@ TEST_F(UserSpaceFileEventImplTest, ActivateDedup) {
   }
 }
 
+TEST_F(UserSpaceFileEventImplTest, PollDedup) {
+  // IO is neither readable nor writable.
+  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_all, io_source_);
+  {
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  {
+    user_file_event_->poll(Event::FileReadyType::Read);
+    user_file_event_->poll(Event::FileReadyType::Write);
+    user_file_event_->poll(Event::FileReadyType::Write);
+    user_file_event_->poll(Event::FileReadyType::Read);
+    EXPECT_CALL(ready_cb_, called(event_rw));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  {
+    user_file_event_->poll(Event::FileReadyType::Read);
+    user_file_event_->poll(Event::FileReadyType::Write);
+    user_file_event_->poll(Event::FileReadyType::Write);
+    user_file_event_->poll(Event::FileReadyType::Closed);
+    EXPECT_CALL(ready_cb_, called(event_all));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  {
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   // IO is neither readable nor writable.
-
   user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
