@@ -39,7 +39,7 @@ bring_up_example () {
         popd > /dev/null || return 1
     done
     if [[ "$DELAY" -ne "0" ]]; then
-        run_log "Snooze for ${DELAY} while ${NAME} gets started"
+        run_log "Snooze for ${DELAY}sec while ${NAME} gets started"
         sleep "$DELAY"
     fi
     for path in "${paths[@]}"; do
