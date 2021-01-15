@@ -13,14 +13,25 @@
 
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
+namespace OriginalDst {
 
-HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
+Upstream::Host::CreateConnectionData Cluster::Host::createConnection(
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+  return HostImpl::createConnection(dispatcher, options,
+                                    transport_socket_options != nullptr
+                                        ? transport_socket_options
+                                        : default_transport_socket_options_);
+}
+
+HostConstSharedPtr Cluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     // Check if override host header is present, if yes use it otherwise check local address.
     Network::Address::InstanceConstSharedPtr dst_host = nullptr;
@@ -51,21 +62,72 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       if (dst_ip) {
         Network::Address::InstanceConstSharedPtr host_ip_port(
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
+        Network::TransportSocketOptionsSharedPtr transport_socket_options;
+
+        // Create an override transport socket options that automatically provides both SNI as well
+        // as SAN verification for the new host if the cluster has been configured with TLS.
+        if (parent_->implements_secure_transport_) {
+          absl::string_view sni;
+
+          // First check if have requested server name in the downstream connection
+          // This may be set by a TLS inspector listener socket
+          const Network::Connection* downstream_connection = context->downstreamConnection();
+          if (downstream_connection) {
+            sni = downstream_connection->requestedServerName();
+          }
+
+          if (sni.length() > 0) {
+            ENVOY_LOG(debug, "Using SNI from downstream connection: {}.", sni);
+          } else {
+            // If no SNI from downstream connection, check if have HTTP Host in downstream headers.
+            const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
+            if (downstream_headers) {
+              auto host_header = downstream_headers->get(Http::Headers::get().Host);
+              if (!host_header.empty()) {
+                sni = host_header[0]->value().getStringView();
+                // port in Host is optional, so cut it off, if any
+                const auto pos = sni.rfind(':');
+                if (pos != std::string::npos) {
+                  sni.remove_suffix(sni.length() - pos);
+                }
+                // Remove brackets if any
+                if (sni.front() == '[' && sni.back() == ']') {
+                  sni.remove_prefix(1);
+                  sni.remove_suffix(1);
+                }
+                // Try parse the host as an IP address
+                try {
+                  Network::Utility::parseInternetAddress(std::string(sni));
+                  sni = "";
+                } catch (const EnvoyException&) {
+                  // Parsing as an IP address failed, so it should be a domain name
+                  ENVOY_LOG(debug, "Using SNI from Host header: {}.", sni);
+                }
+              }
+            }
+          }
+
+          if (sni.length() > 0) {
+            transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+                sni, std::vector<std::string>{std::string(sni)});
+          }
+        }
+
         // Create a host we can use immediately.
         auto info = parent_->info();
-        HostSharedPtr host(std::make_shared<HostImpl>(
+        HostSharedPtr host(std::make_shared<Host>(
             info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-            envoy::config::core::v3::UNKNOWN, parent_->time_source_));
+            envoy::config::core::v3::UNKNOWN, parent_->time_source_, transport_socket_options));
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
 
         // Tell the cluster about the new host
         // lambda cannot capture a member by value.
-        std::weak_ptr<OriginalDstCluster> post_parent = parent_;
+        std::weak_ptr<Cluster> post_parent = parent_;
         parent_->dispatcher_.post([post_parent, host]() mutable {
           // The main cluster may have disappeared while this post was queued.
-          if (std::shared_ptr<OriginalDstCluster> parent = post_parent.lock()) {
+          if (std::shared_ptr<Cluster> parent = post_parent.lock()) {
             parent->addHost(host);
           }
         });
@@ -81,7 +143,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 }
 
 Network::Address::InstanceConstSharedPtr
-OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
+Cluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
   Network::Address::InstanceConstSharedPtr request_host;
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
   Http::HeaderMap::GetResult override_header;
@@ -103,10 +165,9 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   return request_host;
 }
 
-OriginalDstCluster::OriginalDstCluster(
-    const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+Cluster::Cluster(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
+                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
+                 Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
                       factory_context.dispatcher().timeSource()),
       dispatcher_(factory_context.dispatcher()),
@@ -116,6 +177,9 @@ OriginalDstCluster::OriginalDstCluster(
       use_http_header_(info_->lbOriginalDstConfig()
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
+      implements_secure_transport_(info_->transportSocketMatcher()
+                                       .resolve(nullptr)
+                                       .factory_.implementsSecureTransport()),
       host_map_(std::make_shared<HostMap>()) {
   // TODO(dio): Remove hosts check once the hosts field is removed.
   if (config.has_load_assignment() || !config.hidden_envoy_deprecated_hosts().empty()) {
@@ -124,7 +188,7 @@ OriginalDstCluster::OriginalDstCluster(
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
-void OriginalDstCluster::addHost(HostSharedPtr& host) {
+void Cluster::addHost(HostSharedPtr& host) {
   HostMapSharedPtr new_host_map = std::make_shared<HostMap>(*getCurrentHostMap());
   auto pair = new_host_map->emplace(host->address()->asString(), host);
   bool added = pair.second;
@@ -142,7 +206,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   }
 }
 
-void OriginalDstCluster::cleanup() {
+void Cluster::cleanup() {
   HostVectorSharedPtr keeping_hosts(new HostVector);
   HostVector to_be_removed;
   ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
@@ -165,7 +229,7 @@ void OriginalDstCluster::cleanup() {
 
   if (!to_be_removed.empty()) {
     HostMapSharedPtr new_host_map = std::make_shared<HostMap>(*host_map);
-    for (const HostSharedPtr& host : to_be_removed) {
+    for (const Upstream::HostSharedPtr& host : to_be_removed) {
       new_host_map->erase(host->address()->asString());
     }
     setHostMap(new_host_map);
@@ -177,8 +241,7 @@ void OriginalDstCluster::cleanup() {
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
-std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-OriginalDstClusterFactory::createClusterImpl(
+std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
@@ -195,17 +258,17 @@ OriginalDstClusterFactory::createClusterImpl(
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster =
-      std::make_shared<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
-                                           std::move(stats_scope), context.addedViaApi());
-  auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
+  auto new_cluster = std::make_shared<Cluster>(cluster, context.runtime(), socket_factory_context,
+                                               std::move(stats_scope), context.addedViaApi());
+  auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }
 
 /**
  * Static registration for the original dst cluster factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
+REGISTER_FACTORY(ClusterFactory, Upstream::ClusterFactory);
 
+} // namespace OriginalDst
 } // namespace Upstream
 } // namespace Envoy
