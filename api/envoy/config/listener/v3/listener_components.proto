@@ -39,6 +39,7 @@ message Filter {
   oneof config_type {
     // Filter specific configuration which depends on the filter being
     // instantiated. See the supported filters for further documentation.
+    // [#protodoc-extension: Filter]
     google.protobuf.Any typed_config = 4;
 
     // Configuration source specifier for an extension configuration discovery
