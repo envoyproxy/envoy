@@ -105,7 +105,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryList(
       ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
       ret.push_back(filter_config_provider_manager_->createDynamicFilterConfigProvider(
           proto_config.config_discovery(), proto_config.name(), filter_chain_factory_context,
-          "listener_config_discovery", terminal));
+          "listener_manager.", terminal));
       continue;
     }
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
