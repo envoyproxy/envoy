@@ -894,7 +894,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableStrictRequestValidation) {
 
   // Transcoding does not occur from a request with the gRPC content type.
   // We verify the request is not transcoded because the upstream receives the same JSON body.
-  // We verify the response is not transoded because the HTTP status code does not match the gRPC
+  // We verify the response is not transcoded because the HTTP status code does not match the gRPC
   // status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -949,7 +949,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
 
   // Transcoding does not occur from a request with the gRPC content type.
   // We verify the request is not transcoded because the upstream receives the same JSON body.
-  // We verify the response is not transoded because the HTTP status code does not match the gRPC
+  // We verify the response is not transcoded because the HTTP status code does not match the gRPC
   // status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
