@@ -385,6 +385,10 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
   server_stats_->version_.set(version_int);
+  const std::string fips_ssl_version = "BoringSSL-FIPS";
+  if(VersionInfo::sslVersion() == fips_ssl_version) {
+    server_stats_->fips_mode_.set(1);
+  }
 
   bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
   bootstrap_.mutable_node()->set_user_agent_name("envoy");

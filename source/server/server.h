@@ -74,6 +74,7 @@ namespace Server {
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)                                                                      \
+  GAUGE(fips_mode, NeverImport)                                                                    \
   HISTOGRAM(initialization_time_ms, Milliseconds)
 
 struct ServerStats {

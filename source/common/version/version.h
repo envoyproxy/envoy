@@ -22,6 +22,7 @@ public:
   static const std::string& revisionStatus();
   // Repository information and build type.
   static const std::string& version();
+  static const std::string& sslVersion();
 
   static const envoy::config::core::v3::BuildVersion& buildVersion();
 
@@ -29,7 +30,6 @@ private:
   friend class Envoy::VersionInfoTestPeer;
   // RELEASE or DEBUG
   static const std::string& buildType();
-  static const std::string& sslVersion();
   static envoy::config::core::v3::BuildVersion makeBuildVersion(const char* version);
 };
 

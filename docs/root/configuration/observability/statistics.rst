@@ -33,4 +33,5 @@ Server related statistics are rooted at *server.* with following statistics:
   envoy_bug_failures, Counter, Number of envoy bug failures detected in a release build. File or report the issue if this increments as this may be serious.
   static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
   dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
+  fips_mode, Gauge, Integer representing whether the envoy build is FIPS compliant or not
 

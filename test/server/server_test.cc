@@ -362,6 +362,17 @@ TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
   server_thread->join();
 }
 
+// Validates that the "server.fips_mode" indicates the FIPS compliance from the Envoy Build
+TEST_P(ServerInstanceImplTest, ValidateFIPSModeForNonFIPSBuild) {
+  auto server_thread =
+      startTestServer("test/server/test_data/server/proxy_version_bootstrap.yaml", true);
+
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.fips_mode")->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/test_data/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
