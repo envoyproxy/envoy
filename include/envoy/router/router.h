@@ -14,7 +14,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
-#include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
@@ -461,7 +460,9 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
-  STATNAME(other)
+  STATNAME(other)                                                                                  \
+  STATNAME(vcluster)                                                                               \
+  STATNAME(vhost)
 
 /**
  * Struct definition for all virtual cluster stats. @see stats_macro.h
@@ -1257,8 +1258,9 @@ public:
  *
  * It is similar logically to RequestEncoder, only without the getStream interface.
  */
-class GenericUpstream : public Event::DeferredDeletable {
+class GenericUpstream {
 public:
+  virtual ~GenericUpstream() = default;
   /**
    * Encode a data frame.
    * @param data supplies the data to encode. The data may be moved by the encoder.

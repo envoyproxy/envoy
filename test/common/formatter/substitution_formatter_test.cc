@@ -14,6 +14,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -428,7 +429,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     // Validate for IPv4 address
     auto address = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("8443", upstream_format.format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -438,7 +439,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("9443", upstream_format.format(request_headers, response_headers, response_trailers,
                                              stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -447,7 +448,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
     // Validate for Pipe
     address = Network::Address::InstanceConstSharedPtr{new Network::Address::PipeInstance("/foo")};
-    EXPECT_CALL(stream_info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address));
+    stream_info.downstream_address_provider_->setLocalAddress(address);
     EXPECT_EQ("", upstream_format.format(request_headers, response_headers, response_trailers,
                                          stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -973,71 +974,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    absl::Time abslStartTime =
-        TestUtility::parseTime("Dec 18 01:50:34 2018 GMT", "%b %e %H:%M:%S %Y GMT");
-    SystemTime startTime = absl::ToChronoTime(abslStartTime);
-    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(startTime));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ("2018-12-18T01:50:34.000Z",
-              upstream_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body));
-  }
-  {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    absl::Time abslEndTime =
-        TestUtility::parseTime("Dec 17 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");
-    SystemTime endTime = absl::ToChronoTime(abslEndTime);
-    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(endTime));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ("2020-12-17T01:50:34.000Z",
-              upstream_format.format(request_headers, response_headers, response_trailers,
-                                     stream_info, body));
-  }
-  {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
-    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, expirationPeerCertificate())
-        .WillRepeatedly(Return(absl::nullopt));
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
-    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
-    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
-                                            stream_info, body),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason = "SSL error";
     EXPECT_CALL(stream_info, upstreamTransportFailureReason())
@@ -1456,6 +1392,119 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  // No downstreamSslConnection
+  {
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+    DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
+    EXPECT_EQ(absl::nullopt, cert_start_formart.format(request_headers, response_headers,
+                                                       response_trailers, stream_info, body));
+    EXPECT_THAT(cert_start_formart.formatValue(request_headers, response_headers, response_trailers,
+                                               stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // No validFromPeerCertificate
+  {
+    DownstreamPeerCertVStartFormatter cert_start_formart("DOWNSTREAM_PEER_CERT_V_START(%Y/%m/%d)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(absl::nullopt, cert_start_formart.format(request_headers, response_headers,
+                                                       response_trailers, stream_info, body));
+    EXPECT_THAT(cert_start_formart.formatValue(request_headers, response_headers, response_trailers,
+                                               stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Default format string
+  {
+    DownstreamPeerCertVStartFormatter cert_start_format("DOWNSTREAM_PEER_CERT_V_START");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              cert_start_format.format(request_headers, response_headers, response_trailers,
+                                       stream_info, body));
+  }
+  // Custom format string
+  {
+    DownstreamPeerCertVStartFormatter cert_start_format(
+        "DOWNSTREAM_PEER_CERT_V_START(%b %e %H:%M:%S %Y %Z)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
+              cert_start_format.format(request_headers, response_headers, response_trailers,
+                                       stream_info, body));
+  }
+}
+
+TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  std::string body;
+
+  // No downstreamSslConnection
+  {
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
+    EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(cert_end_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // No expirationPeerCertificate
+  {
+    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END(%Y/%m/%d)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, expirationPeerCertificate())
+        .WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(absl::nullopt, cert_end_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(cert_end_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  // Default format string
+  {
+    DownstreamPeerCertVEndFormatter cert_end_format("DOWNSTREAM_PEER_CERT_V_END");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              cert_end_format.format(request_headers, response_headers, response_trailers,
+                                     stream_info, body));
+  }
+  // Custom format string
+  {
+    DownstreamPeerCertVEndFormatter cert_end_format(
+        "DOWNSTREAM_PEER_CERT_V_END(%b %e %H:%M:%S %Y %Z)");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ("Mar 28 23:35:58 2018 UTC",
+              cert_end_format.format(request_headers, response_headers, response_trailers,
+                                     stream_info, body));
+  }
+}
+
 TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
@@ -1464,7 +1513,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   std::string body;
 
   {
-    StartTimeFormatter start_time_format("%Y/%m/%d");
+    StartTimeFormatter start_time_format("START_TIME(%Y/%m/%d)");
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
@@ -1476,7 +1525,7 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   }
 
   {
-    StartTimeFormatter start_time_format("");
+    StartTimeFormatter start_time_format("START_TIME");
     SystemTime time;
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
@@ -2149,12 +2198,53 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    // Various START_TIME formats
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
                                "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
     time_t expected_time_in_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                    expected_time_in_epoch),
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    // Various DOWNSTREAM_PEER_CERT_V_START formats (similar to START_TIME)
+    const std::string format =
+        "%DOWNSTREAM_PEER_CERT_V_START(%Y/%m/"
+        "%d)%|%DOWNSTREAM_PEER_CERT_V_START(%s)%|%DOWNSTREAM_PEER_CERT_V_START(bad_format)%|"
+        "%DOWNSTREAM_PEER_CERT_V_START%|%DOWNSTREAM_PEER_CERT_V_START(%f.%1f.%2f.%3f)%";
+
+    time_t expected_time_in_epoch = 1522280158;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
+    EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    FormatterImpl formatter(format, false);
+
+    EXPECT_EQ(
+        fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                    expected_time_in_epoch),
+        formatter.format(request_header, response_header, response_trailer, stream_info, body));
+  }
+
+  {
+    // Various DOWNSTREAM_PEER_CERT_V_END formats (similar to START_TIME)
+    const std::string format =
+        "%DOWNSTREAM_PEER_CERT_V_END(%Y/%m/"
+        "%d)%|%DOWNSTREAM_PEER_CERT_V_END(%s)%|%DOWNSTREAM_PEER_CERT_V_END(bad_format)%|"
+        "%DOWNSTREAM_PEER_CERT_V_END%|%DOWNSTREAM_PEER_CERT_V_END(%f.%1f.%2f.%3f)%";
+
+    time_t expected_time_in_epoch = 1522280158;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
+    EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     FormatterImpl formatter(format, false);
 
     EXPECT_EQ(
@@ -2358,6 +2448,23 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
   for (const std::string& test_case : test_cases) {
     EXPECT_NO_THROW(parser.parse(test_case));
   }
+}
+
+TEST(SubstitutionFormatterTest, FormatterExtension) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  std::vector<CommandParserPtr> commands;
+  commands.push_back(std::make_unique<TestCommandParser>());
+
+  auto providers = SubstitutionFormatParser::parse("foo %COMMAND_EXTENSION(x)%", commands);
+
+  EXPECT_EQ(providers.size(), 2);
+  EXPECT_EQ("TestFormatter", providers[1]->format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
 }
 
 } // namespace

@@ -784,6 +784,41 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutput) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryOnRootPath) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("GET", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/GetRoot", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+
+  google::api::HttpBody response;
+  response.set_content_type("text/html");
+  response.set_data("<h1>Hello, world!</h1>");
+
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
+            filter_.encodeData(*response_data, false));
+
+  EXPECT_EQ(response.content_type(), response_headers.get_("content-type"));
+  EXPECT_EQ(response.data(), response_data->toString());
+
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithInvalidHttpBodyAsOutput) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/echoResponseBodyPath"}};
