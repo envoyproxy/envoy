@@ -130,8 +130,8 @@ public:
   createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
-    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
-        filters, filter_chain_factory_context);
+    return listener_components_.createNetworkFilterFactoryList(filters,
+                                                               filter_chain_factory_context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
@@ -210,6 +210,7 @@ private:
   Router::ContextImpl router_context_;
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
+  ProdListenerComponentFactory listener_components_;
 };
 
 } // namespace Server

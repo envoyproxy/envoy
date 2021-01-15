@@ -78,6 +78,10 @@ void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& stat
 
 } // namespace
 
+ProdListenerComponentFactory::ProdListenerComponentFactory(Instance& server)
+    : server_(server), filter_config_provider_manager_(
+                           std::make_unique<Filter::NetworkFilterConfigProviderManagerImpl>()) {}
+
 bool ListenSocketCreationParams::operator==(const ListenSocketCreationParams& rhs) const {
   return (bind_to_port == rhs.bind_to_port) &&
          (duplicate_parent_socket == rhs.duplicate_parent_socket);
@@ -88,13 +92,22 @@ bool ListenSocketCreationParams::operator!=(const ListenSocketCreationParams& rh
 }
 
 std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
-ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+ProdListenerComponentFactory::createNetworkFilterFactoryList(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
     Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
+    const bool terminal = i == filters.size() - 1;
     ENVOY_LOG(debug, "  filter #{}:", i);
+    if (proto_config.config_type_case() ==
+        envoy::config::listener::v3::Filter::ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", proto_config.name());
+      ret.push_back(filter_config_provider_manager_->createDynamicFilterConfigProvider(
+          proto_config.config_discovery(), proto_config.name(), filter_chain_factory_context,
+          "listener_config_discovery", terminal));
+      continue;
+    }
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessage(
@@ -110,15 +123,14 @@ ProdListenerComponentFactory::createNetworkFilterFactoryList_(
             proto_config);
 
     Config::Utility::validateTerminalFilters(filters[i].name(), factory.name(), "network",
-                                             factory.isTerminalFilter(), i == filters.size() - 1);
+                                             factory.isTerminalFilter(), terminal);
 
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
-    ret.push_back(
-        std::make_unique<Filter::StaticFilterConfigProviderImpl<Network::FilterFactoryCb>>(
-            callback, proto_config.name()));
+    ret.push_back(filter_config_provider_manager_->createStaticFilterConfigProvider(
+        callback, proto_config.name()));
   }
 
   return ret;

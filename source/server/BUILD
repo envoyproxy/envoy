@@ -313,6 +313,7 @@ envoy_cc_library(
         ":transport_socket_config_lib",
         ":well_known_names_lib",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/filter:config_provider_manager_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:udp_packet_writer_config_interface",
         "//include/envoy/server:active_udp_listener_config_interface",

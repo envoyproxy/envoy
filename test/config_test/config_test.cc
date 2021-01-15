@@ -59,7 +59,8 @@ public:
 class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(time_system_)), options_(options) {
+      : api_(Api::createApiForTest(time_system_)), options_(options),
+        prod_component_factory_(server_) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -105,8 +106,7 @@ public:
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context)
                 -> std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> {
-              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                           context);
+              return prod_component_factory_.createNetworkFilterFactoryList(filters, context);
             }));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -146,6 +146,7 @@ public:
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
+  Server::ProdListenerComponentFactory prod_component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
                                                 false};

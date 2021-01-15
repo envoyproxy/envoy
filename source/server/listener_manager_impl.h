@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/api_listener.h"
@@ -40,15 +41,7 @@ class ListenerFilterChainFactoryBuilder;
 class ProdListenerComponentFactory : public ListenerComponentFactory,
                                      Logger::Loggable<Logger::Id::config> {
 public:
-  ProdListenerComponentFactory(Instance& server) : server_(server) {}
-
-  /**
-   * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
-   */
-  static std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
-  createNetworkFilterFactoryList_(
-      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-      Configuration::FilterChainFactoryContext& filter_chain_factory_context);
+  ProdListenerComponentFactory(Instance& server);
 
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
@@ -78,9 +71,8 @@ public:
   std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
   createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
-    return createNetworkFilterFactoryList_(filters, filter_chain_factory_context);
-  }
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override;
+
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
@@ -104,6 +96,8 @@ public:
 private:
   Instance& server_;
   uint64_t next_listener_tag_{1};
+  std::unique_ptr<Filter::FilterConfigProviderManager<Network::FilterFactoryCb>>
+      filter_config_provider_manager_;
 };
 
 class ListenerImpl;

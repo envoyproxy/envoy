@@ -54,7 +54,8 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)) {}
+  ListenerManagerImplTest()
+      : api_(Api::createApiForTest(server_.api_.random_)), listener_components_(server_) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -69,10 +70,10 @@ protected:
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-               Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+            [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+                   Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
                 -> std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> {
-              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+              return listener_components_.createNetworkFilterFactoryList(
                   filters, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
@@ -314,6 +315,7 @@ protected:
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
   NiceMock<testing::MockFunction<void()>> callback_;
+  ProdListenerComponentFactory listener_components_;
 };
 
 } // namespace Server
