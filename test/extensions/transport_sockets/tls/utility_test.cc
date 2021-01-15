@@ -158,12 +158,17 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
       {16, "WANT_CERTIFICATE_VERIFY"},
       {17, "HANDOFF"},
       {18, "HANDBACK"},
-      {19, ""},
   };
 
   for (const auto& test_data : test_set) {
     EXPECT_EQ(test_data.second, Utility::getErrorDescription(test_data.first));
   }
+
+#if defined(NDEBUG)
+  EXPECT_EQ(Utility::getErrorDescription(19), "UNKNOWN_ERROR");
+#else
+  EXPECT_DEATH(Utility::getErrorDescription(19), "Unknown BoringSSL error had occurred");
+#endif
 }
 
 } // namespace

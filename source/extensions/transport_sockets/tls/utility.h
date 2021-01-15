@@ -15,6 +15,29 @@ namespace TransportSockets {
 namespace Tls {
 namespace Utility {
 
+static constexpr absl::string_view SSL_ERROR_NONE_MESSAGE = "NONE";
+static constexpr absl::string_view SSL_ERROR_SSL_MESSAGE = "SSL";
+static constexpr absl::string_view SSL_ERROR_WANT_READ_MESSAGE = "WANT_READ";
+static constexpr absl::string_view SSL_ERROR_WANT_WRITE_MESSAGE = "WANT_WRITE";
+static constexpr absl::string_view SSL_ERROR_WANT_X509_LOOPUP_MESSAGE = "WANT_X509_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_SYSCALL_MESSAGE = "SYSCALL";
+static constexpr absl::string_view SSL_ERROR_ZERO_RETURN_MESSAGE = "ZERO_RETURN";
+static constexpr absl::string_view SSL_ERROR_WANT_CONNECT_MESSAGE = "WANT_CONNECT";
+static constexpr absl::string_view SSL_ERROR_WANT_ACCEPT_MESSAGE = "WANT_ACCEPT";
+static constexpr absl::string_view SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE =
+    "WANT_CHANNEL_ID_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_PENDING_SESSION_MESSAGE = "PENDING_SESSION";
+static constexpr absl::string_view SSL_ERROR_PENDING_CERTIFICATE_MESSAGE = "PENDING_CERTIFICATE";
+static constexpr absl::string_view SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE =
+    "WANT_PRIVATE_KEY_OPERATION";
+static constexpr absl::string_view SSL_ERROR_PENDING_TICKET_MESSAGE = "PENDING_TICKET";
+static constexpr absl::string_view SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE = "EARLY_DATA_REJECTED";
+static constexpr absl::string_view SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE =
+    "WANT_CERTIFICATE_VERIFY";
+static constexpr absl::string_view SSL_ERROR_HANDOFF_MESSAGE = "HANDOFF";
+static constexpr absl::string_view SSL_ERROR_HANDBACK_MESSAGE = "HANDBACK";
+static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
+
 /**
  * Retrieves the serial number of a certificate.
  * @param cert the certificate
@@ -94,7 +117,7 @@ absl::optional<std::string> getLastCryptoError();
  * @param err error code
  * @return string message corresponding error code.
  */
-std::string getErrorDescription(int err);
+absl::string_view getErrorDescription(int err);
 
 } // namespace Utility
 } // namespace Tls

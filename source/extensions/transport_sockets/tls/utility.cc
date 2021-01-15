@@ -215,46 +215,47 @@ absl::optional<std::string> Utility::getLastCryptoError() {
   return absl::nullopt;
 }
 
-std::string Utility::getErrorDescription(int err) {
+absl::string_view Utility::getErrorDescription(int err) {
   switch (err) {
   case SSL_ERROR_NONE:
-    return "NONE";
+    return SSL_ERROR_NONE_MESSAGE;
   case SSL_ERROR_SSL:
-    return "SSL";
+    return SSL_ERROR_SSL_MESSAGE;
   case SSL_ERROR_WANT_READ:
-    return "WANT_READ";
+    return SSL_ERROR_WANT_READ_MESSAGE;
   case SSL_ERROR_WANT_WRITE:
-    return "WANT_WRITE";
+    return SSL_ERROR_WANT_WRITE_MESSAGE;
   case SSL_ERROR_WANT_X509_LOOKUP:
-    return "WANT_X509_LOOKUP";
+    return SSL_ERROR_WANT_X509_LOOPUP_MESSAGE;
   case SSL_ERROR_SYSCALL:
-    return "SYSCALL";
+    return SSL_ERROR_SYSCALL_MESSAGE;
   case SSL_ERROR_ZERO_RETURN:
-    return "ZERO_RETURN";
+    return SSL_ERROR_ZERO_RETURN_MESSAGE;
   case SSL_ERROR_WANT_CONNECT:
-    return "WANT_CONNECT";
+    return SSL_ERROR_WANT_CONNECT_MESSAGE;
   case SSL_ERROR_WANT_ACCEPT:
-    return "WANT_ACCEPT";
+    return SSL_ERROR_WANT_ACCEPT_MESSAGE;
   case SSL_ERROR_WANT_CHANNEL_ID_LOOKUP:
-    return "WANT_CHANNEL_ID_LOOKUP";
+    return SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE;
   case SSL_ERROR_PENDING_SESSION:
-    return "PENDING_SESSION";
+    return SSL_ERROR_PENDING_SESSION_MESSAGE;
   case SSL_ERROR_PENDING_CERTIFICATE:
-    return "PENDING_CERTIFICATE";
+    return SSL_ERROR_PENDING_CERTIFICATE_MESSAGE;
   case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
-    return "WANT_PRIVATE_KEY_OPERATION";
+    return SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE;
   case SSL_ERROR_PENDING_TICKET:
-    return "PENDING_TICKET";
+    return SSL_ERROR_PENDING_TICKET_MESSAGE;
   case SSL_ERROR_EARLY_DATA_REJECTED:
-    return "EARLY_DATA_REJECTED";
+    return SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE;
   case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
-    return "WANT_CERTIFICATE_VERIFY";
+    return SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE;
   case SSL_ERROR_HANDOFF:
-    return "HANDOFF";
+    return SSL_ERROR_HANDOFF_MESSAGE;
   case SSL_ERROR_HANDBACK:
-    return "HANDBACK";
+    return SSL_ERROR_HANDBACK_MESSAGE;
   default:
-    return EMPTY_STRING;
+    ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
+    return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
   }
 }
 
