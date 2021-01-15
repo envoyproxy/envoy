@@ -1,5 +1,7 @@
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
+#include <algorithm>
+
 #ifndef WIN32
 #include <arpa/inet.h>
 #endif
@@ -91,19 +93,22 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
   return false;
 }
 
-bool GrpcWebFilter::hasGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const {
+bool GrpcWebFilter::hasProtoEncodedGrpcWebContentType(
+    const Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
-    // The value of media-type is case-sensitive https://tools.ietf.org/html/rfc2616#section-3.7.
-    const std::string content_type_value =
-        absl::AsciiStrToLower(content_type->value().getStringView());
-    // We ignore "parameter" value.
-    const std::string current_content_type =
-        content_type_value.substr(0, content_type_value.find_last_of(';'));
+    absl::string_view content_type_value = content_type->value().getStringView();
+    // We ignore "parameter" value. Note that "*( ";" parameter )" indicates that there can be
+    // multiple parameters.
+    absl::string_view current_content_type =
+        StringUtil::rtrim(content_type_value.substr(0, content_type_value.find_first_of(';')));
     // We expect only proto encoding response
-    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md.
-    return current_content_type == Http::Headers::get().ContentTypeValues.GrpcWebProto ||
-           current_content_type == Http::Headers::get().ContentTypeValues.GrpcWeb;
+    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md. And the value of media-type is
+    // case-sensitive https://tools.ietf.org/html/rfc2616#section-3.7.
+    return StringUtil::CaseInsensitiveCompare()(
+               current_content_type, Http::Headers::get().ContentTypeValues.GrpcWebProto) ||
+           StringUtil::CaseInsensitiveCompare()(current_content_type,
+                                                Http::Headers::get().ContentTypeValues.GrpcWeb);
   }
   return false;
 }
@@ -115,7 +120,7 @@ bool GrpcWebFilter::needsResponseTransformation(Http::ResponseHeaderMap& headers
              "envoy.reloadable_features.grpc_web_fix_non_grpc_response_handling") &&
          !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
          !(Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
-           hasGrpcWebContentType(headers));
+           hasProtoEncodedGrpcWebContentType(headers));
 }
 
 void GrpcWebFilter::setTransformedResponseHeaders(Buffer::Instance* data) {

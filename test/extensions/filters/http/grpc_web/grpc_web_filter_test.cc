@@ -105,6 +105,14 @@ public:
               request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
   }
 
+  bool isProtoEncodedGrpcWebContentType(const std::string& content_type) {
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    if (!content_type.empty()) {
+      request_headers.addCopy(Http::Headers::get().ContentType, content_type);
+    }
+    return filter_.hasProtoEncodedGrpcWebContentType(request_headers);
+  }
+
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   GrpcWebFilter filter_;
@@ -130,6 +138,35 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
   }
+}
+
+TEST_F(GrpcWebFilterTest, ExpectedGrpcWebProtoContentType) {
+  EXPECT_TRUE(isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWeb));
+  EXPECT_TRUE(
+      isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto));
+  EXPECT_TRUE(isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWeb +
+                                               "; version=1; action=urn:CreateCredential"));
+  EXPECT_TRUE(isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWeb +
+                                               "    ; version=1; action=urn:CreateCredential"));
+  EXPECT_TRUE(isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto +
+                                               "; version=1"));
+  EXPECT_TRUE(isProtoEncodedGrpcWebContentType("Application/Grpc-Web"));
+  EXPECT_TRUE(isProtoEncodedGrpcWebContentType("Application/Grpc-Web+Proto"));
+  EXPECT_TRUE(isProtoEncodedGrpcWebContentType("APPLICATION/GRPC-WEB+PROTO; ok=1; great=1"));
+}
+
+TEST_F(GrpcWebFilterTest, UnexpectedGrpcWebProtoContentType) {
+  EXPECT_FALSE(isProtoEncodedGrpcWebContentType(""));
+  EXPECT_FALSE(isProtoEncodedGrpcWebContentType("Invalid; ok=1"));
+  EXPECT_FALSE(isProtoEncodedGrpcWebContentType("Invalid; ok=1; nok=2"));
+  EXPECT_FALSE(
+      isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWeb + "+thrift"));
+  EXPECT_FALSE(
+      isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWeb + "+json"));
+  EXPECT_FALSE(
+      isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebText));
+  EXPECT_FALSE(
+      isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto));
 }
 
 TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
