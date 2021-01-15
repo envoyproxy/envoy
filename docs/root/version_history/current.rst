@@ -13,6 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* aggregate cluster: fixed a crash due to a TLS initialization issue.
 * lua: fixed crash when Lua script contains streamInfo():downstreamSslConnection().
 * tls: fix detection of the upstream connection close event.
 
