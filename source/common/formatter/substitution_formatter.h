@@ -233,6 +233,7 @@ private:
  */
 class HeadersByteSizeFormatter : public FormatterProvider {
 public:
+  // TODO(htuch): Add RequestTrailers here.
   enum class HeaderType { RequestHeaders, ResponseHeaders, ResponseTrailers };
 
   HeadersByteSizeFormatter(const HeaderType header_type);
