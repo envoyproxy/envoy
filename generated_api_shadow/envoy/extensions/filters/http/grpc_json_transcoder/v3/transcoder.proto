@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message GrpcJsonTranscoder {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder";
