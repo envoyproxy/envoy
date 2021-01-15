@@ -981,5 +981,33 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
       true, false, "");
 }
 
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQueryParam) {
+  const std::string filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              enable_strict_request_validation : true
+              ignore_unknown_query_parameters : true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+
+  // When strict mode is enabled with ignore unknown query params,
+  // the request is not rejected and transcoding occurs.
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/shelves/9999?unknown=1"},
+                                     {":authority", "host"}},
+      "", {"shelf: 9999"}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "");
+}
+
 } // namespace
 } // namespace Envoy
