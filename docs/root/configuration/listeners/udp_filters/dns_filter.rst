@@ -1,34 +1,28 @@
 .. _config_udp_listener_filters_dns_filter:
 
-DNS Filter
-==========
+DNS 过滤器
+============
 
 .. attention::
 
-  DNS Filter is under active development and should be considered alpha and not production ready.
+  DNS 过滤器还在开发中，应该被视为 alpha 且不是生产可用。
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
-* This filter should be configured with the name *envoy.filters.udp_listener.dns_filter*
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+* 这个过滤器应该使用名字 *envoy.filters.udp_listener.dns_filter* 来配置
 
-Overview
+概览
 --------
 
-The DNS filter allows Envoy to resolve forward DNS queries as an authoritative server for any
-configured domains. The filter's configuration specifies the names and addresses for which Envoy
-will answer as well as the configuration needed to send queries externally for unknown domains.
+DNS 过滤器允许 Envoy 将转发的 DNS 查询解析为任何已配置域的权威服务器。过滤器的配置指定 Envoy 会应答的名称和地址，以及从外部向未知域发送查询所需的配置。
 
-The filter supports local and external DNS resolution. If a lookup for a name does not match a
-statically configured domain, or a provisioned cluster name, Envoy can refer the query to an
-external resolver for an answer. Users have the option of specifying the DNS servers that Envoy
-will use for external resolution. Users can disable external DNS resolution by omitting the
-client configuration object.
+过滤器支持本地和外部 DNS 解析。如果名称查找与静态配置的域或配置的群集名称不匹配，Envoy 可以将查询引至外部解析器以寻求结果。用户可以选择指定 Envoy 将用于外部解析的 DNS 服务器。用户可以通过省略客户端配置对象来禁用外部 DNS 解析。
 
-The filter supports :ref:`per-filter configuration
-<envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`.
-An Example configuration follows that illustrates how the filter can be used.
+过滤器支持 :ref:`per-filter 配置
+<envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`。
+下面的示例配置说明了如何使用过滤器。
 
-Example Configuration
----------------------
+示例配置
+-------------
 
 .. code-block:: yaml
 
@@ -97,36 +91,16 @@ Example Configuration
                         port: 5060
 
 
-In this example, Envoy is configured to respond to client queries for four domains. For any
-other query, it will forward upstream to external resolvers. The filter will return an address
-matching the input query type. If the query is for type A records and no A records are configured,
-Envoy will return no addresses and set the response code appropriately. Conversely, if there are
-matching records for the query type, each configured address is returned. This is also true for
-AAAA records. Only A, AAAA, and SRV records are supported. If the filter parses queries for other
-record types, the filter immediately responds indicating that the type is not supported. The
-filter can also redirect a query for a DNS name to the enpoints of a cluster. "www.domain4.com"
-in the configuration demonstrates this. Along with an address list, a cluster name is a valid
-endpoint for a DNS name.
+在此示例中，Envoy 被配置为响应四个域的客户端查询。对于任何其他查询，它将上游转发到外部解析器。过滤器将返回与输入查询类型匹配的地址。如果查询针对的是 A 类型的记录，并且没有配置 A 记录，则 Envoy 将不返回任何地址并设置适当的响应代码。相反，如果有匹配查询类型的记录，则返回每个已配置的地址。对于 AAAA 记录也是如此。仅支持 A、AAAA 和 SRV 记录。如果过滤器解析其他记录类型的查询，则过滤器将立即响应，指示不支持该类型。过滤器还可以将对 DNS 名称的查询重定向到集群的各个端点。配置中的“www.domain4.com”对此进行了证明。除地址列表外，集群名称是 DNS 名称的有效端点。
 
-The DNS filter also supports responding to queries for service records. The records for "domain5.com"
-illustrate the configuration necessary to support responding to SRV records. The target name
-populated in the configuration must be fully qualified domain names, unless the target is a cluster.
-For non-cluster targets, each referenced target name must be defined in the DNS Filter table so that
-Envoy can resolve the target hosts' IP addresses. For a cluster, Envoy will return an address for
-each cluster endpoint.
+DNS 过滤器还支持响应对服务记录的查询。“domain5.com”的记录说明了支持响应 SRV 记录所必需的配置。除非目标是集群，否则配置中填充的目标名称必须是全限定域名。对于非集群目标，必须在 DNS 过滤器表中定义每个引用的目标名称，以便 Envoy 可以解析目标主机的 IP 地址。对于集群，Envoy 将为每个集群端点返回一个地址。
 
-Each service record's protocol can be defined by a name or number. As configured in the example,
-the filter will successfully respond to SRV record requests for "_sip._tcp.voip.domain5.com". If a
-numerical value is specified, Envoy will attempt to resolve the number to a name. String values for
-protocols are used as they appear. An underscore is prepended to both the service and protocol to
-adhere to the convention outlined in the RFC.
+每个服务记录的协议都可以通过名称或编号来定义。按照示例中的配置，过滤器将成功响应对“_sip._tcp.voip.domain5.com”的 SRV 记录请求。如果指定了数值，Envoy 会尝试将数字解析为名称。协议的字符串值将在出现时使用。在服务和协议之前加一个下划线，以遵守 RFC 中概述的约定。
 
-The filter can also consume its domain configuration from an external DNS table. The same entities
-appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
-using the :ref:`external_dns_table DataSource <envoy_api_msg_core.DataSource>` directive:
+过滤器还可以通过外部 DNS 表来自定义其域配置。静态配置中出现相同实体可以作为 JSON 或 YAML 的形式存储在独立的文件中，并使用 :ref:`external_dns_table DataSource <envoy_api_msg_core.DataSource>` 指令进行引用：
 
-Example External DnsTable Configuration
----------------------------------------
+外部 DnsTable 配置示例
+-----------------------------
 
 .. code-block:: yaml
 
@@ -139,10 +113,10 @@ Example External DnsTable Configuration
           external_dns_table:
             filename: "/home/ubuntu/configs/dns_table.json"
 
-In the file, the table can be defined as follows:
+在该文件中，表可以如下定义：
 
-DnsTable JSON Configuration
----------------------------
+DnsTable JSON 配置
+--------------------------
 
 .. code-block:: json
 
@@ -172,5 +146,4 @@ DnsTable JSON Configuration
   }
 
 
-By utilizing this configuration, the DNS responses can be configured separately from the Envoy
-configuration.
+通过使用此配置，可以将 DNS 响应与 Envoy 配置分开配置。
