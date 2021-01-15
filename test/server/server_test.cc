@@ -1320,18 +1320,20 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
     return std::make_unique<test::common::config::DummyConfig>();
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext&) {
-        const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
-        EXPECT_NE(nullptr, proto);
-        EXPECT_EQ(proto->a(), "foo");
-        auto mock_extension = std::make_unique<MockBootstrapExtension>();
-        EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([]() {
-          // call to cluster manager, to make sure it is not nullptr.
-          ctx.clusterManager().clusters();
-        }));
-        return mock_extension;
-      }));
+      .WillOnce(
+          Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
+            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            EXPECT_NE(nullptr, proto);
+            EXPECT_EQ(proto->a(), "foo");
+            auto mock_extension = std::make_unique<MockBootstrapExtension>();
+            EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
+              // call to cluster manager, to make sure it is not nullptr.
+              ctx.clusterManager().clusters();
+            }));
+            return mock_extension;
+          }));
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
