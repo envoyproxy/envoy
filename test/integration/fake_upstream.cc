@@ -355,28 +355,8 @@ AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
 }
 
 AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milliseconds timeout) {
-  // Do the work inline if called from the dispatcher thread, executeOnDispatcher can only be called
-  // from outside the dispatcher thread.
-  if (shared_connection_.connection().dispatcher().isThreadSafe()) {
-    shared_connection_.connection().readDisable(disable);
-    return AssertionSuccess();
-  } else {
-    return shared_connection_.executeOnDispatcher(
-        [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
-  }
-}
-
-AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
-                                                    std::chrono::milliseconds timeout) {
-  // Do the work inline if called from the dispatcher thread, executeOnDispatcher can only be called
-  // from outside the dispatcher thread.
-  if (shared_connection_.connection().dispatcher().isThreadSafe()) {
-    shared_connection_.connection().enableHalfClose(enable);
-    return AssertionSuccess();
-  } else {
-    return shared_connection_.executeOnDispatcher(
-        [enable](Network::Connection& connection) { connection.enableHalfClose(enable); }, timeout);
-  }
+  return shared_connection_.executeOnDispatcher(
+      [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
 }
 
 Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {
@@ -637,7 +617,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     absl::MutexLock lock(&lock_);
     connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
     VERIFY_ASSERTION(connection->initialize());
-    VERIFY_ASSERTION(connection->enableHalfClose(enable_half_close_));
+    connection->connection().enableHalfClose(enable_half_close_);
     return AssertionSuccess();
   });
 }
@@ -648,7 +628,6 @@ FakeUpstream::waitForAndConsumeDisconnectedConnection(std::chrono::milliseconds 
   SharedConnectionWrapper* connection;
   {
     absl::MutexLock lock(&lock_);
-    ENVOY_LOG_MISC(critical, "waitForAndConsumeDisconnectedConnection");
     const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
       return !new_connections_.empty();
     };
@@ -706,16 +685,18 @@ void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
   received_datagrams_.emplace_back(std::move(data));
 }
 
-AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb) {
-  AssertionResult result = AssertionSuccess();
-  absl::Notification done;
+AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
+                                                           std::chrono::milliseconds timeout) {
+  auto result = std::make_shared<AssertionResult>(AssertionSuccess());
+  auto done = std::make_shared<absl::Notification>();
   ASSERT(!dispatcher_->isThreadSafe());
   dispatcher_->post([&]() {
-    result = cb();
-    done.Notify();
+    *result = cb();
+    done->Notify();
   });
-  done.WaitForNotification();
-  return result;
+  RELEASE_ASSERT(done->WaitForNotificationWithTimeout(absl::FromChrono(timeout)),
+                 "Timed out waiting for cb to run on dispatcher");
+  return *result;
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
@@ -756,23 +737,13 @@ FakeRawConnection::~FakeRawConnection() {
 testing::AssertionResult FakeRawConnection::initialize() {
   Network::ReadFilterSharedPtr filter{new ReadFilter(*this)};
   read_filter_ = filter;
+  VERIFY_ASSERTION(FakeConnectionBase::initialize());
   if (!shared_connection_.connected()) {
-    VERIFY_ASSERTION(FakeConnectionBase::initialize());
     return AssertionFailure() << "initialize failed, connection is disconnected.";
   }
   ASSERT(shared_connection_.connection().dispatcher().isThreadSafe());
-  if (shared_connection_.connection().dispatcher().isThreadSafe()) {
-    shared_connection_.connection().addReadFilter(filter);
-  } else {
-    testing::AssertionResult result = shared_connection_.executeOnDispatcher(
-        [filter = std::move(filter)](Network::Connection& connection) {
-          connection.addReadFilter(filter);
-        });
-    if (!result) {
-      return result;
-    }
-  }
-  return FakeConnectionBase::initialize();
+  shared_connection_.connection().addReadFilter(filter);
+  return AssertionSuccess();
 }
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,

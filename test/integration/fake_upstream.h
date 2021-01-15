@@ -291,7 +291,6 @@ public:
                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     absl::MutexLock lock(&lock_);
     if (!time_system.waitFor(lock_, absl::Condition(&disconnected_), timeout)) {
-      ENVOY_LOG_MISC(critical, "timeout");
       return AssertionFailure() << "Timed out waiting for disconnect";
     }
     return AssertionSuccess();
@@ -315,6 +314,8 @@ public:
     if (disconnected_) {
       return testing::AssertionSuccess();
     }
+    // Sanity check: detect if the post and wait is attempted from the dispatcher thread; fail
+    // immediately instead of deadlocking.
     ASSERT(!connection_.dispatcher().isThreadSafe(),
            "deadlock: executeOnDispatcher called from dispatcher thread.");
     bool callback_ready_event = false;
@@ -387,9 +388,6 @@ public:
     initialized_ = true;
     return testing::AssertionSuccess();
   }
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  enableHalfClose(bool enabled, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
@@ -743,7 +741,9 @@ private:
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void onRecvDatagram(Network::UdpRecvData& data);
-  AssertionResult runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb);
+  AssertionResult
+  runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
+                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;
