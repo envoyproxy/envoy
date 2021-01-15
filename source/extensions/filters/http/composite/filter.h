@@ -97,7 +97,7 @@ private:
   // serve to surface an easier to understand error, as attempting to insert a filter at a later
   // time will result in various FM assertions firing.
   // TODO(snowp): Instead of validating this via ASSERTs, we should be able to validate that the
-  // match tree is only going to fire at permissable times.
+  // match tree is only going to fire when we can actually inject a filter.
   bool decoded_headers_ : 1;
   bool encoded_headers_ : 1;
 };
