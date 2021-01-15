@@ -155,18 +155,13 @@ public:
                                                     // has_next guarantee the shared_ptr exists.
                                                     calculate_weight(*(next->entry_.lock()));
       addDeadline(deadline, next->entry_);
+      // Save weak_ptr before pop.
+      auto ret = next->entry_;
       wheel_[offset_].pop_front();
       maybeAdvanceCurrent();
-      return next->entry_.lock();
+      return ret.lock();
     }
     return nullptr;
-  }
-
-  // TODO(lambdai): When is empty called? Consider maintain the current non-empty slot in the rest
-  // of the flow.
-  bool empty() const {
-    return distant_entries_.empty() &&
-           std::all_of(wheel_.begin(), wheel_.end(), [](auto& slot) { return slot.empty(); });
   }
 
 private:
