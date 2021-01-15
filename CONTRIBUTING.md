@@ -99,7 +99,7 @@ versioning guidelines:
 
   Please see [support/README.md](support/README.md) for more information on these hooks.
 
-* Create your PR.
+* Create your PR. If your PR adds new code, it should include tests [covering](source/docs/coverage.md) the new code.
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
