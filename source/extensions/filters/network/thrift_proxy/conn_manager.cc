@@ -180,7 +180,7 @@ bool ConnectionManager::passthroughEnabled() const {
     return false;
   }
 
-  // If a local response was sent, the rpcs list has been cleared.
+  // If the rpcs list is empty, a local response happened.
   if (rpcs_.empty()) {
     return false;
   }
