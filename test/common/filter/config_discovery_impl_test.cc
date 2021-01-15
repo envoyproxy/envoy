@@ -71,8 +71,7 @@ public:
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() {
-    filter_config_provider_manager_ = std::make_unique<FilterConfigProviderManagerImpl<
-        Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb>>();
+    filter_config_provider_manager_ = std::make_unique<HttpFilterConfigProviderManagerImpl>();
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 

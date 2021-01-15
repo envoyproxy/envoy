@@ -161,5 +161,25 @@ FilterConfigSubscription::~FilterConfigSubscription() {
   filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
 }
 
+Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::instantiateFilterFactory(
+    const ProtobufWkt::Any& proto_config, const std::string& stat_prefix,
+    Server::Configuration::FactoryContext& factory_context) {
+  auto& factory = Config::Utility::getAndCheckFactoryByType<
+      Server::Configuration::NamedHttpFilterConfigFactory>(proto_config);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      proto_config, factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
+  return factory.createFilterFactoryFromProto(*message, stat_prefix, factory_context);
+}
+
+Network::FilterFactoryCb NetworkFilterConfigProviderManagerImpl::instantiateFilterFactory(
+    const ProtobufWkt::Any& proto_config, const std::string&,
+    Server::Configuration::FactoryContext& factory_context) {
+  auto& factory = Config::Utility::getAndCheckFactoryByType<
+      Server::Configuration::NamedNetworkFilterConfigFactory>(proto_config);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      proto_config, factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
+  return factory.createFilterFactoryFromProto(*message, factory_context);
+}
+
 } // namespace Filter
 } // namespace Envoy

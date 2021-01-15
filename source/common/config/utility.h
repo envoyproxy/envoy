@@ -337,40 +337,6 @@ public:
     return *factory;
   }
 
-  template <class Factory, class FactoryCallback>
-  static FactoryCallback
-  createFactoryCallbackFromProto(Factory& factory, const Protobuf::Message& message,
-                                 const std::string& stat_prefix,
-                                 Server::Configuration::FactoryContext& factory_context);
-
-  template <>
-  Http::FilterFactoryCb
-  createFactoryCallbackFromProto(Server::Configuration::NamedHttpFilterConfigFactory& factory,
-                                 const Protobuf::Message& message, const std::string& stat_prefix,
-                                 Server::Configuration::FactoryContext& factory_context) {
-    return factory.createFilterFactoryFromProto(message, stat_prefix, factory_context);
-  }
-
-  template <>
-  Network::FilterFactoryCb
-  createFactoryCallbackFromProto(Server::Configuration::NamedNetworkFilterConfigFactory& factory,
-                                 const Protobuf::Message& message, const std::string&,
-                                 Server::Configuration::FactoryContext& factory_context) {
-    return factory.createFilterFactoryFromProto(message, factory_context);
-  }
-
-  template <class Factory, class FactoryCallback>
-  static FactoryCallback
-  createFactoryCallbackFromAny(const ProtobufWkt::Any& typed_config, const std::string& stat_prefix,
-                               Server::Configuration::FactoryContext& factory_context) {
-    Factory& factory = Config::Utility::getAndCheckFactoryByType<Factory>(typed_config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        typed_config, factory_context.messageValidationContext().dynamicValidationVisitor(),
-        factory);
-    return Config::Utility::createFactoryCallbackFromProto<Factory, FactoryCallback>(
-        factory, *message, stat_prefix, factory_context);
-  }
-
   /**
    * Get a Factory from the registry by type URL.
    * @param typed_config for the extension config.
