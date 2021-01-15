@@ -132,7 +132,10 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   if annotations.EXTENSION_ANNOTATION in comment.annotations:
     extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
     formatted_extension = FormatExtension(extension)
-  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension
+  formatted_extension_type = ''
+  if annotations.EXTENSION_TYPE_ANNOTATION in source_code_info.file_level_annotations:
+    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE 8)"
+  return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_type
 
 
 def MapLines(f, s):
