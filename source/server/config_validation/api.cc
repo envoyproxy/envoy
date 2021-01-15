@@ -18,9 +18,9 @@ Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string& name)
 }
 
 Event::DispatcherPtr
-ValidationImpl::allocateDispatcher(const std::string& name,
+ValidationImpl::allocateDispatcher(const std::string&,
                                    const Event::ScaledRangeTimerManagerFactory&) {
-  return Event::DispatcherPtr{new Event::ValidationDispatcher(name, *this, time_system_)};
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string&,
