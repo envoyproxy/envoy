@@ -145,7 +145,6 @@ public:
                                   const std::string& stat_prefix)
       : DynamicFilterConfigProviderImplBase(std::move(subscription), require_type_urls),
         tls_(factory_context.threadLocal()), factory_context_(factory_context),
-        validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
         stat_prefix_(stat_prefix) {
     tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
   }
@@ -160,11 +159,8 @@ public:
     // This should throw on the first provider update, which should prevent partial updates.
     // Ideally, this factory callback happens once during validation and propagated, but
     // it would require adding a template parameter to the base classes.
-    auto& factory = Config::Utility::getAndCheckFactoryByType<Factory>(proto_config);
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateAnyToFactoryConfig(proto_config, validator_, factory);
-    FactoryCb config =
-        factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
+    FactoryCb config = Config::Utility::createFactoryCallbackFromAny<Factory, FactoryCb>(
+        proto_config, stat_prefix_, factory_context_);
     tls_.runOnAllThreads(
         [config, cb](OptRef<ThreadLocalConfig> tls) {
           tls->config_ = config;
@@ -192,7 +188,6 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
 
   Server::Configuration::FactoryContext& factory_context_;
-  ProtobufMessage::ValidationVisitor& validator_;
   const std::string stat_prefix_;
 };
 
