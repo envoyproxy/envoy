@@ -302,7 +302,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
 
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
-    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    Event::TestTimeSystem::RealTimeBound bound(2 * TestUtility::DefaultTimeout);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
