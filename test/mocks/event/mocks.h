@@ -185,7 +185,7 @@ public:
     return TimerPtr{createTimer_(minimum, std::move(callback))};
   }
   MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
-  MOCK_METHOD(void, setScaleFactor, (double), (override));
+  MOCK_METHOD(void, setScaleFactor, (UnitFloat), (override));
 };
 
 class MockSchedulableCallback : public SchedulableCallback {

@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/http/filter.h"
+#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -100,6 +101,7 @@ public:
 
 private:
   void closeStream();
+  void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
