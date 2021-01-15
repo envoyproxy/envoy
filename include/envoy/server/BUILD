@@ -238,6 +238,7 @@ envoy_cc_library(
         ":drain_manager_interface",
         ":filter_config_interface",
         ":guarddog_interface",
+        "//include/envoy/filter:config_provider_manager_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/ssl:context_interface",

@@ -126,7 +126,8 @@ public:
                                         initManager(), stats(), listenerManager(),
                                         messageValidationContext().dynamicValidationVisitor());
   }
-  std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
+  std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
+  createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
     return ProdListenerComponentFactory::createNetworkFilterFactoryList_(

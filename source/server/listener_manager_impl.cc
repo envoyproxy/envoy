@@ -18,6 +18,7 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/filter/config_discovery_impl.h"
 #include "common/network/filter_matcher.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -86,10 +87,11 @@ bool ListenSocketCreationParams::operator!=(const ListenSocketCreationParams& rh
   return !operator==(rhs);
 }
 
-std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
+ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
     Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
-  std::vector<Network::FilterFactoryCb> ret;
+  std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
@@ -114,8 +116,11 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
-    ret.push_back(callback);
+    ret.push_back(
+        std::make_unique<Filter::StaticFilterConfigProviderImpl<Network::FilterFactoryCb>>(
+            callback, proto_config.name()));
   }
+
   return ret;
 }
 

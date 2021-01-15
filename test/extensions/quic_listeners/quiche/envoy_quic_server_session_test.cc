@@ -791,7 +791,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
     read_filter_->callbacks_->connection().setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
   }};
-  EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
+  EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(Return(filter_factory));
   EXPECT_CALL(*read_filter_, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));

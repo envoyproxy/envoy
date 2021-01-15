@@ -398,13 +398,10 @@ private:
       return std::chrono::milliseconds::zero();
     }
 
-    const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
-      return empty_network_filter_factory_;
-    }
+    std::vector<Network::FilterFactoryCb> networkFilterFactories() const override { return {}; }
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
-    const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
   };
 
   Server::Instance& server_;

@@ -25,7 +25,7 @@ envoy_extension_cc_test(
         ":config_cc_proto",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/filter/http:filter_config_discovery_lib",
+        "//source/common/filter:config_discovery_lib",
         "//source/common/network:address_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/health_check:config",

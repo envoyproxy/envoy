@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
@@ -81,9 +82,11 @@ public:
    * Creates a list of filter factories.
    * @param filters supplies the proto configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Network::FilterFactoryCb> the list of filter factories.
+   * @return std::vector<Filter::FilterConfigProviderPtr> the list of network filter factory
+   * providers.
    */
-  virtual std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
+  virtual std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
+  createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 

@@ -18,7 +18,7 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
+#include "common/filter/config_discovery_impl.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
@@ -126,10 +126,12 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.getServerFactoryContext(), context.messageValidationVisitor()));
       });
 
-  std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager =
-      context.singletonManager().getTyped<Filter::Http::FilterConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager),
-          [] { return std::make_shared<Filter::Http::FilterConfigProviderManagerImpl>(); });
+  std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager =
+      context.singletonManager().getTyped<FilterConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager), [] {
+            return std::make_shared<Filter::FilterConfigProviderManagerImpl<
+                Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb>>();
+          });
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
           http_tracer_manager, filter_config_provider_manager};
@@ -142,7 +144,7 @@ std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager) {
+    FilterConfigProviderManager& filter_config_provider_manager) {
   return std::make_shared<HttpConnectionManagerConfig>(
       proto_config, context, date_provider, route_config_provider_manager,
       scoped_routes_config_provider_manager, http_tracer_manager, filter_config_provider_manager);
@@ -191,7 +193,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager)
+    FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -553,20 +555,8 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
       config_discovery.config_source(), name, require_type_urls, context_, stats_prefix_,
       config_discovery.apply_default_config_without_warming());
   if (config_discovery.has_default_config()) {
-    auto* default_factory =
-        Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
-            config_discovery.default_config());
-    if (default_factory == nullptr) {
-      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
-                                       "configuration with type URL {}.",
-                                       name, config_discovery.default_config().type_url()));
-    }
-    filter_config_provider->validateConfig(config_discovery.default_config(), *default_factory);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config_discovery.default_config(), context_.messageValidationVisitor(), *default_factory);
-    Http::FilterFactoryCb default_config =
-        default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
-    filter_config_provider->onConfigUpdate(default_config, "", nullptr);
+    filter_config_provider->validateConfig(config_discovery.default_config());
+    filter_config_provider->onConfigUpdate(config_discovery.default_config(), "", nullptr);
   }
   filter_factories.push_back(std::move(filter_config_provider));
 }

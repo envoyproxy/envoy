@@ -370,9 +370,9 @@ public:
   virtual std::chrono::milliseconds transportSocketConnectTimeout() const PURE;
 
   /**
-   * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
+   * std::vector<FilterFactoryCb> a list of filters to be used by the new connection.
    */
-  virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
+  virtual std::vector<FilterFactoryCb> networkFilterFactories() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

@@ -8,7 +8,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
+#include "common/filter/config_discovery_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/request_id_extension_uuid_impl.h"
 #include "common/network/address_impl.h"
@@ -57,7 +57,9 @@ public:
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;
-  Filter::Http::FilterConfigProviderManagerImpl filter_config_provider_manager_;
+  Filter::FilterConfigProviderManagerImpl<Server::Configuration::NamedHttpFilterConfigFactory,
+                                          Http::FilterFactoryCb>
+      filter_config_provider_manager_;
   std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> http_tracer_{
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   void createHttpConnectionManagerConfig(const std::string& yaml) {
@@ -1794,10 +1796,9 @@ http_filters:
     - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "Error: cannot find filter factory foo for default filter configuration with type URL "
-      "type.googleapis.com/google.protobuf.Value.");
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "Error: filter config has type URL google.protobuf.Value but expect "
+                            "envoy.extensions.filters.http.router.v3.Router.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultNotTerminal) {

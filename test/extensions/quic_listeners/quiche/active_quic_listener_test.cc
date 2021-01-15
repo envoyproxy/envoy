@@ -195,7 +195,7 @@ protected:
       // calls for the same object.
       EXPECT_CALL(*filter_chain_, networkFilterFactories())
           .InSequence(seq)
-          .WillOnce(ReturnRef(filter_factories_.back()));
+          .WillOnce(Return(filter_factories_.back()));
     }
   }
 

@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/extension_config_provider.h"
-#include "envoy/http/filter.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/filter_config.h"
 
@@ -10,18 +9,17 @@
 
 namespace Envoy {
 namespace Filter {
-namespace Http {
 
-using FilterConfigProvider =
-    Envoy::Config::ExtensionConfigProvider<Server::Configuration::NamedHttpFilterConfigFactory,
-                                           Envoy::Http::FilterFactoryCb>;
-using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider>;
+template <class FactoryCallback>
+using FilterConfigProvider = Envoy::Config::ExtensionConfigProvider<FactoryCallback>;
+template <class FactoryCallback>
+using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider<FactoryCallback>>;
 
 /**
- * The FilterConfigProviderManager exposes the ability to get an FilterConfigProvider
+ * The FilterConfigProviderManager exposes the ability to get a FilterConfigProvider
  * for both static and dynamic filter config providers.
  */
-class FilterConfigProviderManager {
+template <class FactoryCallback> class FilterConfigProviderManager {
 public:
   virtual ~FilterConfigProviderManager() = default;
 
@@ -36,7 +34,7 @@ public:
    * @param apply_without_warming initializes immediately with the default config and starts the
    * subscription.
    */
-  virtual FilterConfigProviderPtr createDynamicFilterConfigProvider(
+  virtual FilterConfigProviderPtr<FactoryCallback> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ConfigSource& config_source,
       const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
@@ -47,11 +45,10 @@ public:
    * @param config is a fully resolved filter instantiation factory.
    * @param filter_config_name is the name of the filter configuration resource.
    */
-  virtual FilterConfigProviderPtr
-  createStaticFilterConfigProvider(const Envoy::Http::FilterFactoryCb& config,
+  virtual FilterConfigProviderPtr<FactoryCallback>
+  createStaticFilterConfigProvider(const FactoryCallback& config,
                                    const std::string& filter_config_name) PURE;
 };
 
-} // namespace Http
 } // namespace Filter
 } // namespace Envoy

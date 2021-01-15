@@ -191,7 +191,7 @@ public:
               {read_total, read_current, write_total, write_current, nullptr, nullptr});
         }});
     EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
-        .WillOnce(ReturnRef(filter_factory));
+        .WillOnce(Return(filter_factory));
     EXPECT_CALL(listener_config_, filterChainFactory());
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .WillOnce(Invoke([](Network::Connection& connection,

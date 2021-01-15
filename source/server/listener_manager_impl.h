@@ -45,7 +45,8 @@ public:
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
+  static std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
+  createNetworkFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Configuration::FilterChainFactoryContext& filter_chain_factory_context);
 
@@ -74,7 +75,8 @@ public:
         server_.stats(), server_.listenerManager(),
         server_.messageValidationContext().dynamicValidationVisitor());
   }
-  std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
+  std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>
+  createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
     return createNetworkFilterFactoryList_(filters, filter_chain_factory_context);

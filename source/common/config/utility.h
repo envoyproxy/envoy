@@ -324,6 +324,20 @@ public:
   }
 
   /**
+   * Get and check a factory from the registry by type URL.
+   * @param typed_config for the extension config.
+   */
+  template <class Factory>
+  static Factory& getAndCheckFactoryByType(const ProtobufWkt::Any& typed_config) {
+    Factory* factory = Utility::getFactoryByType<Factory>(typed_config);
+    if (factory == nullptr) {
+      ExceptionUtil::throwEnvoyException(fmt::format(
+          "Did not find a registered implementation for type: '{}'", typed_config.type_url()));
+    }
+    return *factory;
+  }
+
+  /**
    * Get a Factory from the registry by type URL.
    * @param typed_config for the extension config.
    */

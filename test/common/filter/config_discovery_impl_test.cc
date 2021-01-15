@@ -9,7 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
+#include "common/filter/config_discovery_impl.h"
 #include "common/json/json_loader.h"
 
 #include "test/mocks/init/mocks.h"
@@ -33,7 +33,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Filter {
-namespace Http {
 namespace {
 
 class FilterConfigDiscoveryTestBase : public testing::Test {
@@ -72,17 +71,19 @@ public:
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() {
-    filter_config_provider_manager_ = std::make_unique<FilterConfigProviderManagerImpl>();
+    filter_config_provider_manager_ = std::make_unique<FilterConfigProviderManagerImpl<
+        Server::Configuration::NamedHttpFilterConfigFactory, Http::FilterFactoryCb>>();
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-  FilterConfigProviderPtr createProvider(std::string name, bool warm) {
+  FilterConfigProviderPtr<Http::FilterFactoryCb> createProvider(std::string name, bool warm) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ConfigSource config_source;
     TestUtility::loadFromYaml("ads: {}", config_source);
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, {"envoy.extensions.filters.http.router.v3.Router"}, factory_context_,
-        "xds.", !warm);
+        config_source, name,
+        {"envoy.extensions.filters.http.router.v3.Router", "google.protobuf.StringValue"},
+        factory_context_, "xds.", !warm);
   }
 
   void setup(bool warm = true) {
@@ -96,8 +97,9 @@ public:
     init_manager_.initialize(init_watcher_);
   }
 
-  std::unique_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
-  FilterConfigProviderPtr provider_;
+  std::unique_ptr<FilterConfigProviderManager<Http::FilterFactoryCb>>
+      filter_config_provider_manager_;
+  FilterConfigProviderPtr<Http::FilterFactoryCb> provider_;
   Config::SubscriptionCallbacks* callbacks_{};
 };
 
@@ -211,6 +213,30 @@ TEST_F(FilterConfigDiscoveryImplTest, WrongName) {
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
+TEST_F(FilterConfigDiscoveryImplTest, MissingFactory) {
+  InSequence s;
+  setup();
+  const std::string response_yaml = R"EOF(
+  version_info: "1"
+  resources:
+  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: foo
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+  const auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(
+      callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
+      EnvoyException,
+      "Did not find a registered implementation for type: "
+      "'type.googleapis.com/google.protobuf.StringValue'");
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+}
+
 TEST_F(FilterConfigDiscoveryImplTest, Incremental) {
   InSequence s;
   setup();
@@ -291,11 +317,10 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
       EnvoyException,
       "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
-      "expect envoy.extensions.filters.http.router.v3.Router.");
+      "expect envoy.extensions.filters.http.router.v3.Router, google.protobuf.StringValue.");
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
 } // namespace
-} // namespace Http
 } // namespace Filter
 } // namespace Envoy

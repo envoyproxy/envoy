@@ -5,6 +5,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
+#include "common/filter/config_discovery_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
 
@@ -70,7 +71,7 @@ protected:
         .WillByDefault(Invoke(
             [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
+                -> std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
                   filters, filter_chain_factory_context);
             }));
@@ -131,13 +132,17 @@ protected:
             [raw_listener, need_init](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
                 Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
+                -> std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> {
+              std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> ret;
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
                 filter_chain_factory_context.initManager().add(notifier->target_);
               }
-              return {[notifier](Network::FilterManager&) -> void {}};
+              ret.push_back(std::make_unique<
+                            Filter::StaticFilterConfigProviderImpl<Network::FilterFactoryCb>>(
+                  [notifier](Network::FilterManager&) -> void {}, ""));
+              return ret;
             }));
 
     return raw_listener;
@@ -158,13 +163,17 @@ protected:
             [raw_listener, need_init](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
                 Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
+                -> std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> {
+              std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> ret;
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
                 filter_chain_factory_context.initManager().add(notifier->target_);
               }
-              return {[notifier](Network::FilterManager&) -> void {}};
+              ret.push_back(std::make_unique<
+                            Filter::StaticFilterConfigProviderImpl<Network::FilterFactoryCb>>(
+                  [notifier](Network::FilterManager&) -> void {}, ""));
+              return ret;
             }));
 
     return raw_listener;

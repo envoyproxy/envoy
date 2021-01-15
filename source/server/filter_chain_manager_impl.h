@@ -87,9 +87,10 @@ private:
 
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
-  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb>&& filters_factory,
-                  std::chrono::milliseconds transport_socket_connect_timeout)
+  FilterChainImpl(
+      Network::TransportSocketFactoryPtr&& transport_socket_factory,
+      std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>>&& filters_factory,
+      std::chrono::milliseconds transport_socket_connect_timeout)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)),
         transport_socket_connect_timeout_(transport_socket_connect_timeout) {}
@@ -101,8 +102,18 @@ public:
   std::chrono::milliseconds transportSocketConnectTimeout() const override {
     return transport_socket_connect_timeout_;
   }
-  const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
-    return filters_factory_;
+  std::vector<Network::FilterFactoryCb> networkFilterFactories() const override {
+    std::vector<Network::FilterFactoryCb> filters;
+    filters.reserve(filters_factory_.size());
+    for (const auto& provider : filters_factory_) {
+      auto filter_factory = provider->config();
+      if (filter_factory.has_value()) {
+        filters.push_back(filter_factory.value());
+      } else {
+        return {};
+      }
+    }
+    return filters;
   }
   void startDraining() override { factory_context_->startDraining(); }
 
@@ -115,7 +126,7 @@ public:
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
-  const std::vector<Network::FilterFactoryCb> filters_factory_;
+  const std::vector<Filter::FilterConfigProviderPtr<Network::FilterFactoryCb>> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
 };
 

@@ -9,11 +9,10 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "filter_config_provider_interface",
-    hdrs = ["filter_config_provider.h"],
+    name = "config_provider_manager_interface",
+    hdrs = ["config_provider_manager.h"],
     deps = [
         "//include/envoy/config:extension_config_provider_interface",
-        "//include/envoy/http:filter_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/server:filter_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
