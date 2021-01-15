@@ -280,8 +280,8 @@ using StreamDecoderFilterSharedPtr = std::shared_ptr<StreamDecoderFilter>;
 class StreamEncoderFilter;
 using StreamEncoderFilterSharedPtr = std::shared_ptr<StreamEncoderFilter>;
 /**
- * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to
- * restart decoding if they decide to hold data (e.g. for buffering or rate limiting).
+ * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
+ * decoding if they decide to hold data (e.g. for buffering or rate limiting).
  */
 class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
@@ -327,8 +327,8 @@ public:
    * to further filters (outside of callback context).
    *
    * 4) If additional data needs to be added in the decodeTrailers() callback, this method can be
-   * called in the context of the callback. All further filters will receive decodeData(...,
-   * false) followed by decodeTrailers(). However if the iteration is stopped, the added data will
+   * called in the context of the callback. All further filters will receive decodeData(..., false)
+   * followed by decodeTrailers(). However if the iteration is stopped, the added data will
    * buffered, so that the further filters will not receive decodeData() before decodeHeaders().
    *
    * It is an error to call this method in any other case.
@@ -337,8 +337,7 @@ public:
    * filters and also how the two methods are different.
    *
    * @param data Buffer::Instance supplies the data to be decoded.
-   * @param streaming_filter boolean supplies if this filter streams data or buffers the full
-   * body.
+   * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
@@ -354,16 +353,15 @@ public:
    * from within a filter's decodeData() call.
    *
    * When using this callback, filters should generally only return
-   * FilterDataStatus::StopIterationNoBuffer from their decodeData() call, since use of this
-   * method indicates that a filter does not wish to participate in standard HTTP connection
-   * manager buffering and continuation and will perform any necessary buffering and continuation
-   * on its own.
+   * FilterDataStatus::StopIterationNoBuffer from their decodeData() call, since use of this method
+   * indicates that a filter does not wish to participate in standard HTTP connection manager
+   * buffering and continuation and will perform any necessary buffering and continuation on
+   * its own.
    *
    * This callback is different from addDecodedData() in that the specified data and end_stream
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addDecodedData() where data is added to the HTTP connection manager's buffered data with
-   * the assumption that standard HTTP connection manager buffering and continuation are being
-   * used.
+   * the assumption that standard HTTP connection manager buffering and continuation are being used.
    */
   virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
@@ -379,14 +377,13 @@ public:
   virtual RequestTrailerMap& addDecodedTrailers() PURE;
 
   /**
-   * Attempts to create a locally generated response using the provided response_code and
-   * body_text parameters. If the request was a gRPC request the local reply will be encoded as a
-   * gRPC response with a 200 HTTP response code and grpc-status and grpc-message headers mapped
-   * from the provided parameters.
+   * Attempts to create a locally generated response using the provided response_code and body_text
+   * parameters. If the request was a gRPC request the local reply will be encoded as a gRPC
+   * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
+   * provided parameters.
    *
    * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
-   * headers) this will either ship the reply directly to the downstream codec, or reset the
-   * stream.
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
    * @param body_text supplies the optional body text which is sent using the text/plain content
@@ -435,8 +432,8 @@ public:
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
    * - See source/common/http/headers.h
    *
-   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the
-   * final encodeHeaders() for a response.
+   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the final
+   * encodeHeaders() for a response.
    *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
@@ -482,9 +479,8 @@ public:
    * their high watermark.
    *
    * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
-   * connection etc.) this may be called multiple times. Any such filter is responsible for
-   * calling the low watermark callbacks an equal number of times as the respective buffers are
-   * drained.
+   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
    */
   virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
 
