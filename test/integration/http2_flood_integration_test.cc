@@ -169,8 +169,6 @@ INSTANTIATE_TEST_SUITE_P(
     http2FloodMitigationTestParamsToString);
 
 bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.upstream_http2_flood_checks",
-                                    "true");
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower upstream outbound frame limits to make tests run faster
@@ -199,8 +197,6 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
 
 std::vector<char> Http2FloodMitigationTest::serializeFrames(const Http2Frame& frame,
                                                             uint32_t num_frames) {
-  // make sure all frames can fit into 16k buffer
-  ASSERT(num_frames <= ((16u * 1024u) / frame.size()));
   std::vector<char> buf(num_frames * frame.size());
   for (auto pos = buf.begin(); pos != buf.end();) {
     pos = std::copy(frame.begin(), frame.end(), pos);
@@ -1578,6 +1574,17 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   // Verify that the flood check was triggered.
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_flood")->value());
+}
+
+// Validate that the default configuration has flood protection enabled.
+TEST_P(Http2FloodMitigationTest, UpstreamFloodDetectionIsOnByDefault) {
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  initialize();
+
+  floodClient(Http2Frame::makePingFrame(),
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1,
+              "cluster.cluster_0.http2.outbound_control_flood");
 }
 
 class Http2BufferWatermarksTest : public Http2FloodMitigationTest {

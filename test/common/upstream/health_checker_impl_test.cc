@@ -1,5 +1,6 @@
 #include <chrono>
 #include <memory>
+#include <ostream>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -4285,6 +4286,21 @@ public:
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
 };
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const GrpcHealthCheckerImplTestBase::ResponseSpec& spec, std::ostream* os) {
+  (*os) << "(headers{" << absl::StrJoin(spec.response_headers, ",", absl::PairFormatter(":"))
+        << "},";
+  (*os) << "body{" << absl::StrJoin(spec.body_chunks, ",", [](std::string* out, const auto& spec) {
+    absl::StrAppend(out, spec.valid ? "valid" : "invalid", ",{",
+                    absl::StrJoin(spec.data, "-",
+                                  [](std::string* out, uint8_t byte) {
+                                    absl::StrAppend(out, absl::Hex(byte, absl::kZeroPad2));
+                                  }),
+                    "}");
+  }) << "}";
+  (*os) << "trailers{" << absl::StrJoin(spec.trailers, ",", absl::PairFormatter(":")) << "})";
+}
 
 class GrpcHealthCheckerImplTest : public testing::Test, public GrpcHealthCheckerImplTestBase {};
 
