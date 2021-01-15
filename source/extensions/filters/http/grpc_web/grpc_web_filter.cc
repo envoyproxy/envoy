@@ -22,8 +22,7 @@ namespace GrpcWeb {
 
 namespace {
 
-// This is arbitrarily chosen.
-// TODO(dio): Make it configurable when it is needed.
+// This is arbitrarily chosen. This can be made configurable when it is required.
 constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
 
 // This builds grpc-message header value from encoding buffer and the last frame (when
