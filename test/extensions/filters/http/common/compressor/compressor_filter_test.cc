@@ -662,6 +662,32 @@ TEST_P(IsMinimumContentLengthTest, Validate) {
   EXPECT_EQ(is_compression_expected, headers.has("vary"));
 }
 
+class IsTransferEncodingAllowedTest
+    : public CompressorFilterTest,
+      public testing::WithParamInterface<std::tuple<std::string, std::string, bool>> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    IsTransferEncodingAllowedSuite, IsTransferEncodingAllowedTest,
+    testing::Values(std::make_tuple("transfer-encoding", "deflate", false),
+                    std::make_tuple("transfer-encoding", "Deflate", false),
+                    std::make_tuple("transfer-encoding", "test", false),
+                    std::make_tuple("transfer-encoding", "chunked, test", false),
+                    std::make_tuple("transfer-encoding", "test, chunked", false),
+                    std::make_tuple("transfer-encoding", "test\t, chunked\t", false),
+                    std::make_tuple("x-garbage", "no_value", true)));
+
+TEST_P(IsTransferEncodingAllowedTest, Validate) {
+  const std::string& header_name = std::get<0>(GetParam());
+  const std::string& header_value = std::get<1>(GetParam());
+  const bool is_compression_expected = std::get<2>(GetParam());
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
+  Http::TestResponseHeaderMapImpl headers{
+      {":method", "get"}, {"content-length", "256"}, {header_name, header_value}};
+  doResponse(headers, is_compression_expected, false);
+  EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
+}
+
 class InsertVaryHeaderTest
     : public CompressorFilterTest,
       public testing::WithParamInterface<std::tuple<std::string, std::string, std::string>> {};
