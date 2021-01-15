@@ -675,16 +675,6 @@ TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
   EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
-TEST_F(DnsCacheImplTest, ClustersCircuitBreakersOverflow) {
-  initialize();
-  NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
-
-  EXPECT_CALL(pending_requests_, canCreate()).WillOnce(Return(false));
-  auto raii_ptr = dns_cache_->canCreateDnsRequest();
-  EXPECT_EQ(raii_ptr.get(), nullptr);
-  EXPECT_EQ(0, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
-}
-
 TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionSet) {
   NiceMock<Event::MockDispatcher> dispatcher;
   std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};

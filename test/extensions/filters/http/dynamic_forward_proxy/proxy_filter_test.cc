@@ -151,8 +151,6 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
 
 // Circuit breaker overflow
 TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
-  // Disable dns cache circuit breakers because which we expect to be used cluster circuit breakers.
-  TestScopedRuntime scoped_runtime;
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
   InSequence s;
