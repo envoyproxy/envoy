@@ -65,7 +65,7 @@ protected:
       response = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
-    if (!expected_grpc_request_messages.empty() || expected_upstream_request_body.length() != 0) {
+    if (!expected_grpc_request_messages.empty() || !expected_upstream_request_body.empty()) {
       ASSERT_TRUE(
           fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
       ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -95,7 +95,7 @@ protected:
         }
       }
 
-      if (expected_upstream_request_body.length() != 0) {
+      if (!expected_upstream_request_body.empty()) {
         EXPECT_EQ(expected_upstream_request_body, upstream_request_->body().toString());
       }
 
@@ -124,6 +124,8 @@ protected:
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());
+      ASSERT_TRUE(fake_upstream_connection_->close());
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     }
 
     response->waitForEndStream();
@@ -158,8 +160,6 @@ protected:
     }
 
     codec_client_->close();
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 };
 
