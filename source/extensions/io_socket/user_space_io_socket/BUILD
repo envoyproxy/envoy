@@ -30,6 +30,7 @@ envoy_cc_extension(
     ],
     security_posture = "unknown",
     status = "alpha",
+    undocumented = True,
     deps = [
         ":peer_buffer_lib",
         "//source/common/event:dispatcher_includes",
