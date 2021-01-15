@@ -80,7 +80,6 @@ docker run --rm \
        -e GCP_SERVICE_ACCOUNT_KEY \
        -e NUM_CPUS \
        -e ENVOY_RBE \
-       -e COVERAGE_FAILED \
        -e ENVOY_BUILD_IMAGE \
        -e ENVOY_SRCDIR \
        -e ENVOY_BUILD_TARGET \
