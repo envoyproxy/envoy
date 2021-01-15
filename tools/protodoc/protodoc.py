@@ -133,7 +133,7 @@ def FormatCommentWithAnnotations(comment, type_name=''):
     extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
     formatted_extension = FormatExtension(extension)
   formatted_extension_type = ''
-  if annotations.EXTENSION_TYPE_ANNOTATION in source_code_info.file_level_annotations:
+  if annotations.EXTENSION_TYPE_ANNOTATION in content.annotations:
     formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE 8)"
   return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_type
 
