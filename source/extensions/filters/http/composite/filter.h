@@ -31,6 +31,7 @@ public:
     // of assuming it will only be header matching.
     return Http::FilterHeadersStatus::Continue;
   }
+
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     encoded_headers_ = true;
 
@@ -39,14 +40,14 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  struct FilterAccumulator : public Http::FilterChainFactoryCallbacks {
-    FilterAccumulator(Http::StreamDecoderFilterCallbacks& decoder_callbacks,
-                      Http::StreamEncoderFilterCallbacks& encoder_callbacks)
-        : decoder_callbacks_(decoder_callbacks), encoder_callbacks_(encoder_callbacks) {}
-    Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
-    Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
+  // A FilterChainFactoryCallbacks that delegates filter creation to the filter callbacks.
+  struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
+    explicit FactoryCallbacksWrapper(Filter& filter) : filter_(filter) {}
+
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
-      decoder_callbacks_.addStreamDecoderFilter(filter);
+      ASSERT(!filter_.decoded_headers_);
+
+      filter_.decoder_callbacks_->addStreamDecoderFilter(filter);
     }
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr,
                                 Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override {
@@ -55,7 +56,8 @@ public:
     }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
-      encoder_callbacks_.addStreamEncoderFilter(filter);
+      ASSERT(!filter_.encoded_headers_);
+      filter_.encoder_callbacks_->addStreamEncoderFilter(filter);
     }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr,
@@ -65,7 +67,8 @@ public:
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
-      decoder_callbacks_.addStreamFilter(filter);
+      ASSERT(!filter_.decoded_headers_);
+      filter_.decoder_callbacks_->addStreamFilter(filter);
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr,
@@ -75,19 +78,26 @@ public:
     }
 
     void addAccessLogHandler(AccessLog::InstanceSharedPtr) override {
+      // TODO(snowp): Should we support adding an access log as well? Wouldn't be hard to do.
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
+
+    Filter& filter_;
   };
 
   void onMatchCallback(const Matcher::Action& action) override {
-    ASSERT(!decoded_headers_);
     const auto& composite_action = action.getTyped<CompositeAction>();
 
-    FilterAccumulator acc(*decoder_callbacks_, *encoder_callbacks_);
-    composite_action.createFilters(acc);
+    FactoryCallbacksWrapper wrapper(*this);
+    composite_action.createFilters(wrapper);
   }
 
 private:
+  // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
+  // serve to surface an easier to understand error, as attempting to insert a filter at a later
+  // time will result in various FM assertions firing.
+  // TODO(snowp): Instead of validating this via ASSERTs, we should be able to validate that the
+  // match tree is only going to fire at permissable times.
   bool decoded_headers_ : 1;
   bool encoded_headers_ : 1;
 };

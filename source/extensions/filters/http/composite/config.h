@@ -29,9 +29,13 @@ public:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
+/**
+ * A match action used by the composite filter. We snap the factory function for the filter
+ * specified by the action configuration allowing us to invoke the filter factory if this match is
+ * hit.
+ */
 class CompositeAction
     : public Matcher::ActionBase<envoy::extensions::filters::http::composite::v3::CompositeAction> {
-
 public:
   explicit CompositeAction(Http::FilterFactoryCb cb) : cb_(std::move(cb)) {}
 
@@ -41,6 +45,9 @@ private:
   const Http::FilterFactoryCb cb_;
 };
 
+/**
+ * Factory for the composite match factory.
+ */
 class CompositeMatchActionFactory : public Matcher::ActionFactory {
 public:
   Matcher::ActionFactoryCb

@@ -345,8 +345,164 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionDualFilter) {
   filter_manager_->destroyFilters();
 }
 
-TEST_F(FilterManagerTest, InjectStreamFilter) {}
+// Verifies that a filter can add a stream filter during decodeHeaders and
+// that the injected filter has decodeHeaders invoked.
+TEST_F(FilterManagerTest, InjectStreamFilter) {
+  initialize();
 
+  std::shared_ptr<MockStreamFilter> injected_filter(new MockStreamFilter());
+  std::shared_ptr<MockStreamFilter> filter(new MockStreamFilter());
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        filter->decoder_callbacks_->addStreamFilter(injected_filter);
+
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*injected_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*injected_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*injected_filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        ResponseHeaderMapPtr headers{new TestResponseHeaderMapImpl{
+            {":status", "200"}, {"match-header", "match"}, {"content-type", "application/grpc"}}};
+
+        filter->decoder_callbacks_->encodeHeaders(std::move(headers), true, "details");
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  // Note that the injected filter is also on the encoding path.
+  EXPECT_CALL(*injected_filter, encodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(*injected_filter, onDestroy());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamFilter(filter, nullptr);
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"match-header", "match"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(*filter, encodeHeaders(_, true));
+  filter_manager_->decodeHeaders(*grpc_headers, true);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, InjectStreamDecoderFilter) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> injected_filter(new MockStreamDecoderFilter());
+  std::shared_ptr<MockStreamFilter> filter(new MockStreamFilter());
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        filter->decoder_callbacks_->addStreamDecoderFilter(injected_filter);
+
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*injected_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*injected_filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        ResponseHeaderMapPtr headers{new TestResponseHeaderMapImpl{
+            {":status", "200"}, {"match-header", "match"}, {"content-type", "application/grpc"}}};
+
+        filter->decoder_callbacks_->encodeHeaders(std::move(headers), true, "details");
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  // Note that the injected filter is *not* on the encoding path.
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(*injected_filter, onDestroy());
+  EXPECT_CALL(*injected_filter, decodeComplete());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamFilter(filter, nullptr);
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"match-header", "match"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
+  EXPECT_CALL(*filter, encodeHeaders(_, true));
+  filter_manager_->decodeHeaders(*grpc_headers, true);
+  filter_manager_->destroyFilters();
+}
+
+// Verifies that we can inject a new encoding filter on the encoding path.
+TEST_F(FilterManagerTest, InjectStreamEncoderFilter) {
+  initialize();
+
+  std::shared_ptr<MockStreamEncoderFilter> injected_filter(new MockStreamEncoderFilter());
+  std::shared_ptr<MockStreamFilter> filter(new MockStreamFilter());
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        ResponseHeaderMapPtr headers{new TestResponseHeaderMapImpl{
+            {":status", "200"}, {"match-header", "match"}, {"content-type", "application/grpc"}}};
+
+        filter->decoder_callbacks_->encodeHeaders(std::move(headers), true, "details");
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*injected_filter, setEncoderFilterCallbacks(_));
+
+  EXPECT_CALL(*filter, onDestroy());
+  EXPECT_CALL(*injected_filter, onDestroy());
+  EXPECT_CALL(*injected_filter, encodeComplete());
+
+  // Note that we inject the filter on the encoding path, resulting in the injected filter seeing
+  // the headers after the original filter.
+  EXPECT_CALL(*filter, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](auto&, bool) -> FilterHeadersStatus {
+        filter->encoder_callbacks_->addStreamEncoderFilter(injected_filter);
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*injected_filter, encodeHeaders(_, true));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamFilter(filter, nullptr);
+      }));
+
+  RequestHeaderMapPtr grpc_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"match-header", "match"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*grpc_headers)));
+  filter_manager_->createFilterChain();
+
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*grpc_headers, true);
+  filter_manager_->destroyFilters();
+}
 } // namespace
 } // namespace Http
 } // namespace Envoy

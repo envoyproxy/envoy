@@ -49,6 +49,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Verifies that if we don't match the match action the request is proxied as normal, while if the
+// match action is hit we apply the specified filter to the stream.
 TEST_P(CompositeFilterIntegrationTest, TestBasic) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

@@ -23,6 +23,10 @@ Http::FilterFactoryCb CompositeFilterFactory::createFilterFactoryFromProtoTyped(
  * Static registration for the composite filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(CompositeFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+
+/**
+ * Static registration for the composite action. @see RegisterFactory.
+ */
 REGISTER_FACTORY(CompositeMatchActionFactory, Matcher::ActionFactory);
 
 } // namespace Composite
