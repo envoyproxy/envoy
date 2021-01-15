@@ -192,7 +192,7 @@ message ClustersConfigDump {
     // The error_state field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
-    // [#not-implemented-yet:]
+    // [#not-implemented-hide:]
     UpdateFailureState error_state = 4;
   }
 
@@ -253,7 +253,7 @@ message RoutesConfigDump {
     // The error_state field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
-    // [#not-implemented-yet:]
+    // [#not-implemented-hide:]
     UpdateFailureState error_state = 4;
   }
 
@@ -309,7 +309,7 @@ message ScopedRoutesConfigDump {
     // The error_state field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
-    // [#not-implemented-yet:]
+    // [#not-implemented-hide:]
     UpdateFailureState error_state = 5;
   }
 
@@ -348,7 +348,7 @@ message SecretsConfigDump {
     // The error_state field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
-    // [#not-implemented-yet:]
+    // [#not-implemented-hide:]
     UpdateFailureState error_state = 5;
   }
 
@@ -417,7 +417,7 @@ message EndpointsConfigDump {
     // The error_state field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
-    // [#not-implemented-yet:]
+    // [#not-implemented-hide:]
     UpdateFailureState error_state = 4;
   }
 
