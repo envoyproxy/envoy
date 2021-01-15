@@ -189,9 +189,18 @@ message GrpcJsonTranscoder {
   // By default, the transcoder will silently pass through HTTP requests that all malformed.
   // This includes requests with unknown query parameters, unregister paths, etc.
   //
-  // Enable this flag to enable strict validation, resulting in the transcoder rejecting
-  // these requests with HTTP 400 Bad Request.
+  // Set this flag to enable strict HTTP request validation, resulting in the transcoder rejecting
+  // these requests with `HTTP 400 Bad Request`.
   // gRPC requests will still silently pass through without transcoding.
+  //
+  // The benefit of this flag is a proper error message to the downstream.
+  // Without this flag, the downstream will receive a `connection recent`
+  // if the gRPC upstream is unable to handle HTTP requests that were silently passed through.
+  // This incorrect error message may conflict with other Envoy components, such as retry policies.
+  //
+  // Do not use this flag if the upstream supports both HTTP and gRPC.
+  // Only use this flag if the upstream is gRPC and all its services have been
+  // specified in the descriptor file in the filter config.
   //
   // Defaults to false for backwards compatibility.
   bool strict_http_request_validation = 11;

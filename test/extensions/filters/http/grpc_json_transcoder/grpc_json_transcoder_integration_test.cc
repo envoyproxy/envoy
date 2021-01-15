@@ -893,7 +893,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableStrictRequestValidation) {
   HttpIntegrationTest::initialize();
 
   // Transcoding does not occur from a request with the gRPC content type.
-  // The contents in the body do not matter, they are passed through to upstream.
+  // We verify the request is not transcoded because the upstream receives the same JSON body.
+  // We verify the response is not transoded because the HTTP status code does not match the gRPC
+  // status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/shelves/100"},
@@ -946,7 +948,9 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
   HttpIntegrationTest::initialize();
 
   // Transcoding does not occur from a request with the gRPC content type.
-  // The contents in the body do not matter, they are passed through to upstream.
+  // We verify the request is not transcoded because the upstream receives the same JSON body.
+  // We verify the response is not transoded because the HTTP status code does not match the gRPC
+  // status.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/shelves/100"},
@@ -981,7 +985,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
       true, false, "");
 }
 
-
 TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQueryParam) {
   const std::string filter =
       R"EOF(
@@ -1000,9 +1003,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
   // When strict mode is enabled with ignore unknown query params,
   // the request is not rejected and transcoding occurs.
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/shelves/9999?unknown=1"},
-                                     {":authority", "host"}},
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/9999?unknown=1"}, {":authority", "host"}},
       "", {"shelf: 9999"}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
       Http::TestResponseHeaderMapImpl{
           {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
