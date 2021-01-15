@@ -31,7 +31,6 @@ using testing::DoAll;
 using testing::FloatNear;
 using testing::Invoke;
 using testing::InvokeArgument;
-using testing::MockFunction;
 using testing::NiceMock;
 using testing::Pointee;
 using testing::Property;
