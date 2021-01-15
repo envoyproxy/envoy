@@ -11,7 +11,8 @@ using Envoy::benchmark::skipExpensiveBenchmarks;
 namespace Envoy {
 namespace Upstream {
 
-template <class Edf> static void BM_pick_and_add(State& state) {
+// NOLINTNEXTLINE(readability-identifier-naming)
+template <class Edf> static void BM_PickAndAdd(State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     // if we've been instructed to skip tests, only run once no matter the argument:
@@ -29,10 +30,10 @@ template <class Edf> static void BM_pick_and_add(State& state) {
   }
 }
 
-BENCHMARK_TEMPLATE(BM_pick_and_add, EdfScheduler<uint32_t>)
+BENCHMARK_TEMPLATE(BM_PickAndAdd, EdfScheduler<uint32_t>)
     ->Ranges({{1, 10000}})
     ->Unit(::benchmark::kMillisecond);
-BENCHMARK_TEMPLATE(BM_pick_and_add, TimeWheel<uint32_t>)
+BENCHMARK_TEMPLATE(BM_PickAndAdd, TimeWheel<uint32_t>)
     ->Ranges({{1, 10000}})
     ->Unit(::benchmark::kMillisecond);
 
