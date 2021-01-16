@@ -1,4 +1,4 @@
-![Envoy Logo](https://github.com/envoyproxy/artwork/blob/master/PNG/Envoy_Logo_Final_PANTONE.png)
+![Envoy Logo](https://github.com/envoyproxy/artwork/blob/main/PNG/Envoy_Logo_Final_PANTONE.png)
 
 [Cloud-native high-performance edge/middle/service proxy](https://www.envoyproxy.io/)
 
@@ -9,7 +9,7 @@ involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=master)
+[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=main)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=main)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
 
