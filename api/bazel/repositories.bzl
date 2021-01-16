@@ -101,30 +101,3 @@ go_proto_library(
     visibility = ["//visibility:public"],
 )
 """
-
-SKYWALKING_DATA_COLLECT_PROTOCOL_BUILD_CONTENT = """
-load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@rules_cc//cc:defs.bzl", "cc_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
-
-proto_library(
-    name = "protocol",
-    srcs = [
-        "common/Common.proto",
-        "language-agent/Tracing.proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-cc_proto_library(
-    name = "protocol_cc_proto",
-    deps = [":protocol"],
-    visibility = ["//visibility:public"],
-)
-
-go_proto_library(
-    name = "protocol_go_proto",
-    proto = ":protocol",
-    visibility = ["//visibility:public"],
-)
-"""
