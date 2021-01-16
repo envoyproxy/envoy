@@ -3,70 +3,65 @@
 DynamoDB
 ========
 
-* DynamoDB :ref:`architecture overview <arch_overview_dynamo>`
-* :ref:`v3 API reference <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`
-* This filter should be configured with the name *envoy.filters.http.dynamo*.
+* DynamoDB :ref:`架构概述 <arch_overview_dynamo>`
+* :ref:`v3 API 参考 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`
+* 该过滤器应该用 *envoy.filters.http.dynamo* 来配置。
 
-Statistics
+统计
 ----------
 
-The DynamoDB filter outputs statistics in the *http.<stat_prefix>.dynamodb.* namespace. The :ref:`stat prefix
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
-owning HTTP connection manager.
+DynamoDB 过滤器在 *http.<stat_prefix>.dynamodb.* 命名空间中输出统计数据. :ref:`统计前缀
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` 来自于自己的 HTTP 连接管理器。
 
-Per operation stats can be found in the *http.<stat_prefix>.dynamodb.operation.<operation_name>.*
-namespace.
+每个操作的统计可以在 *http.<stat_prefix>.dynamodb.operation.<operation_name>.* 命名空间中找到。
 
   .. csv-table::
-    :header: Name, Type, Description
+    :header: 名称, 类型, 描述
     :widths: 1, 1, 2
 
-    upstream_rq_total, Counter, Total number of requests with <operation_name>
-    upstream_rq_time, Histogram, Time spent on <operation_name>
-    upstream_rq_total_xxx, Counter, Total number of requests with <operation_name> per response code (503/2xx/etc)
-    upstream_rq_time_xxx, Histogram, Time spent on <operation_name> per response code (400/3xx/etc)
+    upstream_rq_total, Counter, 带有 <operation_name> 的请求总数
+    upstream_rq_time, Histogram, 在 <operation_name> 上的耗时
+    upstream_rq_total_xxx, Counter, 每个响应码 (如 503/2xx/ 等) 中带有 <operation_name> 的请求总数
+    upstream_rq_time_xxx, Histogram, 每个响应码 (如 400/3xx/ 等) 在 <operation_name> 上的耗时
 
-Per table stats can be found in the *http.<stat_prefix>.dynamodb.table.<table_name>.* namespace.
-Most of the operations to DynamoDB involve a single table, but BatchGetItem and BatchWriteItem can
-include several tables, Envoy tracks per table stats in this case only if it is the same table used
-in all operations from the batch.
+每张表的统计数据可以在 *http.<stat_prefix>.dynamodb.table.<table_name>.* 命名空间中找到。
+对 DynamoDB 的大多数操作都只涉及到一张表, 但是 BatchGetItem 和 BatchWriteItem 可以包括几张表, 在
+这种情况下, Envoy 只有在批处理的所有操作都使用同一张表时才会跟踪每张表的统计。
 
   .. csv-table::
-    :header: Name, Type, Description
+    :header: 名称, 类型, 描述
     :widths: 1, 1, 2
 
-    upstream_rq_total, Counter, Total number of requests on <table_name> table
-    upstream_rq_time, Histogram, Time spent on <table_name> table
-    upstream_rq_total_xxx, Counter, Total number of requests on <table_name> table per response code (503/2xx/etc)
-    upstream_rq_time_xxx, Histogram, Time spent on <table_name> table per response code (400/3xx/etc)
+    upstream_rq_total, Counter, 在 <table_name> 表上的请求总数
+    upstream_rq_time, Histogram, 在 <table_name> 表上的耗时
+    upstream_rq_total_xxx, Counter, 每个响应码 (如 503/2xx/ 等) 在 <table_name> 表上的请求总数
+    upstream_rq_time_xxx, Histogram, 每个响应码 (如 400/3xx/ 等) 在 <table_name> 表上的耗时
 
-*Disclaimer: Please note that this is a pre-release Amazon DynamoDB feature that is not yet widely available.*
-Per partition and operation stats can be found in the *http.<stat_prefix>.dynamodb.table.<table_name>.*
-namespace. For batch operations, Envoy tracks per partition and operation stats only if it is the same
-table used in all operations.
+*声明: 请注意，这是 Amazon DynamoDB 的预发布功能，尚未广泛使用。*
+每个分区和操作统计可以在 *http.<stat_prefix>.dynamodb.table.<table_name>.* 命名空间中找到。
+对于批处理操作，只有当所有操作中使用的是同一张表时，Envoy 才会跟踪每个分区和操作统计。
 
   .. csv-table::
-    :header: Name, Type, Description
+    :header: 名称, 类型, 描述
     :widths: 1, 1, 2
 
-    capacity.<operation_name>.__partition_id=<last_seven_characters_from_partition_id>, Counter, Total number of capacity for <operation_name> on <table_name> table for a given <partition_id>
+    capacity.<operation_name>.__partition_id=<last_seven_characters_from_partition_id>, Counter, 在给定的 <partition_id> 中的 <table_name> 表上 <operation_name> 的容量总数
 
-Additional detailed stats:
+其它的详细统计:
 
-* For 4xx responses and partial batch operation failures, the total number of failures for a given
-  table and failure are tracked in the *http.<stat_prefix>.dynamodb.error.<table_name>.* namespace.
+* 对于 4xx 响应和部分批量操作失败，给定表的失败总数和失败情况在 *http.<stat_prefix>.dynamodb.error.<table_name>.* 命名空间中进行跟踪。
 
   .. csv-table::
-    :header: Name, Type, Description
+    :header: 名称, 类型, 描述
     :widths: 1, 1, 2
 
-    <error_type>, Counter, Total number of specific <error_type> for a given <table_name>
-    BatchFailureUnprocessedKeys, Counter, Total number of partial batch failures for a given <table_name>
+    <error_type>, Counter, 给定的 <table_name> 表上的特定 <error_type> 的总数
+    BatchFailureUnprocessedKeys, Counter, 给定的 <table_name> 表上的部分批处理失败的总数
 
-Runtime
+运行时
 -------
 
-The DynamoDB filter supports the following runtime settings:
+DynamoDB 过滤器支持下面的运行时设置:
 
 dynamodb.filter_enabled
-  The % of requests for which the filter is enabled. Default is 100%.
+  启用了过滤器的请求的百分比。默认值为 100％。
