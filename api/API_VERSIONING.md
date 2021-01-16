@@ -105,7 +105,7 @@ Envoy will support at most three major versions of any API package at all times:
   for the next stable major version. This is only generated when the current stable major version
   requires a breaking change at the next cycle, e.g. a deprecation or field rename. This release
   candidate is mechanically generated via the
-  [protoxform](https://github.com/envoyproxy/envoy/tree/master/tools/protoxform) tool from the
+  [protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool from the
   current stable major version, making use of annotations such as `deprecated = true`. This is not a
   human editable artifact.
 
@@ -161,7 +161,7 @@ methods, depending on whether the change is mechanical or manual.
 ## Mechanical breaking changes
 
 Field deprecations, renames, etc. are mechanical changes that are supported by the
-[protoxform](https://github.com/envoyproxy/envoy/tree/master/tools/protoxform) tool. These are
+[protoxform](https://github.com/envoyproxy/envoy/tree/main/tools/protoxform) tool. These are
 guided by [annotations](STYLE.md#api-annotations).
 
 ## Manual breaking changes
