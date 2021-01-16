@@ -22,7 +22,7 @@ returned, etc.
 > Include sample requests, environment, etc. All data and inputs
 required to reproduce the bug.
 
->**Note**: The [Envoy_collect tool](https://github.com/envoyproxy/envoy/blob/master/tools/envoy_collect/README.md)
+>**Note**: The [Envoy_collect tool](https://github.com/envoyproxy/envoy/blob/main/tools/envoy_collect/README.md)
 gathers a tarball with debug logs, config and the following admin
 endpoints: /stats, /clusters and /server_info. Please note if there are
 privacy concerns, sanitize the data prior to sharing the tarball/pasting.
@@ -46,4 +46,4 @@ sharing.
 
 *Call Stack*:
 > If the Envoy binary is crashing, a call stack is **required**.
-Please refer to the [Bazel Stack trace documentation](https://github.com/envoyproxy/envoy/tree/master/bazel#stack-trace-symbol-resolution).
+Please refer to the [Bazel Stack trace documentation](https://github.com/envoyproxy/envoy/tree/main/bazel#stack-trace-symbol-resolution).
