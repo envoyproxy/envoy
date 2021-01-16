@@ -118,19 +118,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
     EXPECT_EQ("url", span->spanEntity()->tags().at(4).first);
 
-    const auto timestamp = SystemTime{std::chrono::duration<int, std::milli>(100)};
-    span->log(timestamp, "abc");
-
-    Log expected_log;
-    expected_log.set_time(
-        std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch())
-            .count());
-    KeyStringValuePair key_value;
-    key_value.set_key("event");
-    key_value.set_value("abc");
-    *expected_log.add_data() = key_value;
-
+    span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "abc");
     EXPECT_EQ(1, span->spanEntity()->logs().size());
+    EXPECT_LT(0, span->spanEntity()->logs().at(0).time());
+    EXPECT_EQ("abc", span->spanEntity()->logs().at(0).data().at(0).value());
   }
 
   {
