@@ -4,8 +4,8 @@ set -e
 
 ENVOY_SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)
 CHECKOUT_DIR=../envoy-filter-example
-MAIN_BRANCH="refs/heads/master"
-FILTER_EXAMPLE_MAIN_BRANCH="master"
+MAIN_BRANCH="refs/heads/main"
+FILTER_EXAMPLE_MAIN_BRANCH="main"
 
 if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
   echo "Cloning..."

@@ -78,7 +78,7 @@ documentation for further references.
 # Updating an external dependency version
 
 1. Update the corresponding entry in
-[the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
+[the repository locations file.](https://github.com/envoyproxy/envoy/blob/main/bazel/repository_locations.bzl)
 2. `bazel test //test/...`
 
 # Overriding an external dependency temporarily
@@ -88,7 +88,7 @@ specifying Bazel option
 [`--override_repository`](https://docs.bazel.build/versions/master/command-line-reference.html)
 to point to a local copy. The option can used multiple times to override multiple dependencies.
 The name of the dependency can be found in
-[the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
+[the repository locations file.](https://github.com/envoyproxy/envoy/blob/main/bazel/repository_locations.bzl)
 The path of the local copy has to be absolute path.
 
 For repositories built by `envoy_cmake_external()` in `bazel/foreign_cc/BUILD`,

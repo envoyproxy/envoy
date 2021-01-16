@@ -2,7 +2,7 @@
 
 ## Active development
 
-Active development is happening on the `master` branch, and a new version is released from it
+Active development is happening on the `main` branch, and a new version is released from it
 at the end of each quarter.
 
 ## Stable releases
@@ -10,23 +10,23 @@ at the end of each quarter.
 Stable releases of Envoy include:
 
 * Extended maintenance window (any version released in the last 12 months).
-* Security fixes backported from the `master` branch (including those deemed not worthy
+* Security fixes backported from the `main` branch (including those deemed not worthy
   of creating a CVE).
-* Stability fixes backported from the `master` branch (anything that can result in a crash,
+* Stability fixes backported from the `main` branch (anything that can result in a crash,
   including crashes triggered by a trusted control plane).
 * Bugfixes, deemed worthwhile by the maintainers of stable releases.
 
 ### Hand-off
 
 Hand-off to the maintainers of stable releases happens after Envoy maintainers release a new
-version from the `master` branch by creating a `vX.Y.0` tag and a corresponding `release/vX.Y`
+version from the `main` branch by creating a `vX.Y.0` tag and a corresponding `release/vX.Y`
 branch, with merge permissions given to the release manager of stable releases, and CI configured
 to execute tests on it.
 
 ### Security releases
 
 Critical security fixes are owned by the Envoy security team, which provides fixes for the
-`master` branch, and the latest release branch. Once those fixes are ready, the maintainers
+`main` branch, and the latest release branch. Once those fixes are ready, the maintainers
 of stable releases backport them to the remaining supported stable releases.
 
 ### Backports
@@ -37,7 +37,7 @@ by adding the `backport/review` or `backport/approved` label (this can be done u
 `/backport` command). Changes nominated by the change author and/or members of the Envoy community
 are evaluated for backporting on a case-by-case basis, and require approval from either the release
 manager of stable release, Envoy maintainers, or Envoy security team. Once approved, those fixes
-are backported from the `master` branch to all supported stable branches by the maintainers of
+are backported from the `main` branch to all supported stable branches by the maintainers of
 stable releases. New stable versions from non-critical security fixes are released on a regular
 schedule, initially aiming for the bi-weekly releases.
 

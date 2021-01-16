@@ -279,7 +279,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // vary.
   //
   // If you encounter a failure here, please see
-  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
   //
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
@@ -325,7 +325,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // at the logs.
   //
   // If you encounter a failure here, please see
-  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
   //
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a

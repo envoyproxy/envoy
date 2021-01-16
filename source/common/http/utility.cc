@@ -554,7 +554,7 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
-      // https://github.com/envoyproxy/envoy/blob/master/source/common/formatter/substitution_formatter.cc#L129
+      // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
       if (body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }

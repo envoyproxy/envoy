@@ -63,31 +63,31 @@ score >= 4; see below). If the fix relies on another upstream project's disclosu
 will adjust the process as well. We will work with the upstream project to fit their timeline and
 best protect our users.
 
-### Released versions and master branch
+### Released versions and main branch
 
 If the vulnerability affects the last point release version, e.g. 1.10, then the full security
 release process described in this document will be activated. A security point release will be
-created for 1.10, e.g. 1.10.1, together with a fix to master if necessary. Older point releases,
+created for 1.10, e.g. 1.10.1, together with a fix to main if necessary. Older point releases,
 e.g. 1.9, are not supported by the Envoy project and will not have any security release created.
 
-If a security vulnerability affects only these older versions but not master or the last supported
+If a security vulnerability affects only these older versions but not main or the last supported
 point release, the Envoy security team will share this information with the private distributor
 list, following the standard embargo process, but not create a security release. After the embargo
 expires, the vulnerability will be described as a GitHub issue. A CVE will be filed if warranted by
 severity.
 
-If a vulnerability does not affect any point release but only master, additional caveats apply:
+If a vulnerability does not affect any point release but only main, additional caveats apply:
 
 * If the issue is detected and a fix is available within 7 days of the introduction of the
   vulnerability, or the issue is deemed a low severity vulnerability by the Envoy maintainer and
-  security teams, the fix will be publicly reviewed and landed on master. If the severity is at least
+  security teams, the fix will be publicly reviewed and landed on main. If the severity is at least
   medium or at maintainer discretion a courtesy e-mail will be sent to envoy-users@googlegroups.com,
   envoy-dev@googlegroups.com, envoy-security-announce@googlegroups.com and
   cncf-envoy-distributors-announce@lists.cncf.io.
 * If the vulnerability has been in existence for more than 7 days and is medium or higher, we will
   activate the security release process.
 
-We advise distributors and operators working from the master branch to allow at least 5 days soak
+We advise distributors and operators working from the main branch to allow at least 5 days soak
 time after cutting a binary release before distribution or rollout, to allow time for our fuzzers to
 detect issues during their execution on ClusterFuzz. A soak period of 7 days provides an even stronger
 guarantee, since we will invoke the security release process for medium or higher severity issues
@@ -181,7 +181,7 @@ patches, understand exact mitigation steps, etc.
   should be reserved for remotely exploitable or privilege escalation issues. Otherwise, this
   process can be skipped.
 - The Fix Lead will email the patches to cncf-envoy-distributors-announce@lists.cncf.io so
-  distributors can prepare builds to be available to users on the day of the issue's announcement. Any 
+  distributors can prepare builds to be available to users on the day of the issue's announcement. Any
   patches against main will be updated and resent weekly.
   Distributors should read about the [Private Distributors List](#private-distributors-list) to find
   out the requirements for being added to this list.
@@ -193,7 +193,7 @@ patches, understand exact mitigation steps, etc.
 - The maintainers will create a new patch release branch from the latest patch release tag + the fix
   from the security branch. As a practical example if v1.5.3 is the latest patch release in Envoy.git
   a new branch will be created called v1.5.4 which includes only patches required to fix the issue.
-- The Fix Lead will cherry-pick the patches onto the master branch and all relevant release branches.
+- The Fix Lead will cherry-pick the patches onto the main branch and all relevant release branches.
   The Fix Team will LGTM and merge. Maintainers will merge these PRs as quickly as possible. Changes
   shouldn't be made to the commits even for a typo in the CHANGELOG as this will change the git sha
   of the commits leading to confusion and potentially conflicts as the fix is cherry-picked around

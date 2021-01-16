@@ -80,7 +80,7 @@ Changes
 * runtime: :ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` support added to layered runtime configuration.
 * sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.
 * server: ``--define manual_stamp=manual_stamp`` was added to allow server stamping outside of binary rules.
-  more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#enabling-optional-features>`_.
+  more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/main/bazel/README.md#enabling-optional-features>`_.
 * server: added :ref:`server state <statistics>` statistic.
 * server: added :ref:`initialization_time_ms<statistics>` statistic.
 * subset: added :ref:`list_as_any<envoy_api_field_Cluster.LbSubsetConfig.list_as_any>` option to
