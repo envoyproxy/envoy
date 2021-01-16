@@ -13,6 +13,7 @@
 
 namespace Envoy {
 
+using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
@@ -318,6 +319,31 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
   auto* add1 = response_mutation->add_set_headers();
   add1->mutable_header()->set_key("x-response-processed");
   add1->mutable_header()->set_value("1");
+  processor_stream_->sendGrpcMessage(resp2);
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+}
+
+// Test the filter using a configuration that uses the processing mode to
+// only send the response_headers message.
+TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+  handleUpstreamRequest();
+
+  ProcessingRequest response_headers_msg;
+  waitForFirstMessage(response_headers_msg);
+  ASSERT_TRUE(response_headers_msg.has_response_headers());
+  ProcessingResponse resp2;
+  auto* headers2 = resp2.mutable_response_headers();
+  auto* response_mutation = headers2->mutable_response()->mutable_header_mutation();
+  auto* add1 = response_mutation->add_set_headers();
+  add1->mutable_header()->set_key("x-response-processed");
+  add1->mutable_header()->set_value("1");
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   processor_stream_->sendGrpcMessage(resp2);
 
   verifyDownstreamResponse(*response, 200);
