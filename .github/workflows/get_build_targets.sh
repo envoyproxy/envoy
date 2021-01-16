@@ -6,7 +6,7 @@ readonly SEARCH_FOLDER="//source/common/..."
 set -e -o pipefail
 
 function get_targets() {
-  # Comparing the PR HEAD with the upstream master HEAD.
+  # Comparing the PR HEAD with the upstream main HEAD.
   git diff --name-only HEAD FETCH_HEAD | while IFS= read -r line
   do
     # Only targets under those folders.
@@ -23,6 +23,6 @@ function get_targets() {
 }
 
 # Fetching the upstream HEAD to compare with and stored in FETCH_HEAD.
-git fetch https://github.com/envoyproxy/envoy.git master 2>/dev/null
+git fetch https://github.com/envoyproxy/envoy.git main 2>/dev/null
 
 export BUILD_TARGETS_LOCAL=$(echo $(get_targets))

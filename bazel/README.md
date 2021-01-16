@@ -40,13 +40,13 @@ independently sourced, the following steps should be followed:
 This section describes how to and what dependencies to install to get started building Envoy with Bazel.
 If you would rather use a pre-build Docker image with required tools installed, skip to [this section](#building-envoy-with-the-ci-docker-image).
 
-As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/master/WORKSPACE) and
+As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/main/WORKSPACE) and
 [rules for building a recent
-version](https://github.com/envoyproxy/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
+version](https://github.com/envoyproxy/envoy/blob/main/bazel/repositories.bzl) of the various Envoy
 dependencies are provided. These are provided as is, they are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
 up-to-date with the latest security patches. See
-[this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
+[this doc](https://github.com/envoyproxy/envoy/blob/main/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
 for how to update or override dependencies.
 
 1. Install external dependencies.
@@ -239,7 +239,7 @@ MSYS2 or Git bash), run:
 ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
-See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
+See also the [documentation](https://github.com/envoyproxy/envoy/tree/main/ci) for developer use of the
 CI Docker image.
 
 ## Building Envoy with Remote Execution
@@ -331,7 +331,7 @@ bazel test //test/...
 An individual test target can be run with a more specific Bazel
 [label](https://bazel.build/versions/master/docs/build-ref.html#Labels), e.g. to build and run only
 the units tests in
-[test/common/http/async_client_impl_test.cc](https://github.com/envoyproxy/envoy/blob/master/test/common/http/async_client_impl_test.cc):
+[test/common/http/async_client_impl_test.cc](https://github.com/envoyproxy/envoy/blob/main/test/common/http/async_client_impl_test.cc):
 
 ```
 bazel test //test/common/http:async_client_impl_test
@@ -730,8 +730,8 @@ need to navigate down and open "coverage.html" but then you can navigate per nor
 have seen some issues with seeing the artifacts tab. If you can't see it, log out of Circle, and
 then log back in and it should start working.
 
-The latest coverage report for master is available
-[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html). The latest fuzz coverage report for master is available [here](https://storage.googleapis.com/envoy-postsubmit/master/fuzz_coverage/index.html).
+The latest coverage report for main is available
+[here](https://storage.googleapis.com/envoy-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-postsubmit/main/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
