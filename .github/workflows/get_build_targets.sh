@@ -6,7 +6,7 @@ readonly SEARCH_FOLDER="//source/common/..."
 set -e -o pipefail
 
 function get_targets() {
-  # Comparing the PR HEAD with the upstream master HEAD.
+  # Comparing the PR HEAD with the upstream main HEAD.
   git diff --name-only HEAD FETCH_HEAD | while IFS= read -r line
   do
     # Only targets under those folders.
