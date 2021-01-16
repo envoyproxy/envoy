@@ -149,7 +149,7 @@ public:
 
 /**
  * Store implementation with thread local caching. For design details see
- * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
