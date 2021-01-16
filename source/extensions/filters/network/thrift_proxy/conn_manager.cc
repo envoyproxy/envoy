@@ -182,6 +182,10 @@ bool ConnectionManager::passthroughEnabled() const {
   }
 
   // If the rpcs list is empty, a local response happened.
+  //
+  // TODO(rgs1): we actually could still enable passthrough for local
+  // responses as long as the transport is framed and the protocol is
+  // not Twitter.
   if (rpcs_.empty()) {
     return false;
   }
