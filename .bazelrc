@@ -204,7 +204,7 @@ build:remote-msvc-cl --config=remote-windows
 build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
 
 # Docker sandbox
-# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
+# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:f21773ab398a879f976936f72c78c9dd3718ca1e
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker

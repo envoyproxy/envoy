@@ -16,21 +16,21 @@ for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     docker build -f ci/Dockerfile-envoy"${BUILD_TYPE}" -t "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" .
 done
 
-MASTER_BRANCH="refs/heads/master"
+MAIN_BRANCH="refs/heads/main"
 RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
 RELEASE_TAG_REGEX="^refs/tags/v.*"
 
-# Only push images for master builds, release branch builds, and tag builds.
-if [[ "${AZP_BRANCH}" != "${MASTER_BRANCH}" ]] && \
+# Only push images for main builds, release branch builds, and tag builds.
+if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] && \
    ! [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]] && \
    ! [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
-    echo 'Ignoring non-master branch or tag for docker push.'
+    echo 'Ignoring non-main branch or tag for docker push.'
     exit 0
 fi
 
-# For master builds and release branch builds use the dev repo. Otherwise we assume it's a tag and
+# For main builds and release branch builds use the dev repo. Otherwise we assume it's a tag and
 # we push to the primary repo.
-if [[ "${AZP_BRANCH}" == "${MASTER_BRANCH}" ]] || \
+if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]] || \
    [[ "${AZP_BRANCH}" =~ ${RELEASE_BRANCH_REGEX} ]]; then
   IMAGE_POSTFIX="-dev"
   IMAGE_NAME="$AZP_SHA1"
@@ -45,8 +45,8 @@ for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
     docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
 
-    # Only push latest on master builds.
-    if [[ "${AZP_BRANCH}" == "${MASTER_BRANCH}" ]]; then
+    # Only push latest on main builds.
+    if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
         docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
         docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:latest"
     fi

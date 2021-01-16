@@ -15,7 +15,7 @@ The following procedure will be used when proposing new extensions for inclusion
   2. All extensions must be sponsored by an existing maintainer. Sponsorship means that the
   maintainer will shepherd the extension through design/code reviews. Maintainers can self-sponsor
   extensions if they are going to write them, shepherd them, and maintain them.
-  
+
      Sponsorship serves two purposes:
      * It ensures that the extension will ultimately meet the Envoy quality bar.
      * It makes sure that incentives are aligned and that extensions are not added to the repo without
@@ -24,7 +24,7 @@ The following procedure will be used when proposing new extensions for inclusion
      *If sponsorship cannot be found from an existing maintainer, an organization can consider
      [doing the work to become a maintainer](./GOVERNANCE.md#process-for-becoming-a-maintainer) in
      order to be able to self-sponsor extensions.*
-  
+
   3. Each extension must have two reviewers proposed for reviewing PRs to the extension. Neither of
   the reviewers must be a senior maintainer. Existing maintainers (including the sponsor) and other
   contributors can count towards this number. The initial reviewers will be codified in the

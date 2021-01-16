@@ -353,7 +353,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // vary.
   //
   // If you encounter a failure here, please see
-  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_cluster, 36827);
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
@@ -395,7 +395,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // at the logs.
   //
   // If you encounter a failure here, please see
-  // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
+  // https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
   EXPECT_MEMORY_EQ(m_per_host, 1380);
   EXPECT_MEMORY_LE(m_per_host, 1800); // Round up to allow platform variations.

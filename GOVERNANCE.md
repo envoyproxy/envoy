@@ -38,7 +38,7 @@
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
 * Triage build issues - file issues for known flaky builds or bugs, and either fix or find someone
-  to fix any master build breakages.
+  to fix any main build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
@@ -77,7 +77,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   "is:open is:issue milestone:[current milestone]" and either hold off until
   they are fixed or bump them to the next milestone.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
-  particularly risky PRs until after the release is tagged. This is because we aim for master to be
+  particularly risky PRs until after the release is tagged. This is because we aim for main to be
   at release candidate quality at all times.
 * Do a final check of the [release notes](docs/root/version_history/current.rst):
   * Make any needed corrections (grammar, punctuation, formatting, etc.).
@@ -101,7 +101,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
   Envoy account post).
 * Do a new PR to setup the next version
-  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
+  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev".
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
     release version number in the filename, and add an entry for the new file in the `toctree` in 
     [version_history.rst](docs/root/version_history/version_history.rst).
