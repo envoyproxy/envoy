@@ -285,17 +285,6 @@ public:
     return !disconnected_;
   }
 
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  waitForDisconnect(Event::TestTimeSystem& time_system,
-                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
-    absl::MutexLock lock(&lock_);
-    if (!time_system.waitFor(lock_, absl::Condition(&disconnected_), timeout)) {
-      return AssertionFailure() << "Timed out waiting for disconnect";
-    }
-    return AssertionSuccess();
-  }
-
   // This provides direct access to the underlying connection, but only to const methods.
   // Stateful connection related methods should happen on the connection's dispatcher via
   // executeOnDispatcher.
@@ -383,11 +372,7 @@ public:
   testing::AssertionResult
   waitForHalfClose(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  ABSL_MUST_USE_RESULT
-  virtual testing::AssertionResult initialize() {
-    initialized_ = true;
-    return testing::AssertionSuccess();
-  }
+  virtual void initialize() { initialized_ = true; }
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
@@ -493,8 +478,7 @@ public:
   testing::AssertionResult write(const std::string& data, bool end_stream = false,
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult initialize() override;
+  void initialize() override;
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contained in the incoming data string. Unlike many of Envoy waitFor functions,
@@ -579,11 +563,6 @@ public:
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult waitForAndConsumeDisconnectedConnection(
-      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-
   Network::Address::InstanceConstSharedPtr localAddress() const {
     return socket_->addressProvider().localAddress();
   }

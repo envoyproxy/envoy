@@ -1032,8 +1032,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
   tls_hosts_ = true;
 
   initialize();
-  // Allow the fake upstreams to detect an error and disconnect during the TLS handshake.
-  host_upstream_->setReadDisableOnNewConnection(false);
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -1049,9 +1047,11 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTlsMissingSocketMatch) {
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
-  // Envoy sends a health check message to an endpoint, but the endpoint doesn't respond to the
-  // health check
-  ASSERT_TRUE(host_upstream_->waitForAndConsumeDisconnectedConnection());
+  // Envoy sends a health check message to an endpoint
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
+
+  // Endpoint doesn't respond to the health check
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect());
 
   // Receive updates until the one we expect arrives. This should be UNHEALTHY and not TIMEOUT,
   // because TIMEOUT occurs in the situation where there is no response from the endpoint. In this
