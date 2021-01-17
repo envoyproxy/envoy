@@ -1,7 +1,7 @@
 .. _envoy_api_reference:
 
-v2 API reference
-================
+v2 API 参考
+=============
 
 .. toctree::
   :glob:
