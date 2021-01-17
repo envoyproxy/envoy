@@ -1,8 +1,8 @@
 Version history
 ---------------
 
-1.13.8 (Pending)
-================
+1.13.8 (January 15, 2021)
+=========================
 Changes
 -------
 * http: fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
