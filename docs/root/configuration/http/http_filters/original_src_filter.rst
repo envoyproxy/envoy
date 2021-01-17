@@ -1,46 +1,28 @@
 .. _config_http_filters_original_src:
 
-Original Source
-===============
+请求源
+==========
 
-* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
-* This filter should be configured with the name *envoy.filters.http.original_src*.
+* :ref:`HTTP 过滤器 v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.original_src.v3.OriginalSrc>`
+* 此过滤器的名称应该配置为 *envoy.filters.http.original_src*。
 
-The original source http filter replicates the downstream remote address of the connection on
-the upstream side of Envoy. For example, if a downstream connection connects to Envoy with IP
-address ``10.1.2.3``, then Envoy will connect to the upstream with source IP ``10.1.2.3``. The
-downstream remote address is determined based on the logic for the "trusted client address"
-outlined in :ref:`XFF <config_http_conn_man_headers_x-forwarded-for>`.
+请求源 http 过滤器在 Envoy 的上游端复制连接的下游远程地址。比如，下游使用 IP 地址 ``10.1.2.3`` 连接到 Envoy，接着 Envoy 使用源 IP ``10.1.2.3`` 连接到上游。下游远程地址是根据 :ref:`XFF <config_http_conn_man_headers_x-forwarded-for>` 中概述的“可信客户端地址”的逻辑确定。
 
 
-Note that the filter is intended to be used in conjunction with the
-:ref:`Router <config_http_filters_router>` filter. In particular, it must run prior to the router
-filter so that it may add the desired source IP to the state of the filter chain.
+请注意，该过滤器旨在与 :ref:`路由器 <config_http_filters_router>` 过滤器结合使用。特别是，它必须在路由器过滤器之前运行，以便可以将所需的源IP添加到过滤器链的状态。
 
-IP Version Support
-------------------
-The filter supports both IPv4 and IPv6 as addresses. Note that the upstream connection must support
-the version used.
+IP 版本支持
+---------------
+该过滤器同时支持将 IPv4 和 IPv6 作为地址。请注意，上游连接必须支持所使用的版本。
 
-Extra Setup
------------
+额外设置
+------------
 
-The downstream remote address used will likely be globally routable. By default, packets returning
-from the upstream host to that address will not route through Envoy. The network must be configured
-to forcefully route any traffic whose IP was replicated by Envoy back through the Envoy host.
+使用的下游远程地址很可能是全局可路由的。默认情况下，从上游主机返回到该地址的数据包将不会通过 Envoy 路由。必须将网络配置为将 IP 被 Envoy 复制的所有流量都通过 Envoy 主机强制路由回去。
 
-If Envoy and the upstream are on the same host -- e.g. in an sidecar deployment --, then iptables
-and routing rules can be used to ensure correct behaviour. The filter has an unsigned integer
-configuration,
-:ref:`mark <envoy_v3_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>`. Setting
-this to *X* causes Envoy to *mark* all upstream packets originating from this http with value
-*X*. Note that if
-:ref:`mark <envoy_v3_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>` is set
-to 0, Envoy will not mark upstream packets.
+假如 Envoy 和上游在同一个主机上--例如在边车（sidecar）部署中--，iptables 和路由规则可以被用来确保正确的行为。过滤器有个无符号整数配置 :ref:`标记 <envoy_v3_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>`。将其设置为 *X* 会导致 Envoy对来自此 http 的所有上游数据包 *标记* 为 *X*。注意 :ref:`标记 <envoy_v3_api_field_extensions.filters.http.original_src.v3.OriginalSrc.mark>` 被设置为 0，Envoy 将不会标记上游数据包。
 
-We can use the following set of commands to ensure that all ipv4 and ipv6 traffic marked with *X*
-(assumed to be 123 in the example) routes correctly. Note that this example assumes that *eth0* is
-the default outbound interface.
+我们可以使用下面这组命令来确保所有被标记为 *X*（例子上假设为 123）的 ipv4 和 ipv6 的流量都进行了正确路由。注意，这个例子假设 *eth0* 为默认的出站接口。
 
 .. code-block:: text
 
@@ -55,11 +37,11 @@ the default outbound interface.
   echo 1 > /proc/sys/net/ipv4/conf/eth0/route_localnet
 
 
-Example HTTP configuration
-------------------------------
+HTTP 配置示例
+-------------------
 
-The following example configures Envoy to use the original source for all connections made on port
-8888. All upstream packets are marked with 123.
+下面的示例将 Envoy 配置为对 8888 端口上的所有连接使用请求源。
+所有上游数据包被标记为 123。
 
 .. code-block:: yaml
 
