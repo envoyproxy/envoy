@@ -46,7 +46,7 @@ export TEST_TMPDIR=${BUILD_DIR}/tmp
 
 BAZEL_STARTUP_OPTIONS+=("--output_base=${TEST_TMPDIR/\/c/c:}")
 BAZEL_BUILD_OPTIONS=(
-    -c opt
+    -c dbg
     --show_task_finish
     --verbose_failures
     "--test_output=errors"
