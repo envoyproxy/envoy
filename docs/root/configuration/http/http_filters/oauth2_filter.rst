@@ -4,14 +4,14 @@
 OAuth2
 ======
 
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth2.v3alpha.OAuth2>`
-* This filter should be configured with the name *envoy.filters.http.oauth2*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.oauth2.v3alpha.OAuth2>`
+* 此过滤器的配置项名称应为：*envoy.filters.http.oauth2*。
 
 .. attention::
 
-  The OAuth2 filter is currently under active development.
+  OAuth2 过滤器目前处于活跃的开发状态。
 
-Example configuration
+示例配置
 ---------------------
 
 .. code-block::
@@ -56,23 +56,22 @@ Example configuration
             address: { socket_address: { address: auth.example.com, port_value: 443 }}
     tls_context: { sni: auth.example.com }
 
-Notes
+注意
 -----
 
-This module does not currently provide much Cross-Site-Request-Forgery protection for the redirect loop
-to the OAuth server and back.
+这个模块目前没有为发送/返回到 OAuth 服务器的重定向循环提供太多的跨站请求伪造（ Cross-Site-Request-Forgery）方面的保护。
 
-The service must be served over HTTPS for this filter to work, as the cookies use `;secure`.
+为了保障过滤器正常运行，服务必须基于 HTTPS，且 cookies 须使用 `;secure`。
 
-Statistics
+统计
 ----------
 
-The OAuth filter outputs statistics in the *<stat_prefix>.* namespace.
+OAuth 过滤器在 *<stat_prefix>.* 命名空间下输出统计信息。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  oauth_failure, Counter, Total requests that were denied.
-  oauth_success, Counter, Total requests that were allowed.
-  oauth_unauthorization_rq, Counter, Total unauthorized requests.
+  oauth_failure, Counter, 拒绝请求总数。
+  oauth_success, Counter, 允许的请求总数。
+  oauth_unauthorization_rq, Counter, 未授权请求总数。
