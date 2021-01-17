@@ -1,13 +1,9 @@
 .. _operations_stats:
 
-Statistics overview
-===================
+统计概览
+=========
 
-Envoy outputs numerous statistics which depend on how the server is configured. They can be seen
-locally via the :http:get:`/stats` command and are typically sent to a :ref:`statsd cluster
-<arch_overview_statistics>`. The statistics that are output are documented in the relevant
-sections of the :ref:`configuration guide <config>`. Some of the more important statistics that will
-almost always be used can be found in the following sections:
+依赖于服务器的配置情况，Envoy 会输出大量的统计信息。这些统计可以在本地通过 :http:get:`/stats` 命令来查看，且通常会被发送到 :ref:`statsd 集群 <arch_overview_statistics>`。输出的统计信息记录在 :ref:`配置指南 <config>` 的相关章节中。在以下章节中可以找到一些几乎总是会用到，且更重要的统计信息：
 
-* :ref:`HTTP connection manager <config_http_conn_man_stats>`
-* :ref:`Upstream cluster <config_cluster_manager_cluster_stats>`
+* :ref:`HTTP 连接管理器 <config_http_conn_man_stats>`
+* :ref:`上游集群 <config_cluster_manager_cluster_stats>`
