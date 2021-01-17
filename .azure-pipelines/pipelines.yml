@@ -452,6 +452,7 @@ stages:
 
       - job: docker
         dependsOn: ["release"]
+        timeoutInMinutes: 120
         pool:
           vmImage: "windows-latest"
         steps:
