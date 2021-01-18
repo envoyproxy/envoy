@@ -72,7 +72,7 @@ if __name__ == '__main__':
       '//source/extensions/upstreams/http:config')
 
   print('EXTENSION DB')
-  print(extesion_db)
+  print(extension_db)
   print()
 
   pathlib.Path(output_path).write_text(json.dumps(extension_db))
