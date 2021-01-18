@@ -16,6 +16,7 @@ envoy_cc_library(
     name = "file_access_log_lib",
     srcs = ["file_access_log_impl.cc"],
     hdrs = ["file_access_log_impl.h"],
+    category = "envoy.extensions.access_loggers.file",
     # The file based access logger is core code.
     visibility = ["//visibility:public"],
     deps = [
