@@ -119,7 +119,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
 
 std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
                                                    Api::Api& api) {
-  static const ssize_t MaxBodySize = 4096;
+  static const ssize_t MaxBodySize = 1024 * 1024;
   if (!route.has_direct_response() || !route.direct_response().has_body()) {
     return EMPTY_STRING;
   }

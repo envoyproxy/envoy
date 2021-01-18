@@ -6170,11 +6170,11 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
   EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route, *api_), EnvoyException,
                             "response body file missing_file does not exist");
 
-  std::string body(4097, '*');
+  std::string body(1024 * 1024 + 1, '*');
   auto filename = TestEnvironment::writeStringToFileForTest("body", body);
   route.mutable_direct_response()->mutable_body()->set_filename(filename);
   std::string expected_message("response body file " + filename +
-                               " size is 4097 bytes; maximum is 4096");
+                               " size is 1048577 bytes; maximum is 1048576");
   EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseBody(route, *api_), EnvoyException,
                             expected_message);
 }

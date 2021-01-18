@@ -186,9 +186,9 @@ upon configuration load and cache the contents.
 
 .. attention::
 
-   If a response body is specified, it must be no more than 4KB in size, regardless of
+   If a response body is specified, it must be no more than 1MiB in size, regardless of
    whether it is provided inline or in a file. Envoy currently holds the entirety of the
-   body in memory, so the 4KB limit is intended to keep the proxy's memory footprint
+   body in memory, so the 1MiB limit is intended to keep the proxy's memory footprint
    from growing too large.
 
 If **response_headers_to_add** has been set for the Route or the enclosing Virtual Host,
