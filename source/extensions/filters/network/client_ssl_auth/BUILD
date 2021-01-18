@@ -16,6 +16,7 @@ envoy_cc_library(
     name = "client_ssl_auth",
     srcs = ["client_ssl_auth.cc"],
     hdrs = ["client_ssl_auth.h"],
+    category = "envoy.filters.network",
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
