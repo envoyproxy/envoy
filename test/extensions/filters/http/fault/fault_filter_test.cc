@@ -1,3 +1,4 @@
+
 #include <chrono>
 #include <cstdint>
 #include <limits>
@@ -122,7 +123,7 @@ public:
 
   const std::string v2_empty_fault_config_yaml = "{}";
 
-  void SetUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
+  void setUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
     config_ = std::make_shared<FaultFilterConfig>(fault, runtime_, "prefix.", stats_, time_system_);
     filter_ = std::make_unique<FaultFilter>(*config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -130,7 +131,7 @@ public:
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
   }
 
-  void SetUpTest(const std::string& yaml) { SetUpTest(convertYamlStrToProtoConfig(yaml)); }
+  void setUpTest(const std::string& yaml) { setUpTest(convertYamlStrToProtoConfig(yaml)); }
 
   void expectDelayTimer(uint64_t duration_ms) {
     timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
@@ -228,7 +229,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   fault.mutable_abort()->mutable_percentage()->set_denominator(
       envoy::type::v3::FractionalPercent::HUNDRED);
   fault.mutable_abort()->set_http_status(429);
-  SetUpTest(fault);
+  setUpTest(fault);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -274,7 +275,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
-  SetUpTest(header_abort_only_yaml);
+  setUpTest(header_abort_only_yaml);
 
   request_headers_.addCopy("x-envoy-fault-abort-request", "429");
 
@@ -329,7 +330,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   fault.mutable_abort()->mutable_percentage()->set_denominator(
       envoy::type::v3::FractionalPercent::HUNDRED);
   fault.mutable_abort()->set_grpc_status(5);
-  SetUpTest(fault);
+  setUpTest(fault);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -377,7 +378,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
 
 TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
   decoder_filter_callbacks_.is_grpc_request_ = true;
-  SetUpTest(header_abort_only_yaml);
+  setUpTest(header_abort_only_yaml);
 
   request_headers_.addCopy("x-envoy-fault-abort-grpc-request", "5");
 
@@ -427,7 +428,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithGrpcStatus) {
 }
 
 TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
-  SetUpTest(header_abort_only_yaml);
+  setUpTest(header_abort_only_yaml);
 
   request_headers_.addCopy("x-envoy-fault-abort-request", "429");
   request_headers_.addCopy("x-envoy-fault-abort-grpc-request", "5");
@@ -478,7 +479,7 @@ TEST_F(FaultFilterTest, HeaderAbortWithHttpAndGrpcStatus) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
-  SetUpTest(fixed_delay_only_yaml);
+  setUpTest(fixed_delay_only_yaml);
 
   // Delay related calls
   EXPECT_CALL(
@@ -506,7 +507,7 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
 }
 
 TEST_F(FaultFilterTest, Overflow) {
-  SetUpTest(fixed_delay_only_yaml);
+  setUpTest(fixed_delay_only_yaml);
 
   // Delay related calls
   EXPECT_CALL(
@@ -532,7 +533,7 @@ TEST_F(FaultFilterTest, Overflow) {
 // Verifies that we don't increment the active_faults gauge when not applying a fault.
 TEST_F(FaultFilterTest, Passthrough) {
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
-  SetUpTest(fault);
+  setUpTest(fault);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
@@ -545,7 +546,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   fault.mutable_delay()->mutable_percentage()->set_denominator(
       envoy::type::v3::FractionalPercent::HUNDRED);
   fault.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
-  SetUpTest(fault);
+  setUpTest(fault);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -588,7 +589,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
 }
 
 TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
-  SetUpTest(fixed_delay_only_yaml);
+  setUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -636,7 +637,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
-  SetUpTest(fixed_delay_and_abort_yaml);
+  setUpTest(fixed_delay_and_abort_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -702,7 +703,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbort) {
-  SetUpTest(fixed_delay_and_abort_yaml);
+  setUpTest(fixed_delay_and_abort_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -758,7 +759,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
-  SetUpTest(fixed_delay_and_abort_nodes_yaml);
+  setUpTest(fixed_delay_and_abort_nodes_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -812,13 +813,13 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 }
 
 TEST_F(FaultFilterTest, NoDownstreamMatch) {
-  SetUpTest(fixed_delay_and_abort_nodes_yaml);
+  setUpTest(fixed_delay_and_abort_nodes_yaml);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
-  SetUpTest(fixed_delay_and_abort_match_headers_yaml);
+  setUpTest(fixed_delay_and_abort_match_headers_yaml);
   request_headers_.addCopy("x-foo1", "Bar");
   request_headers_.addCopy("x-foo2", "RandomValue");
 
@@ -875,7 +876,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
-  SetUpTest(fixed_delay_and_abort_match_headers_yaml);
+  setUpTest(fixed_delay_and_abort_match_headers_yaml);
   request_headers_.addCopy("x-foo1", "Bar");
   request_headers_.addCopy("x-foo3", "Baz");
 
@@ -903,7 +904,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
 }
 
 TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
-  SetUpTest(fixed_delay_only_yaml);
+  setUpTest(fixed_delay_only_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -954,7 +955,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
-  SetUpTest(delay_with_upstream_cluster_yaml);
+  setUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(decoder_filter_callbacks_.route_->route_entry_, clusterName())
@@ -999,7 +1000,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
-  SetUpTest(delay_with_upstream_cluster_yaml);
+  setUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("mismatch");
 
   EXPECT_CALL(decoder_filter_callbacks_.route_->route_entry_, clusterName())
@@ -1027,7 +1028,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
-  SetUpTest(delay_with_upstream_cluster_yaml);
+  setUpTest(delay_with_upstream_cluster_yaml);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(*decoder_filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
@@ -1108,7 +1109,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
 
   // route-level fault overrides listener-level fault
   {
-    SetUpTest(v2_empty_fault_config_yaml); // This is a valid listener level fault
+    setUpTest(v2_empty_fault_config_yaml); // This is a valid listener level fault
     TestPerFilterConfigFault(&delay_fault, nullptr);
   }
 
@@ -1116,7 +1117,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   {
     config_->stats().aborts_injected_.reset();
     config_->stats().delays_injected_.reset();
-    SetUpTest(v2_empty_fault_config_yaml);
+    setUpTest(v2_empty_fault_config_yaml);
     TestPerFilterConfigFault(nullptr, &delay_fault);
   }
 
@@ -1124,7 +1125,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   {
     config_->stats().aborts_injected_.reset();
     config_->stats().delays_injected_.reset();
-    SetUpTest(v2_empty_fault_config_yaml);
+    setUpTest(v2_empty_fault_config_yaml);
     TestPerFilterConfigFault(&delay_fault, &abort_fault);
   }
 }
@@ -1135,7 +1136,7 @@ public:
     envoy::extensions::filters::http::fault::v3::HTTPFault fault;
     fault.mutable_response_rate_limit()->mutable_fixed_limit()->set_limit_kbps(1);
     fault.mutable_response_rate_limit()->mutable_percentage()->set_numerator(100);
-    SetUpTest(fault);
+    setUpTest(fault);
 
     EXPECT_CALL(
         runtime_.snapshot_,
