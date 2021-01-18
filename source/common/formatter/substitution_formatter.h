@@ -23,8 +23,9 @@ namespace Formatter {
 class SubstitutionFormatParser {
 public:
   static std::vector<FormatterProviderPtr> parse(const std::string& format);
+  static std::vector<FormatterProviderPtr>
+  parse(const std::string& format, const std::vector<CommandParserPtr>& command_parsers);
 
-private:
   /**
    * Parse a header format rule of the form: %REQ(X?Y):Z% .
    * Will populate a main_header and an optional alternative header if specified.
@@ -60,6 +61,19 @@ private:
                            const std::string& separator, std::string& main,
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 
+  /**
+   * Return a FormatterProviderPtr if a built-in command is parsed from the token. This method
+   * handles mapping the command name to an appropriate formatter after parsing.
+   *
+   * TODO(rgs1): this can be refactored into a dispatch table using the command name as the key and
+   * the parsing parameters as the value.
+   *
+   * @param token the token to parse
+   * @return FormattterProviderPtr substitution provider for the parsed command or nullptr
+   */
+  static FormatterProviderPtr parseBuiltinCommand(const std::string& token);
+
+private:
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
@@ -93,6 +107,8 @@ private:
 class FormatterImpl : public Formatter {
 public:
   FormatterImpl(const std::string& format, bool omit_empty_values = false);
+  FormatterImpl(const std::string& format, bool omit_empty_values,
+                const std::vector<CommandParserPtr>& command_parsers);
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -210,6 +226,33 @@ private:
   Http::LowerCaseString main_header_;
   Http::LowerCaseString alternative_header_;
   absl::optional<size_t> max_length_;
+};
+
+/**
+ * FormatterProvider for headers byte size.
+ */
+class HeadersByteSizeFormatter : public FormatterProvider {
+public:
+  // TODO(taoxuy): Add RequestTrailers here.
+  enum class HeaderType { RequestHeaders, ResponseHeaders, ResponseTrailers };
+
+  HeadersByteSizeFormatter(const HeaderType header_type);
+
+  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
+                                     const Http::ResponseHeaderMap& response_headers,
+                                     const Http::ResponseTrailerMap& response_trailers,
+                                     const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&, absl::string_view) const override;
+
+private:
+  uint64_t extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
+                                  const Http::ResponseHeaderMap& response_headers,
+                                  const Http::ResponseTrailerMap& response_trailers) const;
+  HeaderType header_type_;
 };
 
 /**

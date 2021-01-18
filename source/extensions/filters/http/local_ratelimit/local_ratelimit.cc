@@ -6,6 +6,7 @@
 #include "envoy/http/codes.h"
 
 #include "common/http/utility.h"
+#include "common/router/config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,16 +15,17 @@ namespace LocalRateLimitFilter {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-    Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
-    const bool per_route)
+    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher, Stats::Scope& scope,
+    Runtime::Loader& runtime, const bool per_route)
     : status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
       rate_limiter_(Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
           std::chrono::milliseconds(
               PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0)),
           config.token_bucket().max_tokens(),
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1), dispatcher)),
-      runtime_(runtime),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1), dispatcher,
+          config.descriptors())),
+      local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
               ? absl::optional<Envoy::Runtime::FractionalPercent>(
@@ -35,7 +37,9 @@ FilterConfig::FilterConfig(
                     Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
               : absl::nullopt),
       response_headers_parser_(
-          Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {
+          Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
+      stage_(static_cast<uint64_t>(config.stage())),
+      has_descriptors_(!config.descriptors().empty()) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -46,7 +50,10 @@ FilterConfig::FilterConfig(
   }
 }
 
-bool FilterConfig::requestAllowed() const { return rate_limiter_.requestAllowed(); }
+bool FilterConfig::requestAllowed(
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+  return rate_limiter_.requestAllowed(request_descriptors);
+}
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + ".http_local_rate_limit";
@@ -61,7 +68,7 @@ bool FilterConfig::enforced() const {
   return filter_enforced_.has_value() ? filter_enforced_->enabled() : false;
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* config = getConfig();
 
   if (!config->enabled()) {
@@ -70,7 +77,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap&, bool) {
 
   config->stats().enabled_.inc();
 
-  if (config->requestAllowed()) {
+  std::vector<RateLimit::LocalDescriptor> descriptors;
+  if (config->hasDescriptors()) {
+    populateDescriptors(descriptors, headers);
+  }
+
+  if (config->requestAllowed(descriptors)) {
     config->stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -92,6 +104,28 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
 
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
+                                 Http::RequestHeaderMap& headers) {
+  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
+  if (!route || !route->routeEntry()) {
+    return;
+  }
+
+  const Router::RouteEntry* route_entry = route->routeEntry();
+  // Get all applicable rate limit policy entries for the route.
+  const auto* config = getConfig();
+  for (const Router::RateLimitPolicyEntry& rate_limit :
+       route_entry->rateLimitPolicy().getApplicableRateLimit(config->stage())) {
+    const std::string& disable_key = rate_limit.disableKey();
+
+    if (!disable_key.empty()) {
+      continue;
+    }
+    rate_limit.populateLocalDescriptors(descriptors, config->localInfo().clusterName(), headers,
+                                        decoder_callbacks_->streamInfo());
+  }
 }
 
 const FilterConfig* Filter::getConfig() const {
