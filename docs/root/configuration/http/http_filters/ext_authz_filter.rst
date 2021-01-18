@@ -1,30 +1,25 @@
 .. _config_http_filters_ext_authz:
 
-External Authorization
+外部授权
 ======================
-* External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
-* This filter should be configured with the name *envoy.filters.http.ext_authz*.
+* 外部授权 :ref:`架构概览 <arch_overview_ext_authz>`
+* :ref:`HTTP 过滤器 v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
+* 过滤器的名称应该配置为 *envoy.filters.http.ext_authz* 。
 
-The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
-HTTP request is authorized or not.
-If the request is deemed unauthorized, then the request will be denied normally with 403 (Forbidden) response.
-Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
-also possible. This is explained in more details at :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
+外部授权服务通过调用外部 gRPC 或者 HTTP 服务来检查传入的 HTTP 请求是否被授权。
+如果该请求被视为未授权，则通常会以 403 （禁止）响应拒绝该请求。
+注意，从授权服务向上游、下游或者授权服务发送其他自定义元数据也是被允许的。在 :ref:`HTTP 过滤器 <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>` 中有更多详细的解释。
 
-The content of the requests that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
+传递给授权服务的请求内容由 :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>` 指定。
 
 .. _config_http_filters_ext_authz_http_configuration:
 
-The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You can see all the
-configuration options at
-:ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
+使用 gRPC/HTTP 服务的 HTTP 过滤器配置如下。你可以在 :ref:`HTTP 过滤器 <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>` 看到所有的配置选项。
 
-Configuration Examples
+配置示例
 ----------------------
 
-A sample filter configuration for a gRPC authorization server:
+gRPC 授权服务器的过滤器配置示例：
 
 .. code-block:: yaml
 
@@ -62,11 +57,9 @@ A sample filter configuration for a gRPC authorization server:
 
 .. note::
 
-  One of the features of this filter is to send HTTP request body to the configured gRPC
-  authorization server as part of the :ref:`check request
-  <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
+  这个过滤器的一个特性就是将 HTTP 请求体作为 :ref:`检查请求 <envoy_v3_api_msg_service.auth.v3.CheckRequest>` 的一部分发送到配置的 gRPC 授权服务器。
 
-  A sample configuration is as follows:
+  简单配置如下：
 
   .. code:: yaml
 
@@ -82,17 +75,11 @@ A sample filter configuration for a gRPC authorization server:
             allow_partial_message: true
             pack_as_bytes: true
 
-  Please note that by default :ref:`check request<envoy_v3_api_msg_service.auth.v3.CheckRequest>`
-  carries the HTTP request body as UTF-8 string and it fills the :ref:`body
-  <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` field. To pack the request
-  body as raw bytes, it is needed to set :ref:`pack_as_bytes
-  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` field to
-  true. In effect to that, the :ref:`raw_body
-  <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>`
-  field will be set and :ref:`body
-  <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` field will be empty.
+  注意，默认情况下，:ref:`check request<envoy_v3_api_msg_service.auth.v3.CheckRequest>` 以 UTF-8 字符串的形式携带 HTTP 请求体，并同时填充 :ref:`body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` 字段。
+  如果需要将请求体打包为原始字节，则需要将 :ref:`pack_as_bytes <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.BufferSettings.pack_as_bytes>` 设置为 true。
+  事实上，:ref:`raw_body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.raw_body>` 字段会被赋值，而 :ref:`body <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.body>` 会被设为空。
 
-A sample filter configuration for a raw HTTP authorization server:
+原始 HTTP 授权服务器的过滤器配置示例：
 
 .. code-block:: yaml
 
@@ -125,11 +112,11 @@ A sample filter configuration for a raw HTTP authorization server:
                   address: 127.0.0.1
                   port_value: 10003
 
-Per-Route Configuration
+按路由独立配置
 -----------------------
 
-A sample virtual host and route filter configuration.
-In this example we add additional context on the virtual host, and disabled the filter for `/static` prefixed routes.
+虚拟主机和路由过滤器的简单配置示例。
+在示例中，我们为虚拟主机添加了其他的上下文，并且禁用了前缀为 `/static` 的路由过滤器。
 
 .. code-block:: yaml
 
@@ -154,40 +141,33 @@ In this example we add additional context on the virtual host, and disabled the 
       - match: { prefix: "/" }
         route: { cluster: some_service }
 
-Statistics
+统计信息
 ----------
 .. _config_http_filters_ext_authz_stats:
 
-The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_authz.* namespace.
+HTTP 过滤器输出的统计信息 *cluster.<route target cluster>.ext_authz.* 命名空间中。
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  ok, Counter, Total responses from the filter.
-  error, Counter, Total errors (including timeouts) contacting the external service.
-  timeout, Counter, Total timeouts contacting the external service (only counted when timeout is measured when check request is created).
-  denied, Counter, Total responses from the authorizations service that were to deny the traffic.
-  disabled, Counter, Total requests that are allowed without calling external services due to the filter is disabled.
-  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of failure_mode_allow set to true."
+  ok, Counter, 过滤器的响应总数。
+  error, Counter, 联系外部服务（包含超时）的异常总数。
+  timeout, Counter, 联系外部服务的超时总数（仅计算在创建请求时判定为超时）。
+  denied, Counter, 授权服务的拒绝通信的响应总数。
+  disabled, Counter, 由于过滤器被禁用，不调用外部服务而允许的请求总数。
+  failure_mode_allowed, Counter, 出现异常但由于 failure_mode_allow 被设置为 true 而允许通过的请求总数。
 
-Dynamic Metadata
+动态元数据
 ----------------
 .. _config_http_filters_ext_authz_dynamic_metadata:
 
 .. note::
 
-  The External Authorization filter emits dynamic metadata only when it is configured to use
-  gRPC service as the authorization server.
+  外部授权服务器仅在使用 gRPC 服务作为授权服务器时才会发出动态元数据。
 
-The External Authorization filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
-*only* when the gRPC authorization server returns a :ref:`CheckResponse
-<envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a filled :ref:`dynamic_metadata
-<envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field.
+当 gRPC 授权服务器返回一个带有 :ref:`dynamic_metadata <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` 字段的 :ref:`CheckResponse <envoy_v3_api_msg_service.auth.v3.CheckResponse>` 时，外部授权过滤器会将动态元数据作为不透明的 ``google.protobuf.Struct`` 发出。
 
-Runtime
+运行时
 -------
-The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
-<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled>` field.
+可以通过 :ref:`filter_enabled <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled>` 字段的 :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` 值来配置启用过滤器的请求百分比。
