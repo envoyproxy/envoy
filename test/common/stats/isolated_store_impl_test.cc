@@ -6,6 +6,8 @@
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
 
+#include "test/common/stats/stat_test_utility.h"
+
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -51,9 +53,9 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(100, TestUtil::unforcedValue(found_counter->get()));
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, TestUtil::unforcedValue(found_counter->get()));
 
   Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
@@ -77,9 +79,9 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(100, TestUtil::unforcedValue(found_gauge->get()));
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, TestUtil::unforcedValue(found_gauge->get()));
 
   Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
@@ -240,10 +242,10 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
 TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullCounterImpl& c = store_->nullCounter();
   c.inc();
-  EXPECT_EQ(0, c.value());
+  EXPECT_EQ(0, TestUtil::unforcedValue(c));
   NullGaugeImpl& g = store_->nullGauge("");
   g.inc();
-  EXPECT_EQ(0, g.value());
+  EXPECT_EQ(0, TestUtil::unforcedValue(g));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {

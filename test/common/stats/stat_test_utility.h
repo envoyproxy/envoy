@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/stats/store.h"
 
 #include "common/common/logger.h"
@@ -14,6 +15,10 @@
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
+
+template<class StatObject> uint64_t unforcedValue(const StatObject& stat) {
+  return UnforcedReader::value(stat);
+}
 
 class TestSymbolTableHelper {
 public:
@@ -104,6 +109,93 @@ public:
   TestSymbolTable global_symbol_table_;
 };
 
+/*
+template<class BaseClass> class TestMetricHelper : public BaseClass {
+ public:
+  TestMetricHelper(BaseClass& base_class) : instance_(base_class) {}
+  std::string name() const override { return instance_.name(); }
+  StatName statName() const override { return instance_.statName(); }
+  TagVector tags() const override { return instance_.tags(); }
+  std::string tagExtractedName() const override { return instance_.tagExtractedName(); }
+  StatName tagExtractedStatName() const override { return instance_.tagExtractedStatName(); }
+  void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const override {
+    return instance_.iterateTagStatNames(fn);
+  }
+  bool used() const override { return instance_.tags(); }
+  SymbolTable& symbolTable() override { return instance_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return instance_.constSymbolTable(); }
+
+ protected:
+  BaseClass& instance_;
+};
+*/
+
+class TestCounter {
+ public:
+  using ValueType = Counter;
+
+  TestCounter(Counter& counter) : counter_(counter) {}
+  void add(uint64_t amount) { counter_.add(amount); }
+  void inc() { counter_.inc(); }
+  uint64_t latch() { return counter_.latch(); }
+  void reset() { counter_.reset(); }
+  Mode mode() const { return counter_.mode(); }
+  uint64_t valueForceEnabled() const { return counter_.valueForceEnabled(); }
+  uint64_t value() const { return unforcedValue(counter_); }
+  Counter* operator->() { return &counter_; }
+
+ private:
+  Counter& counter_;
+};
+
+class TestConstCounter {
+ public:
+  TestConstCounter(const Counter& counter) : counter_(counter) {}
+  Mode mode() const { return counter_.mode(); }
+  uint64_t valueForceEnabled() const { return counter_.valueForceEnabled(); }
+  uint64_t value() const { return unforcedValue(counter_); }
+
+ private:
+  const Counter& counter_;
+};
+
+class TestGauge {
+ public:
+  using ValueType = Counter;
+
+  TestGauge(Gauge& gauge) : gauge_(gauge) {}
+  void add(uint64_t amount) { gauge_.add(amount); }
+  void dec() { gauge_.dec(); }
+  void inc() { gauge_.inc(); }
+  void set(uint64_t value) { gauge_.set(value); }
+  void sub(uint64_t amount) { gauge_.sub(amount); }
+  void setParentValue(uint64_t parent_value) { gauge_.setParentValue(parent_value); }
+  Gauge::ImportMode importMode() const { return gauge_.importMode(); }
+  void mergeImportMode(Gauge::ImportMode import_mode) { gauge_.mergeImportMode(import_mode); }
+  Mode mode() const { return gauge_.mode(); }
+  uint64_t valueForceEnabled() const { return gauge_.valueForceEnabled(); }
+  uint64_t value() const { return unforcedValue(gauge_); }
+
+ private:
+  Gauge& gauge_;
+};
+
+class TestConstGauge {
+ public:
+  TestConstGauge(const Gauge& gauge) : gauge_(gauge) {}
+  Gauge::ImportMode importMode() const { return gauge_.importMode(); }
+  Mode mode() const { return gauge_.mode(); }
+  uint64_t valueForceEnabled() const { return gauge_.valueForceEnabled(); }
+  uint64_t value() const { return unforcedValue(gauge_); }
+
+ private:
+  const Gauge& gauge_;
+};
+
+using TestCounterOptConstRef = const OptRef<TestConstCounter>;
+using TestGaugeOptConstRef = const OptRef<TestConstGauge>;
+
+
 // Helper class to use in lieu of an actual Stats::Store for doing lookups by
 // name. The intent is to remove the deprecated Scope::counter(const
 // std::string&) methods, and always use this class for accessing stats by
@@ -124,8 +216,8 @@ public:
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
 
-  Counter& counter(const std::string& name) { return counterFromString(name); }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) {
+  TestCounter counter(const std::string& name) { return TestCounter(counterFromString(name)); }
+  TestGauge gauge(const std::string& name, Gauge::ImportMode import_mode) {
     return gaugeFromString(name, import_mode);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) {
@@ -150,8 +242,8 @@ public:
                                            Histogram::Unit unit, Mode mode) override;
 
   // New APIs available for tests.
-  CounterOptConstRef findCounterByString(const std::string& name) const;
-  GaugeOptConstRef findGaugeByString(const std::string& name) const;
+  TestCounterOptConstRef findCounterByString(const std::string& name) const;
+  TestGaugeOptConstRef findGaugeByString(const std::string& name) const;
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
 
 private:

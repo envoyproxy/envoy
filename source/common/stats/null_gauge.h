@@ -30,6 +30,7 @@ public:
   void setParentValue(uint64_t) override {}
   void sub(uint64_t) override {}
   uint64_t value() const override { return 0; }
+  uint64_t valueForceEnabled() const override { return 0; }
   ImportMode importMode() const override { return ImportMode::NeverImport; }
   void mergeImportMode(ImportMode /* import_mode */) override {}
   Mode mode() const override { return Mode::Default; }

@@ -2,6 +2,7 @@
 
 #include "common/stats/allocator_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -48,8 +49,8 @@ TEST_F(AllocatorImplTest, CountersWithSameName) {
   EXPECT_TRUE(c1->used());
   EXPECT_TRUE(c2->used());
   c2->inc();
-  EXPECT_EQ(2, c1->value());
-  EXPECT_EQ(2, c2->value());
+  EXPECT_EQ(2, TestUtil::unforcedValue(*c1));
+  EXPECT_EQ(2, TestUtil::unforcedValue(*c2));
 }
 
 TEST_F(AllocatorImplTest, GaugesWithSameName) {
@@ -67,11 +68,11 @@ TEST_F(AllocatorImplTest, GaugesWithSameName) {
   g1->inc();
   EXPECT_TRUE(g1->used());
   EXPECT_TRUE(g2->used());
-  EXPECT_EQ(1, g1->value());
-  EXPECT_EQ(1, g2->value());
+  EXPECT_EQ(1, TestUtil::unforcedValue(*g1));
+  EXPECT_EQ(1, TestUtil::unforcedValue(*g2));
   g2->dec();
-  EXPECT_EQ(0, g1->value());
-  EXPECT_EQ(0, g2->value());
+  EXPECT_EQ(0, TestUtil::unforcedValue(*g1));
+  EXPECT_EQ(0, TestUtil::unforcedValue(*g2));
 }
 
 // Test for a race-condition where we may decrement the ref-count of a stat to

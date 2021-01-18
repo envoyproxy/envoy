@@ -172,7 +172,8 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
                                               std::chrono::milliseconds timeout,
                                               Event::Dispatcher* dispatcher) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
+  while (findCounter(store, name) == nullptr ||
+         Stats::UnforcedReader::value(*findCounter(store, name)) != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
@@ -188,7 +189,8 @@ AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::st
                                               uint64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+  while (!testValue(findCounter(store, name),
+                    [value](uint64_t stat_value) -> bool { return stat_value >= value; })) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
@@ -201,7 +203,8 @@ AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::stri
                                             uint64_t value, Event::TestTimeSystem& time_system,
                                             std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
+  while (!testValue(findGauge(store, name),
+                    [value](uint64_t stat_value) -> bool { return stat_value >= value; })) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
@@ -214,7 +217,8 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
                                             uint64_t value, Event::TestTimeSystem& time_system,
                                             std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
+  while (!testValue(findGauge(store, name),
+                    [value](uint64_t stat_value) -> bool { return stat_value == value; })) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
@@ -298,13 +302,16 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 
 // static
 std::string TestUtility::nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges) {
-  // Returns all gauges that are 0 except the circuit_breaker remaining resource
+  // Returns all gauges that are not 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
   std::string non_zero;
   for (const Stats::GaugeSharedPtr& gauge : gauges) {
-    if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
-      non_zero.append(fmt::format("{}: {}; ", gauge->name(), gauge->value()));
+    if (!std::regex_match(gauge->name(), omitted)) {
+      uint64_t value = Stats::UnforcedReader::value(*gauge);
+      if (value != 0) {
+        non_zero.append(fmt::format("{}: {}; ", gauge->name(), value));
+      }
     }
   }
   return non_zero;

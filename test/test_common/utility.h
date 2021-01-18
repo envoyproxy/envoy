@@ -186,6 +186,15 @@ public:
    */
   static Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
 
+  template<class StatPtr> static bool testValue(
+      const StatPtr& stat_ptr, std::function<bool(uint64_t)> predicate) {
+    if (stat_ptr == nullptr) {
+      return false;
+    }
+    return predicate(Stats::UnforcedReader::value(*stat_ptr));
+  }
+
+
   /**
    * Find a gauge in a stats store.
    * @param store supplies the stats store.

@@ -153,6 +153,10 @@ public:
   uint64_t latch() override { return pending_increment_.exchange(0); }
   void reset() override { value_ = 0; }
   uint64_t value() const override { return value_; }
+  uint64_t valueForceEnabled() const override {
+    ASSERT(mode() == Mode::ForceEnable);
+    return value_;
+  }
 
 private:
   std::atomic<uint64_t> value_{0};
@@ -202,6 +206,10 @@ public:
     child_value_ -= amount;
   }
   uint64_t value() const override { return child_value_ + parent_value_; }
+  uint64_t valueForceEnabled() const override {
+    ASSERT(mode() == Mode::ForceEnable);
+    return value();
+  }
 
   ImportMode importMode() const override {
     if (flags_ & Flags::NeverImport) {

@@ -7,6 +7,8 @@
 #include "common/stats/null_gauge.h"
 #include "common/stats/thread_local_store.h"
 
+#include "test/common/stats/stat_test_utility.h"
+
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -80,7 +82,7 @@ protected:
     };
   }
 
-  static bool checkValue(const Counter& counter) { return counter.value() == 1; }
+  static bool checkValue(const Counter& counter) { return TestUtil::unforcedValue(counter) == 1; }
 
   static MakeStatFn makeGauge() {
     return [](Scope& scope, const ElementVec& elements) {
@@ -88,7 +90,7 @@ protected:
     };
   }
 
-  static bool checkValue(const Gauge& gauge) { return gauge.value() == 1; }
+  static bool checkValue(const Gauge& gauge) { return TestUtil::unforcedValue(gauge) == 1; }
 
   static MakeStatFn makeHistogram() {
     return [](Scope& scope, const ElementVec& elements) {

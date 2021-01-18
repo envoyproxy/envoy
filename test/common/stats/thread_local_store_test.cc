@@ -228,9 +228,9 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(100, TestUtil::unforcedValue(found_counter->get()));
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, TestUtil::unforcedValue(found_counter->get()));
 
   Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
@@ -239,9 +239,9 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(100, TestUtil::unforcedValue(found_gauge->get()));
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, TestUtil::unforcedValue(found_gauge->get()));
 
   Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&h1, &store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified));
@@ -282,9 +282,9 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
-  EXPECT_EQ(100, found_counter->get().value());
+  EXPECT_EQ(100, TestUtil::unforcedValue(found_counter->get()));
   c1.add(100);
-  EXPECT_EQ(200, found_counter->get().value());
+  EXPECT_EQ(200, TestUtil::unforcedValue(found_counter->get()));
 
   Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
@@ -293,9 +293,9 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
-  EXPECT_EQ(100, found_gauge->get().value());
+  EXPECT_EQ(100, TestUtil::unforcedValue(found_gauge->get()));
   g1.set(0);
-  EXPECT_EQ(0, found_gauge->get().value());
+  EXPECT_EQ(0, TestUtil::unforcedValue(found_gauge->get()));
 
   Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&h1, &store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified));
@@ -535,8 +535,8 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
 
   // Different allocations point to the same referenced counted backing memory.
   c1.inc();
-  EXPECT_EQ(1UL, c1.value());
-  EXPECT_EQ(c1.value(), c2.value());
+  EXPECT_EQ(1UL, TestUtil::unforcedValue(c1));
+  EXPECT_EQ(TestUtil::unforcedValue(c1), TestUtil::unforcedValue(c2));
 
   Gauge& g1 = scope2->gaugeFromString("some_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ("scope1.foo.some_gauge", g1.name());
@@ -562,11 +562,11 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   Counter& c2 = scope2->counterFromString("c");
   EXPECT_EQ(&c1, &c2);
   c1.inc();
-  EXPECT_EQ(1UL, c1.value());
-  EXPECT_EQ(1UL, c2.value());
+  EXPECT_EQ(1UL, TestUtil::unforcedValue(c1));
+  EXPECT_EQ(1UL, TestUtil::unforcedValue(c2));
   c2.inc();
-  EXPECT_EQ(2UL, c1.value());
-  EXPECT_EQ(2UL, c2.value());
+  EXPECT_EQ(2UL, TestUtil::unforcedValue(c1));
+  EXPECT_EQ(2UL, TestUtil::unforcedValue(c2));
 
   // We should dedup when we fetch all counters to handle the overlapping case.
   EXPECT_EQ(1UL, store_->counters().size());
@@ -576,11 +576,11 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   Gauge& g2 = scope2->gaugeFromString("g", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &g2);
   g1.set(5);
-  EXPECT_EQ(5UL, g1.value());
-  EXPECT_EQ(5UL, g2.value());
+  EXPECT_EQ(5UL, TestUtil::unforcedValue(g1));
+  EXPECT_EQ(5UL, TestUtil::unforcedValue(g2));
   g2.set(1);
-  EXPECT_EQ(1UL, g1.value());
-  EXPECT_EQ(1UL, g2.value());
+  EXPECT_EQ(1UL, TestUtil::unforcedValue(g1));
+  EXPECT_EQ(1UL, TestUtil::unforcedValue(g2));
   EXPECT_EQ(1UL, store_->gauges().size());
 
   // TextReadouts should work just like gauges.
@@ -599,10 +599,10 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
   scope1.reset();
   c2.inc();
-  EXPECT_EQ(3UL, c2.value());
+  EXPECT_EQ(3UL, TestUtil::unforcedValue(c2));
   EXPECT_EQ(1UL, store_->counters().size());
   g2.set(10);
-  EXPECT_EQ(10UL, g2.value());
+  EXPECT_EQ(10UL, TestUtil::unforcedValue(g2));
   EXPECT_EQ(1UL, store_->gauges().size());
   t2.set("abc");
   EXPECT_EQ("abc", t2.value());
@@ -757,13 +757,13 @@ public:
 TEST_F(StatsMatcherNoopTest, Counters) {
   Counter& noop_counter = store_->counterFromString("noop_counter");
   EXPECT_EQ(noop_counter.name(), "");
-  EXPECT_EQ(noop_counter.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter), 0);
   noop_counter.add(1);
-  EXPECT_EQ(noop_counter.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter), 0);
   noop_counter.inc();
-  EXPECT_EQ(noop_counter.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter), 0);
   noop_counter.reset();
-  EXPECT_EQ(noop_counter.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter), 0);
   Counter& noop_counter_2 = store_->counterFromString("noop_counter_2");
   EXPECT_EQ(&noop_counter, &noop_counter_2);
   EXPECT_FALSE(noop_counter.used());      // hardcoded to return false in NullMetricImpl.
@@ -772,29 +772,29 @@ TEST_F(StatsMatcherNoopTest, Counters) {
   Counter& noop_counter_3 = store_->counterFromStatNameWithTags(makeStatName("noop_counter_3"),
                                                                 absl::nullopt, Mode::ForceEnable);
   EXPECT_EQ(noop_counter_3.name(), "noop_counter_3");
-  EXPECT_EQ(noop_counter_3.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter_3), 0);
   noop_counter_3.add(1);
-  EXPECT_EQ(noop_counter_3.value(), 1);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter_3), 1);
   noop_counter_3.inc();
-  EXPECT_EQ(noop_counter_3.value(), 2);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter_3), 2);
   noop_counter_3.reset();
-  EXPECT_EQ(noop_counter_3.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_counter_3), 0);
 }
 
 TEST_F(StatsMatcherNoopTest, Gauges) {
   Gauge& noop_gauge = store_->gaugeFromString("noop_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(noop_gauge.name(), "");
-  EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge), 0);
   noop_gauge.add(1);
-  EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge), 0);
   noop_gauge.inc();
-  EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge), 0);
   noop_gauge.dec();
-  EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge), 0);
   noop_gauge.set(2);
-  EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge), 0);
   noop_gauge.sub(2);
-  EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge), 0);
   EXPECT_EQ(Gauge::ImportMode::NeverImport, noop_gauge.importMode());
   EXPECT_FALSE(noop_gauge.used());      // null gauge is contained in ThreadLocalStoreImpl.
   EXPECT_EQ(0, noop_gauge.use_count()); // null gauge is contained in ThreadLocalStoreImpl.
@@ -806,17 +806,17 @@ TEST_F(StatsMatcherNoopTest, Gauges) {
       store_->gaugeFromStatNameWithTags(makeStatName("noop_gauge_3"), absl::nullopt,
                                         Gauge::ImportMode::Accumulate, Mode::ForceEnable);
   EXPECT_EQ(noop_gauge_3.name(), "noop_gauge_3");
-  EXPECT_EQ(noop_gauge_3.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge_3), 0);
   noop_gauge_3.add(1);
-  EXPECT_EQ(noop_gauge_3.value(), 1);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge_3), 1);
   noop_gauge_3.inc();
-  EXPECT_EQ(noop_gauge_3.value(), 2);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge_3), 2);
   noop_gauge_3.dec();
-  EXPECT_EQ(noop_gauge_3.value(), 1);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge_3), 1);
   noop_gauge_3.set(2);
-  EXPECT_EQ(noop_gauge_3.value(), 2);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge_3), 2);
   noop_gauge_3.sub(2);
-  EXPECT_EQ(noop_gauge_3.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(noop_gauge_3), 0);
   EXPECT_EQ(Gauge::ImportMode::Accumulate, noop_gauge_3.importMode());
   EXPECT_TRUE(noop_gauge_3.used());
   EXPECT_EQ(1, noop_gauge_3.use_count());
@@ -899,17 +899,17 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   Counter& uppercase_counter = store_->counterFromString("UPPERCASE_counter");
   EXPECT_EQ(uppercase_counter.name(), "");
   uppercase_counter.inc();
-  EXPECT_EQ(uppercase_counter.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(uppercase_counter), 0);
   uppercase_counter.inc();
-  EXPECT_EQ(uppercase_counter.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(uppercase_counter), 0);
 
   Gauge& uppercase_gauge =
       store_->gaugeFromString("uppercase_GAUGE", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(uppercase_gauge.name(), "");
   uppercase_gauge.inc();
-  EXPECT_EQ(uppercase_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(uppercase_gauge), 0);
   uppercase_gauge.inc();
-  EXPECT_EQ(uppercase_gauge.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(uppercase_gauge), 0);
 
   TextReadout& uppercase_string = store_->textReadoutFromString("uppercase_STRING");
   EXPECT_EQ(uppercase_string.name(), "");
@@ -930,30 +930,30 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 
   Counter& valid_counter = store_->counterFromString("valid_counter");
   valid_counter.inc();
-  EXPECT_EQ(valid_counter.value(), 1);
+  EXPECT_EQ(TestUtil::unforcedValue(valid_counter), 1);
 
   Counter& invalid_counter = store_->counterFromString("invalid_counter");
   invalid_counter.inc();
-  EXPECT_EQ(invalid_counter.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(invalid_counter), 0);
 
   // But the old exclusion rule still holds.
   Counter& invalid_counter_2 = store_->counterFromString("also_INVALID_counter");
   invalid_counter_2.inc();
-  EXPECT_EQ(invalid_counter_2.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(invalid_counter_2), 0);
 
   // And we expect the same behavior from gauges and histograms.
   Gauge& valid_gauge = store_->gaugeFromString("valid_gauge", Gauge::ImportMode::Accumulate);
   valid_gauge.set(2);
-  EXPECT_EQ(valid_gauge.value(), 2);
+  EXPECT_EQ(TestUtil::unforcedValue(valid_gauge), 2);
 
   Gauge& invalid_gauge_1 = store_->gaugeFromString("invalid_gauge", Gauge::ImportMode::Accumulate);
   invalid_gauge_1.inc();
-  EXPECT_EQ(invalid_gauge_1.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(invalid_gauge_1), 0);
 
   Gauge& invalid_gauge_2 =
       store_->gaugeFromString("also_INVALID_gauge", Gauge::ImportMode::Accumulate);
   invalid_gauge_2.inc();
-  EXPECT_EQ(invalid_gauge_2.value(), 0);
+  EXPECT_EQ(TestUtil::unforcedValue(invalid_gauge_2), 0);
 
   Histogram& valid_histogram =
       store_->histogramFromString("valid_histogram", Stats::Histogram::Unit::Unspecified);

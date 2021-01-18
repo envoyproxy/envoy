@@ -143,6 +143,7 @@ public:
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(bool, used, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
+  MOCK_METHOD(uint64_t, valueForceEnabled, (), (const));
   MOCK_METHOD(Mode, mode, (), (const));
 
   bool used_;
@@ -172,6 +173,7 @@ public:
   MOCK_METHOD(void, mergeImportMode, (ImportMode));
   MOCK_METHOD(bool, used, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
+  MOCK_METHOD(uint64_t, valueForceEnabled, (), (const));
   MOCK_METHOD(absl::optional<bool>, cachedShouldImport, (), (const));
   MOCK_METHOD(ImportMode, importMode, (), (const));
   MOCK_METHOD(Mode, mode, (), (const));

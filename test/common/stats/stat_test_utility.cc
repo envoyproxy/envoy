@@ -222,12 +222,22 @@ findByString(const std::string& name, const absl::flat_hash_map<std::string, Sta
   return ret;
 }
 
-CounterOptConstRef TestStore::findCounterByString(const std::string& name) const {
-  return findByString<Counter>(name, counter_map_);
+TestCounterOptConstRef TestStore::findCounterByString(const std::string& name) const {
+  StatTypeOptConstRef<Counter> opt_counter = findByString<Counter>(name, counter_map_);
+  if (opt_counter.has_value()) {
+    TestConstCounter test_counter(opt_counter.value().get());
+    return test_counter;
+  }
+  return TestCounterOptConstRef();
 }
 
-GaugeOptConstRef TestStore::findGaugeByString(const std::string& name) const {
-  return findByString<Gauge>(name, gauge_map_);
+TestGaugeOptConstRef TestStore::findGaugeByString(const std::string& name) const {
+  StatTypeOptConstRef<Gauge> opt_gauge = findByString<Gauge>(name, gauge_map_);
+  if (opt_gauge.has_value()) {
+    TestConstGauge test_gauge(opt_gauge.value().get());
+    return test_gauge;
+  }
+  return TestGaugeOptConstRef();
 }
 
 HistogramOptConstRef TestStore::findHistogramByString(const std::string& name) const {

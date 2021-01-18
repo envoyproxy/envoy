@@ -4,6 +4,7 @@
 #include "common/stats/stat_merger.h"
 #include "common/stats/thread_local_store.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -72,27 +73,27 @@ TEST_F(StatMergerTest, CounterMerge) {
   counter_deltas["draculaer"] = 1;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   // Initial combined value: 1+1.
-  EXPECT_EQ(2, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(2, TestUtil::unforcedValue(store_.counterFromString("draculaer")));
   EXPECT_EQ(1, store_.counterFromString("draculaer").latch());
 
   // The parent's counter increases by 1.
   counter_deltas["draculaer"] = 1;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
-  EXPECT_EQ(3, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(3, TestUtil::unforcedValue(store_.counterFromString("draculaer")));
   EXPECT_EQ(1, store_.counterFromString("draculaer").latch());
 
   // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
   store_.counterFromString("draculaer").add(4);
   counter_deltas["draculaer"] = 0;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
-  EXPECT_EQ(7, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(7, TestUtil::unforcedValue(store_.counterFromString("draculaer")));
   EXPECT_EQ(4, store_.counterFromString("draculaer").latch());
 
   // Our counter and the parent's counter both increase by 2, total increase of 4.
   store_.counterFromString("draculaer").add(2);
   counter_deltas["draculaer"] = 2;
   stat_merger_.mergeStats(counter_deltas, empty_gauges_);
-  EXPECT_EQ(11, store_.counterFromString("draculaer").value());
+  EXPECT_EQ(11, TestUtil::unforcedValue(store_.counterFromString("draculaer")));
   EXPECT_EQ(4, store_.counterFromString("draculaer").latch());
 }
 
@@ -100,7 +101,7 @@ TEST_F(StatMergerTest, BasicDefaultAccumulationImport) {
   Protobuf::Map<std::string, uint64_t> gauges;
   gauges["whywassixafraidofseven"] = 111;
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(789, whywassixafraidofseven_.value());
+  EXPECT_EQ(789, TestUtil::unforcedValue(whywassixafraidofseven_));
 }
 
 TEST_F(StatMergerTest, MultipleImportsWithAccumulationLogic) {
@@ -109,14 +110,14 @@ TEST_F(StatMergerTest, MultipleImportsWithAccumulationLogic) {
     gauges["whywassixafraidofseven"] = 100;
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
     // Initial combined values: 678+100 and 1+2.
-    EXPECT_EQ(778, whywassixafraidofseven_.value());
+    EXPECT_EQ(778, TestUtil::unforcedValue(whywassixafraidofseven_));
   }
   {
     Protobuf::Map<std::string, uint64_t> gauges;
     // The parent's gauge drops by 1, and its counter increases by 1.
     gauges["whywassixafraidofseven"] = 99;
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-    EXPECT_EQ(777, whywassixafraidofseven_.value());
+    EXPECT_EQ(777, TestUtil::unforcedValue(whywassixafraidofseven_));
   }
   {
     Protobuf::Map<std::string, uint64_t> gauges;
@@ -124,7 +125,7 @@ TEST_F(StatMergerTest, MultipleImportsWithAccumulationLogic) {
     // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
     whywassixafraidofseven_.add(12);
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-    EXPECT_EQ(789, whywassixafraidofseven_.value());
+    EXPECT_EQ(789, TestUtil::unforcedValue(whywassixafraidofseven_));
   }
   {
     Protobuf::Map<std::string, uint64_t> gauges;
@@ -133,7 +134,7 @@ TEST_F(StatMergerTest, MultipleImportsWithAccumulationLogic) {
     whywassixafraidofseven_.sub(5);
     gauges["whywassixafraidofseven"] = 104;
     stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-    EXPECT_EQ(789, whywassixafraidofseven_.value());
+    EXPECT_EQ(789, TestUtil::unforcedValue(whywassixafraidofseven_));
   }
 }
 
@@ -150,7 +151,7 @@ TEST_F(StatMergerTest, ExclusionsNotImported) {
 
   // Check defined values are not changed, and undefined remain undefined.
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(12345, some_sort_of_version.value());
+  EXPECT_EQ(12345, TestUtil::unforcedValue(some_sort_of_version));
   EXPECT_FALSE(
       store_.gaugeFromString("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport)
           .used());
@@ -337,11 +338,12 @@ TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
     gauges["newgauge1"] = 1;
     gauges["newgauge2"] = 2;
     stat_merger.mergeStats(counter_deltas, gauges);
-    EXPECT_EQ(0, store_.counterFromString("newcounter0").value());
+    EXPECT_EQ(0, TestUtil::unforcedValue(store_.counterFromString("newcounter0")));
     EXPECT_EQ(0, store_.counterFromString("newcounter0").latch());
-    EXPECT_EQ(1, store_.counterFromString("newcounter1").value());
+    EXPECT_EQ(1, TestUtil::unforcedValue(store_.counterFromString("newcounter1")));
     EXPECT_EQ(1, store_.counterFromString("newcounter1").latch());
-    EXPECT_EQ(1, store_.gaugeFromString("newgauge1", Gauge::ImportMode::Accumulate).value());
+    EXPECT_EQ(1, TestUtil::unforcedValue(store_.gaugeFromString(
+        "newgauge1", Gauge::ImportMode::Accumulate)));
   }
   // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
   // 2 should be gone.
@@ -359,16 +361,16 @@ TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
   Gauge& gauge = store_.gaugeFromString("mygauge", Gauge::ImportMode::Accumulate);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
-  EXPECT_EQ(42, gauge.value());
+  EXPECT_EQ(42, TestUtil::unforcedValue(gauge));
   {
     StatMerger stat_merger(store_);
     Protobuf::Map<std::string, uint64_t> counter_deltas;
     Protobuf::Map<std::string, uint64_t> gauges;
     gauges["mygauge"] = 789;
     stat_merger.mergeStats(counter_deltas, gauges);
-    EXPECT_EQ(789 + 42, gauge.value());
+    EXPECT_EQ(789 + 42, TestUtil::unforcedValue(gauge));
   }
-  EXPECT_EQ(42, gauge.value());
+  EXPECT_EQ(42, TestUtil::unforcedValue(gauge));
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
 }
 
@@ -379,7 +381,7 @@ TEST_F(StatMergerThreadLocalTest, RetainNeverImportModeAfterMerge) {
   Gauge& gauge = store_.gaugeFromString("mygauge", Gauge::ImportMode::NeverImport);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());
-  EXPECT_EQ(42, gauge.value());
+  EXPECT_EQ(42, TestUtil::unforcedValue(gauge));
   {
     StatMerger stat_merger(store_);
     Protobuf::Map<std::string, uint64_t> counter_deltas;
@@ -388,7 +390,7 @@ TEST_F(StatMergerThreadLocalTest, RetainNeverImportModeAfterMerge) {
     stat_merger.mergeStats(counter_deltas, gauges);
   }
   EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());
-  EXPECT_EQ(42, gauge.value());
+  EXPECT_EQ(42, TestUtil::unforcedValue(gauge));
 }
 
 } // namespace

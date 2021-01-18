@@ -20,6 +20,7 @@ namespace Stats {
 MockCounter::MockCounter() {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
+  ON_CALL(*this, valueForceEnabled()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, latch()).WillByDefault(ReturnPointee(&latch_));
   ON_CALL(*this, mode()).WillByDefault(Return(Mode::Default));
 }
@@ -28,6 +29,7 @@ MockCounter::~MockCounter() = default;
 MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accumulate) {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
+  ON_CALL(*this, valueForceEnabled()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, importMode()).WillByDefault(ReturnPointee(&import_mode_));
 }
 MockGauge::~MockGauge() = default;

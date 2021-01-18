@@ -22,6 +22,7 @@
 #include "server/options_impl.h"
 #include "server/server.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server_stats.h"
 #include "test/integration/tcp_dump.h"
 #include "test/test_common/test_time_system.h"
@@ -192,7 +193,8 @@ public:
   void inc() override { add(1); }
   uint64_t latch() override { return counter_->latch(); }
   void reset() override { return counter_->reset(); }
-  uint64_t value() const override { return counter_->value(); }
+  uint64_t value() const override { return Stats::TestUtil::unforcedValue(*counter_); }
+  uint64_t valueForceEnabled() const override { return counter_->valueForceEnabled(); }
   void incRefCount() override { counter_->incRefCount(); }
   bool decRefCount() override { return counter_->decRefCount(); }
   uint32_t use_count() const override { return counter_->use_count(); }

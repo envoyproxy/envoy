@@ -100,6 +100,11 @@ public:
   virtual const SymbolTable& constSymbolTable() const PURE;
 };
 
+class UnforcedReader {
+public:
+  template<class T> static uint64_t value(T& stat) { return stat.value(); }
+};
+
 /**
  * An always incrementing counter with latching capability. Each increment is added both to a
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
@@ -113,8 +118,13 @@ public:
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
-  virtual uint64_t value() const PURE;
   virtual Mode mode() const PURE;
+  virtual uint64_t valueForceEnabled() const PURE;
+
+protected:
+  friend UnforcedReader;
+
+  virtual uint64_t value() const PURE;
 };
 
 using CounterSharedPtr = RefcountPtr<Counter>;
@@ -137,7 +147,6 @@ public:
   virtual void inc() PURE;
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
-  virtual uint64_t value() const PURE;
 
   /**
    * Sets a value from a hot-restart parent. This parent contribution must be
@@ -166,6 +175,13 @@ public:
 
   /** @return the mode. */
   virtual Mode mode() const PURE;
+
+  virtual uint64_t valueForceEnabled() const PURE;
+
+protected:
+  friend UnforcedReader;
+
+  virtual uint64_t value() const PURE;
 };
 
 using GaugeSharedPtr = RefcountPtr<Gauge>;
@@ -192,6 +208,7 @@ public:
   /**
    * @return the copy of this TextReadout value.
    */
+
   virtual std::string value() const PURE;
 
   /** @return the mode. */

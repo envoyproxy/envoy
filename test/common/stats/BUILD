@@ -16,6 +16,7 @@ envoy_cc_test(
     name = "allocator_impl_test",
     srcs = ["allocator_impl_test.cc"],
     deps = [
+        ":stat_test_utility_lib",
         "//source/common/stats:allocator_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:thread_factory_for_test_lib",
@@ -26,6 +27,7 @@ envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
     deps = [
+        ":stat_test_utility_lib",
         "//source/common/stats:isolated_store_lib",
     ],
 )
@@ -281,6 +283,7 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
+        ":stat_test_utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/stats:utility_lib",
