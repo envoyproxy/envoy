@@ -1050,6 +1050,42 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::RequestHeaders);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "16");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(16)));
+  }
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "10");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(10)));
+  }
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "23");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(23)));
+  }
+}
+
 TEST(SubstitutionFormatterTest, responseHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};

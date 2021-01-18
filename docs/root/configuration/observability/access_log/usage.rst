@@ -163,6 +163,13 @@ The following command operators are supported:
 
   In typed JSON logs, START_TIME is always rendered as a string.
 
+%REQUEST_HEADERS_BYTES%
+  HTTP
+    Uncompressed bytes of request headers.
+
+  TCP
+    Not implemented (0).
+
 %BYTES_RECEIVED%
   HTTP
     Body bytes received.
@@ -212,6 +219,20 @@ The following command operators are supported:
   HTTP and TCP
     Connection termination details may provide additional information about why the connection was
     terminated by Envoy for L4 reasons.
+
+%RESPONSE_HEADERS_BYTES%
+  HTTP
+    Uncompressed bytes of response headers.
+
+  TCP
+    Not implemented (0).
+
+%RESPONSE_TRAILERS_BYTES%
+  HTTP
+    Uncompressed bytes of response trailers.
+
+  TCP
+    Not implemented (0).
 
 %BYTES_SENT%
   HTTP

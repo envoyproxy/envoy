@@ -229,6 +229,33 @@ private:
 };
 
 /**
+ * FormatterProvider for headers byte size.
+ */
+class HeadersByteSizeFormatter : public FormatterProvider {
+public:
+  // TODO(taoxuy): Add RequestTrailers here.
+  enum class HeaderType { RequestHeaders, ResponseHeaders, ResponseTrailers };
+
+  HeadersByteSizeFormatter(const HeaderType header_type);
+
+  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
+                                     const Http::ResponseHeaderMap& response_headers,
+                                     const Http::ResponseTrailerMap& response_trailers,
+                                     const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&, absl::string_view) const override;
+
+private:
+  uint64_t extractHeadersByteSize(const Http::RequestHeaderMap& request_headers,
+                                  const Http::ResponseHeaderMap& response_headers,
+                                  const Http::ResponseTrailerMap& response_trailers) const;
+  HeaderType header_type_;
+};
+
+/**
  * FormatterProvider for request headers.
  */
 class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
