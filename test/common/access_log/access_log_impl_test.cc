@@ -159,12 +159,12 @@ typed_config:
   response_headers_.addCopy("response_header_key", "response_header_val");
   response_trailers_.addCopy("response_trailer_key", "response_trailer_val");
 
-  //    request headers:
-  //    :method: GET
-  //    :path: /
-  //    request_header_key: request_header_val
-
-  //    response headers:
+  // request headers:
+  // :method: GET
+  // :path: /
+  // request_header_key: request_header_val
+  //
+  // response headers:
   // response_header_key: response_header_val
   //
   // response trailers:

@@ -165,7 +165,7 @@ The following command operators are supported:
 
 %REQUEST_HEADERS_BYTES%
   HTTP
-    Request headers bytes.
+    Uncompressed bytes of request headers.
 
   TCP
     Not implemented (0).
@@ -222,14 +222,14 @@ The following command operators are supported:
 
 %RESPONSE_HEADERS_BYTES%
   HTTP
-    Response headers bytes.
+    Uncompressed bytes of response headers.
 
   TCP
     Not implemented (0).
 
 %RESPONSE_TRAILERS_BYTES%
   HTTP
-    Response trailers bytes.
+    Uncompressed bytes of response trailers.
 
   TCP
     Not implemented (0).
