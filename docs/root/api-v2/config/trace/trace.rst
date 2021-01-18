@@ -1,4 +1,4 @@
-HTTP Tracers
+HTTP 追踪器
 ==============
 
 .. toctree::
