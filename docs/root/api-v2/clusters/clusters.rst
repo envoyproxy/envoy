@@ -1,4 +1,4 @@
-Clusters
+集群
 ========
 
 .. toctree::
