@@ -42,7 +42,7 @@ private:
 class SourceClusterAction : public RateLimit::DescriptorProducer {
 public:
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
@@ -54,7 +54,7 @@ public:
 class DestinationClusterAction : public RateLimit::DescriptorProducer {
 public:
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
@@ -70,7 +70,7 @@ public:
         skip_if_absent_(action.skip_if_absent()) {}
 
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
@@ -87,7 +87,7 @@ private:
 class RemoteAddressAction : public RateLimit::DescriptorProducer {
 public:
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
@@ -104,7 +104,7 @@ public:
                                                          : "generic_key") {}
 
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
@@ -123,7 +123,7 @@ public:
   // for maintaining backward compatibility with the deprecated DynamicMetaData action
   MetaDataAction(const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action);
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
@@ -144,7 +144,7 @@ public:
       const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action);
 
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
@@ -169,6 +169,10 @@ public:
   void populateDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                            const std::string& local_service_cluster, const Http::RequestHeaderMap&,
                            const StreamInfo::StreamInfo& info) const override;
+  void populateLocalDescriptors(std::vector<Envoy::RateLimit::LocalDescriptor>& descriptors,
+                                const std::string& local_service_cluster,
+                                const Http::RequestHeaderMap&,
+                                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const std::string disable_key_;

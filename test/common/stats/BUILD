@@ -233,6 +233,25 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "tag_extractor_impl_benchmark",
+    srcs = [
+        "tag_extractor_impl_speed_test.cc",
+    ],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/stats:tag_producer_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "tag_extractor_impl_benchmark_test",
+    benchmark_binary = "tag_extractor_impl_benchmark",
+)
+
 envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],

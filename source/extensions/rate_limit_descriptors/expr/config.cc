@@ -30,7 +30,7 @@ public:
   }
 
   // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::Descriptor& descriptor, const std::string&,
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
     ProtobufWkt::Arena arena;
@@ -42,7 +42,7 @@ public:
       // service.
       return skip_if_error_;
     }
-    descriptor.entries_.push_back({descriptor_key_, Filters::Common::Expr::print(result.value())});
+    descriptor_entry = {descriptor_key_, Filters::Common::Expr::print(result.value())};
     return true;
   }
 

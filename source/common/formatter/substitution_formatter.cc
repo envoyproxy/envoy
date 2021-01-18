@@ -113,6 +113,12 @@ FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values)
   providers_ = SubstitutionFormatParser::parse(format);
 }
 
+FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values,
+                             const std::vector<CommandParserPtr>& command_parsers)
+    : empty_value_string_(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueString) {
+  providers_ = SubstitutionFormatParser::parse(format, command_parsers);
+}
+
 std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
                                   const Http::ResponseHeaderMap& response_headers,
                                   const Http::ResponseTrailerMap& response_trailers,
@@ -282,109 +288,143 @@ void SubstitutionFormatParser::parseCommand(const std::string& token, const size
   }
 }
 
-// TODO(derekargueta): #2967 - Rewrite SubstitutionFormatter with parser library & formal grammar
 std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
-  std::string current_token;
-  std::vector<FormatterProviderPtr> formatters;
+  return SubstitutionFormatParser::parse(format, {});
+}
+
+FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token) {
   static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
   static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
-  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
-
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
 
+  if (absl::StartsWith(token, "REQ(")) {
+    std::string main_header, alternative_header;
+    absl::optional<size_t> max_length;
+
+    parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
+
+    return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header, max_length);
+  } else if (absl::StartsWith(token, "RESP(")) {
+    std::string main_header, alternative_header;
+    absl::optional<size_t> max_length;
+
+    parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
+
+    return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header, max_length);
+  } else if (absl::StartsWith(token, "TRAILER(")) {
+    std::string main_header, alternative_header;
+    absl::optional<size_t> max_length;
+
+    parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
+
+    return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header, max_length);
+  } else if (absl::StartsWith(token, "LOCAL_REPLY_BODY")) {
+    return std::make_unique<LocalReplyBodyFormatter>();
+  } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
+    std::string filter_namespace;
+    absl::optional<size_t> max_length;
+    std::vector<std::string> path;
+    const size_t start = DYNAMIC_META_TOKEN.size();
+
+    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
+  } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
+    std::string key;
+    absl::optional<size_t> max_length;
+    std::vector<std::string> path;
+    const size_t start = FILTER_STATE_TOKEN.size();
+
+    parseCommand(token, start, ":", key, path, max_length);
+    if (key.empty()) {
+      throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
+    }
+
+    const absl::string_view serialize_type =
+        !path.empty() ? path[path.size() - 1] : TYPED_SERIALIZATION;
+
+    if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
+      throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
+    }
+    const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
+
+    return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string);
+  } else if (absl::StartsWith(token, "START_TIME")) {
+    return std::make_unique<StartTimeFormatter>(token);
+  } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
+    return std::make_unique<DownstreamPeerCertVStartFormatter>(token);
+  } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
+    return std::make_unique<DownstreamPeerCertVEndFormatter>(token);
+  } else if (absl::StartsWith(token, "GRPC_STATUS")) {
+    return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>());
+  } else if (absl::StartsWith(token, "REQUEST_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::RequestHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_TRAILERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
+  }
+
+  return nullptr;
+}
+
+// TODO(derekargueta): #2967 - Rewrite SubstitutionFormatter with parser library & formal grammar
+std::vector<FormatterProviderPtr>
+SubstitutionFormatParser::parse(const std::string& format,
+                                const std::vector<CommandParserPtr>& commands) {
+  std::string current_token;
+  std::vector<FormatterProviderPtr> formatters;
+  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
+
   for (size_t pos = 0; pos < format.length(); ++pos) {
-    if (format[pos] == '%') {
-      if (!current_token.empty()) {
-        formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
-        current_token = "";
+    if (format[pos] != '%') {
+      current_token += format[pos];
+      continue;
+    }
+
+    if (!current_token.empty()) {
+      formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
+      current_token = "";
+    }
+
+    std::smatch m;
+    const std::string search_space = format.substr(pos);
+    if (!std::regex_search(search_space, m, command_w_args_regex)) {
+      throw EnvoyException(fmt::format(
+          "Incorrect configuration: {}. Couldn't find valid command at position {}", format, pos));
+    }
+
+    const std::string match = m.str(0);
+    const std::string token = match.substr(1, match.length() - 2);
+    pos += 1;
+    const size_t command_end_position = pos + token.length();
+
+    auto formatter = parseBuiltinCommand(token);
+    if (formatter) {
+      formatters.push_back(std::move(formatter));
+    } else {
+      // Check formatter extensions. These are used for anything not provided by the built-in
+      // operators, e.g.: specialized formatting, computing stats from request/response headers
+      // or from stream info, etc.
+      bool added = false;
+      for (const auto& cmd : commands) {
+        auto formatter = cmd->parse(token, pos, command_end_position);
+        if (formatter) {
+          formatters.push_back(std::move(formatter));
+          added = true;
+          break;
+        }
       }
 
-      std::smatch m;
-      const std::string search_space = format.substr(pos);
-      if (!std::regex_search(search_space, m, command_w_args_regex)) {
-        throw EnvoyException(
-            fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
-                        format, pos));
-      }
-
-      const std::string match = m.str(0);
-      const std::string token = match.substr(1, match.length() - 2);
-      pos += 1;
-      const int command_end_position = pos + token.length();
-
-      if (absl::StartsWith(token, "REQ(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
-
-        parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
-
-        formatters.emplace_back(FormatterProviderPtr{
-            new RequestHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "RESP(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
-
-        parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
-
-        formatters.emplace_back(FormatterProviderPtr{
-            new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "TRAILER(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
-
-        parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
-
-        formatters.emplace_back(FormatterProviderPtr{
-            new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "LOCAL_REPLY_BODY")) {
-        formatters.emplace_back(std::make_unique<LocalReplyBodyFormatter>());
-      } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
-        std::string filter_namespace;
-        absl::optional<size_t> max_length;
-        std::vector<std::string> path;
-        const size_t start = DYNAMIC_META_TOKEN.size();
-
-        parseCommand(token, start, ":", filter_namespace, path, max_length);
-        formatters.emplace_back(
-            FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
-      } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
-        std::string key;
-        absl::optional<size_t> max_length;
-        std::vector<std::string> path;
-        const size_t start = FILTER_STATE_TOKEN.size();
-
-        parseCommand(token, start, ":", key, path, max_length);
-        if (key.empty()) {
-          throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
-        }
-
-        const absl::string_view serialize_type =
-            !path.empty() ? path[path.size() - 1] : TYPED_SERIALIZATION;
-
-        if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
-          throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
-        }
-        const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
-
-        formatters.push_back(
-            std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
-      } else if (absl::StartsWith(token, "START_TIME")) {
-        formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(token)});
-      } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
-        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVStartFormatter(token)});
-      } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
-        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVEndFormatter(token)});
-      } else if (absl::StartsWith(token, "GRPC_STATUS")) {
-        formatters.emplace_back(FormatterProviderPtr{
-            new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
-      } else {
+      if (!added) {
         formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
       }
-      pos = command_end_position;
-    } else {
-      current_token += format[pos];
     }
+
+    pos = command_end_position;
   }
 
   if (!current_token.empty()) {
@@ -922,6 +962,41 @@ ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http:
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo&, absl::string_view) const {
   return HeaderFormatter::formatValue(response_trailers);
+}
+
+HeadersByteSizeFormatter::HeadersByteSizeFormatter(const HeaderType header_type)
+    : header_type_(header_type) {}
+
+uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers) const {
+  switch (header_type_) {
+  case HeaderType::RequestHeaders:
+    return request_headers.byteSize();
+  case HeaderType::ResponseHeaders:
+    return response_headers.byteSize();
+  case HeaderType::ResponseTrailers:
+    return response_trailers.byteSize();
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+absl::optional<std::string>
+HeadersByteSizeFormatter::format(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&, absl::string_view) const {
+  return absl::StrCat(extractHeadersByteSize(request_headers, response_headers, response_trailers));
+}
+
+ProtobufWkt::Value
+HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
+                                      const Http::ResponseHeaderMap& response_headers,
+                                      const Http::ResponseTrailerMap& response_trailers,
+                                      const StreamInfo::StreamInfo&, absl::string_view) const {
+  return ValueUtil::numberValue(
+      extractHeadersByteSize(request_headers, response_headers, response_trailers));
 }
 
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
