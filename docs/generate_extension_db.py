@@ -71,4 +71,8 @@ if __name__ == '__main__':
   extension_db['envoy.upstreams.http.http_protocol_options'] = GetExtensionMetadata(
       '//source/extensions/upstreams/http:config')
 
+  print('EXTENSION DB')
+  print(extesion_db)
+  print()
+
   pathlib.Path(output_path).write_text(json.dumps(extension_db))
