@@ -233,8 +233,8 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
       RequestParser::parsePartitions(json_body);
   for (const RequestParser::PartitionDescriptor& partition : partitions) {
     stats_
-        ->buildPartitionStatCounter(table_descriptor_.table_name, operation_,
-                                    partition.partition_id_)
+        .buildPartitionStatCounter(table_descriptor_.table_name, operation_,
+                                   partition.partition_id_)
         .add(partition.capacity_);
   }
 }

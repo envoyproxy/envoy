@@ -33,8 +33,8 @@ public:
         .WillByDefault(Return(enabled));
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
-    auto stats = std::make_shared<DynamoStats>(stats_, "prefix.");
-    filter_ = std::make_unique<DynamoFilter>(loader_, stats,
+    dynamo_stats_ = std::make_shared<DynamoStats>(stats_, "prefix.");
+    filter_ = std::make_unique<DynamoFilter>(loader_, *dynamo_stats_,
                                              decoder_callbacks_.dispatcher().timeSource());
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -44,6 +44,7 @@ public:
   ~DynamoFilterTest() override { filter_->onDestroy(); }
 
   NiceMock<Stats::MockStore> stats_;
+  std::shared_ptr<DynamoStats> dynamo_stats_;
   std::unique_ptr<DynamoFilter> filter_;
   NiceMock<Runtime::MockLoader> loader_;
   std::string stat_prefix_{"prefix."};

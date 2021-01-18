@@ -19,7 +19,7 @@ Http::FilterFactoryCb DynamoFilterConfig::createFilterFactoryFromProtoTyped(
   auto stats = std::make_shared<DynamoStats>(context.scope(), stats_prefix);
   return [&context, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Dynamo::DynamoFilter>(
-        context.runtime(), stats, context.dispatcher().timeSource()));
+        context.runtime(), *stats, context.dispatcher().timeSource()));
   };
 }
 
