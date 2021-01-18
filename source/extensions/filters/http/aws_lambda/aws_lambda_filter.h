@@ -125,7 +125,7 @@ private:
   // Convert the JSON response to a standard HTTP response.
   void dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::Instance& body,
                          Buffer::Instance& out);
-  const FilterSettings& settings_;
+  const FilterSettings settings_;
   FilterStats stats_;
   Http::RequestHeaderMap* request_headers_ = nullptr;
   Http::ResponseHeaderMap* response_headers_ = nullptr;
