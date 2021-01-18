@@ -105,6 +105,7 @@ envoy_cc_test(
     srcs = ["filter_config_test.cc"],
     deps = [
         "//include/envoy/server:filter_config_interface",
+        "//test/mocks/server:server_mocks",
     ],
 )
 
