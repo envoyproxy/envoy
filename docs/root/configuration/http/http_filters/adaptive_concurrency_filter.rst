@@ -1,118 +1,106 @@
 .. _config_http_filters_adaptive_concurrency:
 
-Adaptive Concurrency
+自适应并发
 ====================
 
 .. attention::
 
-  The adaptive concurrency filter is experimental and is currently under active development.
+  自适应过滤器还是实验性的，目前正在积极开发中
 
-This filter should be configured with the name `envoy.filters.http.adaptive_concurrency`.
+这个过滤器应该通过名字 `envoy.filters.http.adaptive_concurrency` 配置
 
-See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.
+查看 :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` 来获取各配置参数的详细信息。
 
-Overview
+概览
 --------
-The adaptive concurrency filter dynamically adjusts the allowed number of requests that can be
-outstanding (concurrency) to all hosts in a given cluster at any time. Concurrency values are
-calculated using latency sampling of completed requests and comparing the measured samples in a time
-window against the expected latency for hosts in the cluster.
+自适应并发过滤器可以在任何时候动态调整连接到给定集群中所有主机的允许未完成（并发）的请求数。并发值
+的计算方法是使用已完成请求的延迟采样，然后将时间窗口中的测量样本与集群中主机的预期延迟进行比较。
 
-Concurrency Controllers
------------------------
-Concurrency controllers implement the algorithm responsible for making forwarding decisions for each
-request and recording latency samples to use in the calculation of the concurrency limit.
+并发控制器
+------------
+并发控制器实现了负责为每个请求做出转发决策
+并记录在并发限制计算中使用的延迟采样的算法。
 
-Gradient Controller
+梯度控制器
 ~~~~~~~~~~~~~~~~~~~
-The gradient controller makes forwarding decisions based on a periodically measured ideal round-trip
-time (minRTT) for an upstream.
+梯度控制器基于上游理想往返时间（minRTT）周期性地测量做转发决策。
 
-:ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig>`
+:ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig>`
 
-Calculating the minRTT
+计算 minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The minRTT is periodically measured by only allowing a very low outstanding request count to an
-upstream cluster and measuring the latency under these ideal conditions. The calculation is also
-triggered in scenarios where the concurrency limit is determined to be the minimum possible value
-for 5 consecutive sampling windows. The length of this minRTT calculation window is variable
-depending on the number of requests the filter is configured to aggregate to represent the expected
-latency of an upstream.
+minRTT 通过只允许一个非常低的未完成请求计数来周期性地度量
+上游集群在这些理想条件下延迟。计算也是
+当并发限制被确定为可能的最小值时触发
+5个连续的采样窗口。minRTT 计算窗口的长度是根据请求的数量可变的
+，过滤器被配置为聚合以表示预期的请求上游延迟。
 
-A configurable *jitter* value is used to randomly delay the start of the minRTT calculation window
-by some amount of time. This is not necessary and can be disabled; however, it is recommended to
-prevent all hosts in a cluster from being in a minRTT calculation window (and having a concurrency
-limit of 3 by default) at the same time. The jitter helps negate the effect of the minRTT
-calculation on the downstream success rate if retries are enabled.
+一个可配置的 *jitter* 值用于随机延迟开始 minRTT 计算窗口的
+时间。这是不必要的，可以禁用; 但是，建议这样做
+防止集群中的所有主机处于 minRTT 计算窗口中(并且有一个并发限制，默认为3)同时。
+抖动有助于再开启重试情况下抵消在下行成功率技术上 minRTT 的影响
 
-It is possible that there is a noticeable increase in request 503s during the minRTT measurement
-window because of the potentially significant drop in the concurrency limit. This is expected and it
-is recommended to enable retries for resets/503s.
+在 minRTT 测量期间，在测量窗口可能有明显的 503 请求增加，因为并发限制可能显著下降。这是意料之中的事
+建议启用 resets/503 的重试。
 
 .. note::
 
-    It is recommended to use :ref:`the previous_hosts retry predicate
-    <arch_overview_http_retry_plugins>`. Due to the minRTT recalculation jitter, it's unlikely that
-    all hosts in the cluster will be in a minRTT calculation window, so retrying on a different host
-    in the cluster will have a higher likelihood of success in this scenario.
+    建议使用 :ref:`the previous_hosts retry predicate
+    <arch_overview_http_retry_plugins>`. minRTT 重新计算抖动, 不太可能
+    集群中的所有主机都将处于 minRTT 计算窗口中，因此在不同的主机上重新尝试
+    在这个场景下，在集群中成功的可能性更高。
 
-Once calculated, the minRTT is then used in the calculation of a value referred to as the
-*gradient*.
+一旦计算出来，minRTT 就被用于计算一个称为*梯度*的值.
 
-The Gradient
+梯度
 ^^^^^^^^^^^^
-The gradient is calculated using summarized sampled request latencies (sampleRTT):
+梯度使用汇总的抽样请求延迟来计算 (sampleRTT):
 
 .. math::
 
     gradient = \frac{minRTT + B}{sampleRTT}
 
-This gradient value has a useful property, such that it decreases as the sampled latencies increase.
-Notice that *B*, the buffer value added to the minRTT, allows for normal variance in the sampled
-latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
-before decreasing the gradient value.
+这个梯度值有一个有用的属性，它会随着抽样延迟的增加而减少。
+注意，添加到 minRTT 的缓冲区值 *B* 允许采样值的正态方差
+通过要求采样的延迟超过某个可配置阈值的 minRTT在减小梯度值之前。
 
-The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+缓冲区是测量的 minRTT 值的百分比，该值是通过缓冲区字段修改的
+:ref:`minRTT 计算参数 <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>` 
+缓冲区的计算如下:
 
 .. math::
 
     B = minRTT * buffer_{pct}
 
-The gradient value is then used to update the concurrency limit via:
+然后使用梯度值来更新并发限制:
 
 .. math::
 
     limit_{new} = gradient * limit_{old} + headroom
 
-Concurrency Limit Headroom
+并发限制空间
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-The headroom value is necessary as a driving factor to increase the concurrency limit when the
-sampleRTT is in the same ballpark as the minRTT. This value must be present in the limit
-calculation, since it forces the concurrency limit to increase until there is a deviation from the
-minRTT latency. In the absence of a headroom value, the concurrency limit could potentially stagnate
-at an unnecessary small value if the sampleRTT and minRTT are close to each other.
+事件发生时，头部值是增加并发限制的驱动因素，在sampleRTT 和 minRTT 差不多的情况下。
+此值必须存在于 limit 计算中，因为它强制增加并发限制，直到出现偏离 minRTT 延迟。如果没有头部值，并发限制可能会停滞
+如果 sampleRTT 和 minRTT 离得很近，则取一个不必要的小值。
 
-Because the headroom value is so necessary to the proper function for the gradient controller, the
-headroom value is unconfigurable and pinned to the square-root of the concurrency limit.
+因为头部值对于梯度控制器的适当功能是如此的必要，所以
+头部值是不可配置的，并且固定在并发限制的平方根上。
 
-Limitations
+限制
 -----------
-The adaptive concurrency filter's control loop relies on latency measurements
-and adjustments to the concurrency limit based on those measurements. Because of
-this, the filter must operate in conditions where it has full control over
-request concurrency. This means that:
+自适应并发过滤器的控制循环依赖于延迟测量以及基于这些度量对并发限制的调整。
+因为这些，过滤器必须在它能完全控制的条件下工作并发请求。这意味着:
 
-    1. The filter works as intended in the filter chain for a local cluster.
+    1. 该过滤器在本地集群的过滤器链中按照预期工作
 
-    2. The filter must be able to limit the concurrency for a cluster. This means
-       there must not be requests destined for a cluster that are not decoded by
-       the adaptive concurrency filter.
+    2. 该过滤器必须能够限制集群的并发性。这意味着不能有指向群集的未被自适应并发过滤器解码的请求
 
-Example Configuration
+示例配置
 ---------------------
-An example filter configuration can be found below. Not all fields are required and many of the
-fields can be overridden via runtime settings.
+下面可以找到一个过滤器配置示例。并不是所有的字段都是必需的
+可以通过运行时设置覆盖字段。
 
 .. code-block:: yaml
 
@@ -133,81 +121,72 @@ fields can be overridden via runtime settings.
       default_value: true
       runtime_key: "adaptive_concurrency.enabled"
 
-The above configuration can be understood as follows:
+以上配置的理解如下:
 
-* Gather latency samples for a time window of 100ms. When entering a new window, summarize the
-  requests (sampleRTT) and and update the concurrency limit using this sampleRTT.
-* When calculating the sampleRTT, use the p90 of all sampled latencies for that window.
-* Recalculate the minRTT every 60s and add a jitter (random delay) of 0s-6s to the start of the
-  minRTT recalculation. The delay is dictated by the jitter value.
-* Collect 50 request samples to calculate the minRTT and use the p90 to summarize them.
-* The filter is enabled by default.
+* 在100ms的时间窗口内收集延迟样本。当进入一个新窗口时，汇总请求 (sampleRTT) 和使用此 sampleRTT 更新并发限制
+* 在计算 sampleRTT 时，使用该窗口所有采样延迟的 百分之 90
+* 每隔 60 秒重新计算 minRTT ，并在开始处增加一个 0s-6s 的抖动(随机延迟) minRTT 重新计算。延迟由抖动值决定
+* 收集 50个 请求样本来计算 minRTT，并使用百分之 90 来汇总它们
+* 该过滤器默认启用
 
 .. note::
 
-    It is recommended that the adaptive concurrency filter come after the healthcheck filter in the
-    filter chain to prevent latency sampling of health checks. If health check traffic is sampled,
-    it could potentially affect the accuracy of the minRTT measurements.
+    建议自适应并发过滤器在 filter 链中位于健康检查过滤器之后，以防止运行状况检查的延迟采样。
+    如果对健康检查流量进行抽样，这可能会影响 minRTT 测量的准确性
 
-Runtime
+运行时
 -------
 
-The adaptive concurrency filter supports the following runtime settings:
+自适应并发过滤器支持以下运行时设置:
 
 adaptive_concurrency.enabled
-    Overrides whether the adaptive concurrency filter will use the concurrency controller for
-    forwarding decisions. If set to `false`, the filter will be a no-op. Defaults to what is
-    specified for `enabled` in the filter configuration.
+    重写自适应并发过滤器是否将使用并发控制器转发决策。如果设置为 `false`，该过滤器将是一个空操作。默认值
+    在筛选器配置中指定为 `enabled`
 
 adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms
-    Overrides the interval in which the ideal round-trip time (minRTT) will be recalculated.
+    覆盖重新计算理想往返时间 (minRTT) 的时间间隔
 
 adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count
-    Overrides the number of requests sampled for calculation of the minRTT.
+    覆盖为计算 minRTT 而采样的请求数
 
 adaptive_concurrency.gradient_controller.jitter
-    Overrides the random delay introduced to the minRTT calculation start time. A value of `10`
-    indicates a random delay of 10% of the configured interval. The runtime value specified is
-    clamped to the range [0,100].
+    覆盖 minRTT 计算开始时间引入的随机延迟。值为 `10` 表示为配置时间间隔的 10% 的随机延迟。指定的运行时值为
+    固定到范围 [0,100]
 
 adaptive_concurrency.gradient_controller.sample_rtt_calc_interval_ms
-    Overrides the interval in which the concurrency limit is recalculated based on sampled latencies.
-
+    重写基于抽样延迟重新计算并发限制的时间间隔
 adaptive_concurrency.gradient_controller.max_concurrency_limit
-    Overrides the maximum allowed concurrency limit.
+    覆盖允许的最大并发限制
 
 adaptive_concurrency.gradient_controller.min_rtt_buffer
-    Overrides the padding added to the minRTT when calculating the concurrency limit.
+    覆盖在计算并发限制时添加到 minRTT 的填充
 
 adaptive_concurrency.gradient_controller.sample_aggregate_percentile
-    Overrides the percentile value used to represent the collection of latency samples in
-    calculations. A value of `95` indicates the 95th percentile. The runtime value specified is
-    clamped to the range [0,100].
+    在百分位数值计算中用于表示延迟样本集合。值 `95` 表示第 95 个百分位数。指定的运行时值为固定到范围 [0,100]
 
 adaptive_concurrency.gradient_controller.min_concurrency
-    Overrides the concurrency that is pinned while measuring the minRTT.
+    覆盖在测量 minRTT 时固定的并发性
 
 Statistics
 ----------
-The adaptive concurrency filter outputs statistics in the
-*http.<stat_prefix>.adaptive_concurrency.* namespace. The :ref:`stat prefix
+自适应并发过滤器将统计信息输出到
+*http.<stat_prefix>.adaptive_concurrency.* namespace. :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
-comes from the owning HTTP connection manager. Statistics are specific to the concurrency
-controllers.
+来自所属的 HTTP connection manager. 统计信息是特定于并发性控制器的。
 
-Gradient Controller Statistics
+梯度控制器统计
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The gradient controller uses the namespace
+梯度控制器使用命名空间
 *http.<stat_prefix>.adaptive_concurrency.gradient_controller*.
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: auto
 
-  rq_blocked, Counter, Total requests that were blocked by the filter.
-  min_rtt_calculation_active, Gauge, Set to 1 if the controller is in the process of a minRTT calculation. 0 otherwise.
-  concurrency_limit, Gauge, The current concurrency limit.
-  gradient, Gauge, The current gradient value.
-  burst_queue_size, Gauge, The current headroom value in the concurrency limit calculation.
-  min_rtt_msecs, Gauge, The current measured minRTT value.
-  sample_rtt_msecs, Gauge, The current measured sampleRTT aggregate.
+  rq_blocked, Counter, 被筛选器阻止的请求总数
+  min_rtt_calculation_active, Gauge, 如果控制器正在进行 minRTT 计算，则设置为1，否则为 0 
+  concurrency_limit, Gauge, 当前并发限制
+  gradient, Gauge, 当前梯度值
+  burst_queue_size, Gauge, 并发限制计算中的当前头部值
+  min_rtt_msecs, Gauge, 当前测量的 minRTT 值
+  sample_rtt_msecs, Gauge, 当前测量的 sampleRTT 集
