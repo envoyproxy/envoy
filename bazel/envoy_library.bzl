@@ -80,6 +80,8 @@ EXTENSION_STATUS_VALUES = [
 def envoy_cc_extension(
         name,
         security_posture,
+        # Make this mandatory once all extensions have had their cat added.
+        category = None,
         # Only set this for internal, undocumented extensions.
         undocumented = False,
         status = "stable",
