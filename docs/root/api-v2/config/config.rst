@@ -1,5 +1,5 @@
-Extensions
-==========
+扩展
+======
 
 .. toctree::
   :glob:
