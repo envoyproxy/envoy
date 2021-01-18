@@ -422,12 +422,15 @@ public:
                                               const bool always_print_primitive_fields = false);
 
   /**
-   * Extract JSON as string from a google.protobuf.Message.
+   * Extract JSON as string from a google.protobuf.Message. Returns an error if the message cannot
+   * be represented as JSON, which can occur if it contains an Any proto with an unrecognized type
+   * URL or invalid data, or if memory cannot be allocated.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default
    * values, e.g. an int32 set to 0 or a bool set to false.
-   * @return std::string of formatted JSON object.
+   * @return ProtobufUtil::StatusOr<std::string> of formatted JSON object, or an error status if
+   * conversion fails.
    */
   static ProtobufUtil::StatusOr<std::string>
   getJsonStringFromMessage(const Protobuf::Message& message, bool pretty_print = false,
@@ -435,7 +438,8 @@ public:
 
   /**
    * Extract JSON as string from a google.protobuf.Message, crashing if the conversion to JSON
-   * fails.
+   * fails. This method is safe so long as the message does not contain an Any proto with an
+   * unrecognized type or invalid data.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default
