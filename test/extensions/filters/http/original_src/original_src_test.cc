@@ -34,8 +34,8 @@ public:
 
   std::unique_ptr<OriginalSrcFilter>
   makeFilterWithCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-    const Config default_config;
-    auto filter = std::make_unique<OriginalSrcFilter>(default_config);
+    default_config_ = std::make_shared<Config>();
+    auto filter = std::make_unique<OriginalSrcFilter>(*default_config_);
     filter->setDecoderFilterCallbacks(callbacks);
     return filter;
   }
@@ -44,8 +44,8 @@ public:
     envoy::extensions::filters::http::original_src::v3::OriginalSrc proto_config;
     proto_config.set_mark(mark);
 
-    const Config config(proto_config);
-    auto filter = std::make_unique<OriginalSrcFilter>(config);
+    config_ = std::make_shared<Config>(proto_config);
+    auto filter = std::make_unique<OriginalSrcFilter>(*config_);
     filter->setDecoderFilterCallbacks(callbacks_);
     return filter;
   }
@@ -56,6 +56,8 @@ public:
   }
 
 protected:
+  std::shared_ptr<Config> default_config_;
+  std::shared_ptr<Config> config_;
   StrictMock<MockBuffer> buffer_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnectionSocket> socket_;

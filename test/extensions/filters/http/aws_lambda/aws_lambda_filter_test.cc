@@ -36,8 +36,9 @@ public:
   AwsLambdaFilterTest() : arn_(parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value()) {}
 
   void setupFilter(const FilterSettings& settings) {
+    settings_ = std::make_shared<FilterSettings>(settings);
     signer_ = std::make_shared<NiceMock<MockSigner>>();
-    filter_ = std::make_unique<Filter>(settings, stats_, signer_);
+    filter_ = std::make_unique<Filter>(*settings_, stats_, signer_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     setupClusterMetadata();
@@ -50,6 +51,7 @@ public:
     ON_CALL(*decoder_callbacks_.cluster_info_, metadata()).WillByDefault(ReturnRef(metadata_));
   }
 
+  std::shared_ptr<FilterSettings> settings_;
   std::unique_ptr<Filter> filter_;
   std::shared_ptr<NiceMock<MockSigner>> signer_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
