@@ -266,7 +266,7 @@ message Http2ProtocolOptions {
   // Still under implementation. DO NOT USE.
   //
   // Allows metadata. See [metadata
-  // docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more
+  // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
 
