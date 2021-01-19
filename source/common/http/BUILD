@@ -432,12 +432,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "path_utility_lib",
-    srcs = [
-        "path_utility.cc",
-    ],
-    hdrs = [
-        "path_utility.h",
-    ],
+    srcs = ["path_utility.cc"],
+    hdrs = ["path_utility.h"],
     external_deps = [
         "abseil_optional",
         "googleurl",
@@ -452,15 +448,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "legacy_path_canonicalizer",
-    srcs = [
-        "legacy_path_canonicalizer.cc",
-    ],
-    hdrs = [
-        "legacy_path_canonicalizer.h",
-    ],
-    deps = [
-        "//source/common/chromium_url",
-    ],
+    srcs = ["legacy_path_canonicalizer.cc"],
+    hdrs = ["legacy_path_canonicalizer.h"],
+    deps = ["//source/common/chromium_url"],
 )
 
 envoy_cc_library(
