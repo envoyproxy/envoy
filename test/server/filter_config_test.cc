@@ -10,7 +10,7 @@ namespace {
 
 class TestHttpFilter : public Http::StreamDecoderFilter {
 public:
-  TestHttpFilter() {}
+  TestHttpFilter() = default;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     return Envoy::Http::FilterHeadersStatus::Continue;
@@ -28,7 +28,7 @@ public:
 
 class TestHttpFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  TestHttpFilterConfigFactory() {}
+  TestHttpFilterConfigFactory() = default;
 
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
