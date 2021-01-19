@@ -25,6 +25,8 @@ namespace {
 // This is arbitrarily chosen. This can be made configurable when it is required.
 constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
 
+// When we have buffered data in encoding buffer, we limit the length of the output to be smaller
+// than MAX_GRPC_MESSAGE_LENGTH. However, when we only have "last" data, we send it all.
 void mergeEncodingBufferAndLastData(Buffer::OwnedImpl& output,
                                     const Buffer::Instance* encoding_buffer,
                                     Buffer::Instance* last_data) {
@@ -46,9 +48,7 @@ void mergeEncodingBufferAndLastData(Buffer::OwnedImpl& output,
 }
 
 // This builds grpc-message header value from a merged data (built from encoding buffer and the last
-// frame, when end_stream=true). When we have buffered data in encoding buffer, we limit the length
-// of grpc-message to be smaller than MAX_GRPC_MESSAGE_LENGTH. However, when we only have "last"
-// data, we send it all.
+// frame, when end_stream=true).
 std::string buildGrpcMessage(Buffer::Instance& merged_data) {
   const uint64_t message_length = merged_data.length();
   std::string message(message_length, 0);
