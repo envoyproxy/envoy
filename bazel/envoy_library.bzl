@@ -80,7 +80,6 @@ EXTENSION_STATUS_VALUES = [
 def envoy_cc_extension(
         name,
         security_posture,
-        # Make this mandatory once all extensions have had their cat added.
         category = None,
         # Only set this for internal, undocumented extensions.
         undocumented = False,
@@ -89,6 +88,9 @@ def envoy_cc_extension(
         extra_visibility = [],
         visibility = EXTENSION_CONFIG_VISIBILITY,
         **kwargs):
+    if not category:
+        fail("Category not set for %s" % name)
+
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:
