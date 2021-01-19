@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.common.dependency.v3;
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+message Dependency {
+  enum DependencyType {
+    Header = 0;
+    FilterStateKey = 1;
+    DynamicMetadata = 2;
+  }
+
+  DependencyType type = 0;
+  string name = 1;
+}
+
+message FilterDependencies {
+  repeated Dependency decode_dependencies = 0;
+  repeated Dependency decode_providencies = 1;
+  repeated Dependency encode_dependencies = 2;
+  repeated Dependency encode_providencies = 3;
+}
