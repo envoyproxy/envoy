@@ -90,7 +90,7 @@ consider the answers to these questions before sending a PR.
     with LRS load reporting?
 - Will there be combinations of features that won't work properly?  If so,
   please document each combination that won't work and justify why this is
-  okay.  Is there some other way to structure this feature that would not
+  okay. Is there some other way to structure this feature that would not
   cause conflicts with other features?
 - If this change involves extension configuration, how will it interact
   with ECDS?
@@ -148,7 +148,7 @@ consider the answers to these questions before sending a PR.
 
 ## Where to Put New Protos
 - The xDS API is currently partly in the Envoy repo and partly in the
-  cncf/xds repo.  We will move pieces of the API to the latter repo
+  cncf/xds repo. We will move pieces of the API to the latter repo
   slowly over time, as they become less Envoy-specific, until eventually
-  the whole API has been moved there.  If your change involves adding
+  the whole API has been moved there. If your change involves adding
   new protos, they should generally go in the new repo.
