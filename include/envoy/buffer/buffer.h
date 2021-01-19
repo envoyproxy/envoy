@@ -557,6 +557,7 @@ public:
    * @note No other methods should be called on the object after `commit()` is called.
    */
   void commit(uint64_t length) {
+    ASSERT(length <= slice_.len_);
     buffer_.commit(length, absl::MakeSpan(&slice_, 1), absl::MakeSpan(&owned_slice_, 1));
     slice_ = {nullptr, 0};
     owned_slice_.reset();
