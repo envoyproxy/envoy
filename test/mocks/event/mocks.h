@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
@@ -130,7 +131,8 @@ public:
   MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
   MOCK_METHOD(void, post, (std::function<void()> callback));
   MOCK_METHOD(void, run, (RunType type));
-  MOCK_METHOD(const ScopeTrackedObject*, setTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
   MOCK_METHOD(bool, isThreadSafe, (), (const));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
   MOCK_METHOD(Thread::ThreadId, getCurrentThreadId, ());

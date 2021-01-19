@@ -18,7 +18,8 @@ MockRouterFilterInterface::MockRouterFilterInterface()
   ON_CALL(*this, config()).WillByDefault(ReturnRef(config_));
   ON_CALL(*this, cluster()).WillByDefault(Return(cluster_info_));
   ON_CALL(*this, upstreamRequests()).WillByDefault(ReturnRef(requests_));
-  EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
+  EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
+  EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_));
   ON_CALL(callbacks_, connection()).WillByDefault(Return(&client_connection_));
   route_entry_.connect_config_.emplace(RouteEntry::ConnectConfig());
