@@ -130,7 +130,7 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
-                                         const std::set<std::string>& resources,
+                                         const absl::flat_hash_set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
                                          OpaqueResourceDecoder& resource_decoder,
                                          const bool use_namespace_matching) {
@@ -154,14 +154,14 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                                 const std::set<std::string>& resources,
+                                 const absl::flat_hash_set<std::string>& resources,
                                  const bool creating_namespace_watch) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
   // If this is a glob collection subscription, we need to compute actual context parameters.
-  std::set<std::string> xdstp_resources;
+  absl::flat_hash_set<std::string> xdstp_resources;
   // TODO(htuch): add support for resources beyond glob collections, the constraints below around
   // resource size and ID reflect the progress of the xdstp:// implementation.
   if (!resources.empty() && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
@@ -198,7 +198,7 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
 }
 
 void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
-                                           const std::set<std::string>& for_update) {
+                                           const absl::flat_hash_set<std::string>& for_update) {
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
