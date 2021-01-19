@@ -355,7 +355,10 @@ using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
  */
 class FakeConnectionBase : public Logger::Loggable<Logger::Id::testing> {
 public:
-  virtual ~FakeConnectionBase() { ASSERT(initialized_); }
+  virtual ~FakeConnectionBase() {
+    absl::MutexLock lock(&lock_);
+    ASSERT(initialized_);
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult close(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
@@ -372,7 +375,10 @@ public:
   testing::AssertionResult
   waitForHalfClose(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  virtual void initialize() { initialized_ = true; }
+  virtual void initialize() {
+    absl::MutexLock lock(&lock_);
+    initialized_ = true;
+  }
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
@@ -383,9 +389,9 @@ protected:
         time_system_(time_system) {}
 
   SharedConnectionWrapper& shared_connection_;
-  bool initialized_{};
   absl::Mutex& lock_; // TODO(mattklein123): Use the shared connection lock and figure out better
                       // guarded by annotations.
+  bool initialized_ ABSL_GUARDED_BY(lock_){};
   bool half_closed_ ABSL_GUARDED_BY(lock_){};
   Event::TestTimeSystem& time_system_;
 };
