@@ -51,6 +51,9 @@ index 0cd36dc..8c4cbd4 100644
  #define STACK_UNINITIALIZED
  #endif
 
+# TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
+# library from the upstream Chromium project.
+
 diff --git a/url/BUILD b/url/BUILD
 index f2ec8da..714f90e 100644
 --- a/url/BUILD
