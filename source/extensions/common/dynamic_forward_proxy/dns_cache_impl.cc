@@ -83,15 +83,10 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   }
 }
 
-Upstream::ResourceAutoIncDecPtr
-DnsCacheImpl::canCreateDnsRequest(ResourceLimitOptRef pending_requests) {
-  const auto has_pending_requests = pending_requests.has_value();
-  auto& current_pending_requests =
-      has_pending_requests ? pending_requests->get() : resource_manager_.pendingRequests();
+Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest() {
+  auto& current_pending_requests = resource_manager_.pendingRequests();
   if (!current_pending_requests.canCreate()) {
-    if (!has_pending_requests) {
-      stats_.dns_rq_pending_overflow_.inc();
-    }
+    stats_.dns_rq_pending_overflow_.inc();
     return nullptr;
   }
   return std::make_unique<Upstream::ResourceAutoIncDec>(current_pending_requests);
