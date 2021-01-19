@@ -9,7 +9,7 @@ source_venv() {
     fi
     # venv scripts are in a different location on Windows vs everywhere else.
     # shellcheck disable=SC1090
-    if [[ "${VENV_DIR}/venv/Scripts/activate" ]]; then
+    if [[ -f "${VENV_DIR}/venv/Scripts/activate" ]]; then
       # shellcheck disable=SC1090
       source "${VENV_DIR}/venv/Scripts/activate"
     else
