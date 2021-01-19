@@ -233,6 +233,8 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
                : PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl(), rc);
+    ENVOY_CONN_LOG(trace, "ssl error occurred while read: {}", handshake_callbacks_->connection(),
+                   Utility::getErrorDescription(err));
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
