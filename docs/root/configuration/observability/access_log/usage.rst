@@ -163,6 +163,13 @@ The following command operators are supported:
 
   In typed JSON logs, START_TIME is always rendered as a string.
 
+%REQUEST_HEADERS_BYTES%
+  HTTP
+    Uncompressed bytes of request headers.
+
+  TCP
+    Not implemented (0).
+
 %BYTES_RECEIVED%
   HTTP
     Body bytes received.
@@ -212,6 +219,20 @@ The following command operators are supported:
   HTTP and TCP
     Connection termination details may provide additional information about why the connection was
     terminated by Envoy for L4 reasons.
+
+%RESPONSE_HEADERS_BYTES%
+  HTTP
+    Uncompressed bytes of response headers.
+
+  TCP
+    Not implemented (0).
+
+%RESPONSE_TRAILERS_BYTES%
+  HTTP
+    Uncompressed bytes of response trailers.
+
+  TCP
+    Not implemented (0).
 
 %BYTES_SENT%
   HTTP
@@ -535,17 +556,27 @@ The following command operators are supported:
   TCP
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
 
+.. _config_access_log_format_downstream_peer_cert_v_start:
+
 %DOWNSTREAM_PEER_CERT_V_START%
   HTTP
     The validity start date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
+.. _config_access_log_format_downstream_peer_cert_v_end:
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %HOSTNAME%
   The system hostname.

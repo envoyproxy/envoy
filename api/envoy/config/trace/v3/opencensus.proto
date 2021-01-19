@@ -72,11 +72,14 @@ message OpenCensusConfig {
   core.v3.GrpcService stackdriver_grpc_service = 13;
 
   // Enables the Zipkin exporter if set to true. The url and service name must
-  // also be set.
-  bool zipkin_exporter_enabled = 5;
+  // also be set. This is deprecated, prefer to use Envoy's :ref:`native Zipkin
+  // tracer <envoy_v3_api_msg_config.trace.v3.ZipkinConfig>`.
+  bool zipkin_exporter_enabled = 5 [deprecated = true];
 
-  // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v2/spans"
-  string zipkin_url = 6;
+  // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v2/spans". This is
+  // deprecated, prefer to use Envoy's :ref:`native Zipkin tracer
+  // <envoy_v3_api_msg_config.trace.v3.ZipkinConfig>`.
+  string zipkin_url = 6 [deprecated = true];
 
   // Enables the OpenCensus Agent exporter if set to true. The ocagent_address or
   // ocagent_grpc_service must also be set.

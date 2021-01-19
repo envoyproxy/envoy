@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Init {
 
 TargetHandleImpl::TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
-                                   std::weak_ptr<InternalInitalizeFn> fn)
+                                   std::weak_ptr<InternalInitializeFn> fn)
     : handle_name_(handle_name), name_(name), fn_(std::move(fn)) {}
 
 bool TargetHandleImpl::initialize(const Watcher& watcher) const {
@@ -26,7 +26,7 @@ absl::string_view TargetHandleImpl::name() const { return name_; }
 
 TargetImpl::TargetImpl(absl::string_view name, InitializeFn fn)
     : name_(fmt::format("target {}", name)),
-      fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
+      fn_(std::make_shared<InternalInitializeFn>([this, fn](WatcherHandlePtr watcher_handle) {
         watcher_handle_ = std::move(watcher_handle);
         fn();
       })) {}
@@ -38,7 +38,7 @@ absl::string_view TargetImpl::name() const { return name_; }
 TargetHandlePtr TargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
   return TargetHandlePtr(
-      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
+      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitializeFn>(fn_)));
 }
 
 bool TargetImpl::ready() {
@@ -54,7 +54,7 @@ bool TargetImpl::ready() {
 
 SharedTargetImpl::SharedTargetImpl(absl::string_view name, InitializeFn fn)
     : name_(fmt::format("shared target {}", name)),
-      fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
+      fn_(std::make_shared<InternalInitializeFn>([this, fn](WatcherHandlePtr watcher_handle) {
         if (initialized_) {
           watcher_handle->ready();
         } else {
@@ -70,7 +70,7 @@ absl::string_view SharedTargetImpl::name() const { return name_; }
 TargetHandlePtr SharedTargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
   return TargetHandlePtr(
-      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
+      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitializeFn>(fn_)));
 }
 
 bool SharedTargetImpl::ready() {

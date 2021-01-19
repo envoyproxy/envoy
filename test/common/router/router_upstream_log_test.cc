@@ -107,9 +107,10 @@ public:
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(upstream_locality_));
-    router_->downstream_connection_.local_address_ = host_address_;
-    router_->downstream_connection_.remote_address_ =
-        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
+    router_->downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+        host_address_);
+    router_->downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
   }
 
   void expectResponseTimerCreate() {
@@ -323,6 +324,44 @@ typed_config:
 
   // Check that timestamp is close enough.
   EXPECT_LE(std::abs(std::difftime(log_time, now)), 300);
+}
+
+// Test request headers/response headers/response trailers byte size.
+TEST_F(RouterUpstreamLogTest, HeaderByteSize) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%REQUEST_HEADERS_BYTES% %RESPONSE_HEADERS_BYTES% %RESPONSE_TRAILERS_BYTES%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
+
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  run(200, {{"request-header-name", "request-header-val"}},
+      {{"response-header-name", "response-header-val"}},
+      {{"response-trailer-name", "response-trailer-val"}});
+
+  EXPECT_EQ(output_.size(), 1U);
+  // Request headers:
+  // scheme: http
+  // :method: GET
+  // :authority: host
+  // :path: /
+  // x-envoy-expected-rq-timeout-ms: 10
+  // request-header-name: request-header-val
+
+  // Response headers:
+  // :status: 200
+  // response-header-name: response-header-val
+
+  // Response trailers:
+  // response-trailer-name: response-trailer-val
+  EXPECT_EQ(output_.front(), "110 49 41");
 }
 
 } // namespace Router

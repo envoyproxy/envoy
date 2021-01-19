@@ -56,20 +56,24 @@ Config::RouteImpl::RouteImpl(
 
 bool Config::RouteImpl::matches(Network::Connection& connection) const {
   if (!source_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.remoteAddress(), source_port_ranges_)) {
+      !Network::Utility::portInRangeList(*connection.addressProvider().remoteAddress(),
+                                         source_port_ranges_)) {
     return false;
   }
 
-  if (!source_ips_.empty() && !source_ips_.contains(*connection.remoteAddress())) {
+  if (!source_ips_.empty() &&
+      !source_ips_.contains(*connection.addressProvider().remoteAddress())) {
     return false;
   }
 
   if (!destination_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.localAddress(), destination_port_ranges_)) {
+      !Network::Utility::portInRangeList(*connection.addressProvider().localAddress(),
+                                         destination_port_ranges_)) {
     return false;
   }
 
-  if (!destination_ips_.empty() && !destination_ips_.contains(*connection.localAddress())) {
+  if (!destination_ips_.empty() &&
+      !destination_ips_.contains(*connection.addressProvider().localAddress())) {
     return false;
   }
 
@@ -425,8 +429,9 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                  Network::ProxyProtocolFilterState::key())) {
       read_callbacks_->connection().streamInfo().filterState()->setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              downstreamConnection()->remoteAddress(), downstreamConnection()->localAddress()}),
+          std::make_unique<Network::ProxyProtocolFilterState>(
+              Network::ProxyProtocolData{downstreamConnection()->addressProvider().remoteAddress(),
+                                         downstreamConnection()->addressProvider().localAddress()}),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }

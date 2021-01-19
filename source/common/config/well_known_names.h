@@ -131,7 +131,6 @@ public:
   const std::vector<Descriptor>& descriptorVec() const { return descriptor_vec_; }
 
 private:
-  void addRegex(const std::string& name, const std::string& regex, const std::string& substr = "");
   void addRe2(const std::string& name, const std::string& regex, const std::string& substr = "");
 
   // Collection of tag descriptors.
