@@ -33,6 +33,7 @@ constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
 // we send it all.
 std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance* last) {
   Buffer::OwnedImpl buffer;
+  // In the case of local reply, "buffered" is nullptr and we only have "last" data filled.
   if (buffered != nullptr) {
     ASSERT(buffered->length() <= MAX_GRPC_MESSAGE_LENGTH);
     buffer.add(*buffered);
@@ -40,6 +41,7 @@ std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance*
 
   if (last != nullptr) {
     uint64_t needed = last->length();
+    // When we have buffered data (from encoding buffer, we limit the length of the final buffer).
     if (buffered != nullptr && (buffer.length() + needed) >= MAX_GRPC_MESSAGE_LENGTH) {
       needed = std::min(needed, MAX_GRPC_MESSAGE_LENGTH - buffer.length());
     }
