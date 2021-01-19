@@ -45,7 +45,7 @@ public:
     TestUtility::loadFromYaml(yaml, proto_config, false, true);
     config_ = std::make_shared<Config>(proto_config, stats_store_, runtime_);
     client_ = new Filters::Common::RateLimit::MockClient();
-    filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
+    filter_ = std::make_unique<Filter>(*config_, Filters::Common::RateLimit::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
