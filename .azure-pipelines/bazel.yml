@@ -51,10 +51,6 @@ steps:
       SLACK_TOKEN: $(SLACK_TOKEN)
       REPO_URI: $(Build.Repository.Uri)
       BUILD_URI: $(Build.BuildUri)
-      BUILD_REASON: $(Build.Reason)
-      BUILD_STAGE_NAME: $(System.StageDisplayName)
-      BUILD_JOB_NAME: $(System.JobDisplayName)
-      PULL_REQUEST_ID: $(System.PullRequest.PullRequestId)
       ${{ if parameters.rbe }}:
         ENVOY_RBE: "1"
         BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"

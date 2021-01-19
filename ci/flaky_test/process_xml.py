@@ -172,11 +172,11 @@ def getGitInfo(CI_TARGET):
   if CI_TARGET != "":
     ret += "Target:\t\t{}\n".format(CI_TARGET)
 
-  if os.getenv('BUILD_STAGE_NAME') and os.getenv('BUILD_JOB_NAME'):
-    ret += "Stage:\t\t{} {}\n".format(os.environ['BUILD_STAGE_NAME'], os.environ['BUILD_JOB_NAME'])
+  if os.getenv('SYSTEM_STAGEDISPLAYNAME') and os.getenv('SYSTEM_STAGEJOBNAME'):
+    ret += "Stage:\t\t{} {}\n".format(os.environ['SYSTEM_STAGEDISPLAYNAME'], os.environ['SYSTEM_STAGEJOBNAME'])
 
-  if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv('PULL_REQUEST_ID'):
-    ret += "Pull request:\t{}/pull/{}\n".format(os.environ['REPO_URI'], os.environ['PULL_REQUEST_ID'])
+  if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv('SYSTEM_PULLREQUEST_PULLREQUESTID'):
+    ret += "Pull request:\t{}/pull/{}\n".format(os.environ['REPO_URI'], os.environ['SYSTEM_PULLREQUEST_PULLREQUESTID'])
   elif os.getenv('BUILD_REASON'):
     ret += "Build reason:\t{}\n".format(os.environ['BUILD_REASON'])
 
