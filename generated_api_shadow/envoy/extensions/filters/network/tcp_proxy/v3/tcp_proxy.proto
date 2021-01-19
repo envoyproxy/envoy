@@ -72,7 +72,6 @@ message TcpProxy {
 
     // Use POST method instead of CONNECT method to tunnel the TCP stream.
     // The 'protocol: bytestream' header is also NOT set to comply with the HTTP spec.
-    // Only HTTP/2 is supported.
     //
     // The upstream proxy is expected to convert POST back to CONNECT.
     bool use_post = 2;

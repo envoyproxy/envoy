@@ -455,6 +455,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
   // Send data from upstream to downstream.
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "POST");
   upstream_request_->encodeData(12, false);
   ASSERT_TRUE(tcp_client->waitForData(12));
 
