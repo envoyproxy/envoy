@@ -1,13 +1,15 @@
 #include "envoy/server/filter_config.h"
+
+#include "test/mocks/server/factory_context.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "test/mocks/server/factory_context.h"
 
 namespace Envoy {
 namespace {
 
 class TestHttpFilter : public Http::StreamDecoderFilter {
- public:
+public:
   TestHttpFilter() {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
@@ -21,7 +23,7 @@ class TestHttpFilter : public Http::StreamDecoderFilter {
   }
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override {}
-  void onDestroy() override {};
+  void onDestroy() override{};
 };
 
 class TestHttpFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
@@ -37,9 +39,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
-  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
-    return nullptr;
-  }
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return nullptr; }
 
   std::string name() const override { return "envoy.test.http_filter"; }
   std::string configType() override { return ""; };
