@@ -163,6 +163,7 @@ protected:
   void sendLdsResponse(const std::vector<std::string>& listener_configs,
                        const std::string& version) {
     std::vector<envoy::config::listener::v3::Listener> proto_configs;
+    proto_configs.reserve(listener_configs.size());
     for (const auto& listener_blob : listener_configs) {
       proto_configs.emplace_back(
           TestUtility::parseYaml<envoy::config::listener::v3::Listener>(listener_blob));

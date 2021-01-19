@@ -1510,10 +1510,6 @@ envoy_cc_test(
     srcs = [
         "listener_lds_integration_test.cc",
     ],
-    args = [
-        "-l",
-        "debug",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
