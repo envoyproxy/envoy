@@ -59,6 +59,7 @@ message UpdateFailureState {
   string details = 3;
 
   // This is the version of the rejected resource.
+  // [#not-implemented-hide:]
   string version_info = 4;
 }
 
@@ -138,7 +139,7 @@ message ListenersConfigDump {
     DynamicListenerState draining_state = 4;
 
     // Set if the last update failed, cleared after the next successful update.
-    // The error_state field contains the rejected version of this particular
+    // The *error_state* field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
     UpdateFailureState error_state = 5;
@@ -193,7 +194,7 @@ message ClustersConfigDump {
     google.protobuf.Timestamp last_updated = 3;
 
     // Set if the last update failed, cleared after the next successful update.
-    // The error_state field contains the rejected version of this particular
+    // The *error_state* field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
@@ -255,7 +256,7 @@ message RoutesConfigDump {
     google.protobuf.Timestamp last_updated = 3;
 
     // Set if the last update failed, cleared after the next successful update.
-    // The error_state field contains the rejected version of this particular
+    // The *error_state* field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
@@ -311,7 +312,7 @@ message ScopedRoutesConfigDump {
     google.protobuf.Timestamp last_updated = 4;
 
     // Set if the last update failed, cleared after the next successful update.
-    // The error_state field contains the rejected version of this particular
+    // The *error_state* field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
@@ -351,7 +352,7 @@ message SecretsConfigDump {
     google.protobuf.Any secret = 4;
 
     // Set if the last update failed, cleared after the next successful update.
-    // The error_state field contains the rejected version of this particular
+    // The *error_state* field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
@@ -412,7 +413,7 @@ message EndpointsConfigDump {
     google.protobuf.Timestamp last_updated = 3;
 
     // Set if the last update failed, cleared after the next successful update.
-    // The error_state field contains the rejected version of this particular
+    // The *error_state* field contains the rejected version of this particular
     // resource along with the reason and timestamp. For successfully updated or
     // acknowledged resource, this field should be empty.
     // [#not-implemented-hide:]
