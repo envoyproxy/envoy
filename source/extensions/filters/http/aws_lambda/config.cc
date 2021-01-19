@@ -50,12 +50,12 @@ Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
   auto signer = std::make_shared<Extensions::Common::Aws::SignerImpl>(
       service_name, region, std::move(credentials_provider), context.dispatcher().timeSource());
 
-  FilterSettings filter_settings{*arn, getInvocationMode(proto_config),
-                                 proto_config.payload_passthrough()};
+  auto filter_settings = std::make_shared<FilterSettings>(*arn, getInvocationMode(proto_config),
+                                                          proto_config.payload_passthrough());
 
   FilterStats stats = generateStats(stat_prefix, context.scope());
   return [stats, signer, filter_settings](Http::FilterChainFactoryCallbacks& cb) {
-    auto filter = std::make_shared<Filter>(filter_settings, stats, signer);
+    auto filter = std::make_shared<Filter>(*filter_settings, stats, signer);
     cb.addStreamFilter(filter);
   };
 }
