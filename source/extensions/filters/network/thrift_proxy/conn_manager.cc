@@ -335,7 +335,7 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderF
       }
 
       if (status != FilterStatus::Continue) {
-        // If we got FilterStatus::StopIteration and a local reply happend but
+        // If we got FilterStatus::StopIteration and a local reply happened but
         // local_response_sent_ was not set, the connection was closed.
         //
         // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
