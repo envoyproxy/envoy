@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["config_utils.h"],
     deps = [
         ":grpc_access_log_lib",
+        ":grpc_ot_access_log_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/singleton:instance_interface",
@@ -103,6 +104,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ot_grpc_access_log_lib",
+    srcs = ["ot_grpc_access_log_impl.cc"],
+    hdrs = ["ot_grpc_access_log_impl.h"],
+    deps = [
+        ":grpc_access_log_utils",
+        ":grpc_ot_access_log_lib",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/extensions/access_loggers/common:access_log_base",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+        "@opentelemetry_proto//:logs_cc_proto"
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_access_log_proto_descriptors_lib",
     srcs = ["grpc_access_log_proto_descriptors.cc"],
     hdrs = ["grpc_access_log_proto_descriptors.h"],
@@ -132,6 +151,7 @@ envoy_cc_extension(
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
+        "//source/extensions/access_loggers/grpc:ot_grpc_access_log_lib",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
     ],
 )

@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
+#include "extensions/access_loggers/grpc/ot_grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -56,7 +57,7 @@ TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
   AccessLog::InstanceSharedPtr instance =
       factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
   EXPECT_NE(nullptr, instance);
-  EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
+  EXPECT_NE(nullptr, dynamic_cast<OtGrpc::OtGrpcAccessLog*>(instance.get()));
 }
 
 } // namespace

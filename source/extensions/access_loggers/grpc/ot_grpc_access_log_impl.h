@@ -14,6 +14,7 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/formatter/substitution_formatter.h"
 #include "common/grpc/typed_async_client.h"
 
 #include "extensions/access_loggers/common/access_log_base.h"
@@ -22,7 +23,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace HttpGrpc {
+namespace OtGrpc {
 
 // TODO(mattklein123): Stats
 
@@ -32,9 +33,9 @@ namespace HttpGrpc {
 class OtGrpcAccessLog : public Common::ImplBase {
 public:
   OtGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                  envoy::extensions::access_loggers::grpc::v3::OtGrpcAccessLogConfig config,
+                  envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
                   ThreadLocal::SlotAllocator& tls,
-                  GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                  GrpcCommon::GrpcOpenTelemetryAccessLoggerCacheSharedPtr access_logger_cache,
                   Stats::Scope& scope);
 
 private:
@@ -42,9 +43,9 @@ private:
    * Per-thread cached logger.
    */
   struct ThreadLocalLogger : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalLogger(GrpcCommon::GrpcAccessLoggerSharedPtr logger);
+    ThreadLocalLogger(GrpcCommon::GrpcOpenTelemetryAccessLoggerSharedPtr logger);
 
-    const GrpcCommon::GrpcAccessLoggerSharedPtr logger_;
+    const GrpcCommon::GrpcOpenTelemetryAccessLoggerSharedPtr logger_;
   };
 
   // Common::ImplBase
@@ -54,19 +55,15 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   Stats::Scope& scope_;
-  const envoy::extensions::access_loggers::grpc::v3::OtGrpcAccessLogConfig config_;
+  // const envoy::extensions::access_loggers::grpc::v3::OtGrpcAccessLogConfig config_;
   const ThreadLocal::SlotPtr tls_slot_;
-  const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
-  std::vector<Http::LowerCaseString> request_headers_to_log_;
-  std::vector<Http::LowerCaseString> response_headers_to_log_;
-  std::vector<Http::LowerCaseString> response_trailers_to_log_;
-  std::vector<std::string> filter_states_to_log_;
-  const StructFormatter formatter_;
+  const GrpcCommon::GrpcOpenTelemetryAccessLoggerCacheSharedPtr access_logger_cache_;
+  std::unique_ptr<Formatter::StructFormatter> body_formatter_;
 };
 
 using OtGrpcAccessLogPtr = std::unique_ptr<OtGrpcAccessLog>;
 
-} // namespace HttpGrpc
+} // namespace OtGrpc
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy
