@@ -43,6 +43,33 @@ std::string formatPerRequestStateParseException(absl::string_view params) {
                       params);
 }
 
+// Parses a substitution format field and returns a function that formats it.
+// Use the given empty_value if any of the underlying formatters yield no value.
+// In practice, this lets the caller decide if empty string or "-" is desired.
+std::function<std::string(const Envoy::StreamInfo::StreamInfo&)> parseSubstitutionFormatField(
+    absl::string_view field_name,
+    StreamInfoHeaderFormatter::FormatterProviderListMap& formatter_providers,
+    const std::string& empty_value) {
+  const std::string pattern = fmt::format("%{}%", field_name);
+  if (formatter_providers.find(pattern) == formatter_providers.end()) {
+    formatter_providers.emplace(
+        std::make_pair(pattern, Formatter::SubstitutionFormatParser::parse(pattern)));
+  }
+  return [&formatter_providers, pattern,
+          empty_value](const Envoy::StreamInfo::StreamInfo& stream_info) {
+    const auto& formatters = formatter_providers.at(pattern);
+    std::string formatted;
+    for (const auto& formatter : formatters) {
+      const auto bit = formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
+                                         *Http::StaticEmptyHeaders::get().response_headers,
+                                         *Http::StaticEmptyHeaders::get().response_trailers,
+                                         stream_info, absl::string_view());
+      absl::StrAppend(&formatted, bit.value_or(empty_value));
+    }
+    return formatted;
+  };
+}
+
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
 // specified metadata from an StreamInfo::StreamInfo. Expects a string formatted as:
 //   (["a", "b", "c"])
@@ -210,21 +237,6 @@ StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor
   };
 }
 
-// Helper that handles the case when the desired time field is empty.
-StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeaderExtractor(
-    std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
-        time_extractor) {
-  return sslConnectionInfoStringHeaderExtractor(
-      [time_extractor](const Ssl::ConnectionInfo& connection_info) {
-        absl::optional<SystemTime> time = time_extractor(connection_info);
-        if (!time.has_value()) {
-          return std::string();
-        }
-
-        return AccessLogDateTimeFormatter::fromTime(time.value());
-      });
-}
-
 } // namespace
 
 StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
@@ -313,16 +325,10 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
         sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.urlEncodedPemEncodedPeerCertificate();
         });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
-    field_extractor_ =
-        sslConnectionInfoStringTimeHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.validFromPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
-    field_extractor_ =
-        sslConnectionInfoStringTimeHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.expirationPeerCertificate();
-        });
+  } else if (absl::StartsWith(field_name, "DOWNSTREAM_PEER_CERT_V_START")) {
+    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_providers_, "");
+  } else if (absl::StartsWith(field_name, "DOWNSTREAM_PEER_CERT_V_END")) {
+    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_providers_, "");
   } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
       if (stream_info.upstreamHost()) {
@@ -331,23 +337,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return "";
     };
   } else if (absl::StartsWith(field_name, "START_TIME")) {
-    const std::string pattern = fmt::format("%{}%", field_name);
-    if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
-      start_time_formatters_.emplace(
-          std::make_pair(pattern, Formatter::SubstitutionFormatParser::parse(pattern)));
-    }
-    field_extractor_ = [this, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
-      const auto& formatters = start_time_formatters_.at(pattern);
-      std::string formatted;
-      for (const auto& formatter : formatters) {
-        const auto bit = formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
-                                           *Http::StaticEmptyHeaders::get().response_headers,
-                                           *Http::StaticEmptyHeaders::get().response_trailers,
-                                           stream_info, absl::string_view());
-        absl::StrAppend(&formatted, bit.value_or("-"));
-      }
-      return formatted;
-    };
+    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_providers_, "-");
   } else if (absl::StartsWith(field_name, "UPSTREAM_METADATA")) {
     field_extractor_ = parseMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
   } else if (absl::StartsWith(field_name, "DYNAMIC_METADATA")) {
