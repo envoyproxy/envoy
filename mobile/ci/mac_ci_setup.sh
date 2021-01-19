@@ -55,3 +55,13 @@ bazel version
 pip3 install slackclient
 # https://github.com/actions/virtual-environments/blob/main/images/macos/macos-10.15-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_12.2.app
+
+# Download and set up ndk 21. Github upgraded to ndk 22 for their Mac image.
+ANDROID_HOME=$HOME/Library/Android/sdk
+SDKMANAGER=$ANDROID_HOME/tools/bin/sdkmanager
+
+$SDKMANAGER --uninstall "ndk-bundle"
+
+$SDKMANAGER --install "ndk;21.3.6528147"
+
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.3.6528147
