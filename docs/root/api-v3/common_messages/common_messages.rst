@@ -1,4 +1,4 @@
-Common messages
+常见消息
 ===============
 
 .. toctree::
