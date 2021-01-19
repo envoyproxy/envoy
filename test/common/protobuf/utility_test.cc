@@ -1560,7 +1560,7 @@ TEST_P(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
-TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEmitsError)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
@@ -1569,6 +1569,21 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated))
                       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
   EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
+}
+
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEmitsCrash)) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  // Non-fatal checks for a deprecated field should throw an exception if the
+  // runtime flag is enabled..
+  Runtime::LoaderSingleton::getExisting()->mergeValues({
+      {"envoy.features.disallow_deprecated_features", "true"},
+  });
+  EXPECT_THROW_WITH_REGEX(
+      checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
+  EXPECT_EQ(0, deprecated_feature_seen_since_process_start_.value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.

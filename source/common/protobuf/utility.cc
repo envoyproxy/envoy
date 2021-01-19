@@ -191,7 +191,9 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
 #else
   bool warn_only = true;
 #endif
-
+  if (Runtime::runtimeFeatureEnabled("envoy.features.disallow_deprecated_features")) {
+    warn_only = false;
+  }
   bool warn_default = warn_only;
   // Allow runtime to be null both to not crash if this is called before server initialization,
   // and so proto validation works in context where runtime singleton is not set up (e.g.
