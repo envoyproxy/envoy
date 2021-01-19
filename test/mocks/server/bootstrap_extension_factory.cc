@@ -2,6 +2,11 @@
 
 namespace Envoy {
 namespace Server {
+
+MockBootstrapExtension::MockBootstrapExtension() = default;
+
+MockBootstrapExtension::~MockBootstrapExtension() = default;
+
 namespace Configuration {
 MockBootstrapExtensionFactory::MockBootstrapExtensionFactory() = default;
 

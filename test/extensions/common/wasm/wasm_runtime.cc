@@ -35,6 +35,10 @@ std::vector<std::tuple<std::string, std::string>> runtimesAndLanguages() {
   return values;
 }
 
+std::string wasmTestParamsToString(const ::testing::TestParamInfo<std::string>& p) {
+  return p.param;
+}
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions

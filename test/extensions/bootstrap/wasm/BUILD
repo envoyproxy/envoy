@@ -46,6 +46,21 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "wasm_integration_test",
+    srcs = ["wasm_integration_test.cc"],
+    data = envoy_select_wasm([
+        "//test/extensions/bootstrap/wasm/test_data:http_cpp.wasm",
+    ]),
+    extension_name = "envoy.bootstrap.wasm",
+    deps = [
+        "//source/extensions/bootstrap/wasm:config",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
+        "//test/integration:http_protocol_integration_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = envoy_select_wasm([

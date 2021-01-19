@@ -15,6 +15,11 @@ namespace Server {
 class BootstrapExtension {
 public:
   virtual ~BootstrapExtension() = default;
+
+  /**
+   * Called when server is done initializing and we have the ServerFactoryContext fully initialized.
+   */
+  virtual void onServerInitialized() PURE;
 };
 
 using BootstrapExtensionPtr = std::unique_ptr<BootstrapExtension>;
@@ -34,7 +39,8 @@ public:
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException. The returned pointer should never be nullptr.
    * @param config the custom configuration for this bootstrap extension type.
-   * @param context general filter context through which persistent resources can be accessed.
+   * @param context is the context to use for the extension. Note that the clusterManager is not
+   *    yet initialized at this point and **must not** be used.
    */
   virtual BootstrapExtensionPtr createBootstrapExtension(const Protobuf::Message& config,
                                                          ServerFactoryContext& context) PURE;

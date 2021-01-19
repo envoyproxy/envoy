@@ -85,6 +85,11 @@ envoy_wasm_cc_binary(
 )
 
 envoy_wasm_cc_binary(
+    name = "http_cpp.wasm",
+    srcs = ["http_cpp.cc"],
+)
+
+envoy_wasm_cc_binary(
     name = "logging_cpp.wasm",
     srcs = ["logging_cpp.cc"],
 )
