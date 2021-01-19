@@ -28,6 +28,7 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/http/mixed_conn_pool.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -265,7 +266,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()),
       subscription_factory_(local_info, main_thread_dispatcher, *this,
-                            validation_context.dynamicValidationVisitor(), api, runtime_) {
+                            validation_context.dynamicValidationVisitor(), api) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -325,14 +326,14 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              dyn_resources.ads_config().transport_api_version() ==
+              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
                       envoy::config::core::v3::ApiVersion::V3
                   // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
                   // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
                   ? "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "DeltaAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, stats_,
+          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
@@ -342,7 +343,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              dyn_resources.ads_config().transport_api_version() ==
+              Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
                       envoy::config::core::v3::ApiVersion::V3
                   // TODO(htuch): consolidate with type_to_endpoint.cc, once we sort out the future
                   // direction of that module re: https://github.com/envoyproxy/envoy/issues/10650.
@@ -350,7 +351,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "StreamAggregatedResources"),
-          dyn_resources.ads_config().transport_api_version(), random_, stats_,
+          Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
@@ -425,7 +426,7 @@ void ClusterManagerImpl::initializeSecondaryClusters(
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), dispatcher_);
+        Config::Utility::getAndCheckTransportVersion(load_stats_config), dispatcher_);
   }
 }
 
@@ -843,27 +844,34 @@ ThreadLocalCluster* ClusterManagerImpl::getThreadLocalCluster(absl::string_view 
   }
 }
 
-void ClusterManagerImpl::maybePrefetch(
+void ClusterManagerImpl::maybePreconnect(
     ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
-    std::function<ConnectionPool::Instance*()> pick_prefetch_pool) {
-  // TODO(alyssawilk) As currently implemented, this will always just prefetch
-  // one connection ahead of actually needed connections.
-  //
-  // Instead we want to track the following metrics across the entire connection
-  // pool and use the same algorithm we do for per-upstream prefetch:
-  // ((pending_streams_ + num_active_streams_) * global_prefetch_ratio >
-  //  (connecting_stream_capacity_ + num_active_streams_)))
-  //  and allow multiple prefetches per pick.
-  //  Also cap prefetches such that
-  //  num_unused_prefetch < num hosts
-  //  since if we have more prefetches than hosts, we should consider kicking into
-  //  per-upstream prefetch.
-  //
-  //  Once we do this, this should loop capped number of times while shouldPrefetch is true.
-  if (cluster_entry.cluster_info_->peekaheadRatio() > 1.0) {
-    ConnectionPool::Instance* prefetch_pool = pick_prefetch_pool();
-    if (prefetch_pool) {
-      prefetch_pool->maybePrefetch(cluster_entry.cluster_info_->peekaheadRatio());
+    const ClusterConnectivityState& state,
+    std::function<ConnectionPool::Instance*()> pick_preconnect_pool) {
+  auto peekahead_ratio = cluster_entry.cluster_info_->peekaheadRatio();
+  if (peekahead_ratio <= 1.0) {
+    return;
+  }
+
+  // 3 here is arbitrary. Just as in ConnPoolImplBase::tryCreateNewConnections
+  // we want to limit the work which can be done on any given preconnect attempt.
+  for (int i = 0; i < 3; ++i) {
+    // See if adding this one new connection
+    // would put the cluster over desired capacity. If so, stop preconnecting.
+    //
+    // We anticipate the incoming stream here, because maybePreconnect is called
+    // before a new stream is established.
+    if (!ConnectionPool::ConnPoolImplBase::shouldConnect(
+            state.pending_streams_, state.active_streams_, state.connecting_stream_capacity_,
+            peekahead_ratio, true)) {
+      return;
+    }
+    ConnectionPool::Instance* preconnect_pool = pick_preconnect_pool();
+    if (!preconnect_pool || !preconnect_pool->maybePreconnect(peekahead_ratio)) {
+      // Given that the next preconnect pick may be entirely different, we could
+      // opt to try again even if the first preconnect fails. Err on the side of
+      // caution and wait for the next attempt.
+      return;
     }
   }
 }
@@ -875,16 +883,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   // Select a host and create a connection pool for it if it does not already exist.
   auto ret = connPool(priority, protocol, context, false);
 
-  // Now see if another host should be prefetched.
+  // Now see if another host should be preconnected.
   // httpConnPool is called immediately before a call for newStream. newStream doesn't
-  // have the load balancer context needed to make selection decisions so prefetching must be
+  // have the load balancer context needed to make selection decisions so preconnecting must be
   // performed here in anticipation of the new stream.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  maybePrefetch(*this, [this, &priority, &protocol, &context]() {
+  maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &protocol, &context]() {
     return connPool(priority, protocol, context, true);
   });
-
   return ret;
 }
 
@@ -895,13 +902,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   auto ret = tcpConnPool(priority, context, false);
 
   // tcpConnPool is called immediately before a call for newConnection. newConnection
-  // doesn't have the load balancer context needed to make selection decisions so prefetching must
+  // doesn't have the load balancer context needed to make selection decisions so preconnecting must
   // be performed here in anticipation of the new connection.
   // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
   // code-enforced.
-  // Now see if another host should be prefetched.
-  maybePrefetch(*this,
-                [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
+  // Now see if another host should be preconnected.
+  maybePreconnect(*this, parent_.cluster_manager_state_,
+                  [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
 
   return ret;
 }
@@ -1245,7 +1252,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-    // Close non connection pool TCP connections obtained from tcpConnForCluster()
+    // Close non connection pool TCP connections obtained from tcpConn()
     //
     // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
     // TCP client. Perhaps it could be rewritten to use a connection pool, and this code deleted.
@@ -1356,13 +1363,23 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
     return nullptr;
   }
 
-  auto upstream_protocol = host->cluster().upstreamHttpProtocol(downstream_protocol);
-  std::vector<uint8_t> hash_key = {uint8_t(upstream_protocol)};
+  // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
+  // We could do better here, and always use the ALPN pool and simply make sure
+  // we end up on a connection of the correct protocol, but for simplicity we're
+  // starting with something simpler.
+  auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
+  std::vector<uint8_t> hash_key;
+  hash_key.reserve(upstream_protocols.size());
+  for (auto protocol : upstream_protocols) {
+    hash_key.push_back(uint8_t(protocol));
+  }
 
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
@@ -1399,7 +1416,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
-            parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
+            parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.cluster_manager_state_);
@@ -1417,8 +1434,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
-    ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for TCP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
     return nullptr;
   }
 
@@ -1467,20 +1486,26 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
-    Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    std::vector<Http::Protocol>& protocols,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
     ClusterConnectivityState& state) {
-  if (protocol == Http::Protocol::Http2 &&
+  if (protocols.size() == 2 &&
+      ((protocols[0] == Http::Protocol::Http2 && protocols[1] == Http::Protocol::Http11) ||
+       (protocols[1] == Http::Protocol::Http2 && protocols[0] == Http::Protocol::Http11))) {
+    return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
+                                                         priority, options,
+                                                         transport_socket_options, state);
+  }
+
+  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
                                          options, transport_socket_options, state);
-  } else if (protocol == Http::Protocol::Http3) {
-    // Quic connection pool is not implemented.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  } else {
-    return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state);
   }
+  ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
+  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
+                                       transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(

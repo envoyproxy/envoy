@@ -30,6 +30,8 @@ public:
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
 
+    EXPECT_CALL(dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
+
     EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
     dns_cache_ =
         std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, loader_, store_, config_);
@@ -569,7 +571,9 @@ TEST_F(DnsCacheImplTest, MultipleResolveDifferentHost) {
   resolve_cb1(Network::DnsResolver::ResolutionStatus::Success,
               TestUtility::makeDnsResponse({"10.0.0.2"}));
 
-  auto hosts = dns_cache_->hosts();
+  absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts;
+  dns_cache_->iterateHostMap(
+      [&](absl::string_view host, const DnsHostInfoSharedPtr& info) { hosts.emplace(host, info); });
   EXPECT_EQ(2, hosts.size());
   EXPECT_THAT(hosts["bar.com"], DnsHostInfoEquals("10.0.0.1:443", "bar.com", false));
   EXPECT_THAT(hosts["foo.com"], DnsHostInfoEquals("10.0.0.2:80", "foo.com", false));
@@ -658,7 +662,7 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
 TEST_F(DnsCacheImplTest, CircuitBreakersNotInvoked) {
   initialize();
 
-  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  auto raii_ptr = dns_cache_->canCreateDnsRequest();
   EXPECT_NE(raii_ptr.get(), nullptr);
 }
 
@@ -666,19 +670,9 @@ TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
   config_.mutable_dns_cache_circuit_breaker()->mutable_max_pending_requests()->set_value(0);
   initialize();
 
-  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  auto raii_ptr = dns_cache_->canCreateDnsRequest();
   EXPECT_EQ(raii_ptr.get(), nullptr);
   EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
-}
-
-TEST_F(DnsCacheImplTest, ClustersCircuitBreakersOverflow) {
-  initialize();
-  NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
-
-  EXPECT_CALL(pending_requests_, canCreate()).WillOnce(Return(false));
-  auto raii_ptr = dns_cache_->canCreateDnsRequest(pending_requests_);
-  EXPECT_EQ(raii_ptr.get(), nullptr);
-  EXPECT_EQ(0, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
 TEST(DnsCacheImplOptionsTest, UseTcpForDnsLookupsOptionSet) {

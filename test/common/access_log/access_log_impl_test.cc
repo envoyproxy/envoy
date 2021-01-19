@@ -119,7 +119,8 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   log_format:
-    text_format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+    text_format_source:
+      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -138,6 +139,40 @@ typed_config:
       "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 3 - \"x.x.x.x\" "
       "\"user-agent-set\" \"id\"  \"host\"\n",
       output_);
+}
+
+TEST_F(AccessLogImplTest, HeadersBytes) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  log_format:
+    text_format_source:
+      inline_string: "%REQUEST_HEADERS_BYTES% %RESPONSE_HEADERS_BYTES% %RESPONSE_TRAILERS_BYTES%"
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  request_headers_.addCopy("request_header_key", "request_header_val");
+  response_headers_.addCopy("response_header_key", "response_header_val");
+  response_trailers_.addCopy("response_trailer_key", "response_trailer_val");
+
+  // request headers:
+  // :method: GET
+  // :path: /
+  // request_header_key: request_header_val
+  //
+  // response headers:
+  // response_header_key: response_header_val
+  //
+  // response trailers:
+  // response_trailer_key: response_trailer_val
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+
+  EXPECT_EQ(output_, "52 38 40");
 }
 
 TEST_F(AccessLogImplTest, EnvoyUpstreamServiceTime) {
@@ -1062,7 +1097,8 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   log_format:
-    text_format: "%GRPC_STATUS%\n"
+    text_format_source:
+      inline_string: "%GRPC_STATUS%\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -1135,7 +1171,7 @@ typed_config:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
-                          EnvoyException, ".*\"NOT_A_VALID_CODE\" for type TYPE_ENUM.*");
+                          EnvoyException, "NOT_A_VALID_CODE");
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterBlock) {

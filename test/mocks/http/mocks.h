@@ -12,6 +12,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/ssl/connection.h"
 
 #include "common/http/conn_manager_config.h"
@@ -218,12 +219,15 @@ public:
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
+  MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, (), (const));
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override {
     stream_info_.setResponseCodeDetails(details);
     encodeHeaders_(*headers, end_stream);
   }
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, (), (const));
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override { encodeTrailers_(*trailers); }
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, (), (const));
   void encodeMetadata(MetadataMapPtr&& metadata_map) override {
     encodeMetadata_(std::move(metadata_map));
   }
@@ -317,6 +321,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
 
   // Http::StreamDecoderFilter
   MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (RequestHeaderMap & headers, bool end_stream));
@@ -342,6 +347,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
@@ -363,6 +369,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
 
   // Http::StreamDecoderFilter
   MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (RequestHeaderMap & headers, bool end_stream));
@@ -373,9 +380,12 @@ public:
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
+  MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, (), (const));
   MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (ResponseHeaderMap & headers, bool end_stream));
+  MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, (), (const));
   MOCK_METHOD(FilterDataStatus, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, encodeTrailers, (ResponseTrailerMap & trailers));
+  MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, (), (const));
   MOCK_METHOD(FilterMetadataStatus, encodeMetadata, (MetadataMap & metadata_map));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (StreamEncoderFilterCallbacks & callbacks));
 
@@ -469,8 +479,17 @@ public:
   ~MockFilterChainFactoryCallbacks() override;
 
   MOCK_METHOD(void, addStreamDecoderFilter, (Http::StreamDecoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamDecoderFilter,
+              (Http::StreamDecoderFilterSharedPtr filter,
+               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addStreamEncoderFilter, (Http::StreamEncoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamEncoderFilter,
+              (Http::StreamEncoderFilterSharedPtr filter,
+               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addStreamFilter, (Http::StreamFilterSharedPtr filter));
+  MOCK_METHOD(void, addStreamFilter,
+              (Http::StreamFilterSharedPtr filter,
+               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
 };
 
@@ -544,7 +563,7 @@ public:
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
-  MOCK_METHOD(bool, shouldStripMatchingPort, (), (const));
+  MOCK_METHOD(Http::StripPortType, stripPortType, (), (const));
   MOCK_METHOD(envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction,
               headersWithUnderscoresAction, (), (const));
   MOCK_METHOD(const LocalReply::LocalReply&, localReply, (), (const));

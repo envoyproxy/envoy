@@ -548,7 +548,7 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
-  float perUpstreamPrefetchRatio() const override { return per_upstream_prefetch_ratio_; }
+  float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
@@ -644,7 +644,7 @@ public:
   absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
-  Http::Protocol
+  std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   Http::Http1::CodecStats& http1CodecStats() const override;
@@ -683,7 +683,7 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
-  const float per_upstream_prefetch_ratio_;
+  const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
@@ -913,13 +913,15 @@ protected:
    * priority.
    * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
    * be updated with the hosts that remain in this priority after the update.
-   * @param all_hosts all known hosts prior to this host update.
+   * @param all_hosts all known hosts prior to this host update across all priorities.
+   * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
    */
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             HostMap& updated_hosts, const HostMap& all_hosts);
+                             HostMap& updated_hosts, const HostMap& all_hosts,
+                             const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 
 /**

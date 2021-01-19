@@ -19,14 +19,14 @@ namespace Config {
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api, Runtime::Loader& runtime)
+    Api::Api& api)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
-      validation_visitor_(validation_visitor), api_(api), runtime_(runtime) {}
+      validation_visitor_(validation_visitor), api_(api) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-    Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder) {
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    bool use_namespace_matching) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
@@ -41,24 +41,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
-    const auto transport_api_version = api_config_source.transport_api_version();
-    if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
-        transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
-      runtime_.countDeprecatedFeatureUse();
-      const std::string& warning = fmt::format(
-          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
-          "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
-          "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
-          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
-          config.DebugString());
-      ENVOY_LOG(warn, warning);
-      auto& runtime_snapshot = runtime_.snapshot();
-      if (!runtime_snapshot.runtimeFeatureEnabled(
-              "envoy.reloadable_features.enable_deprecated_v2_api")) {
-        throw DeprecatedMajorVersionException(warning);
-      }
-    }
-
+    const auto transport_api_version = Utility::getAndCheckTransportVersion(api_config_source);
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:
       throw EnvoyException(
@@ -70,9 +53,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
           api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source),
-          restMethod(type_url, api_config_source.transport_api_version()), type_url,
-          api_config_source.transport_api_version(), callbacks, resource_decoder, stats,
-          Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
+          restMethod(type_url, transport_api_version), type_url, transport_api_version, callbacks,
+          resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
+          validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::GrpcMuxImpl>(
@@ -80,24 +63,24 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope, true)
                   ->create(),
-              dispatcher_, sotwGrpcMethod(type_url, api_config_source.transport_api_version()),
-              api_config_source.transport_api_version(), api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source),
+              dispatcher_, sotwGrpcMethod(type_url, transport_api_version), transport_api_version,
+              api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
-          /*is_aggregated*/ false);
+          /*is_aggregated*/ false, use_namespace_matching);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
                   ->create(),
-              dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
-              api_config_source.transport_api_version(), api_.randomGenerator(), scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_),
+              dispatcher_, deltaGrpcMethod(type_url, transport_api_version), transport_api_version,
+              api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
+              local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), false);
+          Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false,
+          use_namespace_matching);
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -106,7 +89,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
         cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
-        Utility::configSourceInitialFetchTimeout(config), true);
+        Utility::configSourceInitialFetchTimeout(config), true, use_namespace_matching);
   }
   default:
     throw EnvoyException(
@@ -117,7 +100,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
-    const envoy::config::core::v3::ConfigSource& /*config*/, absl::string_view /*type_url*/,
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
   std::unique_ptr<Subscription> result;
@@ -130,9 +113,32 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
   }
+  case xds::core::v3::ResourceLocator::XDSTP: {
+    if (resource_type != collection_locator.resource_type()) {
+      throw EnvoyException(
+          fmt::format("xdstp:// type does not match {} in {}", resource_type,
+                      Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
+    }
+    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
+    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                            api_config_source);
+
+    switch (api_config_source.api_type()) {
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
+      return std::make_unique<GrpcCollectionSubscriptionImpl>(
+          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
+          Utility::configSourceInitialFetchTimeout(config), false);
+    }
+    default:
+      // TODO(htuch): Add support for non-aggregated delta gRPC, but there will always be options,
+      // e.g. v2 REST, that don't make sense for xdstp:// ResourceLocators.
+      throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
+                                       api_config_source.DebugString()));
+    }
+  }
   default:
-    throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",
-                                     XdsResourceIdentifier::encodeUrl(collection_locator)));
+    // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

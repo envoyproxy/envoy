@@ -33,12 +33,7 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
-
-  // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
-  // can be chained together to behave as one init_manager. In that way, we let
-  // two listeners which share same SdsApi to register at separate init managers, and
-  // each init manager has a chance to initialize its targets.
+      sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, false);
 }
 
 void SdsApi::resolveDataSource(const FileContentMap& files,

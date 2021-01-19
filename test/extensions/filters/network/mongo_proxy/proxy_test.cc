@@ -85,7 +85,7 @@ public:
   void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>(
         "test.", store_, runtime_, access_log_, fault_config_, drain_decision_,
-        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
+        dispatcher_.timeSource(), emit_dynamic_metadata, *mongo_stats_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -102,9 +102,10 @@ public:
 
     fault_config_ = std::make_shared<Filters::Common::Fault::FaultDelayConfig>(fault);
 
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("mongo.fault.fixed_delay.percent",
-                               Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
+    EXPECT_CALL(
+        runtime_.snapshot_,
+        featureEnabled("mongo.fault.fixed_delay.percent",
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {

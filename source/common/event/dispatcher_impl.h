@@ -20,8 +20,15 @@
 #include "common/event/libevent_scheduler.h"
 #include "common/signal/fatal_error_handler.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Event {
+
+// The tracked object stack likely won't grow larger than this initial
+// reservation; this should make appends constant time since the stack
+// shouldn't have to grow larger.
+inline constexpr size_t ExpectedMaxTrackedObjectStackDepth = 10;
 
 /**
  * libevent implementation of Event::Dispatcher.
@@ -30,9 +37,8 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
                        public FatalErrorHandlerInterface {
 public:
-  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system);
-  DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
-                 Event::TimeSystem& time_system);
+  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
+                 const Buffer::WatermarkFactorySharedPtr& factory = nullptr);
   ~DispatcherImpl() override;
 
   /**
@@ -75,25 +81,13 @@ public:
   void post(std::function<void()> callback) override;
   void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
-  const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {
-    const ScopeTrackedObject* return_object = current_object_;
-    current_object_ = object;
-    return return_object;
-  }
+  void pushTrackedObject(const ScopeTrackedObject* object) override;
+  void popTrackedObject(const ScopeTrackedObject* expected_object) override;
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
-  void onFatalError(std::ostream& os) const override {
-    // Dump the state of the tracked object if it is in the current thread. This generally results
-    // in dumping the active state only for the thread which caused the fatal error.
-    if (isThreadSafe()) {
-      if (current_object_) {
-        current_object_->dumpState(os);
-      }
-    }
-  }
-
+  void onFatalError(std::ostream& os) const override;
   void
   runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
 
@@ -141,7 +135,7 @@ private:
   std::string stats_prefix_;
   DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;
-  Buffer::WatermarkFactoryPtr buffer_factory_;
+  Buffer::WatermarkFactorySharedPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
   SchedulableCallbackPtr deferred_delete_cb_;
@@ -151,7 +145,8 @@ private:
   std::vector<DeferredDeletablePtr>* current_to_delete_;
   Thread::MutexBasicLockable post_lock_;
   std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
-  const ScopeTrackedObject* current_object_{};
+  absl::InlinedVector<const ScopeTrackedObject*, ExpectedMaxTrackedObjectStackDepth>
+      tracked_object_stack_;
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
   WatchdogRegistrationPtr watchdog_registration_;

@@ -68,15 +68,15 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
 
   ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store);
   std::unique_ptr<Filter> filter =
-      std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
+      std::make_unique<Filter>(*config, Filters::Common::ExtAuthz::ClientPtr{client});
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   filter->initializeReadFilterCallbacks(filter_callbacks);
   static Network::Address::InstanceConstSharedPtr addr =
       std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
-  ON_CALL(filter_callbacks.connection_, remoteAddress()).WillByDefault(ReturnRef(addr));
-  ON_CALL(filter_callbacks.connection_, localAddress()).WillByDefault(ReturnRef(addr));
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr);
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr);
 
   for (const auto& action : input.actions()) {
     switch (action.action_selector_case()) {

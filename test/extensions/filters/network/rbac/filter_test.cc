@@ -59,13 +59,13 @@ public:
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
     EXPECT_CALL(callbacks_.connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
-    filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+    filter_ = std::make_unique<RoleBasedAccessControlFilter>(*config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    EXPECT_CALL(stream_info_, downstreamLocalAddress()).WillRepeatedly(ReturnRef(address_));
+    stream_info_.downstream_address_provider_->setLocalAddress(address_);
   }
 
   void setRequestedServerName(std::string server_name) {
@@ -128,7 +128,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithOneTimeEnforcement) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithContinuousEnforcement) {
   config_ = setupConfig(true, true /* continuous enforcement */);
-  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(*config_);
   filter_->initializeReadFilterCallbacks(callbacks_);
   setDestinationPort(123);
 
@@ -160,7 +160,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerName) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
   config_ = setupConfig(false /* with_policy */);
-  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(*config_);
   filter_->initializeReadFilterCallbacks(callbacks_);
   setDestinationPort(0);
 
@@ -196,7 +196,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
 // Log Tests
 TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldLog) {
   config_ = setupConfig(true, false, envoy::config::rbac::v3::RBAC::LOG);
-  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(*config_);
   filter_->initializeReadFilterCallbacks(callbacks_);
 
   setDestinationPort(123);
@@ -211,7 +211,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldLog) {
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldNotLog) {
   config_ = setupConfig(true, false, envoy::config::rbac::v3::RBAC::LOG);
-  filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
+  filter_ = std::make_unique<RoleBasedAccessControlFilter>(*config_);
   filter_->initializeReadFilterCallbacks(callbacks_);
 
   setDestinationPort(456);

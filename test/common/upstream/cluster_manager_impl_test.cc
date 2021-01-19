@@ -4,7 +4,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/network/raw_buffer_socket.h"
 #include "common/router/context_impl.h"
+
+#include "extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"
@@ -25,6 +28,7 @@ using ::testing::DoAll;
 using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Invoke;
+using ::testing::InvokeWithoutArgs;
 using ::testing::Mock;
 using ::testing::NiceMock;
 using ::testing::Return;
@@ -160,20 +164,43 @@ static_resources:
   return parseBootstrapFromV3Yaml(yaml);
 }
 
-TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
+class AlpnSocketFactory : public Network::RawBufferSocketFactory {
+public:
+  bool supportsAlpn() const override { return true; }
+};
+
+class AlpnTestConfigFactory
+    : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
+public:
+  std::string name() const override { return "envoy.transport_sockets.alpn"; }
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message&,
+                               Server::Configuration::TransportSocketFactoryContext&) override {
+    return std::make_unique<AlpnSocketFactory>();
+  }
+};
+
+TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
+  AlpnTestConfigFactory alpn_factory;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registered_factory(alpn_factory);
+
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
     - name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
-      http_protocol_options: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          auto_config:
+            http2_protocol_options: {}
+            http_protocol_options: {}
+      transport_socket:
+        name: envoy.transport_sockets.alpn
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
-      "'protocol_selection' values");
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
@@ -211,6 +238,10 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
       protocol_selection: USE_DOWNSTREAM_PROTOCOL
   )EOF";
   create(parseBootstrapFromV3Yaml(yaml));
+  auto info =
+      cluster_manager_->clusters().active_clusters_.find("http12_cluster")->second.get().info();
+  EXPECT_NE(0, info->features() & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL);
+
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
@@ -276,7 +307,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
-                          "invalid value \"foo\" for type TYPE_ENUM");
+                          "invalid value \"foo\"");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -4153,7 +4184,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
                 ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &lb_context));
 }
 
-class PrefetchTest : public ClusterManagerImplTest {
+class PreconnectTest : public ClusterManagerImplTest {
 public:
   void initialize(float ratio) {
     const std::string yaml = R"EOF(
@@ -4171,8 +4202,8 @@ public:
     if (ratio != 0) {
       config.mutable_static_resources()
           ->mutable_clusters(0)
-          ->mutable_prefetch_policy()
-          ->mutable_predictive_prefetch_ratio()
+          ->mutable_preconnect_policy()
+          ->mutable_predictive_preconnect_ratio()
           ->set_value(ratio);
     }
     create(config);
@@ -4190,8 +4221,10 @@ public:
     // Set up the HostSet.
     host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
     host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
+    host3_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
+    host4_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
 
-    HostVector hosts{host1_, host2_};
+    HostVector hosts{host1_, host2_, host3_, host4_};
     auto hosts_ptr = std::make_shared<HostVector>(hosts);
 
     // Sending non-mergeable updates.
@@ -4203,10 +4236,12 @@ public:
   Cluster* cluster_{};
   HostSharedPtr host1_;
   HostSharedPtr host2_;
+  HostSharedPtr host3_;
+  HostSharedPtr host4_;
 };
 
-TEST_F(PrefetchTest, PrefetchOff) {
-  // With prefetch set to 0, each request for a connection pool will only
+TEST_F(PreconnectTest, PreconnectOff) {
+  // With preconnect set to 0, each request for a connection pool will only
   // allocate that conn pool.
   initialize(0);
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
@@ -4222,9 +4257,9 @@ TEST_F(PrefetchTest, PrefetchOff) {
       ->tcpConnPool(ResourcePriority::Default, nullptr);
 }
 
-TEST_F(PrefetchTest, PrefetchOn) {
-  // With prefetch set to 1.1, each request for a connection pool will kick off
-  // prefetching, so create the pool for both the current connection and the
+TEST_F(PreconnectTest, PreconnectOn) {
+  // With preconnect set to 1.1, each request for a connection pool will kick off
+  // preconnecting, so create the pool for both the current connection and the
   // anticipated one.
   initialize(1.1);
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
@@ -4238,6 +4273,96 @@ TEST_F(PrefetchTest, PrefetchOn) {
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   cluster_manager_->getThreadLocalCluster("cluster_1")
       ->tcpConnPool(ResourcePriority::Default, nullptr);
+}
+
+TEST_F(PreconnectTest, PreconnectHighHttp) {
+  // With preconnect set to 3, the first request will kick off 3 preconnect attempts.
+  initialize(3);
+  int http_preconnect = 0;
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
+      .Times(4)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++http_preconnect;
+          return true;
+        }));
+        return ret;
+      }));
+  cluster_manager_->getThreadLocalCluster("cluster_1")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+  // Expect preconnect to be called 3 times across the four hosts.
+  EXPECT_EQ(3, http_preconnect);
+}
+
+TEST_F(PreconnectTest, PreconnectHighTcp) {
+  // With preconnect set to 3, the first request will kick off 3 preconnect attempts.
+  initialize(3);
+  int tcp_preconnect = 0;
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .Times(4)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Tcp::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++tcp_preconnect;
+          return true;
+        }));
+        return ret;
+      }));
+  cluster_manager_->getThreadLocalCluster("cluster_1")
+      ->tcpConnPool(ResourcePriority::Default, nullptr);
+  // Expect preconnect to be called 3 times across the four hosts.
+  EXPECT_EQ(3, tcp_preconnect);
+}
+
+TEST_F(PreconnectTest, PreconnectCappedAt3) {
+  // With preconnect set to 20, no more than 3 connections will be preconnected.
+  initialize(20);
+  int http_preconnect = 0;
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
+      .Times(4)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++http_preconnect;
+          return true;
+        }));
+        return ret;
+      }));
+  cluster_manager_->getThreadLocalCluster("cluster_1")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+  // Expect preconnect to be called 3 times across the four hosts.
+  EXPECT_EQ(3, http_preconnect);
+
+  // A subsequent call to get a connection will consume one of the preconnected
+  // connections, leaving two in queue, and kick off 2 more. This time we won't
+  // do the full 3 as the number of outstanding preconnects is limited by the
+  // number of healthy hosts.
+  http_preconnect = 0;
+  cluster_manager_->getThreadLocalCluster("cluster_1")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+  EXPECT_EQ(2, http_preconnect);
+}
+
+TEST_F(PreconnectTest, PreconnectCappedByMaybePreconnect) {
+  // Set preconnect high, and verify preconnecting stops when maybePreconnect returns false.
+  initialize(20);
+  int http_preconnect_calls = 0;
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _))
+      .Times(2)
+      .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
+        auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
+        ON_CALL(*ret, maybePreconnect(_)).WillByDefault(InvokeWithoutArgs([&]() -> bool {
+          ++http_preconnect_calls;
+          // Force maybe preconnect to fail.
+          return false;
+        }));
+        return ret;
+      }));
+  cluster_manager_->getThreadLocalCluster("cluster_1")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+  // Expect preconnect to be called once and then preconnecting is stopped.
+  EXPECT_EQ(1, http_preconnect_calls);
 }
 
 } // namespace

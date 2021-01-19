@@ -21,28 +21,33 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
-  ENVOY_LOG(debug,
-            "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
-            "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
-            callbacks_->connection().requestedServerName(),
-            callbacks_->connection().remoteAddress()->asString(),
-            callbacks_->connection().streamInfo().downstreamDirectRemoteAddress()->asString(),
-            callbacks_->connection().streamInfo().downstreamRemoteAddress()->asString(),
-            callbacks_->connection().streamInfo().downstreamLocalAddress()->asString(),
-            callbacks_->connection().ssl()
-                ? "uriSanPeerCertificate: " +
-                      absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ",") +
-                      ", dnsSanPeerCertificate: " +
-                      absl::StrJoin(callbacks_->connection().ssl()->dnsSansPeerCertificate(), ",") +
-                      ", subjectPeerCertificate: " +
-                      callbacks_->connection().ssl()->subjectPeerCertificate()
-                : "none",
-            callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
+  ENVOY_LOG(
+      debug,
+      "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
+      "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
+      callbacks_->connection().requestedServerName(),
+      callbacks_->connection().addressProvider().remoteAddress()->asString(),
+      callbacks_->connection()
+          .streamInfo()
+          .downstreamAddressProvider()
+          .directRemoteAddress()
+          ->asString(),
+      callbacks_->connection().streamInfo().downstreamAddressProvider().remoteAddress()->asString(),
+      callbacks_->connection().streamInfo().downstreamAddressProvider().localAddress()->asString(),
+      callbacks_->connection().ssl()
+          ? "uriSanPeerCertificate: " +
+                absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ",") +
+                ", dnsSanPeerCertificate: " +
+                absl::StrJoin(callbacks_->connection().ssl()->dnsSansPeerCertificate(), ",") +
+                ", subjectPeerCertificate: " +
+                callbacks_->connection().ssl()->subjectPeerCertificate()
+          : "none",
+      callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 
   std::string log_policy_id = "none";
   // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
   // run the check once and skip it for subsequent onData calls.
-  if (config_->enforcementType() ==
+  if (config_.enforcementType() ==
       envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS) {
     shadow_engine_result_ =
         checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow).engine_result_;
@@ -90,7 +95,7 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
 }
 
 Result RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
-  const auto engine = config_->engine(mode);
+  const auto engine = config_.engine(mode);
   std::string effective_policy_id;
   if (engine != nullptr) {
     // Check authorization decision and do Action operations
@@ -100,25 +105,25 @@ Result RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::Enforcem
     if (allowed) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed, matched policy {}", log_policy_id);
-        config_->stats().shadow_allowed_.inc();
+        config_.stats().shadow_allowed_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
         ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
-        config_->stats().allowed_.inc();
+        config_.stats().allowed_.inc();
       }
       return Result{Allow, effective_policy_id};
     } else {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow denied, matched policy {}", log_policy_id);
-        config_->stats().shadow_denied_.inc();
+        config_.stats().shadow_denied_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
         ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
-        config_->stats().denied_.inc();
+        config_.stats().denied_.inc();
       }
       return Result{Deny, log_policy_id};
     }

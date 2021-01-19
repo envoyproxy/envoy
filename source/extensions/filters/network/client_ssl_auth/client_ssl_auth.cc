@@ -53,7 +53,7 @@ ClientSslAuthConfigSharedPtr ClientSslAuthConfig::create(
   return new_config;
 }
 
-const AllowedPrincipals& ClientSslAuthConfig::allowedPrincipals() {
+const AllowedPrincipals& ClientSslAuthConfig::allowedPrincipals() const {
   return tls_->getTyped<AllowedPrincipals>();
 }
 
@@ -98,7 +98,7 @@ Network::FilterStatus ClientSslAuthFilter::onNewConnection() {
   // If this is not an SSL connection, do no further checking. High layers should redirect, etc.
   // if SSL is required.
   if (!read_callbacks_->connection().ssl()) {
-    config_->stats().auth_no_ssl_.inc();
+    config_.stats().auth_no_ssl_.inc();
     return Network::FilterStatus::Continue;
   } else {
     // Otherwise we need to wait for handshake to be complete before proceeding.
@@ -112,20 +112,21 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   }
 
   ASSERT(read_callbacks_->connection().ssl());
-  if (config_->ipAllowlist().contains(*read_callbacks_->connection().remoteAddress())) {
-    config_->stats().auth_ip_allowlist_.inc();
+  if (config_.ipAllowlist().contains(
+          *read_callbacks_->connection().addressProvider().remoteAddress())) {
+    config_.stats().auth_ip_allowlist_.inc();
     read_callbacks_->continueReading();
     return;
   }
 
-  if (!config_->allowedPrincipals().allowed(
+  if (!config_.allowedPrincipals().allowed(
           read_callbacks_->connection().ssl()->sha256PeerCertificateDigest())) {
-    config_->stats().auth_digest_no_match_.inc();
+    config_.stats().auth_digest_no_match_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;
   }
 
-  config_->stats().auth_digest_match_.inc();
+  config_.stats().auth_digest_match_.inc();
   read_callbacks_->continueReading();
 }
 

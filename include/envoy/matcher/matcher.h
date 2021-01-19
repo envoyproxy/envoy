@@ -7,6 +7,7 @@
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -120,6 +121,8 @@ public:
   virtual MatchResult match(const DataType& matching_data) PURE;
 };
 
+template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
+
 // InputMatcher provides the interface for determining whether an input value matches.
 class InputMatcher {
 public:
@@ -207,7 +210,9 @@ public:
   /**
    * Creates a DataInput from the provided config.
    */
-  virtual DataInputPtr<DataType> createDataInput(const Protobuf::Message& config) PURE;
+  virtual DataInputPtr<DataType>
+  createDataInput(const Protobuf::Message& config,
+                  ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

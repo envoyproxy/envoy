@@ -74,7 +74,7 @@ class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Filters::Common::RateLimit::RequestCallbacks {
 public:
-  Filter(ConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
+  Filter(Config& config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Network::ReadFilter
@@ -94,12 +94,14 @@ public:
   void complete(Filters::Common::RateLimit::LimitStatus status,
                 Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                Http::RequestHeaderMapPtr&& request_headers_to_add) override;
+                Http::RequestHeaderMapPtr&& request_headers_to_add,
+                const std::string& response_body,
+                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
 
 private:
   enum class Status { NotStarted, Calling, Complete };
 
-  ConfigSharedPtr config_;
+  Config& config_;
   Filters::Common::RateLimit::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};

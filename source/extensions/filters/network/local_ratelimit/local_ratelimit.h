@@ -49,6 +49,7 @@ private:
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
 
+  std::vector<RateLimit::LocalDescriptor> descriptors_;
   friend class LocalRateLimitTestBase;
 };
 
@@ -59,7 +60,7 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
  */
 class Filter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const ConfigSharedPtr& config) : config_(config) {}
+  Filter(Config& config) : config_(config) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override {
@@ -71,7 +72,7 @@ public:
   }
 
 private:
-  const ConfigSharedPtr config_;
+  Config& config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

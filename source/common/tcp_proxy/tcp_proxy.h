@@ -245,7 +245,7 @@ class Filter : public Network::ReadFilter,
                protected Logger::Loggable<Logger::Id::filter>,
                public GenericConnectionPoolCallbacks {
 public:
-  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
+  Filter(Config& config, Upstream::ClusterManager& cluster_manager);
   ~Filter() override;
 
   // Network::ReadFilter
@@ -264,10 +264,11 @@ public:
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   absl::optional<uint64_t> computeHashKey() override {
-    auto hash_policy = config_->hashPolicy();
+    auto hash_policy = config_.hashPolicy();
     if (hash_policy) {
-      return hash_policy->generateHash(downstreamConnection()->remoteAddress().get(),
-                                       downstreamConnection()->localAddress().get());
+      return hash_policy->generateHash(
+          downstreamConnection()->addressProvider().remoteAddress().get(),
+          downstreamConnection()->addressProvider().localAddress().get());
     }
 
     return {};
@@ -336,7 +337,7 @@ protected:
 
   // Callbacks for different error and success states during connection establishment
   virtual RouteConstSharedPtr pickRoute() {
-    return config_->getRouteFromEntries(read_callbacks_->connection());
+    return config_.getRouteFromEntries(read_callbacks_->connection());
   }
 
   virtual void onInitFailure(UpstreamFailureReason) {
@@ -345,7 +346,7 @@ protected:
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
-  bool maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name);
+  bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -356,7 +357,7 @@ protected:
   void disableIdleTimer();
   void onMaxDownstreamConnectionDuration();
 
-  const ConfigSharedPtr config_;
+  Config& config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 

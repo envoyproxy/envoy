@@ -211,7 +211,7 @@ using HostVector = std::vector<HostSharedPtr>;
 using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
-using HostMap = absl::node_hash_map<std::string, Upstream::HostSharedPtr>;
+using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -717,6 +717,9 @@ public:
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Whether connections should be immediately closed upon health failure.
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
+    // If USE_ALPN and HTTP2 are true, the upstream protocol will be negotiated using ALPN.
+    // If ALPN is attempted but not supported by the upstream HTTP/1.1 is used.
+    static const uint64_t USE_ALPN = 0x8;
   };
 
   virtual ~ClusterInfo() = default;
@@ -740,7 +743,7 @@ public:
   /**
    * @return how many streams should be anticipated per each current stream.
    */
-  virtual float perUpstreamPrefetchRatio() const PURE;
+  virtual float perUpstreamPreconnectRatio() const PURE;
 
   /**
    * @return how many streams should be anticipated per each current stream.
@@ -966,9 +969,9 @@ public:
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
 
   /**
-   * Calculate upstream protocol based on features.
+   * Calculate upstream protocol(s) based on features.
    */
-  virtual Http::Protocol
+  virtual std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
   /**

@@ -17,18 +17,18 @@ class SubscriptionFactoryImpl : public SubscriptionFactory, Logger::Loggable<Log
 public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
-                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                          Runtime::Loader& runtime);
+                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
                                                absl::string_view type_url, Stats::Scope& scope,
                                                SubscriptionCallbacks& callbacks,
-                                               OpaqueResourceDecoder& resource_decoder) override;
+                                               OpaqueResourceDecoder& resource_decoder,
+                                               bool use_namespace_matching) override;
   SubscriptionPtr
   collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,
-                                absl::string_view type_url, Stats::Scope& scope,
+                                absl::string_view resource_type, Stats::Scope& scope,
                                 SubscriptionCallbacks& callbacks,
                                 OpaqueResourceDecoder& resource_decoder) override;
 
@@ -38,7 +38,6 @@ private:
   Upstream::ClusterManager& cm_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
-  Runtime::Loader& runtime_;
 };
 
 } // namespace Config

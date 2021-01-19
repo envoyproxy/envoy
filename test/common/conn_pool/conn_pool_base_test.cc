@@ -23,6 +23,7 @@ public:
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
+  absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
 
   uint32_t active_streams_{};
 };
@@ -89,9 +90,9 @@ public:
   std::vector<ActiveClient*> clients_;
 };
 
-TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
+TEST_F(ConnPoolImplBaseTest, BasicPreconnect) {
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
 
   // On new stream, create 2 connections.
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
@@ -104,11 +105,11 @@ TEST_F(ConnPoolImplBaseTest, BasicPrefetch) {
   pool_.destructAllConnections();
 }
 
-TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
+TEST_F(ConnPoolImplBaseTest, PreconnectOnDisconnect) {
   testing::InSequence s;
 
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
 
   // On new stream, create 2 connections.
   EXPECT_CALL(pool_, instantiateActiveClient).Times(2);
@@ -128,9 +129,9 @@ TEST_F(ConnPoolImplBaseTest, PrefetchOnDisconnect) {
   pool_.destructAllConnections();
 }
 
-TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
+TEST_F(ConnPoolImplBaseTest, NoPreconnectIfUnhealthy) {
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
 
   host_->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Unhealthy);
@@ -144,9 +145,9 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfUnhealthy) {
   pool_.destructAllConnections();
 }
 
-TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
+TEST_F(ConnPoolImplBaseTest, NoPreconnectIfDegraded) {
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
 
   EXPECT_EQ(host_->health(), Upstream::Host::Health::Healthy);
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -160,34 +161,34 @@ TEST_F(ConnPoolImplBaseTest, NoPrefetchIfDegraded) {
   pool_.destructAllConnections();
 }
 
-TEST_F(ConnPoolImplBaseTest, ExplicitPrefetch) {
+TEST_F(ConnPoolImplBaseTest, ExplicitPreconnect) {
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
   EXPECT_CALL(pool_, instantiateActiveClient).Times(AnyNumber());
 
-  // With global prefetch off, we won't prefetch.
-  EXPECT_FALSE(pool_.maybePrefetch(0));
+  // With global preconnect off, we won't preconnect.
+  EXPECT_FALSE(pool_.maybePreconnect(0));
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
-  // With prefetch ratio of 1.1, we'll prefetch two connections.
-  // Currently, no number of subsequent calls to prefetch will increase that.
-  EXPECT_TRUE(pool_.maybePrefetch(1.1));
-  EXPECT_TRUE(pool_.maybePrefetch(1.1));
-  EXPECT_FALSE(pool_.maybePrefetch(1.1));
+  // With preconnect ratio of 1.1, we'll preconnect two connections.
+  // Currently, no number of subsequent calls to preconnect will increase that.
+  EXPECT_TRUE(pool_.maybePreconnect(1.1));
+  EXPECT_TRUE(pool_.maybePreconnect(1.1));
+  EXPECT_FALSE(pool_.maybePreconnect(1.1));
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 2 /*connecting capacity*/);
 
-  // With a higher prefetch ratio, more connections may be prefetched.
-  EXPECT_TRUE(pool_.maybePrefetch(3));
+  // With a higher preconnect ratio, more connections may be preconnected.
+  EXPECT_TRUE(pool_.maybePreconnect(3));
 
   pool_.destructAllConnections();
 }
 
-TEST_F(ConnPoolImplBaseTest, ExplicitPrefetchNotHealthy) {
+TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
   // Create more than one connection per new stream.
-  ON_CALL(*cluster_, perUpstreamPrefetchRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
 
-  // Prefetch won't occur if the host is not healthy.
+  // Preconnect won't occur if the host is not healthy.
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  EXPECT_FALSE(pool_.maybePrefetch(1));
+  EXPECT_FALSE(pool_.maybePreconnect(1));
 }
 
 } // namespace ConnectionPool

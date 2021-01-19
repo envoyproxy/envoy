@@ -7,10 +7,12 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
@@ -38,12 +40,11 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
-                               Event::TimeSystem& time_system)
-    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
-
-DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
-                               Api::Api& api, Event::TimeSystem& time_system)
-    : name_(name), api_(api), buffer_factory_(std::move(factory)),
+                               Event::TimeSystem& time_system,
+                               const Buffer::WatermarkFactorySharedPtr& factory)
+    : name_(name), api_(api),
+      buffer_factory_(factory != nullptr ? factory
+                                         : std::make_shared<Buffer::WatermarkBufferFactory>()),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
           [this]() -> void { clearDeferredDeleteList(); })),
@@ -288,6 +289,16 @@ void DispatcherImpl::runPostCallbacks() {
   }
 }
 
+void DispatcherImpl::onFatalError(std::ostream& os) const {
+  // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
+  // results in dumping the active state only for the thread which caused the fatal error.
+  if (isThreadSafe()) {
+    for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
+      (*iter)->dumpState(os);
+    }
+  }
+}
+
 void DispatcherImpl::runFatalActionsOnTrackedObject(
     const FatalAction::FatalActionPtrList& actions) const {
   // Only run if this is the dispatcher of the current thread and
@@ -297,7 +308,7 @@ void DispatcherImpl::runFatalActionsOnTrackedObject(
   }
 
   for (const auto& action : actions) {
-    action->run(current_object_);
+    action->run(tracked_object_stack_);
   }
 }
 
@@ -305,6 +316,24 @@ void DispatcherImpl::touchWatchdog() {
   if (watchdog_registration_) {
     watchdog_registration_->touchWatchdog();
   }
+}
+
+void DispatcherImpl::pushTrackedObject(const ScopeTrackedObject* object) {
+  ASSERT(isThreadSafe());
+  ASSERT(object != nullptr);
+  tracked_object_stack_.push_back(object);
+  ASSERT(tracked_object_stack_.size() <= ExpectedMaxTrackedObjectStackDepth);
+}
+
+void DispatcherImpl::popTrackedObject(const ScopeTrackedObject* expected_object) {
+  ASSERT(isThreadSafe());
+  ASSERT(expected_object != nullptr);
+  RELEASE_ASSERT(!tracked_object_stack_.empty(), "Tracked Object Stack is empty, nothing to pop!");
+
+  const ScopeTrackedObject* top = tracked_object_stack_.back();
+  tracked_object_stack_.pop_back();
+  ASSERT(top == expected_object,
+         "Popped the top of the tracked object stack, but it wasn't the expected object!");
 }
 
 } // namespace Event

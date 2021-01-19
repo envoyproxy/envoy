@@ -46,6 +46,9 @@ bool anyFilterChain(
 }
 
 bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disable_tls_inspector_injection")) {
+    return false;
+  }
   return anyFilterChain(config,
                         [](const auto& filter_chain) {
                           const auto& matcher = filter_chain.filter_chain_match();
@@ -69,6 +72,11 @@ bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
   return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       config.filter_chains().empty() ? config.default_filter_chain() : config.filter_chains()[0],
       use_proxy_proto, false);
+}
+
+bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bind_to_port, true) &&
+         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true);
 }
 } // namespace
 
@@ -106,7 +114,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
   }
 
   if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
-    local_address_ = socket_->localAddress();
+    local_address_ = socket_->addressProvider().localAddress();
   }
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
             local_address_->asString());
@@ -243,9 +251,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+      bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
@@ -321,10 +329,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
-    : parent_(parent), address_(origin.address_),
-      bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
+    : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
@@ -529,7 +536,7 @@ void ListenerImpl::buildSocketOptions() {
 
 void ListenerImpl::buildOriginalDstListenerFilter() {
   // Add original dst listener filter if 'use_original_dst' flag is set.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, hidden_envoy_deprecated_use_original_dst, false)) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, use_original_dst, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
