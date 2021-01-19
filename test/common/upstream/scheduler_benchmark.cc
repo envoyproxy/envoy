@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <random>
 
 #include "common/common/random_generator.h"
 #include "common/upstream/edf_scheduler.h"
@@ -38,7 +39,7 @@ public:
       info.emplace_back(oi);
     }
 
-    std::random_shuffle(info.begin(), info.end());
+    std::shuffle(info.begin(), info.end(), std::default_random_engine());
     state.ResumeTiming();
 
     for (auto& oi : info) {
@@ -60,7 +61,7 @@ public:
       info.emplace_back(oi);
     }
 
-    std::random_shuffle(info.begin(), info.end());
+    std::shuffle(info.begin(), info.end(), std::default_random_engine());
     state.ResumeTiming();
 
     for (auto& oi : info) {
