@@ -70,9 +70,8 @@ public:
   // Side affect: the string view of Path header is invalidated.
   // Return false if error happens during the sanitization.
   // Returns true if there is no path.
-  static bool
-  maybeNormalizePath(RequestHeaderMap& request_headers, const ConnectionManagerConfig& config,
-                     Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting());
+  static bool maybeNormalizePath(RequestHeaderMap& request_headers,
+                                 const ConnectionManagerConfig& config);
 
   static void maybeNormalizeHost(RequestHeaderMap& request_headers,
                                  const ConnectionManagerConfig& config, uint32_t port);
