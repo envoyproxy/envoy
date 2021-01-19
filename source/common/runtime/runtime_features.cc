@@ -107,6 +107,8 @@ constexpr const char* disabled_runtime_features[] = {
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for
     // v2 url is removed from codebase.
     "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade",
+    // Do not modify the externally set x-request-id header to include the tracing decision
+    "envoy.reloadable_features.http_omit_tracing_decsion_from_request_id",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
     // Sentinel and test flag.

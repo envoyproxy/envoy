@@ -1579,5 +1579,68 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
     EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
   }
 }
+
+// test preserve_external_request_id false not edge request
+TEST_F(ConnectionManagerUtilityTest, NoTracingDecisionInRequestIdEdgeRequest) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_omit_tracing_decsion_from_request_id", "true"}});
+
+  const std::map<std::string, std::string> traceIdMap = {
+
+      // Ensure that we still insert a tracing header if none exists
+      {"", random_.uuid_},
+
+      // incoming client request id that is marked as NoTrace, remains unchanged
+      {"b6aa0744-49e1-4f5d-b5a8-750aaaf6c205", "b6aa0744-49e1-4f5d-b5a8-750aaaf6c205"},
+
+      // incoming client request id that is marked as Sampled, remains unchanged
+      {"b6aa0744-49e1-9f5d-b5a8-750aaaf6c205", "b6aa0744-49e1-9f5d-b5a8-750aaaf6c205"},
+  };
+
+  for (const auto& [client_trace_header, expected_header_value] : traceIdMap) {
+
+    TestRequestHeaderMapImpl headers;
+
+    if (!client_trace_header.empty()) {
+      headers.setRequestId(client_trace_header);
+    }
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
+    EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ(expected_header_value, headers.get_(Headers::get().RequestId));
+  }
+}
+
+// test preserve_external_request_id false not edge request
+TEST_F(ConnectionManagerUtilityTest, SetTracingDecisionInRequestIdEdgeRequest) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_omit_tracing_decsion_from_request_id", "false"}});
+
+  const std::string trace_status_no_trace("b6aa0744-49e1-4f5d-b5a8-750aaaf6c205");
+  const std::map<std::string, std::string> traceIdMap = {
+
+      // Ensure that we still insert a tracing header if none exists
+      {"", random_.uuid_},
+
+      // incoming client request id that is marked as Sampled, changed to NoTrace
+      {"b6aa0744-49e1-9f5d-b5a8-750aaaf6c205", trace_status_no_trace},
+
+      {trace_status_no_trace, trace_status_no_trace}};
+
+  for (const auto& [client_trace_header, expected_header_value] : traceIdMap) {
+
+    TestRequestHeaderMapImpl headers;
+
+    if (!client_trace_header.empty()) {
+      headers.setRequestId(client_trace_header);
+    }
+    EXPECT_CALL(*request_id_extension_, set(testing::Ref(headers), false));
+    EXPECT_CALL(*request_id_extension_, set(_, true)).Times(0);
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ(expected_header_value, headers.get_(Headers::get().RequestId));
+  }
+}
 } // namespace Http
 } // namespace Envoy

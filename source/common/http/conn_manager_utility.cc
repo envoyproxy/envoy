@@ -264,6 +264,11 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
     overall_sampling = &route->tracingConfig()->getOverallSampling();
   }
 
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_omit_tracing_decsion_from_request_id")) {
+    return;
+  }
+
   // Do not apply tracing transformations if we are currently tracing.
   if (TraceStatus::NoTrace == rid_extension->getTraceStatus(request_headers)) {
     if (request_headers.ClientTraceId() &&
