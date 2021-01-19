@@ -27,6 +27,29 @@ namespace PostgresProxy {
  *
  */
 
+// Interface to Postgres message class.
+class Message {
+public:
+  enum ValidationResult { ValidationFailed, ValidationOK, ValidationNeedMoreData };
+
+  virtual ~Message() = default;
+
+  // read method should read only as many bytes from data
+  // buffer as it is indicated in message's length field.
+  // "length" parameter indicates how many bytes were indicated in Postgres message's
+  // length field. "data" buffer may contain more bytes than "length".
+  virtual bool read(const Buffer::Instance& data, const uint64_t length) PURE;
+
+  virtual ValidationResult validate(const Buffer::Instance& data, const uint64_t) PURE;
+
+  // toString method provides displayable representation of
+  // the Postgres message.
+  virtual std::string toString() const PURE;
+
+protected:
+  ValidationResult validation_result_{ValidationNeedMoreData};
+};
+
 // Template for integer types.
 // Size of integer types is fixed and depends on the type of integer.
 template <typename T> class Int {
@@ -44,13 +67,24 @@ public:
    * for the current message.
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    if ((data.length() - pos) < sizeof(T)) {
-      return false;
-    }
     value_ = data.peekBEInt<T>(pos);
     pos += sizeof(T);
     left -= sizeof(T);
     return true;
+  }
+
+  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+    if (left < sizeof(T)) {
+      return Message::ValidationFailed;
+    }
+
+    if ((data.length() - pos) < sizeof(T)) {
+      return Message::ValidationNeedMoreData;
+    }
+
+    pos += sizeof(T);
+    left -= sizeof(T);
+    return Message::ValidationOK;
   }
 
   std::string toString() const { return fmt::format("[{}]", value_); }
@@ -76,8 +110,12 @@ public:
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
   std::string toString() const;
+  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t&);
 
 private:
+  // start and end are set by validate method.
+  uint64_t start_;
+  uint64_t end_;
   std::string value_;
 };
 
@@ -90,6 +128,7 @@ public:
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
   std::string toString() const;
+  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t&);
 
 private:
   std::vector<uint8_t> value_;
@@ -113,6 +152,7 @@ public:
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left);
   std::string toString() const;
+  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t&);
 
 private:
   int32_t len_;
@@ -126,22 +166,11 @@ public:
    * See above for parameter and return value description.
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    // First read the 16 bits value which indicates how many
-    // elements there are in the array.
-    if (((data.length() - pos) < sizeof(uint16_t)) || (left < sizeof(uint16_t))) {
-      return false;
-    }
-    const uint16_t num = data.peekBEInt<uint16_t>(pos);
+    // Skip reading the size of array. The validator did it.
     pos += sizeof(uint16_t);
     left -= sizeof(uint16_t);
-    if (num != 0) {
-      for (uint16_t i = 0; i < num; i++) {
-        auto item = std::make_unique<T>();
-        if (!item->read(data, pos, left)) {
-          return false;
-        }
-        value_.push_back(std::move(item));
-      }
+    for (uint16_t i = 0; i < size_; i++) {
+      value_[i]->read(data, pos, left);
     }
     return true;
   }
@@ -159,8 +188,41 @@ public:
 
     return out;
   }
+  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+    // First read the 16 bits value which indicates how many
+    // elements there are in the array.
+    if (left < sizeof(uint16_t)) {
+      return Message::ValidationFailed;
+    }
+
+    if ((data.length() - pos) < sizeof(uint16_t)) {
+      return Message::ValidationNeedMoreData;
+    }
+
+    size_ = data.peekBEInt<uint16_t>(pos);
+    uint64_t orig_pos = pos;
+    uint64_t orig_left = left;
+    pos += sizeof(uint16_t);
+    left -= sizeof(uint16_t);
+    if (size_ != 0) {
+      for (uint16_t i = 0; i < size_; i++) {
+        auto item = std::make_unique<T>();
+        Message::ValidationResult result = item->validate(data, pos, left);
+        if (Message::ValidationOK != result) {
+
+          pos = orig_pos;
+          left = orig_left;
+          value_.clear();
+          return result;
+        }
+        value_.push_back(std::move(item));
+      }
+    }
+    return Message::ValidationOK;
+  }
 
 private:
+  uint16_t size_;
   std::vector<std::unique_ptr<T>> value_;
 };
 
@@ -173,16 +235,10 @@ public:
    * See above for parameter and return value description.
    */
   bool read(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
-    if ((data.length() - pos) < left) {
-      return false;
-    }
-    // Read until nothing is left.
-    while (left != 0) {
-      auto item = std::make_unique<T>();
-      if (!item->read(data, pos, left)) {
+    for (size_t i = 0; i < value_.size(); i++) {
+      if (!value_[i]->read(data, pos, left)) {
         return false;
       }
-      value_.push_back(std::move(item));
     }
     return true;
   }
@@ -198,47 +254,44 @@ public:
     }
     return out;
   }
+  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+    if ((data.length() - pos) < left) {
+      return Message::ValidationNeedMoreData;
+    }
+
+    // Validate until the end of the message.
+    uint64_t orig_pos = pos;
+    uint64_t orig_left = left;
+    while (left != 0) {
+      auto item = std::make_unique<T>();
+      Message::ValidationResult result = item->validate(data, pos, left);
+      if (Message::ValidationOK != result) {
+        pos = orig_pos;
+        left = orig_left;
+        value_.clear();
+        return result;
+      }
+      value_.push_back(std::move(item));
+    }
+
+    return Message::ValidationOK;
+  }
 
 private:
   std::vector<std::unique_ptr<T>> value_;
-};
-
-// Interface to Postgres message class.
-class Message {
-public:
-  virtual ~Message() = default;
-
-  // read method should read only as many bytes from data
-  // buffer as it is indicated in message's length field.
-  // "length" parameter indicates how many bytes were indicated in Postgres message's
-  // length field. "data" buffer may contain more bytes than "length".
-  virtual bool read(const Buffer::Instance& data, const uint64_t length) PURE;
-
-  // toString method provides displayable representation of
-  // the Postgres message.
-  virtual std::string toString() const PURE;
 };
 
 // Sequence is tuple like structure, which binds together
 // set of several fields of different types.
 template <typename... Types> class Sequence;
 
-template <typename FirstField, typename... Remaining>
-class Sequence<FirstField, Remaining...> : public Message {
+template <typename FirstField, typename... Remaining> class Sequence<FirstField, Remaining...> {
   FirstField first_;
   Sequence<Remaining...> remaining_;
 
 public:
   Sequence() = default;
-  std::string toString() const override {
-    return absl::StrCat(first_.toString(), remaining_.toString());
-  }
-
-  bool read(const Buffer::Instance& data, const uint64_t length) override {
-    uint64_t pos = 0;
-    uint64_t left = length;
-    return read(data, pos, left);
-  }
+  std::string toString() const { return absl::StrCat(first_.toString(), remaining_.toString()); }
 
   /**
    * Implementation of "read" method for variadic template.
@@ -253,21 +306,54 @@ public:
     }
     return remaining_.read(data, pos, left);
   }
+
+  Message::ValidationResult validate(const Buffer::Instance& data, uint64_t& pos, uint64_t& left) {
+    Message::ValidationResult result = first_.validate(data, pos, left);
+    if (result != Message::ValidationOK) {
+      return result;
+    }
+    return remaining_.validate(data, pos, left);
+  }
 };
 
 // Terminal template definition for variadic Sequence template.
-template <> class Sequence<> : public Message {
+template <> class Sequence<> {
 public:
   Sequence<>() = default;
-  std::string toString() const override { return ""; }
+  std::string toString() const { return ""; }
   bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
-  bool read(const Buffer::Instance&, const uint64_t) override { return true; }
+  // bool read(const Buffer::Instance&, const uint64_t) override { return true; }
+  Message::ValidationResult validate(const Buffer::Instance&, uint64_t&, uint64_t& left) {
+    return left == 0 ? Message::ValidationOK : Message::ValidationFailed;
+  }
+};
+
+template <typename... Types> class MessageImpl : public Message, public Sequence<Types...> {
+public:
+  virtual ~MessageImpl() = default;
+  bool read(const Buffer::Instance& data, const uint64_t length) override {
+    // Do not call read unless validation was successful.
+    ASSERT(validation_result_ == ValidationOK);
+    uint64_t pos = 0;
+    uint64_t left = length;
+    return Sequence<Types...>::read(data, pos, left);
+  }
+  Message::ValidationResult validate(const Buffer::Instance& data, const uint64_t length) override {
+    uint64_t pos = 0;
+    uint64_t left = length;
+    validation_result_ = Sequence<Types...>::validate(data, pos, left);
+    return validation_result_;
+  }
+  std::string toString() const override { return Sequence<Types...>::toString(); }
+
+private:
+  // Message::ValidationResult validation_result_;
 };
 
 // Helper function to create pointer to a Sequence structure and is used by Postgres
 // decoder after learning the type of Postgres message.
 template <typename... Types> std::unique_ptr<Message> createMsgBodyReader() {
-  return std::make_unique<Sequence<Types...>>();
+  return std::make_unique<MessageImpl<Types...>>();
 }
 
 } // namespace PostgresProxy

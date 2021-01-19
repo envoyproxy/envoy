@@ -29,7 +29,17 @@ TYPED_TEST_SUITE(IntTest, IntTypes);
 TYPED_TEST(IntTest, BasicRead) {
   this->data_.template writeBEInt<decltype(std::declval<TypeParam>().get())>(12);
   uint64_t pos = 0;
-  uint64_t left = this->data_.length();
+  uint64_t left;
+  // Simulate that message is too short.
+  left = sizeof(TypeParam) - 1;
+  ASSERT_THAT(Message::ValidationFailed, this->field_.validate(this->data_, pos, left));
+  // Single 4-byte int. Message length is correct.
+  left = sizeof(TypeParam);
+  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, pos, left));
+
+  // Read the value after successful validation.
+  pos = 0;
+  left = sizeof(TypeParam);
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
 
   ASSERT_THAT(this->field_.toString(), "[12]");
@@ -47,6 +57,10 @@ TYPED_TEST(IntTest, ReadWithLeftovers) {
   this->data_.template writeBEInt<uint8_t>(11);
   uint64_t pos = 0;
   uint64_t left = this->data_.length();
+  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, pos, left));
+
+  pos = 0;
+  left = this->data_.length();
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   ASSERT_THAT(this->field_.toString(), "[12]");
   // pos should be moved forward by the number of bytes read.
@@ -60,8 +74,13 @@ TYPED_TEST(IntTest, ReadAtOffset) {
   // write 1 byte before the actual value.
   this->data_.template writeBEInt<uint8_t>(11);
   this->data_.template writeBEInt<decltype(std::declval<TypeParam>().get())>(12);
+
   uint64_t pos = 1;
   uint64_t left = this->data_.length() - 1;
+  ASSERT_THAT(Message::ValidationOK, this->field_.validate(this->data_, pos, left));
+
+  pos = 1;
+  left = this->data_.length() - 1;
   ASSERT_TRUE(this->field_.read(this->data_, pos, left));
   ASSERT_THAT(this->field_.toString(), "[12]");
   // pos should be moved forward by the number of bytes read.
@@ -74,8 +93,9 @@ TYPED_TEST(IntTest, NotEnoughData) {
   this->data_.template writeBEInt<decltype(std::declval<TypeParam>().get())>(12);
   // Start from offset 1. There is not enough data in the buffer for the required type.
   uint64_t pos = 1;
-  uint64_t left = this->data_.length() - pos;
-  ASSERT_FALSE(this->field_.read(this->data_, pos, left));
+  uint64_t left = this->data_.length();
+
+  ASSERT_THAT(this->field_.validate(this->data_, pos, left), Message::ValidationNeedMoreData);
 }
 
 // Byte1 should format content as char.
@@ -87,6 +107,12 @@ TEST(Byte1, Formatting) {
 
   uint64_t pos = 0;
   uint64_t left = 1;
+  ASSERT_THAT(Message::ValidationOK, field.validate(data, pos, left));
+  ASSERT_THAT(pos, 1);
+  ASSERT_THAT(left, 0);
+
+  pos = 0;
+  left = 1;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 1);
   ASSERT_THAT(left, 0);
@@ -100,51 +126,27 @@ TEST(StringType, SingleString) {
 
   Buffer::OwnedImpl data;
   data.add("test");
-  data.writeBEInt<uint8_t>(0);
+  // Passed length 3 is too short.
   uint64_t pos = 0;
-  uint64_t left = 5;
+  uint64_t left = 3;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  // Correct length, but terminating zero is missing.
+  left = 5;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  // Add terminating zero.
+  data.writeBEInt<uint8_t>(0);
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 5);
+  ASSERT_THAT(left, 0);
+
+  pos = 0;
+  left = 5;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 5);
   ASSERT_THAT(left, 0);
 
   auto out = field.toString();
   ASSERT_THAT(out, "[test]");
-}
-
-TEST(StringType, MultipleStrings) {
-  String field;
-
-  // Add 3 strings.
-  Buffer::OwnedImpl data;
-  data.add("test1");
-  data.writeBEInt<uint8_t>(0);
-  data.add("test2");
-  data.writeBEInt<uint8_t>(0);
-  data.add("test3");
-  data.writeBEInt<uint8_t>(0);
-  uint64_t pos = 0;
-  uint64_t left = 3 * 6;
-
-  // Read the first string.
-  ASSERT_TRUE(field.read(data, pos, left));
-  ASSERT_THAT(pos, 1 * 6);
-  ASSERT_THAT(left, 2 * 6);
-  auto out = field.toString();
-  ASSERT_THAT(out, "[test1]");
-
-  // Read the second string.
-  ASSERT_TRUE(field.read(data, pos, left));
-  ASSERT_THAT(pos, 2 * 6);
-  ASSERT_THAT(left, 1 * 6);
-  out = field.toString();
-  ASSERT_THAT(out, "[test2]");
-
-  // Read the third string.
-  ASSERT_TRUE(field.read(data, pos, left));
-  ASSERT_THAT(pos, 3 * 6);
-  ASSERT_THAT(left, 0);
-  out = field.toString();
-  ASSERT_THAT(out, "[test3]");
 }
 
 TEST(StringType, NoTerminatingByte) {
@@ -154,7 +156,9 @@ TEST(StringType, NoTerminatingByte) {
   data.add("test");
   uint64_t pos = 0;
   uint64_t left = 4;
-  ASSERT_FALSE(field.read(data, pos, left));
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  left = 5;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
 }
 
 // ByteN type is always placed at the end of Postgres message.
@@ -170,10 +174,31 @@ TEST(ByteN, BasicTest) {
     data.writeBEInt<uint8_t>(i);
   }
   uint64_t pos = 0;
-  uint64_t left = 10;
+  uint64_t left;
+
+  // Since ByteN structure does not contain length field, any
+  // value less than number of bytes in the buffer should
+  // pass validation.
+  pos = 0;
+  left = 0;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 0);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 1;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 1);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 4;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 4);
+  ASSERT_THAT(left, 0);
+
+  pos = 0;
+  left = 10;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 10);
-  // One byte should be left in the buffer.
   ASSERT_THAT(left, 0);
 
   auto out = field.toString();
@@ -190,7 +215,7 @@ TEST(ByteN, NotEnoughData) {
   }
   uint64_t pos = 0;
   uint64_t left = 11;
-  ASSERT_FALSE(field.read(data, pos, left));
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
 }
 
 TEST(ByteN, Empty) {
@@ -200,6 +225,7 @@ TEST(ByteN, Empty) {
   // Write nothing to data buffer.
   uint64_t pos = 0;
   uint64_t left = 0;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
   ASSERT_TRUE(field.read(data, pos, left));
 
   auto out = field.toString();
@@ -209,12 +235,49 @@ TEST(ByteN, Empty) {
 // VarByteN type. It contains 4 bytes length field with value which follows.
 TEST(VarByteN, BasicTest) {
   VarByteN field;
-
   Buffer::OwnedImpl data;
-  // Write VarByteN with length equal to zero. No value follows.
-  data.writeBEInt<uint32_t>(0);
 
-  // Write value with 5 bytes.
+  uint64_t pos = 0;
+  uint64_t left = 0;
+  // Simulate that message ended and VarByteN's length fields  sticks past the
+  // message boundary.
+  data.writeBEInt<int32_t>(5);
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+
+  // Write VarByteN with length equal to zero. No value follows.
+  // Set structure length to be -1 (means no payload).
+  left = 4;
+  data.drain(data.length());
+  data.writeBEInt<int32_t>(-1);
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  // The same for structure length 0.
+  pos = 0;
+  left = 4;
+  data.drain(data.length());
+  data.writeBEInt<int32_t>(0);
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+
+  // Simulate that VarByteN would extend past message boundary.
+  data.drain(data.length());
+  data.writeBEInt<int32_t>(30);
+  pos = 0;
+  left = 4;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+
+  // Simulate that VarByteN length is 6, there are 6 bytes left to the
+  // message boundary, but buffer contains only 4 bytes.
+  data.drain(data.length());
+  data.writeBEInt<int32_t>(6);
+  data.writeBEInt<uint32_t>(16);
+  pos = 0;
+  left = 6;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+
+  data.drain(data.length());
+  // Write first value.
+  data.writeBEInt<int32_t>(0);
+
+  // Write 2nd value with 5 bytes.
   data.writeBEInt<uint32_t>(5);
   for (auto i = 0; i < 5; i++) {
     data.writeBEInt<uint8_t>(10 + i);
@@ -223,11 +286,15 @@ TEST(VarByteN, BasicTest) {
   // Write special case value with length -1. No value follows.
   data.writeBEInt<int32_t>(-1);
 
-  uint64_t pos = 0;
-  uint64_t left = 4 + 4 + 5 + 4;
+  pos = 0;
+  left = 4 + 4 + 5 + 4;
   uint64_t expected_left = left;
-
+  uint64_t orig_pos = pos;
+  uint64_t orig_left = left;
   // Read the first value.
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  pos = orig_pos;
+  left = orig_left;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4);
   expected_left -= 4;
@@ -236,6 +303,11 @@ TEST(VarByteN, BasicTest) {
   ASSERT_TRUE(out.find("0 bytes") != std::string::npos);
 
   // Read the second value.
+  orig_pos = pos;
+  orig_left = left;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  pos = orig_pos;
+  left = orig_left;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4 + 4 + 5);
   expected_left -= (4 + 5);
@@ -245,6 +317,11 @@ TEST(VarByteN, BasicTest) {
   ASSERT_TRUE(out.find("10 11 12 13 14") != std::string::npos);
 
   // Read the third value.
+  orig_pos = pos;
+  orig_left = left;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  pos = orig_pos;
+  left = orig_left;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4 + 4 + 5 + 4);
   expected_left -= 4;
@@ -253,47 +330,31 @@ TEST(VarByteN, BasicTest) {
   ASSERT_TRUE(out.find("-1 bytes") != std::string::npos);
 }
 
-TEST(VarByteN, NotEnoughLengthData) {
-  VarByteN field;
-
-  Buffer::OwnedImpl data;
-  // Write 3 bytes. Minimum for this type is 4 bytes of length.
-  data.writeBEInt<uint8_t>(0);
-  data.writeBEInt<uint8_t>(1);
-  data.writeBEInt<uint8_t>(2);
-
-  uint64_t pos = 0;
-  uint64_t left = 3;
-  ASSERT_FALSE(field.read(data, pos, left));
-}
-
-TEST(VarByteN, NotEnoughValueData) {
-  VarByteN field;
-
-  Buffer::OwnedImpl data;
-  // Write length of the value to be 5 bytes, but supply only 4 bytes.
-  data.writeBEInt<int32_t>(5);
-  data.writeBEInt<uint8_t>(0);
-  data.writeBEInt<uint8_t>(1);
-  data.writeBEInt<uint8_t>(2);
-  data.writeBEInt<uint8_t>(3);
-
-  uint64_t pos = 0;
-  uint64_t left = 5 + 4;
-  ASSERT_FALSE(field.read(data, pos, left));
-}
-
 // Array composite type tests.
 TEST(Array, SingleInt) {
   Array<Int32> field;
 
   Buffer::OwnedImpl data;
-  // Write the number of elements in the array.
-  data.writeBEInt<uint16_t>(1);
-  data.writeBEInt<uint32_t>(123);
-
+  // Simulate that message ends before the array.
   uint64_t pos = 0;
-  uint64_t left = 2 + 4;
+  uint64_t left = 1;
+  data.writeBEInt<int8_t>(1);
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+
+  // Write the value of the element into the array.
+  data.drain(data.length());
+  data.writeBEInt<int16_t>(1);
+  data.writeBEInt<uint32_t>(123);
+  // Simulate that message length end before end of array.
+  left = 5;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+
+  left = 6;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 6);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 6;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 6);
   ASSERT_THAT(left, 0);
@@ -307,14 +368,29 @@ TEST(Array, MultipleInts) {
   Array<Int8> field;
 
   Buffer::OwnedImpl data;
-  // Write 3 elements into array.
+  // Write 3 as size of array, but add only 2 elements into array.
   data.writeBEInt<uint16_t>(3);
   data.writeBEInt<uint8_t>(211);
   data.writeBEInt<uint8_t>(212);
-  data.writeBEInt<uint8_t>(213);
 
   uint64_t pos = 0;
   uint64_t left = 2 + 3 * 1;
+
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+
+  // Add the third element.
+  data.writeBEInt<uint8_t>(213);
+
+  // Simulate that message ends before end of the array.
+  left = 2 + 3 * 1 - 1;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+
+  left = 2 + 3 * 1;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 5);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 2 + 3 * 1;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 5);
   ASSERT_THAT(left, 0);
@@ -335,6 +411,11 @@ TEST(Array, Empty) {
 
   uint64_t pos = 0;
   uint64_t left = 2;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 2);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 2;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 2);
   ASSERT_THAT(left, 0);
@@ -353,7 +434,7 @@ TEST(Array, NotEnoughDataForLength) {
 
   uint64_t pos = 0;
   uint64_t left = 1;
-  ASSERT_FALSE(field.read(data, pos, left));
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
 }
 
 // Test situation when there is not enough data in the buffer to read one of the elements
@@ -371,7 +452,7 @@ TEST(Array, NotEnoughDataForValues) {
 
   uint64_t pos = 0;
   uint64_t left = 2 + 4 + 2;
-  ASSERT_FALSE(field.read(data, pos, left));
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
 }
 
 // Repeated composite type tests.
@@ -383,15 +464,37 @@ TEST(Repeated, BasicTestWithStrings) {
   // It will be ignored.
   data.writeBEInt<uint32_t>(101);
   data.writeBEInt<uint8_t>(102);
-  // Now write 3 strings. Each terminated by zero byte.
+  uint64_t pos = 5;
+  uint64_t left = 5;
+  // Write the first string without terminating zero.
   data.add("test1");
-  data.writeBEInt<uint8_t>(0);
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  left = 6;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  // Add terminating zero.
+  data.writeBEInt<int8_t>(0);
+  left = 5;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  left = 7;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  left = 6;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  // Add two additional strings
   data.add("test2");
   data.writeBEInt<uint8_t>(0);
   data.add("test3");
   data.writeBEInt<uint8_t>(0);
-  uint64_t pos = 5;
-  uint64_t left = 3 * 6;
+  pos = 5;
+  left = 3 * 6 - 1;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
+  left = 3 * 6 + 1;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationNeedMoreData);
+  left = 3 * 6;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 5 + 3 * 6);
+  ASSERT_THAT(left, 0);
+  pos = 5;
+  left = 3 * 6;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 5 + 3 * 6);
   ASSERT_THAT(left, 0);
@@ -400,46 +503,6 @@ TEST(Repeated, BasicTestWithStrings) {
   ASSERT_TRUE(out.find("test1") != std::string::npos);
   ASSERT_TRUE(out.find("test2") != std::string::npos);
   ASSERT_TRUE(out.find("test3") != std::string::npos);
-}
-
-// Test verifies that read fails when there is less
-// bytes in the buffer than bytes needed to read to the end of the message.
-TEST(Repeated, NotEnoughData) {
-  Repeated<String> field;
-
-  Buffer::OwnedImpl data;
-  // Write some data to simulate message header.
-  // It will be ignored.
-  data.writeBEInt<uint32_t>(101);
-  data.writeBEInt<uint8_t>(102);
-  data.add("test");
-
-  // "test" with terminating zero is 5 bytes.
-  // Set "left" to indicate that 6 bytes are needed.
-  uint64_t pos = 5;
-  uint64_t left = 5 + 6;
-  ASSERT_FALSE(field.read(data, pos, left));
-}
-
-// Test verifies that entire read fails when one of
-// subordinate reads fails.
-TEST(Repeated, NotEnoughDataForSecondString) {
-  Repeated<String> field;
-
-  Buffer::OwnedImpl data;
-  // Write some data to simulate message header.
-  // It will be ignored.
-  data.writeBEInt<uint32_t>(101);
-  data.writeBEInt<uint8_t>(102);
-  // Now write 3 strings. Each terminated by zero byte.
-  data.add("test1");
-  data.writeBEInt<uint8_t>(0);
-  data.add("test2");
-  // Do not write terminating zero.
-  // Read should fail here.
-  uint64_t pos = 5;
-  uint64_t left = 6 + 5;
-  ASSERT_FALSE(field.read(data, pos, left));
 }
 
 // Sequence composite type tests.
@@ -451,6 +514,11 @@ TEST(Sequence, Int32SingleValue) {
 
   uint64_t pos = 0;
   uint64_t left = 4;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 4);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 4;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4);
   ASSERT_THAT(left, 0);
@@ -467,6 +535,11 @@ TEST(Sequence, Int16SingleValue) {
 
   uint64_t pos = 0;
   uint64_t left = 2;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 2);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 2;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 2);
   ASSERT_THAT(left, 0);
@@ -485,6 +558,11 @@ TEST(Sequence, BasicMultipleValues1) {
 
   uint64_t pos = 0;
   uint64_t left = 4 + 5;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, 4 + 5);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 4 + 5;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, 4 + 5);
   ASSERT_THAT(left, 0);
@@ -504,6 +582,11 @@ TEST(Sequence, BasicMultipleValues2) {
   uint64_t pos = 0;
   uint64_t left = 4 + 2;
   uint64_t expected_pos = left;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, expected_pos);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 4 + 2;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, expected_pos);
   ASSERT_THAT(left, 0);
@@ -525,6 +608,11 @@ TEST(Sequence, BasicMultipleValues3) {
   uint64_t pos = 0;
   uint64_t left = 4 + 2 + 4 + 2;
   uint64_t expected_pos = left;
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationOK);
+  ASSERT_THAT(pos, expected_pos);
+  ASSERT_THAT(left, 0);
+  pos = 0;
+  left = 4 + 2 + 4 + 2;
   ASSERT_TRUE(field.read(data, pos, left));
   ASSERT_THAT(pos, expected_pos);
   ASSERT_THAT(left, 0);
@@ -548,7 +636,7 @@ TEST(Sequence, NotEnoughData) {
 
   uint64_t pos = 0;
   uint64_t left = 4 + 4;
-  ASSERT_FALSE(field.read(data, pos, left));
+  ASSERT_THAT(field.validate(data, pos, left), Message::ValidationFailed);
 }
 
 // Tests for Message interface and helper function createMsgBodyReader.
@@ -556,7 +644,16 @@ TEST(PostgresMessage, SingleFieldInt32) {
   std::unique_ptr<Message> msg = createMsgBodyReader<Int32>();
 
   Buffer::OwnedImpl data;
+  // Validation of empty message should complain that there
+  // is not enough data in the buffer.
+  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+
   data.writeBEInt<uint32_t>(12);
+
+  // Simulate that message is longer than In32.
+  ASSERT_THAT(msg->validate(data, 5), Message::ValidationFailed);
+
+  ASSERT_THAT(msg->validate(data, 4), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, 4));
   auto out = msg->toString();
   ASSERT_THAT(out, "[12]");
@@ -566,7 +663,13 @@ TEST(PostgresMessage, SingleFieldInt16) {
   std::unique_ptr<Message> msg = createMsgBodyReader<Int16>();
 
   Buffer::OwnedImpl data;
+
+  // Validation of empty message should complain that there
+  // is not enough data in the buffer.
+  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+
   data.writeBEInt<uint16_t>(12);
+  ASSERT_THAT(msg->validate(data, 2), Message::ValidationOK);
   ASSERT_TRUE(msg->read(data, 2));
   auto out = msg->toString();
   ASSERT_THAT(out, "[12]");
@@ -576,12 +679,18 @@ TEST(PostgresMessage, SingleByteN) {
   std::unique_ptr<Message> msg = createMsgBodyReader<ByteN>();
 
   Buffer::OwnedImpl data;
+  // Validation of empty message should complain that there
+  // is not enough data in the buffer.
+  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+
   data.writeBEInt<uint8_t>(0);
   data.writeBEInt<uint8_t>(1);
   data.writeBEInt<uint8_t>(2);
   data.writeBEInt<uint8_t>(3);
   data.writeBEInt<uint8_t>(4);
-  ASSERT_TRUE(msg->read(data, 5 * 1));
+  const uint64_t length = 5 * 1;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("0") != std::string::npos); // NOLINT
   ASSERT_TRUE(out.find("1") != std::string::npos); // NOLINT
@@ -594,9 +703,16 @@ TEST(PostgresMessage, MultipleValues1) {
   std::unique_ptr<Message> msg = createMsgBodyReader<Int32, Int16>();
 
   Buffer::OwnedImpl data;
+
+  // Validation of empty message should complain that there
+  // is not enough data in the buffer.
+  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+
   data.writeBEInt<uint32_t>(12);
   data.writeBEInt<uint16_t>(13);
-  ASSERT_TRUE(msg->read(data, 4 + 2));
+  const uint64_t length = 4 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("12") != std::string::npos);
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -609,7 +725,9 @@ TEST(PostgresMessage, MultipleValues2) {
   data.writeBEInt<uint16_t>(13);
   data.writeBEInt<uint32_t>(14);
   data.writeBEInt<uint16_t>(15);
-  ASSERT_TRUE(msg->read(data, 2 + 4 + 2));
+  const uint64_t length = 2 + 4 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
   ASSERT_TRUE(out.find("14") != std::string::npos);
@@ -624,7 +742,9 @@ TEST(PostgresMessage, MultipleValues3) {
   data.writeBEInt<uint16_t>(13);
   data.writeBEInt<uint32_t>(14);
   data.writeBEInt<uint16_t>(15);
-  ASSERT_TRUE(msg->read(data, 4 + 2 + 4 + 2));
+  const uint64_t length = 4 + 2 + 4 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("12") != std::string::npos);
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -641,7 +761,9 @@ TEST(PostgresMessage, MultipleValues4) {
   data.writeBEInt<uint16_t>(15);
   data.writeBEInt<uint32_t>(16);
   data.writeBEInt<uint16_t>(17);
-  ASSERT_TRUE(msg->read(data, 2 + 4 + 2 + 4 + 2));
+  const uint64_t length = 2 + 4 + 2 + 4 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
   ASSERT_TRUE(out.find("14") != std::string::npos);
@@ -660,7 +782,9 @@ TEST(PostgresMessage, MultipleValues5) {
   data.writeBEInt<uint16_t>(15);
   data.writeBEInt<uint32_t>(16);
   data.writeBEInt<uint16_t>(17);
-  ASSERT_TRUE(msg->read(data, 4 + 2 + 4 + 2 + 4 + 2));
+  const uint64_t length = 4 + 2 + 4 + 2 + 4 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("12") != std::string::npos);
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -683,7 +807,9 @@ TEST(PostgresMessage, MultipleValues6) {
   data.writeBEInt<uint16_t>(15);
   data.writeBEInt<uint32_t>(16);
   data.writeBEInt<uint16_t>(17);
-  ASSERT_TRUE(msg->read(data, 5 + 4 + 2 + 4 + 2 + 4 + 2));
+  const uint64_t length = 5 + 4 + 2 + 4 + 2 + 4 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test") != std::string::npos);
   ASSERT_TRUE(out.find("12") != std::string::npos);
@@ -706,7 +832,9 @@ TEST(PostgresMessage, MultipleValues7) {
   data.writeBEInt<uint32_t>(13);
   data.writeBEInt<uint32_t>(14);
   data.writeBEInt<uint32_t>(15);
-  ASSERT_TRUE(msg->read(data, 5 + 2 + 3 * 4));
+  const uint64_t length = 5 + 2 + 3 * 4;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test") != std::string::npos);
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -723,7 +851,9 @@ TEST(PostgresMessage, ArraySet1) {
   data.writeBEInt<uint16_t>(13);
   data.writeBEInt<uint16_t>(14);
   data.writeBEInt<uint16_t>(15);
-  ASSERT_TRUE(msg->read(data, 2 + 3 * 2));
+  const uint64_t length = 2 + 3 * 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
   ASSERT_TRUE(out.find("14") != std::string::npos);
@@ -746,8 +876,9 @@ TEST(PostgresMessage, ArraySet2) {
 
   // 16-bits value.
   data.writeBEInt<uint16_t>(115);
-
-  ASSERT_TRUE(msg->read(data, 2 + 4 + 5 + 2));
+  const uint64_t length = 2 + 4 + 5 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("114") != std::string::npos);
   ASSERT_TRUE(out.find("115") != std::string::npos);
@@ -775,8 +906,9 @@ TEST(PostgresMessage, ArraySet3) {
 
   // 16-bits value.
   data.writeBEInt<uint16_t>(115);
-
-  ASSERT_TRUE(msg->read(data, 2 + 3 * 2 + 2 + 4 + 5 + 2));
+  const uint64_t length = 2 + 3 * 2 + 2 + 4 + 5 + 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
   ASSERT_TRUE(out.find("115") != std::string::npos);
@@ -800,8 +932,9 @@ TEST(PostgresMessage, ArraySet4) {
   data.writeBEInt<int16_t>(2);
   data.writeBEInt<uint16_t>(113);
   data.writeBEInt<uint16_t>(114);
-
-  ASSERT_TRUE(msg->read(data, 2 + 4 + 5 + 2 + 2 * 2));
+  const uint64_t length = 2 + 4 + 5 + 2 + 2 * 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("111") != std::string::npos);
   ASSERT_TRUE(out.find("114") != std::string::npos);
@@ -831,8 +964,9 @@ TEST(PostgresMessage, ArraySet5) {
   data.writeBEInt<int16_t>(2);
   data.writeBEInt<uint16_t>(113);
   data.writeBEInt<uint16_t>(114);
-
-  ASSERT_TRUE(msg->read(data, 2 + 3 * 2 + 2 + 4 + 5 + 2 + 2 * 2));
+  const uint64_t length = 2 + 3 * 2 + 2 + 4 + 5 + 2 + 2 * 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("13") != std::string::npos);
   ASSERT_TRUE(out.find("114") != std::string::npos);
@@ -868,7 +1002,9 @@ TEST(PostgresMessage, ArraySet6) {
   data.writeBEInt<uint16_t>(113);
   data.writeBEInt<uint16_t>(114);
 
-  ASSERT_TRUE(msg->read(data, 5 + 2 + 3 * 2 + 2 + 4 + 5 + 2 + 2 * 2));
+  const uint64_t length = 5 + 2 + 3 * 2 + 2 + 4 + 5 + 2 + 2 * 2;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test") != std::string::npos);
   ASSERT_TRUE(out.find("13") != std::string::npos);
@@ -887,7 +1023,9 @@ TEST(PostgresMessage, Repeated1) {
   data.add("test3");
   data.writeBEInt<int8_t>(0);
 
-  ASSERT_TRUE(msg->read(data, 3 * 6));
+  const uint64_t length = 3 * 6;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("test1") != std::string::npos);
   ASSERT_TRUE(out.find("test2") != std::string::npos);
@@ -907,7 +1045,9 @@ TEST(PostgresMessage, Repeated2) {
   data.add("test3");
   data.writeBEInt<int8_t>(0);
 
-  ASSERT_TRUE(msg->read(data, 4 + 3 * 6));
+  const uint64_t length = 4 + 3 * 6;
+  ASSERT_THAT(msg->validate(data, length), Message::ValidationOK);
+  ASSERT_TRUE(msg->read(data, length));
   auto out = msg->toString();
   ASSERT_TRUE(out.find("115") != std::string::npos);
   ASSERT_TRUE(out.find("test1") != std::string::npos);
@@ -923,7 +1063,8 @@ TEST(PostgresMessage, NotEnoughData) {
   data.writeBEInt<uint8_t>(1);
   data.writeBEInt<uint8_t>(2);
 
-  ASSERT_FALSE(msg->read(data, 3));
+  ASSERT_THAT(msg->validate(data, 4), Message::ValidationNeedMoreData);
+  ASSERT_THAT(msg->validate(data, 2), Message::ValidationFailed);
 }
 
 } // namespace PostgresProxy
