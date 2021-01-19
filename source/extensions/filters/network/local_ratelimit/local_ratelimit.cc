@@ -32,13 +32,13 @@ LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scop
 bool Config::canCreateConnection() { return rate_limiter_.requestAllowed(descriptors_); }
 
 Network::FilterStatus Filter::onNewConnection() {
-  if (!config_.enabled()) {
+  if (!config_->enabled()) {
     ENVOY_CONN_LOG(trace, "local_rate_limit: runtime disabled", read_callbacks_->connection());
     return Network::FilterStatus::Continue;
   }
 
-  if (!config_.canCreateConnection()) {
-    config_.stats().rate_limited_.inc();
+  if (!config_->canCreateConnection()) {
+    config_->stats().rate_limited_.inc();
     ENVOY_CONN_LOG(trace, "local_rate_limit: rate limiting connection",
                    read_callbacks_->connection());
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

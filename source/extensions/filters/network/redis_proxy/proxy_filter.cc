@@ -35,27 +35,27 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          Common::Redis::EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
-                         ProxyFilterConfig& config)
+                         ProxyFilterConfigSharedPtr config)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
       config_(config) {
-  config_.stats_.downstream_cx_total_.inc();
-  config_.stats_.downstream_cx_active_.inc();
+  config_->stats_.downstream_cx_total_.inc();
+  config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =
-      config_.downstream_auth_username_.empty() && config_.downstream_auth_password_.empty();
+      config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty();
 }
 
 ProxyFilter::~ProxyFilter() {
   ASSERT(pending_requests_.empty());
-  config_.stats_.downstream_cx_active_.dec();
+  config_->stats_.downstream_cx_active_.dec();
 }
 
 void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   callbacks_->connection().addConnectionCallbacks(*this);
-  callbacks_->connection().setConnectionStats({config_.stats_.downstream_cx_rx_bytes_total_,
-                                               config_.stats_.downstream_cx_rx_bytes_buffered_,
-                                               config_.stats_.downstream_cx_tx_bytes_total_,
-                                               config_.stats_.downstream_cx_tx_bytes_buffered_,
+  callbacks_->connection().setConnectionStats({config_->stats_.downstream_cx_rx_bytes_total_,
+                                               config_->stats_.downstream_cx_rx_bytes_buffered_,
+                                               config_->stats_.downstream_cx_tx_bytes_total_,
+                                               config_->stats_.downstream_cx_tx_bytes_buffered_,
                                                nullptr, nullptr});
 }
 
@@ -85,10 +85,10 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
   Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
-  if (config_.downstream_auth_password_.empty()) {
+  if (config_->downstream_auth_password_.empty()) {
     response->type(Common::Redis::RespType::Error);
     response->asString() = "ERR Client sent AUTH, but no password is set";
-  } else if (password == config_.downstream_auth_password_) {
+  } else if (password == config_->downstream_auth_password_) {
     response->type(Common::Redis::RespType::SimpleString);
     response->asString() = "OK";
     connection_allowed_ = true;
@@ -103,17 +103,17 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
                          const std::string& password) {
   Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
-  if (config_.downstream_auth_username_.empty() && config_.downstream_auth_password_.empty()) {
+  if (config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty()) {
     response->type(Common::Redis::RespType::Error);
     response->asString() = "ERR Client sent AUTH, but no username-password pair is set";
-  } else if (config_.downstream_auth_username_.empty() && username == "default" &&
-             password == config_.downstream_auth_password_) {
+  } else if (config_->downstream_auth_username_.empty() && username == "default" &&
+             password == config_->downstream_auth_password_) {
     // empty username and "default" are synonymous in Redis 6 ACLs
     response->type(Common::Redis::RespType::SimpleString);
     response->asString() = "OK";
     connection_allowed_ = true;
-  } else if (username == config_.downstream_auth_username_ &&
-             password == config_.downstream_auth_password_) {
+  } else if (username == config_->downstream_auth_username_ &&
+             password == config_->downstream_auth_password_) {
     response->type(Common::Redis::RespType::SimpleString);
     response->asString() = "OK";
     connection_allowed_ = true;
@@ -142,9 +142,9 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
   }
 
   // Check for drain close only if there are no pending responses.
-  if (pending_requests_.empty() && config_.drain_decision_.drainClose() &&
-      config_.runtime_.snapshot().featureEnabled(config_.redis_drain_close_runtime_key_, 100)) {
-    config_.stats_.downstream_cx_drain_close_.inc();
+  if (pending_requests_.empty() && config_->drain_decision_.drainClose() &&
+      config_->runtime_.snapshot().featureEnabled(config_->redis_drain_close_runtime_key_, 100)) {
+    config_->stats_.downstream_cx_drain_close_.inc();
     callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -154,7 +154,7 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
     decoder_->decode(data);
     return Network::FilterStatus::Continue;
   } catch (Common::Redis::ProtocolError&) {
-    config_.stats_.downstream_cx_protocol_error_.inc();
+    config_->stats_.downstream_cx_protocol_error_.inc();
     Common::Redis::RespValue error;
     error.type(Common::Redis::RespType::Error);
     error.asString() = "downstream protocol error";
@@ -166,12 +166,12 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
 }
 
 ProxyFilter::PendingRequest::PendingRequest(ProxyFilter& parent) : parent_(parent) {
-  parent.config_.stats_.downstream_rq_total_.inc();
-  parent.config_.stats_.downstream_rq_active_.inc();
+  parent.config_->stats_.downstream_rq_total_.inc();
+  parent.config_->stats_.downstream_rq_active_.inc();
 }
 
 ProxyFilter::PendingRequest::~PendingRequest() {
-  parent_.config_.stats_.downstream_rq_active_.dec();
+  parent_.config_->stats_.downstream_rq_active_.dec();
 }
 
 } // namespace RedisProxy
