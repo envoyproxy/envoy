@@ -15,6 +15,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     external_deps = ["grpc"],
+    category = "SOMECAT",
     security_posture = "data_plane_agnostic",
     status = "alpha",
     deps = [

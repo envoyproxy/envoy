@@ -369,6 +369,7 @@ envoy_cc_library(
 # All of these are needed for this extension to function.
 envoy_cc_extension(
     name = "quic_factory_lib",
+    category = "SOMECAT",
     security_posture = "unknown",
     tags = ["nofips"],
 

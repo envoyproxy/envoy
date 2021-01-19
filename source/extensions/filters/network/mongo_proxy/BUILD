@@ -107,6 +107,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "SOMECAT",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":proxy_lib",

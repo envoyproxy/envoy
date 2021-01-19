@@ -11,6 +11,7 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    category = "SOMECAT",
     security_posture = "unknown",
     status = "alpha",
     deps = [

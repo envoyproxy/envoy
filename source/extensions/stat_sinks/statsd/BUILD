@@ -14,6 +14,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "SOMECAT",
     security_posture = "data_plane_agnostic",
     # Legacy test use. TODO(#9953) clean up.
     deps = [

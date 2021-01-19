@@ -26,6 +26,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "SOMECAT",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",

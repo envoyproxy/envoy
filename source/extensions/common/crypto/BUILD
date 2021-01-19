@@ -21,6 +21,7 @@ envoy_cc_extension(
     external_deps = [
         "ssl",
     ],
+    category = "SOMECAT",
     # Legacy test use. TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/config:__subpackages__",

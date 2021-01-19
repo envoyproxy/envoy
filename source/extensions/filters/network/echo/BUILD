@@ -28,6 +28,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    category = "SOMECAT",
     # TODO(#9953) move echo integration test to extensions.
     extra_visibility = [
         "//test/integration:__subpackages__",

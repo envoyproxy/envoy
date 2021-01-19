@@ -18,6 +18,7 @@ envoy_cc_extension(
     name = "kafka_broker_config_lib",
     srcs = ["broker/config.cc"],
     hdrs = ["broker/config.h"],
+    category = "SOMECAT",
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "wip",
     deps = [

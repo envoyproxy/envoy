@@ -36,6 +36,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "SOMECAT",
     security_posture = "unknown",
     deps = [
         ":local_ratelimit_lib",

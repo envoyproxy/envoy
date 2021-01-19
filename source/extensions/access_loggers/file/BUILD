@@ -27,6 +27,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    category = "SOMECAT",
     # TODO(#9953) determine if this is core or should be cleaned up.
     extra_visibility = [
         "//test:__subpackages__",

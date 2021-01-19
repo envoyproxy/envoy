@@ -21,6 +21,7 @@ envoy_cc_extension(
         "admission_control.h",
         "thread_local_controller.h",
     ],
+    category = "SOMECAT",
     security_posture = "unknown",
     deps = [
         "//include/envoy/http:filter_interface",
