@@ -33,7 +33,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::Continue;
   }
 
-  circuit_breaker_ = config_.cache().canCreateDnsRequest(absl::nullopt);
+  circuit_breaker_ = config_.cache().canCreateDnsRequest();
 
   if (circuit_breaker_ == nullptr) {
     ENVOY_CONN_LOG(debug, "pending request overflow", read_callbacks_->connection());
