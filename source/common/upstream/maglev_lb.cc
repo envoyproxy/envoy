@@ -19,7 +19,7 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
   table_build_entries.reserve(normalized_host_weights.size());
   for (const auto& host_weight : normalized_host_weights) {
     const auto& host = host_weight.first;
-    std::string key_to_hash = hashKey(host, use_hostname_for_hashing);
+    const std::string key_to_hash = hashKey(host, use_hostname_for_hashing);
     ASSERT(!key_to_hash.empty());
     table_build_entries.emplace_back(host, HashUtil::xxHash64(key_to_hash) % table_size_,
                                      (HashUtil::xxHash64(key_to_hash, 1) % (table_size_ - 1)) + 1,
@@ -65,7 +65,7 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
 
   if (ENVOY_LOG_CHECK_LEVEL(trace)) {
     for (uint64_t i = 0; i < table_.size(); i++) {
-      std::string key_to_hash = hashKey(table_[i], use_hostname_for_hashing);
+      const std::string key_to_hash = hashKey(table_[i], use_hostname_for_hashing);
       ENVOY_LOG(trace, "maglev: i={} address={} host={}", i, table_[i]->address()->asString(),
                 key_to_hash);
     }

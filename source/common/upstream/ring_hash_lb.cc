@@ -149,7 +149,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
   uint64_t max_hashes_per_host = 0;
   for (const auto& entry : normalized_host_weights) {
     const auto& host = entry.first;
-    std::string key_to_hash = hashKey(host, use_hostname_for_hashing);
+    const std::string key_to_hash = hashKey(host, use_hostname_for_hashing);
     ASSERT(!key_to_hash.empty());
 
     hash_key_buffer.assign(key_to_hash.begin(), key_to_hash.end());
@@ -187,7 +187,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
   });
   if (ENVOY_LOG_CHECK_LEVEL(trace)) {
     for (const auto& entry : ring_) {
-      std::string key_to_hash = hashKey(entry.host_, use_hostname_for_hashing);
+      const std::string key_to_hash = hashKey(entry.host_, use_hostname_for_hashing);
       ENVOY_LOG(trace, "ring hash: host={} hash={}", key_to_hash, entry.hash_);
     }
   }

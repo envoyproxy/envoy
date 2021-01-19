@@ -73,7 +73,7 @@ the ring. This technique is also commonly known as `"Ketama" <https://github.com
 hashing, and like all hash-based load balancers, it is only effective when protocol routing is used
 that specifies a value to hash on. If you want something other than the host's address to be used
 as the hash key (e.g. the semantic name of your host in a Kubernetes StatefulSet), then you can specify it 
-in the ``"envoy.lb"``:ref:`filter_metadata <envoy_api_msg_core.Metadata>` e.g.: 
+in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: 
 .. code-block:: yaml
 
     filter_metadata:
@@ -112,7 +112,7 @@ any place in which consistent hashing is desired. Like the ring hash load balanc
 hashing load balancer is only effective when protocol routing is used that specifies a value to
 hash on. If you want something other than the host's address to be used as the hash key (e.g. the 
 semantic name of your host in a Kubernetes StatefulSet), then you can specify it in the ``"envoy.lb"``
-:ref:`filter_metadata <envoy_api_msg_core.Metadata>` e.g.: 
+:ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: 
 .. code-block:: yaml
 
     filter_metadata:
