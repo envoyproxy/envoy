@@ -33,7 +33,6 @@
 #include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Server {
@@ -1007,12 +1006,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
     if (filter_chain.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      transport_socket.set_name("envoy.transport_sockets.tls");
       transport_socket.mutable_typed_config()->PackFrom(
           filter_chain.hidden_envoy_deprecated_tls_context());
     } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     }
   }
 

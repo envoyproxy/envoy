@@ -25,7 +25,6 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 

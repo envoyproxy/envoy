@@ -22,15 +22,14 @@ Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransp
 
   auto& raw_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
-      TransportSocketNames::get().RawBuffer);
+      "envoy.transport_sockets.raw_buffer");
 
   Network::TransportSocketFactoryPtr raw_socket_factory =
       raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(),
                                                              context, server_names);
 
   auto& tls_socket_config_factory = Config::Utility::getAndCheckFactoryByName<
-      Server::Configuration::DownstreamTransportSocketConfigFactory>(
-      TransportSocketNames::get().Tls);
+      Server::Configuration::DownstreamTransportSocketConfigFactory>("envoy.transport_sockets.tls");
 
   Network::TransportSocketFactoryPtr tls_socket_factory =
       tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),

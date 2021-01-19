@@ -6,7 +6,6 @@
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/quic_io_handle_wrapper.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "openssl/bytestring.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
@@ -86,8 +85,7 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
       std::make_unique<QuicIoHandleWrapper>(listen_socket_.ioHandle()),
       quicAddressToEnvoyAddressInstance(server_address),
       quicAddressToEnvoyAddressInstance(client_address));
-  connection_socket.setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
+  connection_socket.setDetectedTransportProtocol("quic");
   connection_socket.setRequestedServerName(hostname);
   connection_socket.setRequestedApplicationProtocols({"h2"});
   const Network::FilterChain* filter_chain =

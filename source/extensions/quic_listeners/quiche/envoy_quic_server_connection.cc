@@ -4,7 +4,6 @@
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/quic_io_handle_wrapper.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -35,8 +34,7 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   // Self address should be initialized by now.
   connectionSocket()->addressProvider().setLocalAddress(
       quicAddressToEnvoyAddressInstance(self_address()));
-  connectionSocket()->setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
+  connectionSocket()->setDetectedTransportProtocol("quic");
   return true;
 }
 

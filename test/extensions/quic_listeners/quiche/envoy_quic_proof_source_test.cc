@@ -144,8 +144,7 @@ public:
                     *connection_socket.addressProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
                     *connection_socket.addressProvider().remoteAddress());
-          EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                    connection_socket.detectedTransportProtocol());
+          EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
           EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
         }));

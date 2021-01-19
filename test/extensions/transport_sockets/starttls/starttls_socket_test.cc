@@ -40,7 +40,7 @@ TEST(StartTlsTest, BasicSwitch) {
   socket->setTransportSocketCallbacks(transport_callbacks);
 
   // StartTls socket is initial clear-text state. All calls should be forwarded to raw socket.
-  ASSERT_THAT(socket->protocol(), TransportProtocolNames::get().StartTls);
+  ASSERT_THAT(socket->protocol(), "starttls");
   EXPECT_CALL(*raw_socket, onConnected());
   EXPECT_CALL(*ssl_socket, onConnected()).Times(0);
   socket->onConnected();
@@ -83,7 +83,7 @@ TEST(StartTlsTest, BasicSwitch) {
 
   // Now calls to all methods should be forwarded to ssl_socket.
   // raw_socket has been destructed when switch to tls happened.
-  ASSERT_THAT(socket->protocol(), TransportProtocolNames::get().StartTls);
+  ASSERT_THAT(socket->protocol(), "starttls");
   EXPECT_CALL(*ssl_socket, onConnected());
   socket->onConnected();
 

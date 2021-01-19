@@ -32,7 +32,6 @@
 #include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Server {

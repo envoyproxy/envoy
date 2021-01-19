@@ -3,8 +3,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -18,7 +16,7 @@ public:
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return TransportSocketNames::get().StartTls; }
+  std::string name() const override { return "envoy.transport_sockets.starttls"; }
 };
 
 DECLARE_FACTORY(DownstreamStartTlsSocketFactory);

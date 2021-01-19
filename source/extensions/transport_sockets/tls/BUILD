@@ -23,7 +23,6 @@ envoy_cc_extension(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

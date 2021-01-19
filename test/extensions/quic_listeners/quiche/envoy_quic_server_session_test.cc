@@ -28,7 +28,6 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "common/event/libevent_scheduler.h"

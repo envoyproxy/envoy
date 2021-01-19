@@ -10,7 +10,6 @@
 
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Quic {

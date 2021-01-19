@@ -77,7 +77,6 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//include/envoy/ssl:tls_certificate_config_interface",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/server:connection_handler_lib",
         "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
     ],
@@ -237,7 +236,6 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//source/common/network:listen_socket_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@com_googlesource_quiche//:quic_core_connection_lib",
     ],
 )
@@ -359,7 +357,6 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],

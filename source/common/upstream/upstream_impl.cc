@@ -51,7 +51,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/network/common/utility.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -867,12 +866,11 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      transport_socket.set_name("envoy.transport_sockets.tls");
       transport_socket.mutable_typed_config()->PackFrom(
           config.hidden_envoy_deprecated_tls_context());
     } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     }
   }
 
