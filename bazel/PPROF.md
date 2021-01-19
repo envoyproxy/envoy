@@ -29,7 +29,7 @@ specific place yourself.
 
 Static linking is already available (because of a `HeapProfilerDump()` call
 inside
-[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L32-L39)).
+[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/main/source/common/profiler/profiler.cc#L32-L39)).
 
 ### Compiling a statically-linked Envoy
 
@@ -82,7 +82,7 @@ is controlled by `ProfilerStart()`/`ProfilerStop()`, and the
 [Gperftools Heap Profiler](https://gperftools.github.io/gperftools/heapprofile.html)
 is controlled by `HeapProfilerStart()`, `HeapProfilerStop()` and `HeapProfilerDump()`.
 
-These functions are wrapped by Envoy objects defined in [`source/common/profiler/profiler.h`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.h)).
+These functions are wrapped by Envoy objects defined in [`source/common/profiler/profiler.h`](https://github.com/envoyproxy/envoy/blob/main/source/common/profiler/profiler.h)).
 
 To enable profiling programmatically:
 
@@ -258,7 +258,7 @@ account other memory allocating functions.
 
 In case there is a need to measure how long a code path takes time to execute in Envoy you may
 resort to instrumenting the code with the
-[performance annotations](https://github.com/envoyproxy/envoy/blob/master/source/common/common/perf_annotation.h).
+[performance annotations](https://github.com/envoyproxy/envoy/blob/main/source/common/common/perf_annotation.h).
 
 There are two types of the annotations. The first one is used to measure operations limited by
 a common lexical scope. For example:

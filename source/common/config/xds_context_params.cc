@@ -48,28 +48,17 @@ void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
 
 } // namespace
 
-xds::core::v3::ContextParams XdsContextParams::encode(
-    const envoy::config::core::v3::Node& node, const std::vector<std::string>& node_context_params,
+xds::core::v3::ContextParams XdsContextParams::encodeResource(
+    const xds::core::v3::ContextParams& node_context_params,
     const xds::core::v3::ContextParams& resource_context_params,
     const std::vector<std::string>& client_features,
     const absl::flat_hash_map<std::string, std::string>& extra_resource_params) {
   xds::core::v3::ContextParams context_params;
-  auto& mutable_params = *context_params.mutable_params();
   // 1. Establish base layer of per-node context parameters.
-  for (const std::string& ncp : node_context_params) {
-    // First attempt field accessors known ahead of time, if that fails we consider the cases of
-    // metadata, either directly in the Node message, or nested in the user_agent_build_version.
-    if (nodeParamCbs().count(ncp) > 0) {
-      mutable_params["xds.node." + ncp] = nodeParamCbs().at(ncp)(node);
-    } else if (ncp == "metadata") {
-      mergeMetadataJson(mutable_params, node.metadata(), "xds.node.metadata.");
-    } else if (ncp == "user_agent_build_version.metadata") {
-      mergeMetadataJson(mutable_params, node.user_agent_build_version().metadata(),
-                        "xds.node.user_agent_build_version.metadata.");
-    }
-  }
+  context_params.MergeFrom(node_context_params);
 
   // 2. Overlay with context parameters from resource name.
+  auto& mutable_params = *context_params.mutable_params();
   for (const auto& it : resource_context_params.params()) {
     mutable_params[it.first] = it.second;
   }
@@ -84,6 +73,46 @@ xds::core::v3::ContextParams XdsContextParams::encode(
     mutable_params["xds.resource." + it.first] = it.second;
   }
 
+  return context_params;
+}
+
+xds::core::v3::ContextParams XdsContextParams::encodeNodeContext(
+    const envoy::config::core::v3::Node& node,
+    const Protobuf::RepeatedPtrField<std::string>& node_context_params) {
+  // E.g. if we have a node instance with contents
+  //
+  // user_agent_build_version:
+  //   version:
+  //     major_number: 1
+  //     minor_number: 2
+  //     patch: 3
+  //   metadata:
+  //     foo: true
+  //     bar: "a"
+  //     baz: 42
+  //
+  // and node_context_params [user_agent_build_version.version, user_agent_build_version.metadata],
+  // we end up with the map:
+  //
+  // xds.node.user_agent_build_version.metadata.bar: "\"a\""
+  // xds.node.user_agent_build_version.metadata.baz: "42"
+  // xds.node.user_agent_build_version.metadata.foo: "true"
+  // xds.node.user_agent_build_version.version: "1.2.3"
+  xds::core::v3::ContextParams context_params;
+  auto& mutable_params = *context_params.mutable_params();
+  for (const std::string& ncp : node_context_params) {
+    // First attempt field accessors known ahead of time, if that fails we consider the cases of
+    // metadata, either directly in the Node message, or nested in the user_agent_build_version.
+    auto it = nodeParamCbs().find(ncp);
+    if (it != nodeParamCbs().end()) {
+      mutable_params["xds.node." + ncp] = (it->second)(node);
+    } else if (ncp == "metadata") {
+      mergeMetadataJson(mutable_params, node.metadata(), "xds.node.metadata.");
+    } else if (ncp == "user_agent_build_version.metadata") {
+      mergeMetadataJson(mutable_params, node.user_agent_build_version().metadata(),
+                        "xds.node.user_agent_build_version.metadata.");
+    }
+  }
   return context_params;
 }
 

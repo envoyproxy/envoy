@@ -546,7 +546,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 
     expect_close_ = false;
     client_->connect();
-    client_->noDelay(true);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+      client_->noDelay(true);
+    }
   }
 
   if (!parent_.send_bytes_.empty()) {

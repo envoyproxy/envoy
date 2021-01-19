@@ -68,7 +68,7 @@ public:
    * Creates a nested scope from a vector of tokens which are used to create the
    * name. The tokens can be specified as DynamicName or StatName. For
    * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
    * See also scopeFromStatNames, which is slightly faster but does not allow
@@ -97,7 +97,7 @@ public:
    * Creates a counter from a vector of tokens which are used to create the
    * name. The tokens can be specified as DynamicName or StatName. For
    * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
    * See also counterFromStatNames, which is slightly faster but does not allow
@@ -130,7 +130,7 @@ public:
    * Creates a gauge from a vector of tokens which are used to create the
    * name. The tokens can be specified as DynamicName or StatName. For
    * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
    * See also gaugeFromStatNames, which is slightly faster but does not allow
@@ -167,7 +167,7 @@ public:
    * Creates a histogram from a vector of tokens which are used to create the
    * name. The tokens can be specified as DynamicName or StatName. For
    * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
    * See also histogramFromStatNames, which is slightly faster but does not allow
@@ -204,7 +204,7 @@ public:
    * Creates a TextReadout from a vector of tokens which are used to create the
    * name. The tokens can be specified as DynamicName or StatName. For
    * tokens specified as DynamicName, a dynamic StatName will be created. See
-   * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#dynamic-stat-tokens
+   * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
    * for more detail on why symbolic StatNames are preferred when possible.
    *
    * See also TextReadoutFromStatNames, which is slightly faster but does not allow
