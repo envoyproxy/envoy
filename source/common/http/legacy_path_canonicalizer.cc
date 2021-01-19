@@ -1,4 +1,4 @@
-#include "common/http/deprecated_path_canonicalizer.h"
+#include "common/http/legacy_path_canonicalizer.h"
 
 #include "common/chromium_url/url_canon.h"
 #include "common/chromium_url/url_canon_stdstring.h"
@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Http {
 
 absl::optional<std::string>
-DeprecatedPathCanonicalizer::canonicalizePath(absl::string_view original_path) {
+LegacyPathCanonicalizer::canonicalizePath(absl::string_view original_path) {
   std::string canonical_path;
   chromium_url::Component in_component(0, original_path.size());
   chromium_url::Component out_component;

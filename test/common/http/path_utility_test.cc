@@ -3,24 +3,15 @@
 
 #include "common/http/path_utility.h"
 
-#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
-using testing::NiceMock;
-using testing::Return;
 
 namespace Envoy {
 namespace Http {
 
 class PathUtilityTest : public testing::Test {
 public:
-  void initializeDeprecatedFeatureEnabled(bool deprecated) {
-    EXPECT_CALL(runtime_.snapshot_,
-                deprecatedFeatureEnabled("envoy.deprecated_features.use_forked_chromium_url", _))
-        .WillRepeatedly(Return(deprecated));
-  }
   // This is an indirect way to build a header entry for
   // PathUtil::canonicalPath(), since we don't have direct access to the
   // HeaderMapImpl constructor.
@@ -33,85 +24,14 @@ public:
     return *headers_.Host();
   }
   TestRequestHeaderMapImpl headers_;
-  NiceMock<Runtime::MockLoader> runtime_;
 };
-
-// Already normalized path don't change using deprecated path canonicalizer.
-TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
-  const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
-  for (const auto& path : normal_paths) {
-    auto& path_header = pathHeaderEntry(path);
-    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
-    EXPECT_TRUE(result) << "original path: " << path;
-    EXPECT_EQ(path_header.value().getStringView(), absl::string_view(path));
-  }
-}
-
-// Invalid paths are rejected using deprecated path canonicalizer.
-TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
-  const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
-                                               "/xyz/AAAAA%%0000/abc"};
-  for (const auto& path : invalid_paths) {
-    pathHeaderEntry(path);
-    EXPECT_FALSE(PathUtil::canonicalPath(headers_, &runtime_)) << "original path: " << path;
-  }
-}
-
-TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedNormalizeValidPaths)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
-  const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
-      {"/a/b/../c", "/a/c"},        // parent dir
-      {"/a/b/./c", "/a/b/c"},       // current dir
-      {"a/b/../c", "/a/c"},         // non / start
-      {"/a/b/../../../../c", "/c"}, // out number parent
-      {"/a/..\\c", "/c"},           // "..\\" canonicalization
-      {"/%c0%af", "/%c0%af"},       // 2 bytes unicode reserved characters
-      {"/%5c%25", "/%5c%25"},       // reserved characters
-      {"/a/b/%2E%2E/c", "/a/c"}     // %2E escape
-  };
-
-  for (const auto& path_pair : non_normal_pairs) {
-    auto& path_header = pathHeaderEntry(path_pair.first);
-    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
-    EXPECT_TRUE(result) << "original path: " << path_pair.first;
-    EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
-        << "original path: " << path_pair.second;
-  }
-}
-
-// Paths that are valid get normalized.
-TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedNormalizeCasePath)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
-  const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
-      {"/A/B/C", "/A/B/C"},           // not normalize to lower case
-      {"/a/b/%2E%2E/c", "/a/c"},      // %2E can be normalized to .
-      {"/a/b/%2e%2e/c", "/a/c"},      // %2e can be normalized to .
-      {"/a/%2F%2f/c", "/a/%2F%2f/c"}, // %2F is not normalized to %2f
-  };
-
-  for (const auto& path_pair : non_normal_pairs) {
-    auto& path_header = pathHeaderEntry(path_pair.first);
-    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
-    EXPECT_TRUE(result) << "original path: " << path_pair.first;
-    EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
-        << "original path: " << path_pair.second;
-  }
-}
 
 // Already normalized path don't change.
 TEST_F(PathUtilityTest, AlreadyNormalPaths) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
-
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
     auto& path_header = pathHeaderEntry(path);
-    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
+    const auto result = PathUtil::canonicalPath(headers_);
     EXPECT_TRUE(result) << "original path: " << path;
     EXPECT_EQ(path_header.value().getStringView(), absl::string_view(path));
   }
@@ -119,20 +39,16 @@ TEST_F(PathUtilityTest, AlreadyNormalPaths) {
 
 // Invalid paths are rejected.
 TEST_F(PathUtilityTest, InvalidPaths) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
-
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {
     pathHeaderEntry(path);
-    EXPECT_FALSE(PathUtil::canonicalPath(headers_, &runtime_)) << "original path: " << path;
+    EXPECT_FALSE(PathUtil::canonicalPath(headers_)) << "original path: " << path;
   }
 }
 
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeValidPaths) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
-
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/a/b/../c", "/a/c"},        // parent dir
       {"/a/b/./c", "/a/b/c"},       // current dir
@@ -146,7 +62,7 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
 
   for (const auto& path_pair : non_normal_pairs) {
     auto& path_header = pathHeaderEntry(path_pair.first);
-    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
+    const auto result = PathUtil::canonicalPath(headers_);
     EXPECT_TRUE(result) << "original path: " << path_pair.first;
     EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
         << "original path: " << path_pair.second;
@@ -155,8 +71,6 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
 
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, NormalizeCasePath) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/false);
-
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/A/B/C", "/A/B/C"},           // not normalize to lower case
       {"/a/b/%2E%2E/c", "/a/c"},      // %2E can be normalized to .
@@ -166,7 +80,7 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 
   for (const auto& path_pair : non_normal_pairs) {
     auto& path_header = pathHeaderEntry(path_pair.first);
-    const auto result = PathUtil::canonicalPath(headers_, &runtime_);
+    const auto result = PathUtil::canonicalPath(headers_);
     EXPECT_TRUE(result) << "original path: " << path_pair.first;
     EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
         << "original path: " << path_pair.second;

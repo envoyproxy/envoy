@@ -1,7 +1,8 @@
 #include "common/http/path_utility.h"
 
 #include "common/common/logger.h"
-#include "common/http/deprecated_path_canonicalizer.h"
+#include "common/http/legacy_path_canonicalizer.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -13,10 +14,8 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-absl::optional<std::string> canonicalizePath(absl::string_view original_path,
-                                             Runtime::Loader* runtime) {
-  if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(
-                     "envoy.deprecated_features.use_forked_chromium_url", /*default_value=*/true)) {
+absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_forked_chromium_url")) {
     std::string canonical_path;
     url::Component in_component(0, original_path.size());
     url::Component out_component;
@@ -28,12 +27,12 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path,
       return absl::make_optional(std::move(canonical_path));
     }
   }
-  return DeprecatedPathCanonicalizer::canonicalizePath(original_path);
+  return LegacyPathCanonicalizer::canonicalizePath(original_path);
 }
 } // namespace
 
 /* static */
-bool PathUtil::canonicalPath(RequestHeaderMap& headers, Runtime::Loader* runtime) {
+bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
@@ -41,8 +40,8 @@ bool PathUtil::canonicalPath(RequestHeaderMap& headers, Runtime::Loader* runtime
   auto normalized_path_opt = canonicalizePath(
       query_pos == original_path.npos
           ? original_path
-          : absl::string_view(original_path.data(), query_pos), // '?' is not included
-      runtime);
+          : absl::string_view(original_path.data(), query_pos) // '?' is not included
+  );
 
   if (!normalized_path_opt.has_value()) {
     return false;

@@ -11,7 +11,7 @@ namespace Http {
 /**
  * Path canonicalizer based on //source/common/chromium_url.
  */
-class DeprecatedPathCanonicalizer {
+class LegacyPathCanonicalizer {
 public:
   // Returns the canonicalized path if successful.
   static absl::optional<std::string> canonicalizePath(absl::string_view original_path);
