@@ -34,7 +34,7 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
   auto& time_source = context.dispatcher().timeSource();
 
   return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(filter_config, time_source));
+    filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(*filter_config, time_source));
   };
 }
 

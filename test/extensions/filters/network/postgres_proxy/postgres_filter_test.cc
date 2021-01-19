@@ -32,7 +32,7 @@ class PostgresFilterTest
 public:
   PostgresFilterTest() {
     config_ = std::make_shared<PostgresFilterConfig>(stat_prefix_, true, scope_);
-    filter_ = std::make_unique<PostgresFilter>(config_);
+    filter_ = std::make_unique<PostgresFilter>(*config_);
 
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -323,7 +323,7 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   setMetadata();
 
   // Disable creating parsing SQL and creating metadata.
-  filter_->getConfig()->enable_sql_parsing_ = false;
+  filter_->getConfig().enable_sql_parsing_ = false;
   createPostgresMsg(data_, "Q", "SELECT * FROM whatever");
   filter_->onData(data_, false);
 
@@ -334,7 +334,7 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 0);
 
   // Now enable SQL parsing and creating metadata.
-  filter_->getConfig()->enable_sql_parsing_ = true;
+  filter_->getConfig().enable_sql_parsing_ = true;
   filter_->onData(data_, false);
 
   auto& filter_meta = filter_->connection().streamInfo().dynamicMetadata().filter_metadata().at(

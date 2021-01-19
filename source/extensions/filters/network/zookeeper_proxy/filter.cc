@@ -68,8 +68,8 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& counter,
   opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
 }
 
-ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
-    : config_(std::move(config)), decoder_(createDecoder(*this, time_source)) {}
+ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfig& config, TimeSource& time_source)
+    : config_(config), decoder_(createDecoder(*this, time_source)) {}
 
 void ZooKeeperFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -90,7 +90,7 @@ Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance& data, bool) {
 Network::FilterStatus ZooKeeperFilter::onNewConnection() { return Network::FilterStatus::Continue; }
 
 DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source) {
-  return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes(), time_source);
+  return std::make_unique<DecoderImpl>(callbacks, config_.maxPacketBytes(), time_source);
 }
 
 void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::string& value) {
@@ -125,45 +125,45 @@ void ZooKeeperFilter::setDynamicMetadata(
 
 void ZooKeeperFilter::onConnect(const bool readonly) {
   if (readonly) {
-    config_->stats_.connect_readonly_rq_.inc();
+    config_.stats_.connect_readonly_rq_.inc();
     setDynamicMetadata("opname", "connect_readonly");
   } else {
-    config_->stats_.connect_rq_.inc();
+    config_.stats_.connect_rq_.inc();
     setDynamicMetadata("opname", "connect");
   }
 }
 
 void ZooKeeperFilter::onDecodeError() {
-  config_->stats_.decoder_error_.inc();
+  config_.stats_.decoder_error_.inc();
   setDynamicMetadata("opname", "error");
 }
 
 void ZooKeeperFilter::onRequestBytes(const uint64_t bytes) {
-  config_->stats_.request_bytes_.add(bytes);
+  config_.stats_.request_bytes_.add(bytes);
   setDynamicMetadata("bytes", std::to_string(bytes));
 }
 
 void ZooKeeperFilter::onResponseBytes(const uint64_t bytes) {
-  config_->stats_.response_bytes_.add(bytes);
+  config_.stats_.response_bytes_.add(bytes);
   setDynamicMetadata("bytes", std::to_string(bytes));
 }
 
 void ZooKeeperFilter::onPing() {
-  config_->stats_.ping_rq_.inc();
+  config_.stats_.ping_rq_.inc();
   setDynamicMetadata("opname", "ping");
 }
 
 void ZooKeeperFilter::onAuthRequest(const std::string& scheme) {
   Stats::Counter& counter = Stats::Utility::counterFromStatNames(
-      config_->scope_, {config_->stat_prefix_, config_->auth_,
-                        config_->stat_name_set_->getBuiltin(absl::StrCat(scheme, "_rq"),
-                                                            config_->unknown_scheme_rq_)});
+      config_.scope_, {config_.stat_prefix_, config_.auth_,
+                       config_.stat_name_set_->getBuiltin(absl::StrCat(scheme, "_rq"),
+                                                          config_.unknown_scheme_rq_)});
   counter.inc();
   setDynamicMetadata("opname", "auth");
 }
 
 void ZooKeeperFilter::onGetDataRequest(const std::string& path, const bool watch) {
-  config_->stats_.getdata_rq_.inc();
+  config_.stats_.getdata_rq_.inc();
   setDynamicMetadata({{"opname", "getdata"}, {"path", path}, {"watch", watch ? "true" : "false"}});
 }
 
@@ -174,19 +174,19 @@ void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags
   switch (opcode) {
   case OpCodes::Create:
     opname = "create";
-    config_->stats_.create_rq_.inc();
+    config_.stats_.create_rq_.inc();
     break;
   case OpCodes::Create2:
     opname = "create2";
-    config_->stats_.create2_rq_.inc();
+    config_.stats_.create2_rq_.inc();
     break;
   case OpCodes::CreateContainer:
     opname = "createcontainer";
-    config_->stats_.createcontainer_rq_.inc();
+    config_.stats_.createcontainer_rq_.inc();
     break;
   case OpCodes::CreateTtl:
     opname = "createttl";
-    config_->stats_.createttl_rq_.inc();
+    config_.stats_.createttl_rq_.inc();
     break;
   default:
     throw EnvoyException(fmt::format("Unknown opcode: {}", enumToSignedInt(opcode)));
@@ -198,7 +198,7 @@ void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags
 }
 
 void ZooKeeperFilter::onSetRequest(const std::string& path) {
-  config_->stats_.setdata_rq_.inc();
+  config_.stats_.setdata_rq_.inc();
   setDynamicMetadata({{"opname", "setdata"}, {"path", path}});
 }
 
@@ -207,91 +207,91 @@ void ZooKeeperFilter::onGetChildrenRequest(const std::string& path, const bool w
   std::string opname = "getchildren";
 
   if (v2) {
-    config_->stats_.getchildren2_rq_.inc();
+    config_.stats_.getchildren2_rq_.inc();
     opname = "getchildren2";
   } else {
-    config_->stats_.getchildren_rq_.inc();
+    config_.stats_.getchildren_rq_.inc();
   }
 
   setDynamicMetadata({{"opname", opname}, {"path", path}, {"watch", watch ? "true" : "false"}});
 }
 
 void ZooKeeperFilter::onDeleteRequest(const std::string& path, const int32_t version) {
-  config_->stats_.delete_rq_.inc();
+  config_.stats_.delete_rq_.inc();
   setDynamicMetadata({{"opname", "delete"}, {"path", path}, {"version", std::to_string(version)}});
 }
 
 void ZooKeeperFilter::onExistsRequest(const std::string& path, const bool watch) {
-  config_->stats_.exists_rq_.inc();
+  config_.stats_.exists_rq_.inc();
   setDynamicMetadata({{"opname", "exists"}, {"path", path}, {"watch", watch ? "true" : "false"}});
 }
 
 void ZooKeeperFilter::onGetAclRequest(const std::string& path) {
-  config_->stats_.getacl_rq_.inc();
+  config_.stats_.getacl_rq_.inc();
   setDynamicMetadata({{"opname", "getacl"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onSetAclRequest(const std::string& path, const int32_t version) {
-  config_->stats_.setacl_rq_.inc();
+  config_.stats_.setacl_rq_.inc();
   setDynamicMetadata({{"opname", "setacl"}, {"path", path}, {"version", std::to_string(version)}});
 }
 
 void ZooKeeperFilter::onSyncRequest(const std::string& path) {
-  config_->stats_.sync_rq_.inc();
+  config_.stats_.sync_rq_.inc();
   setDynamicMetadata({{"opname", "sync"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onCheckRequest(const std::string&, const int32_t) {
-  config_->stats_.check_rq_.inc();
+  config_.stats_.check_rq_.inc();
 }
 
 void ZooKeeperFilter::onCheckWatchesRequest(const std::string& path, const int32_t) {
-  config_->stats_.checkwatches_rq_.inc();
+  config_.stats_.checkwatches_rq_.inc();
   setDynamicMetadata({{"opname", "checkwatches"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onRemoveWatchesRequest(const std::string& path, const int32_t) {
-  config_->stats_.removewatches_rq_.inc();
+  config_.stats_.removewatches_rq_.inc();
   setDynamicMetadata({{"opname", "removewatches"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onMultiRequest() {
-  config_->stats_.multi_rq_.inc();
+  config_.stats_.multi_rq_.inc();
   setDynamicMetadata("opname", "multi");
 }
 
 void ZooKeeperFilter::onReconfigRequest() {
-  config_->stats_.reconfig_rq_.inc();
+  config_.stats_.reconfig_rq_.inc();
   setDynamicMetadata("opname", "reconfig");
 }
 
 void ZooKeeperFilter::onSetWatchesRequest() {
-  config_->stats_.setwatches_rq_.inc();
+  config_.stats_.setwatches_rq_.inc();
   setDynamicMetadata("opname", "setwatches");
 }
 
 void ZooKeeperFilter::onGetEphemeralsRequest(const std::string& path) {
-  config_->stats_.getephemerals_rq_.inc();
+  config_.stats_.getephemerals_rq_.inc();
   setDynamicMetadata({{"opname", "getephemerals"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onGetAllChildrenNumberRequest(const std::string& path) {
-  config_->stats_.getallchildrennumber_rq_.inc();
+  config_.stats_.getallchildrennumber_rq_.inc();
   setDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", path}});
 }
 
 void ZooKeeperFilter::onCloseRequest() {
-  config_->stats_.close_rq_.inc();
+  config_.stats_.close_rq_.inc();
   setDynamicMetadata("opname", "close");
 }
 
 void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32_t timeout,
                                         const bool readonly,
                                         const std::chrono::milliseconds& latency) {
-  config_->stats_.connect_resp_.inc();
+  config_.stats_.connect_resp_.inc();
 
   Stats::Histogram& histogram = Stats::Utility::histogramFromElements(
-      config_->scope_, {config_->stat_prefix_, config_->connect_latency_},
+      config_.scope_, {config_.stat_prefix_, config_.connect_latency_},
       Stats::Histogram::Unit::Milliseconds);
   histogram.recordValue(latency.count());
 
@@ -303,10 +303,10 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 
 void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const int64_t zxid,
                                  const int32_t error, const std::chrono::milliseconds& latency) {
-  Stats::StatName opcode_latency = config_->unknown_opcode_latency_;
-  auto iter = config_->op_code_map_.find(opcode);
+  Stats::StatName opcode_latency = config_.unknown_opcode_latency_;
+  auto iter = config_.op_code_map_.find(opcode);
   std::string opname = "";
-  if (iter != config_->op_code_map_.end()) {
+  if (iter != config_.op_code_map_.end()) {
     const ZooKeeperFilterConfig::OpCodeInfo& opcode_info = iter->second;
     opcode_info.counter_->inc();
     opname = opcode_info.opname_;
@@ -314,8 +314,7 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
   }
 
   Stats::Histogram& histogram = Stats::Utility::histogramFromStatNames(
-      config_->scope_, {config_->stat_prefix_, opcode_latency},
-      Stats::Histogram::Unit::Milliseconds);
+      config_.scope_, {config_.stat_prefix_, opcode_latency}, Stats::Histogram::Unit::Milliseconds);
   histogram.recordValue(latency.count());
 
   setDynamicMetadata({{"opname", opname},
@@ -327,7 +326,7 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
 void ZooKeeperFilter::onWatchEvent(const int32_t event_type, const int32_t client_state,
                                    const std::string& path, const int64_t zxid,
                                    const int32_t error) {
-  config_->stats_.watch_event_.inc();
+  config_.stats_.watch_event_.inc();
   setDynamicMetadata({{"opname", "watch_event"},
                       {"event_type", std::to_string(event_type)},
                       {"client_state", std::to_string(client_state)},

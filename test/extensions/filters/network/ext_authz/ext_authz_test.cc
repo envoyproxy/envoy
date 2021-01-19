@@ -42,7 +42,7 @@ public:
     TestUtility::loadFromYaml(yaml, proto_config);
     config_ = std::make_shared<Config>(proto_config, stats_store_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
-    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
+    filter_ = std::make_unique<Filter>(*config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 

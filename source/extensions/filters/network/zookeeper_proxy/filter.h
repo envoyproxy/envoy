@@ -138,7 +138,7 @@ class ZooKeeperFilter : public Network::Filter,
                         DecoderCallbacks,
                         Logger::Loggable<Logger::Id::filter> {
 public:
-  ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source);
+  ZooKeeperFilter(ZooKeeperFilterConfig& config, TimeSource& time_source);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -187,7 +187,7 @@ public:
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
-  ZooKeeperFilterConfigSharedPtr config_;
+  ZooKeeperFilterConfig& config_;
   std::unique_ptr<Decoder> decoder_;
 };
 

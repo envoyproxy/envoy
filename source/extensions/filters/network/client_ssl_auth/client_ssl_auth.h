@@ -80,8 +80,8 @@ public:
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Random::RandomGenerator& random);
 
-  const AllowedPrincipals& allowedPrincipals();
-  const Network::Address::IpList& ipAllowlist() { return ip_allowlist_; }
+  const AllowedPrincipals& allowedPrincipals() const;
+  const Network::Address::IpList& ipAllowlist() const { return ip_allowlist_; }
   GlobalStats& stats() { return stats_; }
 
 private:
@@ -108,7 +108,7 @@ private:
  */
 class ClientSslAuthFilter : public Network::ReadFilter, public Network::ConnectionCallbacks {
 public:
-  ClientSslAuthFilter(ClientSslAuthConfigSharedPtr config) : config_(config) {}
+  ClientSslAuthFilter(ClientSslAuthConfig& config) : config_(config) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -124,7 +124,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
 private:
-  ClientSslAuthConfigSharedPtr config_;
+  ClientSslAuthConfig& config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

@@ -87,7 +87,7 @@ class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
+  Filter(Config& config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
   ~Filter() override = default;
 
@@ -119,10 +119,10 @@ private:
   void callCheck();
 
   bool filterEnabled(const envoy::config::core::v3::Metadata& metadata) {
-    return config_->filterEnabledMetadata(metadata);
+    return config_.filterEnabledMetadata(metadata);
   }
 
-  ConfigSharedPtr config_;
+  Config& config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};

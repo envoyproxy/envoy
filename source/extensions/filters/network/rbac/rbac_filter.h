@@ -60,8 +60,7 @@ class RoleBasedAccessControlFilter : public Network::ReadFilter,
                                      public Logger::Loggable<Logger::Id::rbac> {
 
 public:
-  RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
-      : config_(config) {}
+  RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfig& config) : config_(config) {}
   ~RoleBasedAccessControlFilter() override = default;
 
   // Network::ReadFilter
@@ -74,7 +73,7 @@ public:
   void setDynamicMetadata(std::string shadow_engine_result, std::string shadow_policy_id);
 
 private:
-  RoleBasedAccessControlFilterConfigSharedPtr config_;
+  RoleBasedAccessControlFilterConfig& config_;
   Network::ReadFilterCallbacks* callbacks_{};
   EngineResult engine_result_{Unknown};
   EngineResult shadow_engine_result_{Unknown};
