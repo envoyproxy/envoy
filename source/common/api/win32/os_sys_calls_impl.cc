@@ -400,5 +400,14 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
+SysCallIntResult OsSysCallsImpl::genericIoctl(os_fd_t sockfd, unsigned long controlCode,
+                                              void* InBuffer, unsigned long InBufferLen,
+                                              void* OutBuffer, unsigned long OutBufferLen,
+                                              unsigned long& bytesReturned) {
+  const int rc = ::WSAIoctl(sockfd, controlCode, InBuffer, InBufferLen, OutBuffer, OutBufferLen,
+                            &bytesReturned, nullptr, nullptr);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
 } // namespace Api
 } // namespace Envoy

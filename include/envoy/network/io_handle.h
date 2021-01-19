@@ -26,6 +26,11 @@ using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
 namespace Network {
 
+struct EnvoyRedirectRecords {
+  void* buf_ptr_[256];
+  unsigned long buf_size_;
+};
+
 /**
  * IoHandle: an abstract interface for all I/O operations
  */
@@ -238,6 +243,13 @@ public:
   virtual Api::SysCallIntResult getOption(int level, int optname, void* optval,
                                           socklen_t* optlen) PURE;
 
+  /**
+   * @see MSDN WSAIoctl. Controls the mode of a socket.
+   */
+  virtual Api::SysCallIntResult genericIoctl(unsigned long controlCode, void* InBuffer,
+                                             unsigned long InBufferLen, void* OutBuffer,
+                                             unsigned long OutBufferLen,
+                                             unsigned long& bytesReturned) PURE;
   /**
    * Toggle blocking behavior
    * @param blocking flag to set/unset blocking state

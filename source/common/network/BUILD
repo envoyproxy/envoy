@@ -352,6 +352,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ioctl_socket_option_lib",
+    srcs = ["ioctl_socket_option_impl.cc"],
+    hdrs = ["ioctl_socket_option_impl.h"],
+    deps = [
+        ":address_lib",
+        ":socket_lib",
+        ":socket_option_lib",
+        "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "socket_option_factory_lib",
     srcs = ["socket_option_factory.cc"],
     hdrs = ["socket_option_factory.h"],
@@ -359,6 +375,7 @@ envoy_cc_library(
     deps = [
         ":addr_family_aware_socket_option_lib",
         ":address_lib",
+        ":ioctl_socket_option_lib",
         ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",

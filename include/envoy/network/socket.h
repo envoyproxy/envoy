@@ -192,6 +192,14 @@ public:
   virtual Api::SysCallIntResult connect(const Address::InstanceConstSharedPtr address) PURE;
 
   /**
+   * @see MSDN WSAIoctl. Controls the mode of a socket.
+   */
+  virtual Api::SysCallIntResult genericIoctl(unsigned long controlCode, void* InBuffer,
+                                             unsigned long InBufferLen, void* OutBuffer,
+                                             unsigned long OutBufferLen,
+                                             unsigned long& bytesReturned) PURE;
+
+  /**
    * Propagates option to underlying socket (@see man 2 setsockopt)
    */
   virtual Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,

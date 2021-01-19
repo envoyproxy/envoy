@@ -4,6 +4,7 @@
 
 #include "common/common/fmt.h"
 #include "common/network/addr_family_aware_socket_option_impl.h"
+#include "common/network/ioctl_socket_option_impl.h"
 #include "common/network/socket_option_impl.h"
 
 namespace Envoy {
@@ -49,6 +50,15 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
   options->push_back(std::make_shared<Network::AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_IP_TRANSPARENT,
       ENVOY_SOCKET_IPV6_TRANSPARENT, 1));
+  return options;
+}
+
+std::unique_ptr<Socket::Options>
+SocketOptionFactory::buildWFPRedirectRecordsOptions(const EnvoyRedirectRecords& redirectRecords) {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<Network::IoctlSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_REDIRECT_RECORDS,
+      (void*)redirectRecords.buf_ptr_, redirectRecords.buf_size_, nullptr, 0));
   return options;
 }
 

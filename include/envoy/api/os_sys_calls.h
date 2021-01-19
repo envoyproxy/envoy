@@ -185,6 +185,14 @@ public:
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
   virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
+
+  /**
+   * @see MSDN WSAIoctl. Controls the mode of a socket.
+   */
+  virtual SysCallIntResult genericIoctl(os_fd_t sockfd, unsigned long controlCode, void* InBuffer,
+                                        unsigned long InBufferLen, void* OutBuffer,
+                                        unsigned long OutBufferLen,
+                                        unsigned long& bytesReturned) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

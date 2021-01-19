@@ -98,6 +98,11 @@ public:
                                         socklen_t optlen) override;
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
                                         socklen_t* optlen) const override;
+  Api::SysCallIntResult genericIoctl(unsigned long controlCode, void* InBuffer,
+                                     unsigned long InBufferLen, void* OutBuffer,
+                                     unsigned long OutBufferLen,
+                                     unsigned long& bytesReturned) override;
+
   Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }

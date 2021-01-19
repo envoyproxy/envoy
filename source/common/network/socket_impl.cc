@@ -94,6 +94,14 @@ Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* 
   return io_handle_->getOption(level, optname, optval, optlen);
 }
 
+Api::SysCallIntResult SocketImpl::genericIoctl(unsigned long controlCode, void* InBuffer,
+                                               unsigned long InBufferLen, void* OutBuffer,
+                                               unsigned long OutBufferLen,
+                                               unsigned long& bytesReturned) {
+  return io_handle_->genericIoctl(controlCode, InBuffer, InBufferLen, OutBuffer, OutBufferLen,
+                                  bytesReturned);
+}
+
 Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {
   return io_handle_->setBlocking(blocking);
 }

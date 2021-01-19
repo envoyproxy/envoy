@@ -25,6 +25,8 @@ public:
   buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepalive_config);
   static std::unique_ptr<Socket::Options> buildIpFreebindOptions();
   static std::unique_ptr<Socket::Options> buildIpTransparentOptions();
+  static std::unique_ptr<Socket::Options>
+  buildWFPRedirectRecordsOptions(const EnvoyRedirectRecords& redirectRecords);
   static std::unique_ptr<Socket::Options> buildSocketMarkOptions(uint32_t mark);
   static std::unique_ptr<Socket::Options> buildSocketNoSigpipeOptions();
   static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);

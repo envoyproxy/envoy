@@ -319,6 +319,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:application_protocol_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint32_accessor_lib",

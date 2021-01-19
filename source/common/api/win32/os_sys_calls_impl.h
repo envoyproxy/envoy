@@ -49,6 +49,9 @@ public:
   SysCallSocketResult duplicate(os_fd_t oldfd) override;
   SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) override;
   SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) override;
+  SysCallIntResult genericIoctl(os_fd_t sockfd, unsigned long controlCode, void* InBuffer,
+                                unsigned long InBufferLen, void* OutBuffer,
+                                unsigned long OutBufferLen, unsigned long& bytesReturned) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

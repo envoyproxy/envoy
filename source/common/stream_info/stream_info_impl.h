@@ -280,6 +280,14 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
 
+  absl::optional<Network::EnvoyRedirectRecords> getRedirectRecords() const override {
+    return redirect_records_;
+  }
+
+  void setRedirectRecords(Network::EnvoyRedirectRecords& records) override {
+    redirect_records_ = records;
+  }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -333,6 +341,7 @@ private:
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   absl::optional<uint64_t> connection_id_;
+  absl::optional<Network::EnvoyRedirectRecords> redirect_records_;
 };
 
 } // namespace StreamInfo

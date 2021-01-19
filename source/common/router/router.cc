@@ -28,6 +28,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/network/upstream_subject_alt_names.h"
@@ -491,6 +492,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
+
+  Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
+  if (downstreamConnection()->streamInfo().getRedirectRecords().has_value()) {
+    const Network::Socket::OptionsSharedPtr wfp_socket_options =
+        Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(
+            downstreamConnection()->streamInfo().getRedirectRecords().value());
+    Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
+  }
+
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
 
   if (!generic_conn_pool) {

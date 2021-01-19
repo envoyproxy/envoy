@@ -105,6 +105,15 @@ public:
                                   socklen_t* optlen) override {
     return io_handle_.getOption(level, optname, optval, optlen);
   }
+
+  Api::SysCallIntResult genericIoctl(unsigned long controlCode, void* InBuffer,
+                                     unsigned long InBufferLen, void* OutBuffer,
+                                     unsigned long OutBufferLen,
+                                     unsigned long& bytesReturned) override {
+    return io_handle_.genericIoctl(controlCode, InBuffer, InBufferLen, OutBuffer, OutBufferLen,
+                                   bytesReturned);
+  }
+
   Api::SysCallIntResult setBlocking(bool blocking) override {
     return io_handle_.setBlocking(blocking);
   }

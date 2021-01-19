@@ -574,6 +574,14 @@ Api::SysCallIntResult IoSocketHandleImpl::getOption(int level, int optname, void
   return Api::OsSysCallsSingleton::get().getsockopt(fd_, level, optname, optval, optlen);
 }
 
+Api::SysCallIntResult IoSocketHandleImpl::genericIoctl(unsigned long controlCode, void* InBuffer,
+                                                       unsigned long InBufferLen, void* OutBuffer,
+                                                       unsigned long OutBufferLen,
+                                                       unsigned long& bytesReturned) {
+  return Api::OsSysCallsSingleton::get().genericIoctl(fd_, controlCode, InBuffer, InBufferLen,
+                                                      OutBuffer, OutBufferLen, bytesReturned);
+}
+
 Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
   return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
 }

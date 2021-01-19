@@ -477,6 +477,27 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
+
+#ifdef SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS
+  if (config_->direction() == envoy::config::core::v3::OUTBOUND &&
+      socket->addressProvider().localAddressRestored()) {
+    ENVOY_LOG(debug, "[Windows] Querying for redirect record for outbound listener");
+    unsigned long redirectRecordsSize = 0;
+    Network::EnvoyRedirectRecords redirect_records;
+    auto status = socket->genericIoctl(
+        SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0, (uint8_t*)redirect_records.buf_ptr_,
+        sizeof(redirect_records.buf_ptr_), redirect_records.buf_size_);
+    if (status.rc_ != 0) {
+      ENVOY_LOG(debug,
+                "closing connection: cannot broker connection to original destination "
+                "[Query redirect record failed] with error {}",
+                status.errno_);
+      return;
+    }
+    stream_info->setRedirectRecords(redirect_records);
+  }
+#endif
+
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
@@ -502,7 +523,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
-}
+} // namespace Server
 
 ConnectionHandlerImpl::ActiveConnections&
 ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
