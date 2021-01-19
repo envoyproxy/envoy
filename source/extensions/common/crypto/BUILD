@@ -18,10 +18,10 @@ envoy_cc_extension(
         "crypto_impl.h",
         "utility_impl.h",
     ],
+    category = "SOMECAT",
     external_deps = [
         "ssl",
     ],
-    category = "SOMECAT",
     # Legacy test use. TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/config:__subpackages__",

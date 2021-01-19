@@ -44,8 +44,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     category = "SOMECAT",
+    repository = "@envoy",
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":filter",

@@ -34,10 +34,10 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
+    category = "SOMECAT",
     external_deps = [
         "abseil_node_hash_set",
     ],
-    category = "SOMECAT",
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":tsi_handshaker",
