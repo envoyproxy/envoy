@@ -55,7 +55,7 @@ public:
         rate_limit_settings_, true);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
-        dispatcher_, init_fetch_timeout, false);
+        dispatcher_, init_fetch_timeout, false, false);
   }
 
   ~GrpcSubscriptionTestHarness() override {
