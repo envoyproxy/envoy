@@ -1050,6 +1050,42 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_header{{":method", "PUT"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
+  std::string body;
+
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::RequestHeaders);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "16");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(16)));
+  }
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "10");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(10)));
+  }
+  {
+    HeadersByteSizeFormatter formatter(HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
+    EXPECT_EQ(
+        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        "23");
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::numberValue(23)));
+  }
+}
+
 TEST(SubstitutionFormatterTest, responseHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
@@ -1624,7 +1660,7 @@ TEST(SubstitutionFormatterTest, StructFormatterPlainStringTest) {
       expected_json_map);
 }
 
-TEST(SubstitutionFormatterTest, StructFormatterNestedObject) {
+TEST(SubstitutionFormatterTest, StructFormatterTypesTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -1638,24 +1674,151 @@ TEST(SubstitutionFormatterTest, StructFormatterNestedObject) {
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
-    level_one:
-      level_two:
-        level_three:
-          plain_string: plain_string_value
-          protocol: '%PROTOCOL%'
+    string_type: plain_string_value
+    struct_type:
+      plain_string: plain_string_value
+      protocol: '%PROTOCOL%'
+    list_type:
+      - plain_string_value
+      - '%PROTOCOL%'
   )EOF",
                             key_mapping);
   StructFormatter formatter(key_mapping, false, false);
 
   const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
-    "level_one": {
-      "level_two": {
-        "level_three": {
-          "plain_string": "plain_string_value",
-          "protocol": "HTTP/1.1"
-        }
-      }
-    }
+    "string_type": "plain_string_value",
+    "struct_type": {
+      "plain_string": "plain_string_value",
+      "protocol": "HTTP/1.1"
+    },
+    "list_type": [
+      "plain_string_value",
+      "HTTP/1.1"
+    ]
+  })EOF");
+  const ProtobufWkt::Struct out_struct =
+      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
+}
+
+// Test that nested values are formatted properly, including inter-type nesting.
+TEST(SubstitutionFormatterTest, StructFormatterNestedObjectsTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  ProtobufWkt::Struct key_mapping;
+  // For both struct and list, we test 3 nesting levels of all types (string, struct and list).
+  TestUtility::loadFromYaml(R"EOF(
+    struct:
+      struct_string: plain_string_value
+      struct_protocol: '%PROTOCOL%'
+      struct_struct:
+        struct_struct_string: plain_string_value
+        struct_struct_protocol: '%PROTOCOL%'
+        struct_struct_struct:
+          struct_struct_struct_string: plain_string_value
+          struct_struct_struct_protocol: '%PROTOCOL%'
+        struct_struct_list:
+          - struct_struct_list_string
+          - '%PROTOCOL%'
+      struct_list:
+        - struct_list_string
+        - '%PROTOCOL%'
+        # struct_list_struct
+        - struct_list_struct_string: plain_string_value
+          struct_list_struct_protocol: '%PROTOCOL%'
+        # struct_list_list
+        - - struct_list_list_string
+          - '%PROTOCOL%'
+    list:
+      - list_string
+      - '%PROTOCOL%'
+      # list_struct
+      - list_struct_string: plain_string_value
+        list_struct_protocol: '%PROTOCOL%'
+        list_struct_struct:
+          list_struct_struct_string: plain_string_value
+          list_struct_struct_protocol: '%PROTOCOL%'
+        list_struct_list:
+          - list_struct_list_string
+          - '%PROTOCOL%'
+      # list_list
+      - - list_list_string
+        - '%PROTOCOL%'
+        # list_list_struct
+        - list_list_struct_string: plain_string_value
+          list_list_struct_protocol: '%PROTOCOL%'
+        # list_list_list
+        - - list_list_list_string
+          - '%PROTOCOL%'
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+  const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
+    "struct": {
+      "struct_string": "plain_string_value",
+      "struct_protocol": "HTTP/1.1",
+      "struct_struct": {
+        "struct_struct_string": "plain_string_value",
+        "struct_struct_protocol": "HTTP/1.1",
+        "struct_struct_struct": {
+          "struct_struct_struct_string": "plain_string_value",
+          "struct_struct_struct_protocol": "HTTP/1.1",
+        },
+        "struct_struct_list": [
+          "struct_struct_list_string",
+          "HTTP/1.1",
+        ],
+      },
+      "struct_list": [
+        "struct_list_string",
+        "HTTP/1.1",
+        {
+          "struct_list_struct_string": "plain_string_value",
+          "struct_list_struct_protocol": "HTTP/1.1",
+        },
+        [
+          "struct_list_list_string",
+          "HTTP/1.1",
+        ],
+      ],
+    },
+    "list": [
+      "list_string",
+      "HTTP/1.1",
+      {
+        "list_struct_string": "plain_string_value",
+        "list_struct_protocol": "HTTP/1.1",
+        "list_struct_struct": {
+          "list_struct_struct_string": "plain_string_value",
+          "list_struct_struct_protocol": "HTTP/1.1",
+        },
+        "list_struct_list": [
+          "list_struct_list_string",
+          "HTTP/1.1",
+        ]
+      },
+      [
+        "list_list_string",
+        "HTTP/1.1",
+        {
+          "list_list_struct_string": "plain_string_value",
+          "list_list_struct_protocol": "HTTP/1.1",
+        },
+        [
+          "list_list_list_string",
+          "HTTP/1.1",
+        ],
+      ],
+    ],
   })EOF");
   const ProtobufWkt::Struct out_struct =
       formatter.format(request_header, response_header, response_trailer, stream_info, body);
@@ -1736,10 +1899,14 @@ TEST(SubstitutionFormatterTest, StructFormatterAlternateHeaderTest) {
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
-    request_present_header_or_request_absent_header: '%REQ(request_present_header?request_absent_header)%'
-    request_absent_header_or_request_present_header: '%REQ(request_absent_header?request_present_header)%'
-    response_absent_header_or_response_absent_header: '%RESP(response_absent_header?response_present_header)%'
-    response_present_header_or_response_absent_header: '%RESP(response_present_header?response_absent_header)%'
+    request_present_header_or_request_absent_header:
+    '%REQ(request_present_header?request_absent_header)%'
+    request_absent_header_or_request_present_header:
+    '%REQ(request_absent_header?request_present_header)%'
+    response_absent_header_or_response_absent_header:
+    '%RESP(response_absent_header?response_present_header)%'
+    response_present_header_or_response_absent_header:
+    '%RESP(response_present_header?response_absent_header)%'
   )EOF",
                             key_mapping);
   StructFormatter formatter(key_mapping, false, false);
@@ -2030,7 +2197,8 @@ TEST(SubstitutionFormatterTest, StructFormatterMultiTokenTest) {
 
     ProtobufWkt::Struct key_mapping;
     TestUtility::loadFromYaml(R"EOF(
-      multi_token_field: '%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%'
+      multi_token_field: '%PROTOCOL% plainstring %REQ(some_request_header)%
+      %RESP(some_response_header)%'
     )EOF",
                               key_mapping);
     for (const bool preserve_types : {false, true}) {

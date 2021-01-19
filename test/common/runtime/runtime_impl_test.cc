@@ -834,11 +834,11 @@ public:
       rtds_layer->mutable_rtds_config();
     }
     EXPECT_CALL(cm_, subscriptionFactory()).Times(layers_.size());
-    ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
-        .WillByDefault(
-            testing::Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                                   Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                                   Config::OpaqueResourceDecoder&) -> Config::SubscriptionPtr {
+    ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+        .WillByDefault(testing::Invoke(
+            [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoder&,
+                   bool) -> Config::SubscriptionPtr {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
               rtds_subscriptions_.push_back(ret.get());
               rtds_callbacks_.push_back(&callbacks);
@@ -848,7 +848,7 @@ public:
                                            generator_, validation_visitor_, *api_);
     loader_->initialize(cm_);
     for (auto* sub : rtds_subscriptions_) {
-      EXPECT_CALL(*sub, start(_, _));
+      EXPECT_CALL(*sub, start(_));
     }
 
     loader_->startRtdsSubscriptions(rtds_init_callback_.AsStdFunction());
@@ -1168,7 +1168,7 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
 
 TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   Upstream::MockClusterManager cm_;
-  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
         throw EnvoyException("bad config");
         return nullptr;

@@ -53,8 +53,7 @@ public:
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
   void iterateHostMap(IterateHostMapCb cb) override;
   absl::optional<const DnsHostInfoSharedPtr> getHost(absl::string_view host_name) override;
-  Upstream::ResourceAutoIncDecPtr
-  canCreateDnsRequest(ResourceLimitOptRef pending_requests) override;
+  Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
 
 private:
   struct LoadDnsCacheEntryHandleImpl
