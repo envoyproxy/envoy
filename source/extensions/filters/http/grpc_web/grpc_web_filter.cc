@@ -27,31 +27,34 @@ namespace {
 // This is arbitrarily chosen. This can be made configurable when it is required.
 constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
 
-// This builds grpc-message header value from encoding buffer and the last frame (when
-// end_stream=true). When we have buffered data in encoding buffer, we limit the length of
-// grpc-message to be smaller than MAX_GRPC_MESSAGE_LENGTH. However, when we only have "last" data,
-// we send it all.
-std::string buildGrpcMessage(const Buffer::Instance* buffered, Buffer::Instance* last) {
-  Buffer::OwnedImpl buffer;
-  // In the case of local reply, "buffered" is nullptr and we only have filled "last" data.
-  if (buffered != nullptr) {
-    ASSERT(buffered->length() <= MAX_GRPC_MESSAGE_LENGTH);
-    buffer.add(*buffered);
+void mergeEncodingBufferAndLastData(Buffer::OwnedImpl& output,
+                                    const Buffer::Instance* encoding_buffer,
+                                    Buffer::Instance* last_data) {
+  // In the case of local reply, "encoding_buffer" is nullptr and we only have filled "last_data".
+  if (encoding_buffer != nullptr) {
+    ASSERT(encoding_buffer->length() <= MAX_GRPC_MESSAGE_LENGTH);
+    output.add(*encoding_buffer);
   }
 
-  if (last != nullptr) {
-    uint64_t needed = last->length();
+  if (last_data != nullptr) {
+    uint64_t needed = last_data->length();
     // When we have buffered data (from encoding buffer), we limit the final buffer length.
-    if (buffered != nullptr && (buffer.length() + needed) >= MAX_GRPC_MESSAGE_LENGTH) {
-      needed = std::min(needed, MAX_GRPC_MESSAGE_LENGTH - buffer.length());
+    if (encoding_buffer != nullptr && (output.length() + needed) >= MAX_GRPC_MESSAGE_LENGTH) {
+      needed = std::min(needed, MAX_GRPC_MESSAGE_LENGTH - output.length());
     }
-    buffer.move(*last, needed);
-    last->drain(last->length());
+    output.move(*last_data, needed);
+    last_data->drain(last_data->length());
   }
+}
 
-  const uint64_t message_length = buffer.length();
+// This builds grpc-message header value from a merged data (built from encoding buffer and the last
+// frame, when end_stream=true). When we have buffered data in encoding buffer, we limit the length
+// of grpc-message to be smaller than MAX_GRPC_MESSAGE_LENGTH. However, when we only have "last"
+// data, we send it all.
+std::string buildGrpcMessage(Buffer::Instance& merged_data) {
+  const uint64_t message_length = merged_data.length();
   std::string message(message_length, 0);
-  buffer.copyOut(0, message_length, message.data());
+  merged_data.copyOut(0, message_length, message.data());
 
   return Http::Utility::PercentEncoding::encode(message);
 }
@@ -116,8 +119,8 @@ bool GrpcWebFilter::hasProtoEncodedGrpcWebContentType(
 }
 
 // If response headers do not contain gRPC or gRPC-Web response headers, it needs transformation.
-bool GrpcWebFilter::needsResponseTransformation(Http::ResponseHeaderMap& headers,
-                                                bool end_stream) const {
+bool GrpcWebFilter::needsTransformationForNonProtoEncodedResponse(Http::ResponseHeaderMap& headers,
+                                                                  bool end_stream) const {
   return Runtime::runtimeFeatureEnabled(
              "envoy.reloadable_features.grpc_web_fix_non_grpc_response_handling") &&
          !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
@@ -125,7 +128,7 @@ bool GrpcWebFilter::needsResponseTransformation(Http::ResponseHeaderMap& headers
            hasProtoEncodedGrpcWebContentType(headers));
 }
 
-void GrpcWebFilter::setTransformedResponseHeaders(Buffer::Instance* data) {
+void GrpcWebFilter::setTransformedNonProtoEncodedResponseHeaders(Buffer::Instance* data) {
   const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
 
   if (encoding_buffer != nullptr && encoding_buffer->length() > MAX_GRPC_MESSAGE_LENGTH) {
@@ -137,7 +140,9 @@ void GrpcWebFilter::setTransformedResponseHeaders(Buffer::Instance* data) {
     });
   }
 
-  const auto message = buildGrpcMessage(encoding_buffer, data);
+  Buffer::OwnedImpl merged_data;
+  mergeEncodingBufferAndLastData(merged_data, encoding_buffer, data);
+  const std::string message = buildGrpcMessage(merged_data);
 
   if (encoding_buffer != nullptr) {
     encoder_callbacks_->modifyEncodingBuffer(
@@ -249,7 +254,8 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
     chargeStat(headers);
   }
 
-  needs_response_transformation_ = needsResponseTransformation(headers, end_stream);
+  needs_transformation_for_non_proto_encoded_response_ =
+      needsTransformationForNonProtoEncodedResponse(headers, end_stream);
 
   if (is_text_response_) {
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
@@ -257,7 +263,7 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& 
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
 
-  if (end_stream || !needs_response_transformation_) {
+  if (end_stream || !needs_transformation_for_non_proto_encoded_response_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -273,7 +279,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   // When the upstream response (this is also relevant for local reply, since gRPC-Web request is
   // not a gRPC request which makes the local reply's is_grpc_request set to false) is not a gRPC
   // response, we set the "grpc-message" header with the upstream body content.
-  if (needs_response_transformation_) {
+  if (needs_transformation_for_non_proto_encoded_response_) {
     const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
     if (!end_stream) {
       if (encoding_buffer != nullptr && encoding_buffer->length() >= MAX_GRPC_MESSAGE_LENGTH) {
@@ -283,8 +289,8 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
     }
 
     ASSERT(response_headers_ != nullptr);
-    needs_response_transformation_ = false;
-    setTransformedResponseHeaders(&data);
+    needs_transformation_for_non_proto_encoded_response_ = false;
+    setTransformedNonProtoEncodedResponseHeaders(&data);
     return Http::FilterDataStatus::Continue;
   }
 
@@ -326,8 +332,8 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
     chargeStat(trailers);
   }
 
-  if (needs_response_transformation_) {
-    setTransformedResponseHeaders(nullptr);
+  if (needs_transformation_for_non_proto_encoded_response_) {
+    setTransformedNonProtoEncodedResponseHeaders(nullptr);
     return Http::FilterTrailersStatus::Continue;
   }
 
