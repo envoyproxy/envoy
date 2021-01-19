@@ -38,8 +38,6 @@ public:
 
 // Already normalized path don't change using deprecated path canonicalizer.
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
     auto& path_header = pathHeaderEntry(path);
@@ -51,8 +49,6 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedAlreadyNormalPaths)) {
 
 // Invalid paths are rejected using deprecated path canonicalizer.
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {
@@ -62,8 +58,6 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedInvalidPaths)) {
 }
 
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedNormalizeValidPaths)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/a/b/../c", "/a/c"},        // parent dir
       {"/a/b/./c", "/a/b/c"},       // current dir
@@ -86,8 +80,6 @@ TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedNormalizeValidPaths)) 
 
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, DEPRECATED_FEATURE_TEST(DeprecatedNormalizeCasePath)) {
-  initializeDeprecatedFeatureEnabled(/*deprecated=*/true);
-
   const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
       {"/A/B/C", "/A/B/C"},           // not normalize to lower case
       {"/a/b/%2E%2E/c", "/a/c"},      // %2E can be normalized to .
