@@ -48,7 +48,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
   // RouteAction, e.g. prefix rewriting. We also reject other :-prefixed
   // headers, since it seems dangerous and there doesn't appear a use case.
   // Host is disallowed as it created confusing and inconsistent behaviors for
-  // HTTP/1 and HTTP/1. It could arugably be allowed on the response path.
+  // HTTP/1 and HTTP/2. It could arguably be allowed on the response path.
   if (!Http::HeaderUtility::isModifiableHeader(key)) {
     throw EnvoyException(":-prefixed or host headers may not be modified");
   }
