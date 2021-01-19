@@ -68,7 +68,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
-                                      const std::set<std::string>& resources,
+                                      const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
                                       OpaqueResourceDecoder& resource_decoder, const bool) {
   auto watch =

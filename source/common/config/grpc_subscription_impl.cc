@@ -25,7 +25,7 @@ GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
       use_namespace_matching_(use_namespace_matching) {}
 
 // Config::Subscription
-void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
+void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -50,12 +50,13 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
 }
 
 void GrpcSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names) {
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
   watch_->update(update_to_these_names);
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::string>& for_update) {
+void GrpcSubscriptionImpl::requestOnDemandUpdate(
+    const absl::flat_hash_set<std::string>& for_update) {
   grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }
@@ -137,7 +138,7 @@ GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
           init_fetch_timeout, is_aggregated, false),
       collection_locator_(collection_locator) {}
 
-void GrpcCollectionSubscriptionImpl::start(const std::set<std::string>& resource_names) {
+void GrpcCollectionSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
   ASSERT(resource_names.empty());
   GrpcSubscriptionImpl::start({XdsResourceIdentifier::encodeUrl(collection_locator_)});
 }

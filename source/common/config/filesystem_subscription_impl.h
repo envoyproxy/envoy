@@ -27,9 +27,9 @@ public:
   // Config::Subscription
   // We report all discovered resources in the watched file, so the resource names arguments are
   // unused, and updateResourceInterest is a no-op (other than updating a stat).
-  void start(const std::set<std::string>&) override;
-  void updateResourceInterest(const std::set<std::string>&) override;
-  void requestOnDemandUpdate(const std::set<std::string>&) override {
+  void start(const absl::flat_hash_set<std::string>&) override;
+  void updateResourceInterest(const absl::flat_hash_set<std::string>&) override;
+  void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 

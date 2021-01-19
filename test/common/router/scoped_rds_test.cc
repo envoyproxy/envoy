@@ -134,22 +134,22 @@ protected:
                 API_NO_BOOST(envoy::api::v2::RouteConfiguration)().GetDescriptor()->full_name())),
             _, _, _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke([this](const envoy::config::core::v3::ConfigSource&,
-                                      absl::string_view, Stats::Scope&,
-                                      Envoy::Config::SubscriptionCallbacks& callbacks,
-                                      Envoy::Config::OpaqueResourceDecoder&, bool) {
-          auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-          rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
-          EXPECT_CALL(*ret, start(_))
-              .WillOnce(Invoke(
-                  [this, config_sub_addr = ret.get()](const std::set<std::string>& resource_names) {
+        .WillRepeatedly(
+            Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                          Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
+                          Envoy::Config::OpaqueResourceDecoder&, bool) {
+              auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+              rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
+              EXPECT_CALL(*ret, start(_))
+                  .WillOnce(Invoke([this, config_sub_addr = ret.get()](
+                                       const absl::flat_hash_set<std::string>& resource_names) {
                     EXPECT_EQ(resource_names.size(), 1);
                     auto iter = rds_subscription_by_config_subscription_.find(config_sub_addr);
                     EXPECT_NE(iter, rds_subscription_by_config_subscription_.end());
                     rds_subscription_by_name_[*resource_names.begin()] = iter->second;
                   }));
-          return ret;
-        }));
+              return ret;
+            }));
 
     ON_CALL(context_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       target_handles_.push_back(target.createHandle("test"));

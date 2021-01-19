@@ -54,11 +54,11 @@ public:
   void startSubscription(const std::set<std::string>& cluster_names) override {
     std::ifstream config_file(path_);
     file_at_start_ = config_file.good();
-    subscription_.start(cluster_names);
+    subscription_.start(flattenResources(cluster_names));
   }
 
   void updateResourceInterest(const std::set<std::string>& cluster_names) override {
-    subscription_.updateResourceInterest(cluster_names);
+    subscription_.updateResourceInterest(flattenResources(cluster_names));
   }
 
   void updateFile(const std::string& json, bool run_dispatcher = true) {

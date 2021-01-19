@@ -78,7 +78,7 @@ public:
     subscription_started_ = true;
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
-    subscription_->start(cluster_names);
+    subscription_->start(flattenResources(cluster_names));
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
@@ -173,7 +173,7 @@ public:
                         std::inserter(unsub, unsub.begin()));
 
     expectSendMessage(sub, unsub, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-    subscription_->updateResourceInterest(cluster_names);
+    subscription_->updateResourceInterest(flattenResources(cluster_names));
     last_cluster_names_ = cluster_names;
   }
 

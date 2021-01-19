@@ -180,20 +180,20 @@ public:
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
    */
-  virtual void start(const std::set<std::string>& resource_names) PURE;
+  virtual void start(const absl::flat_hash_set<std::string>& resource_names) PURE;
 
   /**
    * Update the resources to fetch.
-   * @param resources vector of resource names to fetch. It's a (not unordered_)set so that it can
-   * be passed to std::set_difference, which must be given sorted collections.
+   * @param resources vector of resource names to fetch.
    */
-  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+  virtual void
+  updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) PURE;
 
   /**
    * Creates a discovery request for resources.
    * @param add_these_names resource ids for inclusion in the discovery request.
    */
-  virtual void requestOnDemandUpdate(const std::set<std::string>& add_these_names) PURE;
+  virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;
