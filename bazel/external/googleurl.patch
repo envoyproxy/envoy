@@ -52,7 +52,8 @@ index 0cd36dc..8c4cbd4 100644
  #endif
 
 # TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
-# library from the upstream Chromium project.
+# library from the upstream Chromium project. This is tracked in:
+# https://github.com/envoyproxy/envoy/issues/14743.
 
 diff --git a/url/BUILD b/url/BUILD
 index f2ec8da..714f90e 100644
