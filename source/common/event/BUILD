@@ -112,6 +112,9 @@ envoy_cc_library(
         "file_event_impl.h",
         "schedulable_cb_impl.h",
     ],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         ":libevent_lib",
         ":libevent_scheduler_lib",
