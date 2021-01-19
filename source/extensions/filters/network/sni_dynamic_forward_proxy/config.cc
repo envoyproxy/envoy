@@ -25,7 +25,7 @@ SniDynamicForwardProxyNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
       proto_config, cache_manager_factory, context.clusterManager()));
 
   return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ProxyFilter>(filter_config));
+    filter_manager.addReadFilter(std::make_shared<ProxyFilter>(*filter_config));
   };
 }
 
