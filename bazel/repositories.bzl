@@ -883,7 +883,7 @@ def _rules_fuzzing():
         name = "rules_fuzzing",
         repo_mapping = {
             "@fuzzing_py_deps": "@fuzzing_pip3",
-        }
+        },
     )
 
 def _kafka_deps():
