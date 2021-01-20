@@ -61,6 +61,8 @@ private:
   bool hasProtoEncodedGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const;
   bool needsTransformationForNonProtoEncodedResponse(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) const;
+  void mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& output,
+                                                Buffer::Instance* last_data);
   void setTransformedNonProtoEncodedResponseHeaders(Buffer::Instance* data);
 
   static const uint8_t GRPC_WEB_TRAILER;

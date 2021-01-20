@@ -1,3 +1,5 @@
+#include <bits/stdint-uintn.h>
+
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -113,6 +115,31 @@ public:
     return filter_.hasProtoEncodedGrpcWebContentType(request_headers);
   }
 
+  void expectMergedAndLimitedResponseData(const std::string& encoded_buffer_data,
+                                          Buffer::Instance* last_data,
+                                          uint64_t expected_merged_length) {
+    // If no encoded buffer data, we return nullptr encoding buffer.
+    const bool has_filled_encoding_buffer = !encoded_buffer_data.empty();
+    Buffer::OwnedImpl encoded_buffer;
+    if (has_filled_encoding_buffer) {
+      encoded_buffer.add(encoded_buffer_data);
+      auto on_modify_encoding_buffer =
+          [&encoded_buffer](std::function<void(Buffer::Instance&)> cb) { cb(encoded_buffer); };
+      EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buffer));
+      EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
+          .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+    }
+    Buffer::OwnedImpl output;
+    filter_.mergeAndLimitNonProtoEncodedResponseData(output, last_data);
+    EXPECT_EQ(expected_merged_length, output.length());
+    if (has_filled_encoding_buffer) {
+      EXPECT_EQ(0U, encoded_buffer.length());
+    }
+    if (last_data != nullptr) {
+      EXPECT_EQ(0U, last_data->length());
+    }
+  }
+
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   GrpcWebFilter filter_;
@@ -167,6 +194,40 @@ TEST_F(GrpcWebFilterTest, UnexpectedGrpcWebProtoContentType) {
       isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebText));
   EXPECT_FALSE(
       isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto));
+}
+
+TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseData) {
+  const std::string encoded_buffer(100, 'a');
+  Buffer::OwnedImpl last_data;
+  last_data.add(std::string(100, 'a'));
+  expectMergedAndLimitedResponseData(encoded_buffer, &last_data,
+                                     /*expected_merged_length=*/encoded_buffer.length() +
+                                         last_data.length());
+}
+
+TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithLargeEncodingBuffer) {
+  const std::string encoded_buffer(2 * MAX_GRPC_MESSAGE_LENGTH, 'a');
+  Buffer::OwnedImpl last_data;
+  last_data.add(std::string(2 * MAX_GRPC_MESSAGE_LENGTH, 'a'));
+  // Since the buffered data in encoding buffer is larger than MAX_GRPC_MESSAGE_LENGTH, the output
+  // length is limited to MAX_GRPC_MESSAGE_LENGTH.
+  expectMergedAndLimitedResponseData(encoded_buffer, &last_data,
+                                     /*expected_merged_length=*/MAX_GRPC_MESSAGE_LENGTH);
+}
+
+TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithNullEncodingBuffer) {
+  Buffer::OwnedImpl last_data;
+  last_data.add(std::string(2 * MAX_GRPC_MESSAGE_LENGTH, 'a'));
+  // If we don't have buffered data in encoding buffer, the merged data will be the same as last
+  // data.
+  expectMergedAndLimitedResponseData(EMPTY_STRING, &last_data,
+                                     /*expected_merged_length=*/last_data.length());
+}
+
+TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithNoEncodingBufferAndLastData) {
+  // If we don't have buffered data in encoding buffer and no last data either, the output length is
+  // zero.
+  expectMergedAndLimitedResponseData(EMPTY_STRING, nullptr, /*expected_merged_length=*/0U);
 }
 
 TEST_F(GrpcWebFilterTest, UnsupportedContentType) {
