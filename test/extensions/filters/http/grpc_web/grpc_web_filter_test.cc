@@ -207,8 +207,8 @@ TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseDataWithLargeEncod
   const std::string encoded_buffer(2 * MAX_BUFFERED_PLAINTEXT_LENGTH, 'a');
   Buffer::OwnedImpl last_data;
   last_data.add(std::string(2 * MAX_BUFFERED_PLAINTEXT_LENGTH, 'a'));
-  // Since the buffered data in encoding buffer is larger than MAX_BUFFERED_PLAINTEXT_LENGTH, the output
-  // length is limited to MAX_BUFFERED_PLAINTEXT_LENGTH.
+  // Since the buffered data in encoding buffer is larger than MAX_BUFFERED_PLAINTEXT_LENGTH, the
+  // output length is limited to MAX_BUFFERED_PLAINTEXT_LENGTH.
   expectMergedAndLimitedResponseData(encoded_buffer, &last_data,
                                      /*expected_merged_length=*/MAX_BUFFERED_PLAINTEXT_LENGTH);
 }

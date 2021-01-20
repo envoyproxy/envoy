@@ -109,10 +109,7 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
   if (encoding_buffer != nullptr) {
     if (encoding_buffer->length() > MAX_BUFFERED_PLAINTEXT_LENGTH) {
       encoder_callbacks_->modifyEncodingBuffer([&output](Buffer::Instance& buffered) {
-        Buffer::OwnedImpl needed_buffer;
-        needed_buffer.move(buffered, MAX_BUFFERED_PLAINTEXT_LENGTH);
-        buffered.drain(buffered.length());
-        output.move(needed_buffer);
+        output.move(buffered, MAX_BUFFERED_PLAINTEXT_LENGTH);
       });
     } else {
       output.add(*encoding_buffer);
