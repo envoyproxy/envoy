@@ -100,12 +100,7 @@ void Filter::onReceiveMessage(
 bool Filter::handleRequestHeadersResponse(const HeadersResponse& response) {
   if (request_state_ == FilterState::HEADERS) {
     ENVOY_LOG(debug, "applying request_headers response");
-    if (response.has_response()) {
-      const auto& common_response = response.response();
-      if (common_response.has_header_mutation()) {
-        MutationUtils::applyHeaderMutations(common_response.header_mutation(), *request_headers_);
-      }
-    }
+    MutationUtils::applyCommonHeaderResponse(response, *request_headers_);
     request_state_ = FilterState::IDLE;
     decoder_callbacks_->continueDecoding();
     return true;
@@ -116,12 +111,7 @@ bool Filter::handleRequestHeadersResponse(const HeadersResponse& response) {
 bool Filter::handleResponseHeadersResponse(const HeadersResponse& response) {
   if (response_state_ == FilterState::HEADERS) {
     ENVOY_LOG(debug, "applying response_headers response");
-    if (response.has_response()) {
-      const auto& common_response = response.response();
-      if (common_response.has_header_mutation()) {
-        MutationUtils::applyHeaderMutations(common_response.header_mutation(), *response_headers_);
-      }
-    }
+    MutationUtils::applyCommonHeaderResponse(response, *response_headers_);
     response_state_ = FilterState::IDLE;
     encoder_callbacks_->continueEncoding();
     return true;
