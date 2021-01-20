@@ -53,7 +53,7 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
   server_name_ = server_name;
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
-  ON_CALL(overload_manager_.overload_state_, createScaledTypedTimer_)
+  ON_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_)
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });

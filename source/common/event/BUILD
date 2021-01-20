@@ -34,6 +34,7 @@ envoy_cc_library(
         ":libevent_scheduler_lib",
         ":real_time_system_lib",
         ":signal_lib",
+        ":scaled_range_timer_manager_lib",
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:signal_interface",

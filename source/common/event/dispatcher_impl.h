@@ -37,8 +37,12 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
                        public FatalErrorHandlerInterface {
 public:
+  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system);
+  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_systems,
+                 const Buffer::WatermarkFactorySharedPtr& watermark_factory);
   DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
-                 const Buffer::WatermarkFactorySharedPtr& factory = nullptr);
+                 const ScaledRangeTimerManagerFactory& scaled_timer_factory,
+                 const Buffer::WatermarkFactorySharedPtr& watermark_factory);
   ~DispatcherImpl() override;
 
   /**
@@ -74,6 +78,9 @@ public:
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
+  TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override;
+  TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override;
+
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
@@ -150,6 +157,7 @@ private:
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
   WatchdogRegistrationPtr watchdog_registration_;
+  const ScaledRangeTimerManagerPtr scaled_timer_manager_;
 };
 
 } // namespace Event

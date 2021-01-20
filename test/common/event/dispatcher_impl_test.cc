@@ -24,8 +24,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ByMove;
 using testing::InSequence;
+using testing::MockFunction;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Event {
@@ -1333,6 +1336,48 @@ TEST_F(TimerUtilsTest, TimerValueConversion) {
 
   // Some arbitrary tests for good measure.
   checkConversion(std::chrono::milliseconds(600014), 600, 14000);
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreatesScaledTimerManager) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  EXPECT_CALL(*manager, createTimer_(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), _));
+  dispatcher->createScaledTimer(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), []() {});
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  EXPECT_CALL(*manager, createTypedTimer_(ScaledTimerType::UnscaledRealTimerForTest, _));
+  dispatcher->createScaledTimer(ScaledTimerType::UnscaledRealTimerForTest, []() {});
 }
 
 class DispatcherWithWatchdogTest : public testing::Test {

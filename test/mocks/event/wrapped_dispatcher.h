@@ -77,6 +77,13 @@ public:
   }
 
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }
+  TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override {
+    return impl_.createScaledTimer(minimum, std::move(cb));
+  }
+
+  TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override {
+    return impl_.createScaledTimer(timer_type, std::move(cb));
+  }
 
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
     return impl_.createSchedulableCallback(std::move(cb));
