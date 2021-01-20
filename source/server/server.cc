@@ -358,10 +358,12 @@ void InstanceImpl::initialize(const Options& options,
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
-  server_compilation_settings_stats_ = std::make_unique<CompilationSettings::ServerCompilationSettingsStats>(
-    CompilationSettings::ServerCompilationSettingsStats{ALL_SERVER_COMPILATION_SETTINGS_STATS(POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
-                                  POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
-                                  POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
+  server_compilation_settings_stats_ =
+      std::make_unique<CompilationSettings::ServerCompilationSettingsStats>(
+          CompilationSettings::ServerCompilationSettingsStats{ALL_SERVER_COMPILATION_SETTINGS_STATS(
+              POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
   validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
   validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
