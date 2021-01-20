@@ -181,9 +181,15 @@ bool ConnectionManager::passthroughEnabled() const {
     return false;
   }
 
-  // This is called right after the metadata has been parsed, and the ActiveRpc being processed must
-  // be in the rpcs_ list.
-  ASSERT(!rpcs_.empty());
+  // If the rpcs list is empty, a local response happened.
+  //
+  // TODO(rgs1): we actually could still enable passthrough for local
+  // responses as long as the transport is framed and the protocol is
+  // not Twitter.
+  if (rpcs_.empty()) {
+    return false;
+  }
+
   return (*rpcs_.begin())->passthroughSupported();
 }
 
