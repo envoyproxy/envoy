@@ -469,11 +469,6 @@ config_setting(
 )
 
 config_setting(
-    name = "honggfuzz",
-    define_values = {"FUZZING_ENGINE": "honggfuzz"},
-)
-
-config_setting(
     name = "oss_fuzz",
     define_values = {"FUZZING_ENGINE": "oss-fuzz"},
 )
@@ -482,7 +477,6 @@ alias(
     name = "fuzzing_engine",
     actual = select({
         ":libfuzzer": "@rules_fuzzing//fuzzing/engines:libfuzzer",
-        ":honggfuzz": "@rules_fuzzing//fuzzing/engines:honggfuzz",
         ":oss_fuzz": "@rules_fuzzing_oss_fuzz//:oss_fuzz_engine",
         "//conditions:default": "//test/fuzz:fuzz_runner_engine",
     }),
