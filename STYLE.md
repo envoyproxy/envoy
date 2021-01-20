@@ -115,6 +115,9 @@ A few general notes on our error handling philosophy:
 * Third party dependency return codes should be checked and gracefully handled. Examples include
   HTTP/2 or JSON parsers. Some return codes may be handled by continuing, for example, in case of an
   out of process RPC failure.
+* Testing should cover any serious cases that may result in infinite loops, crashes, or serious
+  errors. Non-trivial invariants are also encouraged to have testing. Internal, localized invariants
+  may not need testing.
 * Errors in the Envoy environment that are *unlikely* to happen after process initialization, should
   lead to process death, under the assumption that the additional burden of defensive coding and
   testing is not an effective use of time for an error that should not happen given proper system
@@ -124,17 +127,14 @@ A few general notes on our error handling philosophy:
   the kernel returning a valid `sockaddr` after a successful call to `accept()`, `pthread_create()`,
   `pthread_join()`, etc. However, system calls that require permissions may cause likely errors in
   some deployments and need graceful error handling.
-* OOM events (both memory and FDs) or ENOMON errors are considered fatal crashing errors. An OOM
+* OOM events (both memory and FDs) or ENOMEM errors are considered fatal crashing errors. An OOM
   error should never silently be ignored and should crash the process either via the C++ allocation
   error exception, an explicit `RELEASE_ASSERT` following a third party library call, or an obvious
   crash on a subsequent line via null pointer dereference. This rule is again based on the
   philosophy that the engineering costs of properly handling these cases are not worth it. Time is
   better spent designing proper system controls that shed load if resource usage becomes too high,
   etc.
-* Testing should cover any serious cases that may result in infinite loops, crashes, or serious
-  errors. Non-trivial invariants are also encouraged to have testing. Internal, localized invariants
-  may not need testing.
-* The "less is more" error handling philosophy described in the previous two points is primarily
+* The "less is more" error handling philosophy described in the previous points is primarily
   based on the fact that restarts are designed to be fast, reliable and cheap.
 * Although we strongly recommend that any type of startup error leads to a fatal error, since this
   is almost always a result of faulty configuration which should be caught during a canary process,
@@ -201,11 +201,11 @@ A few general notes on our error handling philosophy:
   experience and judgment may dictate a particular approach depending on the situation. The risk of
   process death from `RELEASE_ASSERT` should be justified with the severity and possibility of the
   condition to avoid unintentional crashes. You may use the following guide:
-      - If a violation is high risk (will cause a crash in subsequent data processing or indicates a
-        failure state beyond recovery), use `RELEASE_ASSERT`.
-      - If a violation is medium or low risk (Envoy can continue safely) and is not expensive,
-        consider `ENVOY_BUG`.
-      - Otherwise (if a condition is expensive or test-only), use `ASSERT`.
+    * If a violation is high risk (will cause a crash in subsequent data processing or indicates a
+      failure state beyond recovery), use `RELEASE_ASSERT`.
+    * If a violation is medium or low risk (Envoy can continue safely) and is not expensive,
+      consider `ENVOY_BUG`.
+    * Otherwise (if a condition is expensive or test-only), use `ASSERT`.
 
 Below is a guideline for macro usage. The left side of the table has invariants and the right side
 has error conditions that can be triggered and should be gracefully handled. `ENVOY_BUG` represents
