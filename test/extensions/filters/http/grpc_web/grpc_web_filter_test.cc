@@ -1,5 +1,3 @@
-#include <bits/stdint-uintn.h>
-
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
