@@ -341,7 +341,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   if (!parent_.http_status_checker_.inRange(response_code)) {
     // If the HTTP response code would indicate failure AND the immediate health check
     // failure header is set, exclude the host from LB.
-    // TODO(mattklein123):We could consider doing this check for any HTTP response code, but this
+    // TODO(mattklein123): We could consider doing this check for any HTTP response code, but this
     // seems like the least surprising behavior and we could consider relaxing this in the future.
     // TODO(mattklein123): This will not force a host set rebuild of the host was already failed.
     // This is something we could do in the future but seems unnecessary right now.

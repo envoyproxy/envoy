@@ -349,11 +349,13 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   }
 
   // In the case of network timeout and if the host is currently failed, set the timeout flag.
-  // This allows a host to toggle between timeout and failure if it's continuing to fail for
-  // different reasons.
+  // Otherwise clear it. This allows a host to toggle between timeout and failure if it's continuing
+  // to fail for different reasons.
   if (type == envoy::data::core::v3::NETWORK_TIMEOUT &&
       host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     host_->healthFlagSet(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
+  } else {
+    host_->healthFlagClear(Host::HealthFlag::ACTIVE_HC_TIMEOUT);
   }
 
   changed_state = clearPendingFlag(changed_state);
