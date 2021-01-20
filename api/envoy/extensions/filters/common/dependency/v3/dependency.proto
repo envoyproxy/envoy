@@ -5,12 +5,14 @@ package envoy.extensions.filters.common.dependency.v3;
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 
+option java_package = "io.envoyproxy.envoy.extensions.filters.common.dependency.v3";
+option java_outer_classname = "DependencyProto";
+option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Filter dependency specification]
 
 // Dependency specification and string identifier.
-// [#next-free-field: 3]
 message Dependency {
   enum DependencyType {
     HEADER = 0;
@@ -27,7 +29,6 @@ message Dependency {
 
 // Dependency specification for a filter. For a filter chain to be valid, any
 // dependency that is required must be provided by an earlier filter.
-// [#next-free-field: 5]
 message FilterDependencies {
   // A list of dependencies required on the decode path.
   repeated Dependency decode_required = 1;
