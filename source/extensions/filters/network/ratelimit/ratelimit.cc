@@ -42,16 +42,16 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
 
 Network::FilterStatus Filter::onNewConnection() {
   if (status_ == Status::NotStarted &&
-      !config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enabled", 100)) {
+      !config_.runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enabled", 100)) {
     status_ = Status::Complete;
   }
 
   if (status_ == Status::NotStarted) {
     status_ = Status::Calling;
-    config_->stats().active_.inc();
-    config_->stats().total_.inc();
+    config_.stats().active_.inc();
+    config_.stats().total_.inc();
     calling_limit_ = true;
-    client_->limit(*this, config_->domain(), config_->descriptors(), Tracing::NullSpan::instance(),
+    client_->limit(*this, config_.domain(), config_.descriptors(), Tracing::NullSpan::instance(),
                    filter_callbacks_->connection().streamInfo());
     calling_limit_ = false;
   }
@@ -67,7 +67,7 @@ void Filter::onEvent(Network::ConnectionEvent event) {
       event == Network::ConnectionEvent::LocalClose) {
     if (status_ == Status::Calling) {
       client_->cancel();
-      config_->stats().active_.dec();
+      config_.stats().active_.dec();
     }
   }
 }
@@ -82,32 +82,32 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   }
 
   status_ = Status::Complete;
-  config_->stats().active_.dec();
+  config_.stats().active_.dec();
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    config_->stats().ok_.inc();
+    config_.stats().ok_.inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
-    config_->stats().error_.inc();
+    config_.stats().error_.inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    config_->stats().over_limit_.inc();
+    config_.stats().over_limit_.inc();
     break;
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
-      config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100)) {
-    config_->stats().cx_closed_.inc();
+      config_.runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100)) {
+    config_.stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
-    if (config_->failureModeAllow()) {
-      config_->stats().failure_mode_allowed_.inc();
+    if (config_.failureModeAllow()) {
+      config_.stats().failure_mode_allowed_.inc();
       if (!calling_limit_) {
         filter_callbacks_->continueReading();
       }
     } else {
-      config_->stats().cx_closed_.inc();
+      config_.stats().cx_closed_.inc();
       filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     }
   } else {
