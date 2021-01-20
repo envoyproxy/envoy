@@ -339,10 +339,12 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
                  HostUtility::healthFlagsToString(*host_));
 
   if (!parent_.http_status_checker_.inRange(response_code)) {
-    // If the HTTP response code would indicate immediate failure AND the immediate health check
+    // If the HTTP response code would indicate failure AND the immediate health check
     // failure header is set, exclude the host from LB.
     // TODO(mattklein123):We could consider doing this check for any HTTP response code, but this
     // seems like the least surprising behavior and we could consider relaxing this in the future.
+    // TODO(mattklein123): This will not force a host set rebuild of the host was already failed.
+    // This is something we could do in the future but seems unnecessary right now.
     if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
       host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
@@ -494,6 +496,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onDeferredDelete() {
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "total pending buffer={}", *client_, data.length());
+  // TODO(lilika): The TCP health checker does generic pattern matching so we can't differentiate
+  // between wrong data and not enough data. We could likely do better here and figure out cases in
+  // which a match is not possible but that is not done now.
   if (TcpHealthCheckMatcher::match(parent_.receive_bytes_, data)) {
     ENVOY_CONN_LOG(trace, "healthcheck passed", *client_);
     data.drain(data.length());

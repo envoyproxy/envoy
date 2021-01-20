@@ -19,7 +19,11 @@ Minor Behavior Changes
   explicitly told to disable traffic, will not be counted for panic routing calculations. See the
   excluded documentation for more information. This behavior can be temporarily reverted by setting
   the `envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster` feature flag
-  to false.
+  to false. Note that the runtime flag covers *both* the health check filter responding with
+  `x-envoy-immediate-health-check-fail` in all cases (versus just non-HC requests) as well as
+  whether receiving `x-envoy-immediate-health-check-fail` will cause exclusion or not. Thus,
+  depending on the Envoy deployment, the feature flag may need to be flipped on both downstream
+  and upstream instances, depending on the reason.
 * tcp: setting NODELAY in the base connection class. This should have no effect for TCP or HTTP proxying, but may improve throughput in other areas. This behavior can be temporarily reverted by setting `envoy.reloadable_features.always_nodelay` to false.
 * upstream: host weight changes now cause a full load balancer rebuild as opposed to happening
   atomically inline. This change has been made to support load balancer pre-computation of data
