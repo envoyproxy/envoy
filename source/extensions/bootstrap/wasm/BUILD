@@ -16,7 +16,7 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    category = "SOMECAT",
+    category = "envoy.bootstrap",
     security_posture = "unknown",
     status = "alpha",
     deps = [

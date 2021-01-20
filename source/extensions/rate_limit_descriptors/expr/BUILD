@@ -12,7 +12,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "SOMECAT",
+    category = "envoy.rate_limit_descriptors",
     copts = select({
         "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
         "//conditions:default": [

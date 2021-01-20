@@ -14,7 +14,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "SOMECAT",
+    category = "envoy.grpc_credentials",
     external_deps = ["grpc"],
     security_posture = "data_plane_agnostic",
     status = "alpha",

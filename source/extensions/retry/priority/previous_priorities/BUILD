@@ -23,7 +23,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "SOMECAT",
+    category = "envoy.retry_priorities",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":previous_priorities_lib",

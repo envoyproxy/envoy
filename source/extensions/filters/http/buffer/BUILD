@@ -37,7 +37,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "SOMECAT",
+    category = "envoy.filters.http",
     security_posture = "robust_to_untrusted_downstream",
     # Legacy test use. TODO(#9953) clean up.
     visibility = ["//visibility:public"],

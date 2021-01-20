@@ -28,7 +28,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    category = "SOMECAT",
+    category = "envoy.filters.network",
     security_posture = "unknown",
     deps = [
         ":filter",

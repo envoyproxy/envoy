@@ -39,7 +39,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "SOMECAT",
+    category = "envoy.filters.network",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",

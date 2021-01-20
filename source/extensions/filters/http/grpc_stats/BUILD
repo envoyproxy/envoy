@@ -14,7 +14,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["grpc_stats_filter.cc"],
     hdrs = ["grpc_stats_filter.h"],
-    category = "SOMECAT",
+    category = "envoy.filters.http",
     security_posture = "unknown",
     status = "alpha",
     deps = [

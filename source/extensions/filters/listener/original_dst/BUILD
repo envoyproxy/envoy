@@ -1,4 +1,4 @@
-load(
+ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
@@ -28,7 +28,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    category = "SOMECAT",
+    category = "envoy.filters.listener",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",

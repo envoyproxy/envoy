@@ -29,7 +29,7 @@ envoy_cc_extension(
     name = "kill_request_config",
     srcs = ["kill_request_config.cc"],
     hdrs = ["kill_request_config.h"],
-    category = "SOMECAT",
+    category = "envoy.filters.http",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",

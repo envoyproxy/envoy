@@ -38,7 +38,7 @@ envoy_cc_extension(
     name = "config",  # The extension build system requires a library named config
     srcs = ["original_src_config_factory.cc"],
     hdrs = ["original_src_config_factory.h"],
-    category = "SOMECAT",
+    category = "envoy.filters.listener",
     security_posture = "robust_to_untrusted_downstream",
     status = "alpha",
     deps = [
