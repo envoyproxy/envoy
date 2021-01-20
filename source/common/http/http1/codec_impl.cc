@@ -788,8 +788,9 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
 
   header_parsing_state_ = HeaderParsingState::Done;
 
-  // Returning 2 informs http_parser to not expect a body or further data on this connection.
-  return handling_upgrade_ ? 2 : statusor.value();
+  // Returning HttpParserCode::NoBodyData informs http_parser to not expect a body or further data
+  // on this connection.
+  return handling_upgrade_ ? enumToSignedInt(HttpParserCode::NoBodyData) : statusor.value();
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
@@ -1251,9 +1252,10 @@ Envoy::StatusOr<int> ClientConnectionImpl::onHeadersComplete() {
     }
   }
 
-  // Here we deal with cases where the response cannot have a body by returning 1, but http_parser
-  // does not deal with it for us.
-  return cannotHaveBody() ? 1 : 0;
+  // Here we deal with cases where the response cannot have a body by returning
+  // HttpParserCode::NoBody, but http_parser does not deal with it for us.
+  return cannotHaveBody() ? enumToSignedInt(HttpParserCode::NoBody)
+                          : enumToSignedInt(HttpParserCode::Success);
 }
 
 bool ClientConnectionImpl::upgradeAllowed() const {
