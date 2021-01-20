@@ -95,7 +95,8 @@ float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
   }
 }
 
-void ConnPoolImplBase::tryCreateNewConnections() {
+ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
+  ConnPoolImplBase::ConnectionResult result;
   // Somewhat arbitrarily cap the number of connections preconnected due to new
   // incoming connections. The preconnect ratio is capped at 3, so in steady
   // state, no more than 3 connections should be preconnected. If hosts go
@@ -103,16 +104,19 @@ void ConnPoolImplBase::tryCreateNewConnections() {
   // many connections are desired when the host becomes healthy again, but
   // overwhelming it with connections is not desirable.
   for (int i = 0; i < 3; ++i) {
-    if (!tryCreateNewConnection()) {
-      return;
+    result = tryCreateNewConnection();
+    if (result != ConnectionResult::CREATED_NEW_CONNECTION) {
+      break;
     }
   }
+  return result;
 }
 
-bool ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
+ConnPoolImplBase::ConnectionResult
+ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   // There are already enough CONNECTING connections for the number of queued streams.
   if (!shouldCreateNewConnection(global_preconnect_ratio)) {
-    return false;
+    return ConnectionResult::SHOULD_NOT_CONNECT;
   }
 
   const bool can_create_connection =
@@ -135,8 +139,12 @@ bool ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     state_.incrConnectingStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
     LinkedList::moveIntoList(std::move(client), owningList(client->state_));
+    return can_create_connection ? ConnectionResult::CREATED_NEW_CONNECTION
+                                 : ConnectionResult::CREATED_BUT_RATE_LIMITED;
+  } else {
+    ENVOY_LOG(trace, "not creating a new connection: connection constrained");
+    return ConnectionResult::NO_CREATION_RATE_LIMITED;
   }
-  return can_create_connection;
 }
 
 void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
@@ -218,10 +226,18 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
     ConnectionPool::Cancellable* pending = newPendingStream(context);
+    ENVOY_LOG(debug, "trying to create new connection");
+
+    auto old_capacity = connecting_stream_capacity_;
     // This must come after newPendingStream() because this function uses the
     // length of pending_streams_ to determine if a new connection is needed.
-    tryCreateNewConnections();
-
+    const ConnectionResult result = tryCreateNewConnections();
+    // If there is not enough connecting capacity, the only reason to not
+    // increase capacity is if the connection limits are exceeded.
+    ENVOY_BUG(pending_streams_.size() <= connecting_stream_capacity_ ||
+                  connecting_stream_capacity_ > old_capacity ||
+                  result == ConnectionResult::NO_CREATION_RATE_LIMITED,
+              fmt::format("Failed to create expected connection: {}", *this));
     return pending;
   } else {
     ENVOY_LOG(debug, "max pending streams overflow");
@@ -233,7 +249,8 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 }
 
 bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
-  return tryCreateNewConnection(global_preconnect_ratio);
+  return tryCreateNewConnection(global_preconnect_ratio) ==
+         ConnectionResult::CREATED_NEW_CONNECTION;
 }
 
 void ConnPoolImplBase::scheduleOnUpstreamReady() {
