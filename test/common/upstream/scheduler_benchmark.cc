@@ -85,7 +85,7 @@ public:
   }
 };
 
-void BM_EDF_SplitWeightAdd(::benchmark::State& state) {
+void BM_SplitWeightAddEdf(::benchmark::State& state) {
   EdfScheduler<uint32_t> edf;
   const size_t num_objs = state.range(0);
   for (auto _ : state) { // NOLINT: Silences warning about dead store
@@ -93,7 +93,7 @@ void BM_EDF_SplitWeightAdd(::benchmark::State& state) {
   }
 }
 
-void BM_EDF_UniqueWeightAdd(::benchmark::State& state) {
+void BM_UniqueWeightAddEdf(::benchmark::State& state) {
   EdfScheduler<uint32_t> edf;
   const size_t num_objs = state.range(0);
   for (auto _ : state) { // NOLINT: Silences warning about dead store
@@ -101,7 +101,7 @@ void BM_EDF_UniqueWeightAdd(::benchmark::State& state) {
   }
 }
 
-void BM_EDF_SplitWeightPick(::benchmark::State& state) {
+void BM_SplitWeightPickEdf(::benchmark::State& state) {
   EdfScheduler<uint32_t> edf;
   const size_t num_objs = state.range(0);
 
@@ -110,7 +110,7 @@ void BM_EDF_SplitWeightPick(::benchmark::State& state) {
   });
 }
 
-void BM_EDF_UniqueWeightPick(::benchmark::State& state) {
+void BM_UniqueWeightPickEdf(::benchmark::State& state) {
   EdfScheduler<uint32_t> edf;
   const size_t num_objs = state.range(0);
 
@@ -119,7 +119,7 @@ void BM_EDF_UniqueWeightPick(::benchmark::State& state) {
   });
 }
 
-void BM_WRSQ_SplitWeightAdd(::benchmark::State& state) {
+void BM_SplitWeightAddWRSQ(::benchmark::State& state) {
   Random::RandomGeneratorImpl random;
   WRSQScheduler<uint32_t> wrsq(random);
   const size_t num_objs = state.range(0);
@@ -128,7 +128,7 @@ void BM_WRSQ_SplitWeightAdd(::benchmark::State& state) {
   }
 }
 
-void BM_WRSQ_UniqueWeightAdd(::benchmark::State& state) {
+void BM_UniqueWeightAddWRSQ(::benchmark::State& state) {
   Random::RandomGeneratorImpl random;
   WRSQScheduler<uint32_t> wrsq(random);
   const size_t num_objs = state.range(0);
@@ -137,7 +137,7 @@ void BM_WRSQ_UniqueWeightAdd(::benchmark::State& state) {
   }
 }
 
-void BM_WRSQ_SplitWeightPick(::benchmark::State& state) {
+void BM_SplitWeightPickWRSQ(::benchmark::State& state) {
   Random::RandomGeneratorImpl random;
   WRSQScheduler<uint32_t> wrsq(random);
   const size_t num_objs = state.range(0);
@@ -147,7 +147,7 @@ void BM_WRSQ_SplitWeightPick(::benchmark::State& state) {
   });
 }
 
-void BM_WRSQ_UniqueWeightPick(::benchmark::State& state) {
+void BM_UniqueWeightPickWRSQ(::benchmark::State& state) {
   Random::RandomGeneratorImpl random;
   WRSQScheduler<uint32_t> wrsq(random);
   const size_t num_objs = state.range(0);
@@ -157,26 +157,26 @@ void BM_WRSQ_UniqueWeightPick(::benchmark::State& state) {
   });
 }
 
-BENCHMARK(BM_EDF_SplitWeightAdd)
+BENCHMARK(BM_SplitWeightAddEdf)
     ->Unit(::benchmark::kMicrosecond)
     ->RangeMultiplier(8)
     ->Range(1 << 6, 1 << 14);
-BENCHMARK(BM_WRSQ_SplitWeightAdd)
+BENCHMARK(BM_SplitWeightAddWRSQ)
     ->Unit(::benchmark::kMicrosecond)
     ->RangeMultiplier(8)
     ->Range(1 << 6, 1 << 14);
-BENCHMARK(BM_EDF_SplitWeightPick)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
-BENCHMARK(BM_WRSQ_SplitWeightPick)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
-BENCHMARK(BM_EDF_UniqueWeightAdd)
+BENCHMARK(BM_SplitWeightPickEdf)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_SplitWeightPickWRSQ)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_UniqueWeightAddEdf)
     ->Unit(::benchmark::kMicrosecond)
     ->RangeMultiplier(8)
     ->Range(1 << 6, 1 << 14);
-BENCHMARK(BM_WRSQ_UniqueWeightAdd)
+BENCHMARK(BM_UniqueWeightAddWRSQ)
     ->Unit(::benchmark::kMicrosecond)
     ->RangeMultiplier(8)
     ->Range(1 << 6, 1 << 14);
-BENCHMARK(BM_EDF_UniqueWeightPick)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
-BENCHMARK(BM_WRSQ_UniqueWeightPick)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_UniqueWeightPickEdf)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
+BENCHMARK(BM_UniqueWeightPickWRSQ)->RangeMultiplier(8)->Range(1 << 6, 1 << 14);
 
 } // namespace
 } // namespace Upstream
