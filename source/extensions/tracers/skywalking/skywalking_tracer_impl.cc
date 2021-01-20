@@ -94,7 +94,7 @@ Driver::TlsTracer::TlsTracer(TracerPtr tracer) : tracer_(std::move(tracer)) {}
 
 Tracer& Driver::TlsTracer::tracer() {
   ASSERT(tracer_);
-  return *tracer_.get();
+  return *tracer_;
 }
 
 } // namespace SkyWalking
