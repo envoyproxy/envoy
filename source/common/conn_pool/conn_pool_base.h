@@ -210,10 +210,10 @@ protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
-    CREATED_NEW_CONNECTION,
-    SHOULD_NOT_CONNECT,
-    NO_CREATION_RATE_LIMITED,
-    CREATED_BUT_RATE_LIMITED,
+    CreatedNewConnection,
+    ShouldNotConnect,
+    NoConnectionRateLimited,
+    CreatedButRateLimited,
   };
 
   // Creates up to 3 connections, based on the preconnect ratio.

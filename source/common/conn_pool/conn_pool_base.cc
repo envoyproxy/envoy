@@ -105,7 +105,7 @@ ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
   // overwhelming it with connections is not desirable.
   for (int i = 0; i < 3; ++i) {
     result = tryCreateNewConnection();
-    if (result != ConnectionResult::CREATED_NEW_CONNECTION) {
+    if (result != ConnectionResult::CreatedNewConnection) {
       break;
     }
   }
@@ -116,7 +116,7 @@ ConnPoolImplBase::ConnectionResult
 ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   // There are already enough CONNECTING connections for the number of queued streams.
   if (!shouldCreateNewConnection(global_preconnect_ratio)) {
-    return ConnectionResult::SHOULD_NOT_CONNECT;
+    return ConnectionResult::ShouldNotConnect;
   }
 
   const bool can_create_connection =
@@ -139,11 +139,11 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     state_.incrConnectingStreamCapacity(client->effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ += client->effectiveConcurrentStreamLimit();
     LinkedList::moveIntoList(std::move(client), owningList(client->state_));
-    return can_create_connection ? ConnectionResult::CREATED_NEW_CONNECTION
-                                 : ConnectionResult::CREATED_BUT_RATE_LIMITED;
+    return can_create_connection ? ConnectionResult::CreatedNewConnection
+                                 : ConnectionResult::CreatedButRateLimited;
   } else {
     ENVOY_LOG(trace, "not creating a new connection: connection constrained");
-    return ConnectionResult::NO_CREATION_RATE_LIMITED;
+    return ConnectionResult::NoConnectionRateLimited;
   }
 }
 
@@ -236,7 +236,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
     // increase capacity is if the connection limits are exceeded.
     ENVOY_BUG(pending_streams_.size() <= connecting_stream_capacity_ ||
                   connecting_stream_capacity_ > old_capacity ||
-                  result == ConnectionResult::NO_CREATION_RATE_LIMITED,
+                  result == ConnectionResult::NoConnectionRateLimited,
               fmt::format("Failed to create expected connection: {}", *this));
     return pending;
   } else {
@@ -250,7 +250,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 
 bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
   return tryCreateNewConnection(global_preconnect_ratio) ==
-         ConnectionResult::CREATED_NEW_CONNECTION;
+         ConnectionResult::CreatedNewConnection;
 }
 
 void ConnPoolImplBase::scheduleOnUpstreamReady() {
