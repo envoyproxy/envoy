@@ -81,7 +81,7 @@ class PostgresFilter : public Network::Filter,
                        DecoderCallbacks,
                        Logger::Loggable<Logger::Id::filter> {
 public:
-  PostgresFilter(PostgresFilterConfig& config);
+  PostgresFilter(PostgresFilterConfigSharedPtr config);
   ~PostgresFilter() override = default;
 
   // Network::ReadFilter
@@ -114,13 +114,13 @@ public:
   // Routines used during integration and unit tests
   uint32_t getFrontendBufLength() const { return frontend_buffer_.length(); }
   uint32_t getBackendBufLength() const { return backend_buffer_.length(); }
-  const PostgresProxyStats& getStats() const { return config_.stats_; }
+  const PostgresProxyStats& getStats() const { return config_->stats_; }
   Network::Connection& connection() const { return read_callbacks_->connection(); }
-  PostgresFilterConfig& getConfig() const { return config_; }
+  const PostgresFilterConfigSharedPtr& getConfig() const { return config_; }
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
-  PostgresFilterConfig& config_;
+  PostgresFilterConfigSharedPtr config_;
   Buffer::OwnedImpl frontend_buffer_;
   Buffer::OwnedImpl backend_buffer_;
   std::unique_ptr<Decoder> decoder_;

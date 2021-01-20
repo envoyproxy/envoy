@@ -87,7 +87,7 @@ ip_white_list:
 
   void createAuthFilter() {
     filter_callbacks_.connection_.callbacks_.clear();
-    instance_ = std::make_unique<ClientSslAuthFilter>(*config_);
+    instance_ = std::make_unique<ClientSslAuthFilter>(config_);
     instance_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
