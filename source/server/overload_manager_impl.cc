@@ -2,7 +2,6 @@
 
 #include <chrono>
 
-#include "common/event/scaled_range_timer_manager_impl.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/config/overload/v3/overload.pb.validate.h"

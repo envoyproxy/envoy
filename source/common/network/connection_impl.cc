@@ -7,8 +7,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/event/timer.h"
 #include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
 
