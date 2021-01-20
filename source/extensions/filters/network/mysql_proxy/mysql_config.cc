@@ -31,7 +31,7 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
   MySQLFilterConfigSharedPtr filter_config(
       std::make_shared<MySQLFilterConfig>(stat_prefix, context.scope()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<MySQLFilter>(filter_config));
+    filter_manager.addFilter(std::make_shared<MySQLFilter>(*filter_config));
   };
 }
 

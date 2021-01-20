@@ -219,14 +219,12 @@ UpstreamDrainManager& Config::drainManager() {
   return upstream_drain_manager_slot_->getTyped<UpstreamDrainManager>();
 }
 
-Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
+Filter::Filter(Config& config, Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)) {
-  ASSERT(config != nullptr);
-}
+      upstream_callbacks_(new UpstreamCallbacks(this)) {}
 
 Filter::~Filter() {
-  for (const auto& access_log : config_->accessLogs()) {
+  for (const auto& access_log : config_.accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
 
@@ -254,13 +252,13 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // established.
   read_callbacks_->connection().readDisable(true);
 
-  config_->stats().downstream_cx_total_.inc();
+  config_.stats().downstream_cx_total_.inc();
   if (set_connection_stats) {
     read_callbacks_->connection().setConnectionStats(
-        {config_->stats().downstream_cx_rx_bytes_total_,
-         config_->stats().downstream_cx_rx_bytes_buffered_,
-         config_->stats().downstream_cx_tx_bytes_total_,
-         config_->stats().downstream_cx_tx_bytes_buffered_, nullptr, nullptr});
+        {config_.stats().downstream_cx_rx_bytes_total_,
+         config_.stats().downstream_cx_rx_bytes_buffered_,
+         config_.stats().downstream_cx_tx_bytes_total_,
+         config_.stats().downstream_cx_tx_bytes_buffered_, nullptr, nullptr});
   }
 }
 
@@ -295,9 +293,9 @@ void Filter::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
 
   if (disable) {
-    config_->stats().downstream_flow_control_paused_reading_total_.inc();
+    config_.stats().downstream_flow_control_paused_reading_total_.inc();
   } else {
-    config_->stats().downstream_flow_control_resumed_reading_total_.inc();
+    config_.stats().downstream_flow_control_resumed_reading_total_.inc();
   }
 }
 
@@ -395,7 +393,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                    cluster_name);
   } else {
     ENVOY_CONN_LOG(debug, "Cluster not found {}", read_callbacks_->connection(), cluster_name);
-    config_->stats().downstream_cx_no_route_.inc();
+    config_.stats().downstream_cx_no_route_.inc();
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NoRoute);
     return Network::FilterStatus::StopIteration;
@@ -413,7 +411,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  const uint32_t max_connect_attempts = config_->maxConnectAttempts();
+  const uint32_t max_connect_attempts = config_.maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
@@ -461,7 +459,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfig(), this,
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_.tunnelingConfig(), this,
                                                       *upstream_callbacks_);
   if (generic_conn_pool_) {
     connecting_ = true;
@@ -561,10 +559,10 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  if (config_->maxDownstreamConnectionDuration()) {
+  if (config_.maxDownstreamConnectionDuration()) {
     connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onMaxDownstreamConnectionDuration(); });
-    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
+    connection_duration_timer_->enableTimer(config_.maxDownstreamConnectionDuration().value());
   }
   return initializeUpstreamConnection();
 }
@@ -574,9 +572,9 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
     if (conn_data != nullptr &&
         conn_data->connection().state() != Network::Connection::State::Closed) {
-      config_->drainManager().add(config_->sharedConfig(), std::move(conn_data),
-                                  std::move(upstream_callbacks_), std::move(idle_timer_),
-                                  read_callbacks_->upstreamHost());
+      config_.drainManager().add(config_.sharedConfig(), std::move(conn_data),
+                                 std::move(upstream_callbacks_), std::move(idle_timer_),
+                                 read_callbacks_->upstreamHost());
     }
     if (event != Network::ConnectionEvent::Connected) {
       upstream_.reset();
@@ -640,7 +638,7 @@ void Filter::onUpstreamConnection() {
   ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
                  read_callbacks_->connection(), getStreamInfo().requestedServerName());
 
-  if (config_->idleTimeout()) {
+  if (config_.idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into
     // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
     // the call to either TcpProxy or to Drainer, depending on the current state.
@@ -662,7 +660,7 @@ void Filter::onUpstreamConnection() {
 
 void Filter::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "Session timed out", read_callbacks_->connection());
-  config_->stats().idle_timeout_.inc();
+  config_.stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -671,14 +669,14 @@ void Filter::onIdleTimeout() {
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
-  config_->stats().max_downstream_connection_duration_.inc();
+  config_.stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
 void Filter::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
-    ASSERT(config_->idleTimeout());
-    idle_timer_->enableTimer(config_->idleTimeout().value());
+    ASSERT(config_.idleTimeout());
+    idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 }
 

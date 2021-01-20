@@ -1,10 +1,13 @@
 #include <functional>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/common/scope_tracker.h"
+#include "common/common/utility.h"
 #include "common/event/deferred_task.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/timer_impl.h"
@@ -533,9 +536,71 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
   EXPECT_FALSE(dispatcher_->isThreadSafe());
 }
 
+TEST_F(DispatcherImplTest, ShouldDumpNothingIfNoTrackedObjects) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Call on FatalError to trigger dumps of tracked objects.
+  dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
+    static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  // Check ostream still empty.
+  EXPECT_EQ(ostream.contents(), "");
+}
+
+class MessageTrackedObject : public ScopeTrackedObject {
+public:
+  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
+
+private:
+  absl::string_view sv_;
+};
+
+TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Call on FatalError to trigger dumps of tracked objects.
+  dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
+
+    // Add several tracked objects to the dispatcher
+    MessageTrackedObject first{"first"};
+    ScopeTrackerScopeState first_state{&first, *dispatcher_};
+    MessageTrackedObject second{"second"};
+    ScopeTrackerScopeState second_state{&second, *dispatcher_};
+    MessageTrackedObject third{"third"};
+    ScopeTrackerScopeState third_state{&third, *dispatcher_};
+
+    static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  // Check the dump includes and registered objects in a FILO order.
+  EXPECT_EQ(ostream.contents(), "thirdsecondfirst");
+}
+
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
+    ++times_ran_;
+  }
   bool isAsyncSignalSafe() const override { return true; }
   int getNumTimesRan() { return times_ran_; }
 
