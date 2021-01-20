@@ -60,8 +60,7 @@ Configuration
   configuration/level_two
   configuration/sni
   configuration/zone_aware_routing
-  configuration/skywalking_tracing
-  configuration/zipkin_tracing
+  configuration/tracing
   configuration/flow_control
   configuration/timeouts
   configuration/deprecation
