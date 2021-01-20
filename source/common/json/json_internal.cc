@@ -204,7 +204,6 @@ public:
     // Extract position information (line, column, token) in the error.
     auto start = error.find("line");
     auto npos = error.find(":");
-    ENVOY_LOG_MISC(info, "ERROR {}", error);
     error_position_ = absl::StrCat(error.substr(start, npos - start), ", token ", token);
     // Extract portion after ":" to get error string.
     error_ = error.substr(npos + 2);
