@@ -389,7 +389,7 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
 TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextSkipTransformation) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.grpc_web_fix_non_grpc_response_handling", "false"}});
+      {{"envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling", "false"}});
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText},

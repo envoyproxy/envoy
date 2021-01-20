@@ -22,7 +22,8 @@ namespace GrpcWeb {
 
 namespace {
 
-// This is arbitrarily chosen. This can be made configurable when it is required.
+// This is the maximum buffered plaintext data length to be converted into grpc-message header. This
+// is arbitrarily chosen. This can be made configurable when it is required.
 constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 
 // This builds grpc-message header value from body data.
@@ -97,7 +98,7 @@ bool GrpcWebFilter::hasProtoEncodedGrpcWebContentType(
 bool GrpcWebFilter::needsTransformationForNonProtoEncodedResponse(Http::ResponseHeaderMap& headers,
                                                                   bool end_stream) const {
   return Runtime::runtimeFeatureEnabled(
-             "envoy.reloadable_features.grpc_web_fix_non_grpc_response_handling") &&
+             "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling") &&
          !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
          !(Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
            hasProtoEncodedGrpcWebContentType(headers));
