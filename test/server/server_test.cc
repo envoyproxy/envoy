@@ -367,12 +367,11 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
   auto server_thread =
       startTestServer("test/server/test_data/server/proxy_version_bootstrap.yaml", true);
 
-  const std::string fips_ssl_version = "BoringSSL-FIPS";
-  if (VersionInfo::sslVersion() == fips_ssl_version) {
-    EXPECT_EQ(1L, TestUtility::findGauge(stats_store_, "server.fips_mode")->value());
-  } else {
-    EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.fips_mode")->value());
-  }
+#ifdef BORINGSSL_FIPS
+  EXPECT_EQ(1L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+#else
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+#endif
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();

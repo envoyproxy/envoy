@@ -50,6 +50,17 @@
 
 namespace Envoy {
 namespace Server {
+  namespace CompilationSettings {
+  /**
+   * All server compilation settings stats. @see stats_macros.h
+   */
+  #define ALL_SERVER_COMPILATION_SETTINGS_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
+    GAUGE(fips_mode, NeverImport)                                                                    
+
+    struct ServerCompilationSettingsStats {
+      ALL_SERVER_COMPILATION_SETTINGS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+    };
+  }
 
 /**
  * All server wide stats. @see stats_macros.h
@@ -74,7 +85,6 @@ namespace Server {
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
   GAUGE(version, NeverImport)                                                                      \
-  GAUGE(fips_mode, NeverImport)                                                                    \
   HISTOGRAM(initialization_time_ms, Milliseconds)
 
 struct ServerStats {
@@ -323,6 +333,7 @@ private:
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  std::unique_ptr<CompilationSettings::ServerCompilationSettingsStats> server_compilation_settings_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;

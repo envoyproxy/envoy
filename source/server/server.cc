@@ -353,10 +353,15 @@ void InstanceImpl::initialize(const Options& options,
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
+  const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
+  server_compilation_settings_stats_ = std::make_unique<CompilationSettings::ServerCompilationSettingsStats>(
+    CompilationSettings::ServerCompilationSettingsStats{ALL_SERVER_COMPILATION_SETTINGS_STATS(POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+                                  POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+                                  POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
   validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
   validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
@@ -385,9 +390,8 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
   server_stats_->version_.set(version_int);
-  const std::string fips_ssl_version = "BoringSSL-FIPS";
-  if (VersionInfo::sslVersion() == fips_ssl_version) {
-    server_stats_->fips_mode_.set(1);
+  if (VersionInfo::sslFipsCompliant()) {
+    server_compilation_settings_stats_->fips_mode_.set(1);
   }
 
   bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
