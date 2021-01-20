@@ -54,7 +54,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "07f67909bf4cb07b740c78346c304ab41c6e2a56b977e1a267a261bc19dd6e4e",
         strip_prefix = "rules_fuzzing-{version}",
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/{version}.tar.gz"],
-        release_date = "2021-01-11",
+        release_date = "2021-01-19",
         use_category = ["test_only"],
         implied_untracked_deps = [
             "rules_fuzzing_oss_fuzz",
