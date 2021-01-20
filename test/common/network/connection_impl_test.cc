@@ -2017,7 +2017,8 @@ public:
         TransportSocketPtr(transport_socket_), stream_info_, true);
     connection_->addConnectionCallbacks(callbacks_);
     // File events will trigger setTrackedObject on the dispatcher.
-    EXPECT_CALL(dispatcher_, setTrackedObject(_)).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
+    EXPECT_CALL(dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
 
   ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }

@@ -1,5 +1,6 @@
 #include <chrono>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/event/timer.h"
 
 #include "common/event/dispatcher_impl.h"
@@ -24,9 +25,14 @@ public:
   ScopeTrackingDispatcher(DispatcherPtr dispatcher)
       : WrappedDispatcher(*dispatcher), dispatcher_(std::move(dispatcher)) {}
 
-  const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {
+  void pushTrackedObject(const ScopeTrackedObject* object) override {
     scope_ = object;
-    return impl_.setTrackedObject(object);
+    return impl_.pushTrackedObject(object);
+  }
+
+  void popTrackedObject(const ScopeTrackedObject* expected_object) override {
+    scope_ = nullptr;
+    return impl_.popTrackedObject(expected_object);
   }
 
   const ScopeTrackedObject* scope_{nullptr};
@@ -615,6 +621,34 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersWithChangeInScalingFactor) {
   dispatcher_.run(Dispatcher::RunType::Block);
   EXPECT_THAT(*timers[0].trigger_times,
               ElementsAre(start + std::chrono::seconds(9), start + std::chrono::seconds(16)));
+}
+
+TEST_F(ScaledRangeTimerManagerTest, LooksUpConfiguredMinimums) {
+  // Test-only class that overrides one of the createScaledTimer overloads to show that the other
+  // one calls into this one after looking up the minimum.
+  class TestScaledRangeTimerManager : public ScaledRangeTimerManagerImpl {
+  public:
+    using ScaledRangeTimerManagerImpl::createTimer;
+    using ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl;
+    TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
+      return createScaledTimer(minimum, callback);
+    }
+    MOCK_METHOD(TimerPtr, createScaledTimer, (ScaledTimerMinimum, TimerCb));
+  };
+
+  const ScaledTimerTypeMap timer_types{
+      {ScaledTimerType::UnscaledRealTimerForTest, ScaledMinimum(UnitFloat::max())},
+      {ScaledTimerType::HttpDownstreamIdleConnectionTimeout, ScaledMinimum(UnitFloat(0.3))},
+      {ScaledTimerType::HttpDownstreamIdleStreamTimeout, ScaledMinimum(UnitFloat(0.6))},
+  };
+
+  TestScaledRangeTimerManager manager(dispatcher_,
+                                      std::make_unique<decltype(timer_types)>(timer_types));
+  for (const auto& [timer_type, minimum] : timer_types) {
+    SCOPED_TRACE(static_cast<int>(timer_type));
+    EXPECT_CALL(manager, createScaledTimer(minimum, _));
+    manager.createTimer(timer_type, []() {});
+  }
 }
 
 } // namespace
