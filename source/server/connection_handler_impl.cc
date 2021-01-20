@@ -12,6 +12,7 @@
 #include "common/event/deferred_task.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
@@ -29,9 +30,8 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             Server::OverloadManager& overload_manager,
                                              absl::optional<uint32_t> worker_index)
-    : worker_index_(worker_index), dispatcher_(dispatcher), overload_manager_(overload_manager),
+    : worker_index_(worker_index), dispatcher_(dispatcher),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
@@ -154,7 +154,7 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
-void ConnectionHandlerImpl::setListenerRejectFraction(float reject_fraction) {
+void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction) {
   listener_reject_fraction_ = reject_fraction;
   for (auto& listener : listeners_) {
     listener.second.listener_->listener()->setRejectFraction(reject_fraction);
@@ -361,9 +361,11 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
   // Check if the socket may need to be redirected to another listener.
   ActiveTcpListenerOptRef new_listener;
 
-  if (hand_off_restored_destination_connections_ && socket_->localAddressRestored()) {
+  if (hand_off_restored_destination_connections_ &&
+      socket_->addressProvider().localAddressRestored()) {
     // Find a listener associated with the original destination address.
-    new_listener = listener_.parent_.findActiveTcpListenerByAddress(*socket_->localAddress());
+    new_listener = listener_.parent_.findActiveTcpListenerByAddress(
+        *socket_->addressProvider().localAddress());
   }
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
@@ -461,10 +463,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::resumeListening() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket, std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-  // Refresh addresses in case they are modified by listener filters, such as proxy protocol or
-  // original_dst.
-  stream_info->setDownstreamLocalAddress(socket->localAddress());
-  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
@@ -482,8 +480,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
-      std::move(socket), std::move(transport_socket), *stream_info,
-      parent_.overload_manager_.getThreadLocalOverloadState());
+      std::move(socket), std::move(transport_socket), *stream_info);
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
       timeout != std::chrono::milliseconds::zero()) {
     server_conn_ptr->setTransportSocketConnectTimeout(timeout);
@@ -593,7 +590,9 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
           active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
-  connection_->noDelay(true);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    connection_->noDelay(true);
+  }
   auto& listener = active_connections_.listener_;
   listener.stats_.downstream_cx_total_.inc();
   listener.stats_.downstream_cx_active_.inc();

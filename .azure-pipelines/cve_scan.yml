@@ -9,7 +9,7 @@ schedules:
   displayName: Hourly CVE scan
   branches:
     include:
-    - master
+    - main
   always: true
 
 pool:

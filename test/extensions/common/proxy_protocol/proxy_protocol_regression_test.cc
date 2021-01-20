@@ -13,7 +13,6 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -46,15 +45,15 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
-        connection_handler_(
-            new Server::ConnectionHandlerImpl(*dispatcher_, overload_manager_, absl::nullopt)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, localAddress())
+        .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
-    conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
+    conn_ = dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
@@ -166,7 +165,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
   Network::NopConnectionBalancerImpl connection_balancer_;
@@ -205,8 +203,9 @@ TEST_P(ProxyProtocolRegressionTest, V1Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), source_addr);
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            source_addr);
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -227,8 +226,9 @@ TEST_P(ProxyProtocolRegressionTest, V2Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), source_addr);
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            source_addr);
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -243,11 +243,13 @@ TEST_P(ProxyProtocolRegressionTest, V2LocalConnection) {
   expectData("more data");
 
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
   } else {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
   }
-  EXPECT_FALSE(server_connection_->localAddressRestored());
+  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }

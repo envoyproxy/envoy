@@ -40,7 +40,6 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -314,7 +313,6 @@ void testUtil(const TestUtilOptions& options) {
                                                    server_stats_store, std::vector<std::string>{});
 
   Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
-  Server::MockThreadLocalOverloadState overload_state;
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   Network::MockTcpListenerCallbacks callbacks;
@@ -337,7 +335,7 @@ void testUtil(const TestUtilOptions& options) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
@@ -346,7 +344,7 @@ void testUtil(const TestUtilOptions& options) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info, overload_state);
+            stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -628,7 +626,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
                                                    server_stats_store, server_names);
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
-  Server::MockThreadLocalOverloadState overload_state;
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
@@ -647,7 +644,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(options.transportSocketOptions()), nullptr);
 
   if (!options.clientSession().empty()) {
@@ -675,7 +672,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
         socket->setRequestedServerName(sni);
         server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info, overload_state);
+            stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -824,14 +821,14 @@ class SslSocketTest : public SslCertsTest,
                       public testing::WithParamInterface<Network::Address::IpVersion> {
 protected:
   SslSocketTest()
-      : dispatcher_(api_->allocateDispatcher("test_thread")), stream_info_(api_->timeSource()) {}
+      : dispatcher_(api_->allocateDispatcher("test_thread")),
+        stream_info_(api_->timeSource(), nullptr) {}
 
   void testClientSessionResumption(const std::string& server_ctx_yaml,
                                    const std::string& client_ctx_yaml, bool expect_reuse,
                                    const Network::Address::IpVersion version);
 
   Event::DispatcherPtr dispatcher_;
-  Server::MockThreadLocalOverloadState overload_state_;
   StreamInfo::StreamInfoImpl stream_info_;
 };
 
@@ -2444,7 +2441,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -2456,7 +2453,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, false);
@@ -2513,7 +2510,7 @@ TEST_P(SslSocketTest, HalfClose) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->enableHalfClose(true);
   client_connection->addReadFilter(client_read_filter);
@@ -2527,7 +2524,7 @@ TEST_P(SslSocketTest, HalfClose) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2596,7 +2593,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->enableHalfClose(true);
@@ -2610,7 +2607,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2685,7 +2682,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->enableHalfClose(true);
@@ -2699,7 +2696,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2792,7 +2789,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Stats::TestUtil::TestStore client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
@@ -2816,7 +2813,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -2873,7 +2870,6 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
-  Server::MockThreadLocalOverloadState overload_state;
   Network::ListenerPtr listener1 =
       dispatcher->createListener(socket1, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
   Network::ListenerPtr listener2 =
@@ -2892,7 +2888,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket1->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket1->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -2901,14 +2897,15 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   SSL_SESSION* ssl_session = nullptr;
   Network::ConnectionPtr server_connection;
-  StreamInfo::StreamInfoImpl stream_info(time_system);
+  StreamInfo::StreamInfoImpl stream_info(time_system, nullptr);
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        Network::TransportSocketFactory& tsf = socket->localAddress() == socket1->localAddress()
-                                                   ? server_ssl_socket_factory1
-                                                   : server_ssl_socket_factory2;
+        Network::TransportSocketFactory& tsf =
+            socket->addressProvider().localAddress() == socket1->addressProvider().localAddress()
+                ? server_ssl_socket_factory1
+                : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), tsf.createTransportSocket(nullptr), stream_info, overload_state);
+            std::move(socket), tsf.createTransportSocket(nullptr), stream_info);
       }));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
@@ -2933,7 +2930,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
 
   client_connection = dispatcher->createClientConnection(
-      socket2->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket2->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslHandshakerImpl* ssl_socket =
@@ -2944,14 +2941,15 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   client_connection->connect();
 
   Network::MockConnectionCallbacks server_connection_callbacks;
-  StreamInfo::StreamInfoImpl stream_info2(time_system);
+  StreamInfo::StreamInfoImpl stream_info2(time_system, nullptr);
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        Network::TransportSocketFactory& tsf = socket->localAddress() == socket1->localAddress()
-                                                   ? server_ssl_socket_factory1
-                                                   : server_ssl_socket_factory2;
+        Network::TransportSocketFactory& tsf =
+            socket->addressProvider().localAddress() == socket1->addressProvider().localAddress()
+                ? server_ssl_socket_factory1
+                : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), tsf.createTransportSocket(nullptr), stream_info2, overload_state);
+            std::move(socket), tsf.createTransportSocket(nullptr), stream_info2);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3012,7 +3010,6 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
-  Server::MockThreadLocalOverloadState overload_state;
   Network::ListenerPtr listener =
       dispatcher->createListener(tcp_socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -3029,20 +3026,20 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      tcp_socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      tcp_socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
 
-  StreamInfo::StreamInfoImpl stream_info(time_system);
+  StreamInfo::StreamInfoImpl stream_info(time_system, nullptr);
   Network::ConnectionPtr server_connection;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info, overload_state);
+            stream_info);
 
         const SslHandshakerImpl* ssl_socket =
             dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
@@ -3476,7 +3473,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Stats::TestUtil::TestStore client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -3488,12 +3485,12 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Network::MockConnectionCallbacks server_connection_callbacks;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
-        Network::TransportSocketFactory& tsf =
-            accepted_socket->localAddress() == socket->localAddress() ? server_ssl_socket_factory
-                                                                      : server2_ssl_socket_factory;
-        server_connection = dispatcher_->createServerConnection(std::move(accepted_socket),
-                                                                tsf.createTransportSocket(nullptr),
-                                                                stream_info_, overload_state_);
+        Network::TransportSocketFactory& tsf = accepted_socket->addressProvider().localAddress() ==
+                                                       socket->addressProvider().localAddress()
+                                                   ? server_ssl_socket_factory
+                                                   : server2_ssl_socket_factory;
+        server_connection = dispatcher_->createServerConnection(
+            std::move(accepted_socket), tsf.createTransportSocket(nullptr), stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3517,7 +3514,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_EQ(1UL, client_stats_store.counter("ssl.handshake").value());
 
   client_connection = dispatcher_->createClientConnection(
-      socket2->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket2->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslHandshakerImpl* ssl_socket =
@@ -3529,12 +3526,12 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
-        Network::TransportSocketFactory& tsf =
-            accepted_socket->localAddress() == socket->localAddress() ? server_ssl_socket_factory
-                                                                      : server2_ssl_socket_factory;
-        server_connection = dispatcher_->createServerConnection(std::move(accepted_socket),
-                                                                tsf.createTransportSocket(nullptr),
-                                                                stream_info_, overload_state_);
+        Network::TransportSocketFactory& tsf = accepted_socket->addressProvider().localAddress() ==
+                                                       socket->addressProvider().localAddress()
+                                                   ? server_ssl_socket_factory
+                                                   : server2_ssl_socket_factory;
+        server_connection = dispatcher_->createServerConnection(
+            std::move(accepted_socket), tsf.createTransportSocket(nullptr), stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
@@ -3595,7 +3592,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -3621,7 +3618,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3657,7 +3654,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   close_count = 0;
 
   client_connection = dispatcher->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
@@ -3667,7 +3664,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3840,7 +3837,7 @@ TEST_P(SslSocketTest, SslError) {
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-      socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
@@ -3852,7 +3849,7 @@ TEST_P(SslSocketTest, SslError) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -4839,8 +4836,9 @@ protected:
         std::move(client_cfg), *manager_, client_stats_store_);
     auto transport_socket = client_ssl_socket_factory_->createTransportSocket(nullptr);
     client_transport_socket_ = transport_socket.get();
-    client_connection_ = dispatcher_->createClientConnection(
-        socket_->localAddress(), source_address_, std::move(transport_socket), nullptr);
+    client_connection_ =
+        dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
+                                            source_address_, std::move(transport_socket), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_ = std::make_shared<Network::MockReadFilter>();
@@ -4854,7 +4852,7 @@ protected:
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr),
-              stream_info_, overload_state_);
+              stream_info_);
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
@@ -4914,7 +4912,7 @@ protected:
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_(_, _, _))
-        .Times(2)
+        .Times(4)
         .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) -> Buffer::Instance* {
           client_write_buffer = new MockWatermarkBuffer(below_low, above_high, above_overflow);
@@ -4934,7 +4932,7 @@ protected:
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
               std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr),
-              stream_info_, overload_state_);
+              stream_info_);
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
@@ -5054,7 +5052,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
@@ -5064,7 +5062,8 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
+  EXPECT_EQ(address_string,
+            server_connection_->addressProvider().remoteAddress()->ip()->addressAsString());
 
   disconnect();
 }
@@ -5084,7 +5083,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
             std::move(socket), server_ssl_socket_factory_->createTransportSocket(nullptr),
-            stream_info_, overload_state_);
+            stream_info_);
         server_connection_->setBufferLimits(read_buffer_limit);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);

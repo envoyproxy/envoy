@@ -10,6 +10,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/drain_decision.h"
@@ -121,8 +122,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_.idleTimeout()) {
-    connection_idle_timer_ = overload_state_.createScaledTimer(
-        Server::OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
+    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createScaledTimer(
+        Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
@@ -618,16 +619,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-  filter_manager_.streamInfo().setDownstreamLocalAddress(
-      connection_manager_.read_callbacks_->connection().localAddress());
-  filter_manager_.streamInfo().setDownstreamDirectRemoteAddress(
-      connection_manager_.read_callbacks_->connection().directRemoteAddress());
-  // Initially, the downstream remote address is the source address of the
-  // downstream connection. That can change later in the request's lifecycle,
-  // based on XFF processing, but setting the downstream remote address here
-  // prevents surprises for logging code in edge cases.
-  filter_manager_.streamInfo().setDownstreamRemoteAddress(
-      connection_manager_.read_callbacks_->connection().remoteAddress());
 
   filter_manager_.streamInfo().setDownstreamSslConnection(
       connection_manager_.read_callbacks_->connection().ssl());
@@ -637,8 +628,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
-    stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-        [this]() -> void { onIdleTimeout(); });
+    stream_idle_timer_ =
+        connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
+            Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
+            [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
 
@@ -825,7 +818,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
-  auto ip = connection()->localAddress()->ip();
+  auto ip = connection()->addressProvider().localAddress()->ip();
   if (ip == nullptr) {
     return 0;
   }
@@ -867,12 +860,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
-  const bool fixed_connection_close =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close");
-  if (fixed_connection_close) {
-    state_.saw_connection_close_ =
-        HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
-  }
+  state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
   if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
     request_headers_->setPath("/");
@@ -939,14 +927,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       sendLocalReply(false, Code::UpgradeRequired, "", nullptr, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
-    } else if (!fixed_connection_close) {
-      // HTTP/1.0 defaults to single-use connections. Make sure the connection
-      // will be closed unless Keep-Alive is present.
-      state_.saw_connection_close_ = true;
-      if (absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
-                                 Http::Headers::get().ConnectionValues.KeepAlive)) {
-        state_.saw_connection_close_ = false;
-      }
     }
     if (!request_headers_->Host() &&
         !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
@@ -997,28 +977,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
                                                localPort());
 
-  if (!fixed_connection_close && protocol == Protocol::Http11 &&
-      absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
-                             Http::Headers::get().ConnectionValues.Close)) {
-    state_.saw_connection_close_ = true;
-  }
-  // Note: Proxy-Connection is not a standard header, but is supported here
-  // since it is supported by http-parser the underlying parser for http
-  // requests.
-  if (!fixed_connection_close && protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
-      absl::EqualsIgnoreCase(request_headers_->getProxyConnectionValue(),
-                             Http::Headers::get().ConnectionValues.Close)) {
-    state_.saw_connection_close_ = true;
-  }
-
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
-    filter_manager_.streamInfo().setDownstreamRemoteAddress(
-        ConnectionManagerUtility::mutateRequestHeaders(
-            *request_headers_, connection_manager_.read_callbacks_->connection(),
-            connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
+    filter_manager_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
+        *request_headers_, connection_manager_.read_callbacks_->connection(),
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
   }
-  ASSERT(filter_manager_.streamInfo().downstreamRemoteAddress() != nullptr);
+  ASSERT(filter_manager_.streamInfo().downstreamAddressProvider().remoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
@@ -1062,7 +1027,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ =
-              connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+              connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
+                  Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
                   [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {

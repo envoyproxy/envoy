@@ -28,7 +28,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_manager_interface",
-        "//include/envoy/local_info:local_info_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",

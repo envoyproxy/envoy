@@ -884,7 +884,7 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
   return true;
 }
 
-void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
+void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()> callback) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
   workers_started_ = true;
@@ -899,11 +899,13 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     ENVOY_LOG(debug, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-      addListenerToWorker(*worker, absl::nullopt, *listener, [this, listeners_pending_init]() {
-        if (--(*listeners_pending_init) == 0) {
-          stats_.workers_started_.set(1);
-        }
-      });
+      addListenerToWorker(*worker, absl::nullopt, *listener,
+                          [this, listeners_pending_init, callback]() {
+                            if (--(*listeners_pending_init) == 0) {
+                              stats_.workers_started_.set(1);
+                              callback();
+                            }
+                          });
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {
@@ -913,6 +915,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   }
   if (active_listeners_.empty()) {
     stats_.workers_started_.set(1);
+    callback();
   }
 }
 
@@ -1021,7 +1024,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
 
-  auto filter_chain_res = std::make_unique<FilterChainImpl>(
+  auto filter_chain_res = std::make_shared<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),

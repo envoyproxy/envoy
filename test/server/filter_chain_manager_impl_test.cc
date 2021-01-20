@@ -81,7 +81,7 @@ public:
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
-    ON_CALL(*mock_socket, localAddress()).WillByDefault(ReturnRef(local_address_));
+    mock_socket->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*mock_socket, requestedServerName())
         .WillByDefault(Return(absl::string_view(server_name)));
@@ -95,7 +95,7 @@ public:
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
-    ON_CALL(*mock_socket, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
+    mock_socket->address_provider_->setRemoteAddress(remote_address_);
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 
@@ -199,7 +199,7 @@ TEST_F(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
 
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(1);
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _));
   filter_chain_manager_.addFilterChains(
       std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
       nullptr, filter_chain_factory_builder_, filter_chain_manager_);

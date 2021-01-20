@@ -8,17 +8,20 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
-#include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracker.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -27,7 +30,19 @@ namespace {
 constexpr absl::string_view kTransportSocketConnectTimeoutTerminationDetails =
     "transport socket timeout was reached";
 
+std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
+  switch (connection_state) {
+  case Connection::State::Open:
+    return os << "Open";
+  case Connection::State::Closing:
+    return os << "Closing";
+  case Connection::State::Closed:
+    return os << "Closed";
+  }
+  return os;
 }
+
+} // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
@@ -55,12 +70,13 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
-      read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
-                   [this]() -> void { this->onReadBufferHighWatermark(); },
-                   []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
       write_buffer_(dispatcher.getWatermarkFactory().create(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      read_buffer_(dispatcher.getWatermarkFactory().create(
+          [this]() -> void { this->onReadBufferLowWatermark(); },
+          [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
@@ -210,7 +226,7 @@ void ConnectionImpl::setTransportSocketIsReadable() {
 
 bool ConnectionImpl::filterChainWantsData() {
   return read_disable_count_ == 0 ||
-         (read_disable_count_ == 1 && read_buffer_.highWatermarkTriggered());
+         (read_disable_count_ == 1 && read_buffer_->highWatermarkTriggered());
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
@@ -329,7 +345,7 @@ void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
 
   ENVOY_CONN_LOG(trace, "readDisable: disable={} disable_count={} state={} buffer_length={}", *this,
-                 disable, read_disable_count_, static_cast<int>(state()), read_buffer_.length());
+                 disable, read_disable_count_, static_cast<int>(state()), read_buffer_->length());
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // `EPOLLRDHUP` for an epoll backend). For backends that support it, this allows us to apply
@@ -371,10 +387,10 @@ void ConnectionImpl::readDisable(bool disable) {
       ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
     }
 
-    if (filterChainWantsData() && (read_buffer_.length() > 0 || transport_wants_read_)) {
+    if (filterChainWantsData() && (read_buffer_->length() > 0 || transport_wants_read_)) {
       // Sanity check: resumption with read_disable_count_ > 0 should only happen if the read
       // buffer's high watermark has triggered.
-      ASSERT(read_buffer_.length() > 0 || read_disable_count_ == 0);
+      ASSERT(read_buffer_->length() > 0 || read_disable_count_ == 0);
 
       // If the read_buffer_ is not empty or transport_wants_read_ is true, the connection may be
       // able to process additional bytes even if there is no data in the kernel to kick off the
@@ -476,20 +492,14 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // limits we err on the side of buffering more triggering watermark callbacks less often.
   //
   // Given the current implementation for straight up TCP proxying, the common case is reading
-  // |limit| bytes through the socket, passing |limit| bytes to the connection (triggering the high
-  // watermarks) and the immediately draining |limit| bytes to the socket (triggering the low
-  // watermarks). We avoid this by setting the high watermark to limit + 1 so a single read will
-  // not trigger watermarks if the socket is not blocked.
-  //
-  // If the connection class is changed to write to the buffer and flush to the socket in the same
-  // stack then instead of checking watermarks after the write and again after the flush it can
-  // check once after both operations complete. At that point it would be better to change the high
-  // watermark from |limit + 1| to |limit| as the common case (move |limit| bytes, flush |limit|
-  // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
-  // would result in respecting the exact buffer limit.
+  // |limit| bytes through the socket, passing |limit| bytes to the connection and the immediately
+  // draining |limit| bytes to the socket. Triggering the high watermarks and then immediately
+  // triggering the low watermarks would be expensive, but we narrowly avoid triggering high
+  // watermark when moving |limit| bytes through the connection because the high watermark
+  // computation checks if the size of the buffer exceeds the high watermark value.
   if (limit > 0) {
-    static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
-    read_buffer_.setWatermarks(limit + 1);
+    write_buffer_->setWatermarks(limit);
+    read_buffer_->setWatermarks(limit);
   }
 }
 
@@ -530,6 +540,7 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
 }
 
 void ConnectionImpl::onFileEvent(uint32_t events) {
+  ScopeTrackerScopeState scope(this, this->dispatcher_);
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
   if (immediate_error_event_ != ConnectionEvent::Connected) {
@@ -584,7 +595,7 @@ void ConnectionImpl::onReadReady() {
     // Do not clear transport_wants_read_ when returning early; the early return skips the transport
     // socket doRead call.
     if (latched_dispatch_buffered_data && filterChainWantsData()) {
-      onRead(read_buffer_.length());
+      onRead(read_buffer_->length());
     }
     return;
   }
@@ -594,8 +605,8 @@ void ConnectionImpl::onReadReady() {
   // reading from the transport if the read buffer is above high watermark at the start of the
   // method.
   transport_wants_read_ = false;
-  IoResult result = transport_socket_->doRead(read_buffer_);
-  uint64_t new_buffer_size = read_buffer_.length();
+  IoResult result = transport_socket_->doRead(*read_buffer_);
+  uint64_t new_buffer_size = read_buffer_->length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
   // If this connection doesn't have half-close semantics, translate end_stream into
@@ -607,7 +618,7 @@ void ConnectionImpl::onReadReady() {
 
   read_end_stream_ |= result.end_stream_read_;
   if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
-      (latched_dispatch_buffered_data && read_buffer_.length() > 0)) {
+      (latched_dispatch_buffered_data && read_buffer_->length() > 0)) {
     // Skip onRead if no bytes were processed unless we explicitly want to force onRead for
     // buffered data. For instance, skip onRead if the connection was closed without producing
     // more data.
@@ -753,14 +764,24 @@ void ConnectionImpl::flushWriteBuffer() {
   }
 }
 
+void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "ConnectionImpl " << this << DUMP_MEMBER(connecting_) << DUMP_MEMBER(bind_error_)
+     << DUMP_MEMBER(state()) << DUMP_MEMBER(read_buffer_limit_) << "\n";
+
+  DUMP_DETAILS(socket_);
+}
+
 ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
-                                           Server::ThreadLocalOverloadState& overload_state,
                                            ConnectionSocketPtr&& socket,
                                            TransportSocketPtr&& transport_socket,
                                            StreamInfo::StreamInfo& stream_info, bool connected)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected),
-      overload_state_(overload_state) {}
+                     connected) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    noDelay(true);
+  }
+}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) {
   if (!transport_connect_pending_) {
@@ -768,8 +789,8 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
   }
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
-        overload_state_.createScaledTimer(Server::OverloadTimerType::TransportSocketConnectTimeout,
-                                          [this] { onTransportSocketConnectTimeout(); });
+        dispatcher_.createScaledTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
+                                      [this] { onTransportSocketConnectTimeout(); });
   }
   transport_socket_connect_timer_->enableTimer(timeout);
 }
@@ -797,7 +818,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
                      std::move(transport_socket), stream_info_, false),
-      stream_info_(dispatcher.timeSource()) {
+      stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
@@ -813,8 +834,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 
     const Network::Address::InstanceConstSharedPtr* source = &source_address;
 
-    if (socket_->localAddress()) {
-      source = &socket_->localAddress();
+    if (socket_->addressProvider().localAddress()) {
+      source = &socket_->addressProvider().localAddress();
     }
 
     if (*source != nullptr) {
@@ -836,9 +857,13 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
+  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
+                 socket_->addressProvider().remoteAddress()->asString());
+  const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
   if (result.rc_ == 0) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+      noDelay(true);
+    }
     // write will become ready.
     ASSERT(connecting_);
   } else {

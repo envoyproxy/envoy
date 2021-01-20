@@ -394,6 +394,26 @@ public:
   template <typename T, size_t Size = sizeof(T)> void writeBEInt(T value) {
     writeInt<ByteOrder::BigEndian, T, Size>(value);
   }
+
+  /**
+   * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
+   * watermark. Setting the high watermark to 0 disables watermark functionality.
+   * @param watermark supplies the buffer high watermark size threshold, in bytes.
+   */
+  virtual void setWatermarks(uint32_t watermark) PURE;
+  /**
+   * Returns the configured high watermark. A return value of 0 indicates that watermark
+   * functionality is disabled.
+   */
+  virtual uint32_t highWatermark() const PURE;
+  /**
+   * Determine if the buffer watermark trigger condition is currently set. The watermark trigger is
+   * set when the buffer size exceeds the configured high watermark and is cleared once the buffer
+   * size drops to the low watermark.
+   * @return true if the buffer size once exceeded the high watermark and hasn't since dropped to
+   * the low watermark.
+   */
+  virtual bool highWatermarkTriggered() const PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
@@ -419,6 +439,7 @@ public:
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
+using WatermarkFactorySharedPtr = std::shared_ptr<WatermarkFactory>;
 
 } // namespace Buffer
 } // namespace Envoy

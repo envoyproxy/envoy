@@ -35,7 +35,6 @@
 #include "server/active_raw_udp_listener_config.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -223,9 +222,9 @@ protected:
   absl::Mutex lock_;
   Http::RequestHeaderMapPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
+  FakeHttpConnection& parent_;
 
 private:
-  FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
@@ -429,6 +428,12 @@ public:
   // Should only be called for HTTP2
   void onGoAway(Http::GoAwayErrorCode code) override;
 
+  // Should only be called for HTTP2, sends a GOAWAY frame with NO_ERROR.
+  void encodeGoAway();
+
+  // Should only be called for HTTP2, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
+  void encodeProtocolError();
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
@@ -548,6 +553,11 @@ public:
   FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+               const Network::Address::InstanceConstSharedPtr& address,
+               const FakeUpstreamConfig& config);
+
+  // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 
@@ -575,7 +585,9 @@ public:
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-  Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
+  Network::Address::InstanceConstSharedPtr localAddress() const {
+    return socket_->addressProvider().localAddress();
+  }
 
   // Wait for one of the upstreams to receive a connection
   ABSL_MUST_USE_RESULT
@@ -645,7 +657,7 @@ private:
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->localAddress();
+      return socket_->addressProvider().localAddress();
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
@@ -741,7 +753,6 @@ private:
   Api::ApiPtr api_;
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
-  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to

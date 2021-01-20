@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
@@ -16,7 +17,6 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/ssl/context.h"
 
 #include "common/common/scope_tracker.h"
@@ -40,8 +40,8 @@ public:
   TimeSource& timeSource() override { return time_system_; }
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo&,
-                         Server::ThreadLocalOverloadState&) override {
+                         Network::TransportSocketPtr&& transport_socket,
+                         StreamInfo::StreamInfo&) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();
@@ -79,6 +79,20 @@ public:
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
     auto timer = Event::TimerPtr{createTimer_(cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
+  Event::TimerPtr createScaledTimer(ScaledTimerMinimum minimum, Event::TimerCb cb) override {
+    auto timer = Event::TimerPtr{createScaledTimer_(minimum, cb)};
+    // Assert that the timer is not null to avoid confusing test failures down the line.
+    ASSERT(timer != nullptr);
+    return timer;
+  }
+
+  Event::TimerPtr createScaledTimer(ScaledTimerType timer_type, Event::TimerCb cb) override {
+    auto timer = Event::TimerPtr{createScaledTypedTimer_(timer_type, cb)};
     // Assert that the timer is not null to avoid confusing test failures down the line.
     ASSERT(timer != nullptr);
     return timer;
@@ -125,13 +139,16 @@ public:
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
+  MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
+  MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
   MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
   MOCK_METHOD(void, post, (std::function<void()> callback));
   MOCK_METHOD(void, run, (RunType type));
-  MOCK_METHOD(const ScopeTrackedObject*, setTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
   MOCK_METHOD(bool, isThreadSafe, (), (const));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
   MOCK_METHOD(Thread::ThreadId, getCurrentThreadId, ());
@@ -140,7 +157,7 @@ public:
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
-  MockBufferFactory buffer_factory_;
+  testing::NiceMock<MockBufferFactory> buffer_factory_;
 
 private:
   const std::string name_;
@@ -185,8 +202,12 @@ public:
   TimerPtr createTimer(ScaledTimerMinimum minimum, TimerCb callback) override {
     return TimerPtr{createTimer_(minimum, std::move(callback))};
   }
+  TimerPtr createTimer(ScaledTimerType timer_type, TimerCb callback) override {
+    return TimerPtr{createTypedTimer_(timer_type, std::move(callback))};
+  }
   MOCK_METHOD(Timer*, createTimer_, (ScaledTimerMinimum, TimerCb));
-  MOCK_METHOD(void, setScaleFactor, (double), (override));
+  MOCK_METHOD(Timer*, createTypedTimer_, (ScaledTimerType, TimerCb));
+  MOCK_METHOD(void, setScaleFactor, (UnitFloat), (override));
 };
 
 class MockSchedulableCallback : public SchedulableCallback {

@@ -267,7 +267,7 @@ void StreamEncoderImpl::endEncode() {
   }
 }
 
-void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
+void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) {
   // It's messy and complicated to try to tag the final write of an HTTP response for response
   // tracking for flood protection. Instead, write an empty buffer fragment after the response,
   // to allow for tracking.
@@ -297,20 +297,20 @@ void ConnectionImpl::flushOutput(bool end_encode) {
   if (end_encode) {
     // If this is an HTTP response in ServerConnectionImpl, track outbound responses for flood
     // protection
-    maybeAddSentinelBufferFragment(output_buffer_);
+    maybeAddSentinelBufferFragment(*output_buffer_);
   }
-  connection().write(output_buffer_, false);
-  ASSERT(0UL == output_buffer_.length());
+  connection().write(*output_buffer_, false);
+  ASSERT(0UL == output_buffer_->length());
 }
 
-void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_.add(data); }
+void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_->add(data); }
 
-void ConnectionImpl::addCharToBuffer(char c) { output_buffer_.add(&c, 1); }
+void ConnectionImpl::addCharToBuffer(char c) { output_buffer_->add(&c, 1); }
 
-void ConnectionImpl::addIntToBuffer(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
+void ConnectionImpl::addIntToBuffer(uint64_t i) { output_buffer_->add(absl::StrCat(i)); }
 
 void ConnectionImpl::copyToBuffer(const char* data, uint64_t length) {
-  output_buffer_.add(data, length);
+  output_buffer_->add(data, length);
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
@@ -332,7 +332,7 @@ void StreamEncoderImpl::readDisable(bool disable) {
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
 const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
-  return connection_.connection().localAddress();
+  return connection_.connection().addressProvider().localAddress();
 }
 
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
@@ -477,12 +477,12 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
-      dispatching_(false),
-      output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                     [&]() -> void { this->onAboveHighWatermark(); },
-                     []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
+      dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
+                               [&]() -> void { this->onBelowLowWatermark(); },
+                               [&]() -> void { this->onAboveHighWatermark(); },
+                               []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
-  output_buffer_.setWatermarks(connection.bufferLimit());
+  output_buffer_->setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.allow_chunked_length = 1;
   parser_.data = this;
@@ -1096,10 +1096,6 @@ void ServerConnectionImpl::sendProtocolErrorOld(absl::string_view details) {
 }
 
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.early_errors_via_hcm")) {
-    sendProtocolErrorOld(details);
-    return okStatus();
-  }
   // We do this here because we may get a protocol error before we have a logical stream.
   if (!active_request_.has_value()) {
     RETURN_IF_ERROR(onMessageBeginBase());
@@ -1212,15 +1208,6 @@ Envoy::StatusOr<int> ClientConnectionImpl::onHeadersComplete() {
         pending_response_.value().encoder_.connectRequest()) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;
-
-      // For responses to connect requests, do not accept the chunked
-      // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
-      if (headers->TransferEncoding() &&
-          absl::EqualsIgnoreCase(headers->TransferEncoding()->value().getStringView(),
-                                 Headers::get().TransferEncodingValues.Chunked)) {
-        RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));
-        return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
-      }
     }
 
     if (strict_1xx_and_204_headers_ && (parser_.status_code < 200 || parser_.status_code == 204)) {

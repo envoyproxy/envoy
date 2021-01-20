@@ -24,7 +24,6 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/listener_factory_context.h"
-#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -61,15 +60,15 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
-        connection_handler_(
-            new Server::ConnectionHandlerImpl(*dispatcher_, overload_manager_, absl::nullopt)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, localAddress())
+        .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
-    conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
+    conn_ = dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
@@ -193,7 +192,6 @@ public:
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
   Event::DispatcherPtr dispatcher_;
-  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
   Network::NopConnectionBalancerImpl connection_balancer_;
@@ -222,8 +220,9 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -235,11 +234,13 @@ TEST_P(ProxyProtocolTest, V1Minimal) {
   expectData("more data");
 
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
   } else {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
   }
-  EXPECT_FALSE(server_connection_->localAddressRestored());
+  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -255,8 +256,9 @@ TEST_P(ProxyProtocolTest, V2Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -267,8 +269,9 @@ TEST_P(ProxyProtocolTest, BasicV6) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1:2:3::4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -286,8 +289,9 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1:2:3::4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -448,14 +452,16 @@ TEST_P(ProxyProtocolTest, V2LocalConnection) {
   connect();
   write(buffer, sizeof(buffer));
   expectData("more data");
-  if (server_connection_->remoteAddress()->ip()->version() ==
+  if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
       Envoy::Network::Address::IpVersion::v6) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
-  } else if (server_connection_->remoteAddress()->ip()->version() ==
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
+  } else if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
              Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
   }
-  EXPECT_FALSE(server_connection_->localAddressRestored());
+  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
   disconnect();
 }
 
@@ -467,14 +473,16 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
   connect();
   write(buffer, sizeof(buffer));
   expectData("more data");
-  if (server_connection_->remoteAddress()->ip()->version() ==
+  if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
       Envoy::Network::Address::IpVersion::v6) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
-  } else if (server_connection_->remoteAddress()->ip()->version() ==
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
+  } else if (server_connection_->addressProvider().remoteAddress()->ip()->version() ==
              Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
   }
-  EXPECT_FALSE(server_connection_->localAddressRestored());
+  EXPECT_FALSE(server_connection_->addressProvider().localAddressRestored());
   disconnect();
 }
 
@@ -694,8 +702,9 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   // the results. Since we must have data we might as well check that we get it.
   expectData("...");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "254.254.254.254");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -715,8 +724,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented1) {
   write(buffer + 20, 17);
 
   expectData("more data");
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -736,8 +746,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented2) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -900,8 +911,9 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   expectData("...");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "254.254.254.254");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -924,8 +936,9 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
 
   expectData("moredata");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -1290,13 +1303,13 @@ public:
                                                            nullptr, true)),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
-            socket_->localAddress()->ip()->port())),
-        connection_handler_(
-            new Server::ConnectionHandlerImpl(*dispatcher_, overload_manager_, absl::nullopt)),
+            socket_->addressProvider().localAddress()->ip()->port())),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, localAddress())
+        .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,
@@ -1394,7 +1407,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  NiceMock<Server::MockOverloadManager> overload_manager_;
   BasicResourceLimitImpl open_connections_;
   Network::MockListenSocketFactory socket_factory_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
@@ -1424,9 +1436,10 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->asString(), "1.2.3.4:65535");
-  EXPECT_EQ(server_connection_->localAddress()->asString(), "254.254.254.254:1234");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->asString(), "1.2.3.4:65535");
+  EXPECT_EQ(server_connection_->addressProvider().localAddress()->asString(),
+            "254.254.254.254:1234");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -1437,9 +1450,9 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   expectData("more data");
 
-  EXPECT_EQ(server_connection_->remoteAddress()->asString(), "[1:2:3::4]:65535");
-  EXPECT_EQ(server_connection_->localAddress()->asString(), "[5:6::7:8]:1234");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
+  EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->asString(), "[1:2:3::4]:65535");
+  EXPECT_EQ(server_connection_->addressProvider().localAddress()->asString(), "[5:6::7:8]:1234");
+  EXPECT_TRUE(server_connection_->addressProvider().localAddressRestored());
 
   disconnect();
 }
@@ -1458,15 +1471,15 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
             key: "PP2_TYPE_ALPN"
         - tlv_type: 0x1a
           on_tlv_present:
-            key: "PP2_TYPE_CUSTOMER_A"      
+            key: "PP2_TYPE_CUSTOMER_A"
 )EOF";
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   Server::Configuration::MockListenerFactoryContext context;
-  EXPECT_CALL(context, scope()).Times(1);
-  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
+  EXPECT_CALL(context, scope());
+  EXPECT_CALL(context, messageValidationVisitor());
   Network::ListenerFilterFactoryCb cb =
       factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
 

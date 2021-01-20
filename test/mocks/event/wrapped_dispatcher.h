@@ -36,10 +36,9 @@ public:
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo& stream_info,
-                         Server::ThreadLocalOverloadState& overload_state) override {
-    return impl_.createServerConnection(std::move(socket), std::move(transport_socket), stream_info,
-                                        overload_state);
+                         StreamInfo::StreamInfo& stream_info) override {
+    return impl_.createServerConnection(std::move(socket), std::move(transport_socket),
+                                        stream_info);
   }
 
   Network::ClientConnectionPtr
@@ -78,6 +77,13 @@ public:
   }
 
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }
+  TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override {
+    return impl_.createScaledTimer(minimum, std::move(cb));
+  }
+
+  TimerPtr createScaledTimer(ScaledTimerType timer_type, TimerCb cb) override {
+    return impl_.createScaledTimer(timer_type, std::move(cb));
+  }
 
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override {
     return impl_.createSchedulableCallback(std::move(cb));
@@ -98,8 +104,12 @@ public:
   void run(RunType type) override { impl_.run(type); }
 
   Buffer::WatermarkFactory& getWatermarkFactory() override { return impl_.getWatermarkFactory(); }
-  const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) override {
-    return impl_.setTrackedObject(object);
+  void pushTrackedObject(const ScopeTrackedObject* object) override {
+    return impl_.pushTrackedObject(object);
+  }
+
+  void popTrackedObject(const ScopeTrackedObject* expected_object) override {
+    return impl_.popTrackedObject(expected_object);
   }
 
   MonotonicTime approximateMonotonicTime() const override {

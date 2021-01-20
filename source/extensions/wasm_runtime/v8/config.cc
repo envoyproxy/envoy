@@ -14,7 +14,6 @@ public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createV8Vm(); }
 
   absl::string_view name() override { return "envoy.wasm.runtime.v8"; }
-  absl::string_view shortName() override { return "v8"; }
 };
 
 #if defined(ENVOY_WASM_V8)

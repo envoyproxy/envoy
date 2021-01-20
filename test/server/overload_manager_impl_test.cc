@@ -1,6 +1,5 @@
 #include <chrono>
 #include <initializer_list>
-#include <type_traits>
 
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/scaled_range_timer_manager.h"
@@ -29,18 +28,22 @@ using testing::_;
 using testing::AllOf;
 using testing::AnyNumber;
 using testing::ByMove;
-using testing::DoubleNear;
-using testing::Eq;
+using testing::DoAll;
+using testing::FloatNear;
 using testing::Invoke;
-using testing::Mock;
-using testing::MockFunction;
+using testing::InvokeArgument;
 using testing::NiceMock;
+using testing::Pointee;
 using testing::Property;
 using testing::Return;
+using testing::SaveArg;
+using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
 namespace Server {
 namespace {
+
+using TimerType = Event::ScaledTimerType;
 
 class FakeResourceMonitor : public ResourceMonitor {
 public:
@@ -126,12 +129,14 @@ public:
   }
 
   MOCK_METHOD(Event::ScaledRangeTimerManagerPtr, createScaledRangeTimerManager,
-              (Event::Dispatcher&), (const, override));
+              (Event::Dispatcher&, const Event::ScaledTimerTypeMapConstSharedPtr&),
+              (const, override));
 
 private:
-  Event::ScaledRangeTimerManagerPtr
-  createDefaultScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
-    return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher);
+  Event::ScaledRangeTimerManagerPtr createDefaultScaledRangeTimerManager(
+      Event::Dispatcher& dispatcher,
+      const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const {
+    return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher, timer_minimums);
   }
 };
 
@@ -242,7 +247,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(0, cb_count);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(0, scale_percent_gauge.value());
@@ -288,7 +293,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(2, cb_count);
   EXPECT_EQ(30, pressure_gauge2.value());
 
@@ -308,7 +313,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(4, cb_count);
   EXPECT_EQ(41, pressure_gauge1.value());
   EXPECT_EQ(42, pressure_gauge2.value());
@@ -333,7 +338,7 @@ TEST_F(OverloadManagerImplTest, ScaledTrigger) {
   timer_cb_();
 
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
-                                  Property(&OverloadActionState::value, 0)));
+                                  Property(&OverloadActionState::value, UnitFloat::min())));
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(0, scale_percent_gauge.value());
 
@@ -342,7 +347,7 @@ TEST_F(OverloadManagerImplTest, ScaledTrigger) {
   factory3_.monitor_->setPressure(0.65);
   timer_cb_();
 
-  EXPECT_EQ(action_state.value(), 0.5 /* = 0.65 / (0.8 - 0.5) */);
+  EXPECT_EQ(action_state.value(), UnitFloat(0.5) /* = 0.65 / (0.8 - 0.5) */);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(50, scale_percent_gauge.value());
 
@@ -414,13 +419,13 @@ TEST_F(OverloadManagerImplTest, DelayedUpdatesAreCoalesced) {
   // When monitor 3 publishes its update, the action won't be visible to the thread-local state
   factory3_.monitor_->setPressure(0.6);
   factory3_.monitor_->publishUpdate();
-  EXPECT_EQ(action_state.value(), 0.0);
+  EXPECT_EQ(action_state.value(), UnitFloat::min());
 
   // Now when monitor 4 publishes a larger value, the update from monitor 3 is skipped.
   EXPECT_FALSE(action_state.isSaturated());
   factory4_.monitor_->setPressure(0.65);
   factory4_.monitor_->publishUpdate();
-  EXPECT_EQ(action_state.value(), 0.5 /* = (0.65 - 0.5) / (0.8 - 0.5) */);
+  EXPECT_EQ(action_state.value(), UnitFloat(0.5) /* = (0.65 - 0.5) / (0.8 - 0.5) */);
 }
 
 TEST_F(OverloadManagerImplTest, FlushesUpdatesEvenWithOneUnresponsive) {
@@ -484,85 +489,68 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
     - name: envoy.resource_monitors.fake_resource1
   actions:
     - name: envoy.overload_actions.reduce_timeouts
-      triggers:
-        - name: "envoy.resource_monitors.fake_resource1"
-          scaled:
-            scaling_threshold: 0.5
-            saturation_threshold: 1.0
       typed_config:
         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
         timer_scale_factors:
           - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
             min_timeout: 2s
-          - timer: TRANSPORT_SOCKET_CONNECT
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
             min_scale: { value: 10 } # percent
+          - timer: TRANSPORT_SOCKET_CONNECT
+            min_scale: { value: 40 } # percent
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
   )YAML";
 
 // These are the timer types according to the reduced timeouts config above.
-constexpr std::pair<OverloadTimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
-    {OverloadTimerType::UnscaledRealTimerForTest, Event::ScaledMinimum(UnitFloat(1.0))},
-    {OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
+constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
+    {TimerType::HttpDownstreamIdleConnectionTimeout,
      Event::AbsoluteMinimum(std::chrono::seconds(2))},
-    {OverloadTimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
+    {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
+    {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
 };
-
-TEST_F(OverloadManagerImplTest, TimerTypesProduceCorrectMinimums) {
-  setDispatcherExpectation();
+TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));
 
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
-  EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
-  manager->start();
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
 
-  for (const auto& [timer_type, expected_minimum] : kReducedTimeoutsMinimums) {
-    SCOPED_TRACE(static_cast<int>(timer_type));
-    EXPECT_CALL(*scaled_timer_manager, createTimer_(Eq(expected_minimum), _));
-    manager->getThreadLocalOverloadState().createScaledTimer(timer_type, []() {});
-    Mock::VerifyAndClearExpectations(scaled_timer_manager);
-  }
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums;
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(
+          DoAll(SaveArg<1>(&timer_minimums),
+                Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager}))));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
+  EXPECT_THAT(timer_minimums, Pointee(UnorderedElementsAreArray(kReducedTimeoutsMinimums)));
 }
 
 TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
   setDispatcherExpectation();
   auto manager(createOverloadManager(kReducedTimeoutsConfig));
 
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager})));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
 
   manager->start();
 
+  EXPECT_CALL(mock_dispatcher, post).WillOnce(InvokeArgument<0>());
   // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
   // a timer scale factor of 0.8 (1 - 0.2).
-  EXPECT_CALL(*scaled_timer_manager, setScaleFactor(DoubleNear(0.8, 0.00001)));
+  EXPECT_CALL(*mock_scaled_timer_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
   factory1_.monitor_->setPressure(0.6);
 
   timer_cb_();
-}
-
-TEST_F(OverloadManagerImplTest, CreateScaledTimerWithProvidedMinimum) {
-  setDispatcherExpectation();
-  auto manager(createOverloadManager(kReducedTimeoutsConfig));
-
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
-  EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
-  manager->start();
-
-  auto* mock_scaled_timer = new Event::MockTimer();
-  MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_)
-      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-        // This timer was created with an absolute minimum. Test that by checking an arbitrary
-        // value.
-        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(3));
-        return mock_scaled_timer;
-      });
-
-  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
-      Event::AbsoluteMinimum(std::chrono::seconds(3)), mock_callback.AsStdFunction());
-  EXPECT_EQ(timer.get(), mock_scaled_timer);
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {

@@ -14,7 +14,6 @@
 #include "envoy/network/listener.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
@@ -67,8 +66,7 @@ class ConnectionHandlerImpl : public Network::ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, OverloadManager& overload_manager,
-                        absl::optional<uint32_t> worker_index);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -85,7 +83,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
-  void setListenerRejectFraction(float reject_fraction) override;
+  void setListenerRejectFraction(UnitFloat reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   /**
@@ -250,13 +248,11 @@ private:
                     bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          iter_(accept_filters_.end()), stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-                                            listener_.parent_.dispatcher_.timeSource(),
-                                            StreamInfo::FilterState::LifeSpan::Connection)) {
+          iter_(accept_filters_.end()),
+          stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+              listener_.parent_.dispatcher_.timeSource(), socket_->addressProviderSharedPtr(),
+              StreamInfo::FilterState::LifeSpan::Connection)) {
       listener_.stats_.downstream_pre_cx_active_.inc();
-      stream_info_->setDownstreamLocalAddress(socket_->localAddress());
-      stream_info_->setDownstreamRemoteAddress(socket_->remoteAddress());
-      stream_info_->setDownstreamDirectRemoteAddress(socket_->directRemoteAddress());
     }
     ~ActiveTcpSocket() override {
       accept_filters_.clear();
@@ -361,12 +357,11 @@ private:
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
-  Server::OverloadManager& overload_manager_;
   const std::string per_handler_stat_prefix_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
-  float listener_reject_fraction_{0};
+  UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };
 
 class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,

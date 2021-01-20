@@ -1,6 +1,6 @@
 load("@rules_python//python:repositories.bzl", "py_repositories")
 load("@rules_python//python:pip.bzl", "pip3_import", "pip_repositories")
-load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_raze__fetch_remote_crates")
+load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_remote_crates")
 
 # Python dependencies.
 def _python_deps():
@@ -101,4 +101,4 @@ def _python_deps():
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
 def envoy_dependencies_extra():
     _python_deps()
-    proxy_wasm_cpp_host_raze__fetch_remote_crates()
+    proxy_wasm_cpp_host_fetch_remote_crates()

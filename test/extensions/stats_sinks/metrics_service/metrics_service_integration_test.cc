@@ -30,6 +30,9 @@ public:
   }
 
   void initialize() override {
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // metrics_service cluster for Envoy gRPC.
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -75,7 +78,8 @@ public:
     // required stats are flushed.
     // TODO(ramaraochavali): Figure out a more robust way to find out all required stats have been
     // flushed.
-    while (!(known_counter_exists && known_gauge_exists && known_histogram_exists)) {
+    while (!(known_counter_exists && known_gauge_exists && known_summary_exists &&
+             known_histogram_exists)) {
       envoy::service::metrics::v3::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
       EXPECT_EQ("POST", metrics_service_request_->headers().getMethodValue());
@@ -118,7 +122,8 @@ public:
           EXPECT_EQ(previous_time_stamp, metrics_family.metric(0).timestamp_ms());
         }
         previous_time_stamp = metrics_family.metric(0).timestamp_ms();
-        if (known_counter_exists && known_gauge_exists && known_histogram_exists) {
+        if (known_counter_exists && known_gauge_exists && known_summary_exists &&
+            known_histogram_exists) {
           break;
         }
       }
