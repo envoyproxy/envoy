@@ -215,34 +215,4 @@ TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
   codec_client_->close();
 }
 
-TEST_P(WebsocketWithCompressorIntegrationTest, RouteSpecificUpgrade) {
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        auto* foo_upgrade = hcm.add_upgrade_configs();
-        foo_upgrade->set_upgrade_type("foo");
-        foo_upgrade->mutable_enabled()->set_value(false);
-      });
-  auto host = config_helper_.createVirtualHost("host", "/websocket/test");
-  host.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("foo");
-  config_helper_.addVirtualHost(host);
-  initialize();
-
-  performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));
-  sendBidirectionalData();
-  codec_client_->sendData(*request_encoder_, "bye!", false);
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    codec_client_->close();
-  } else {
-    codec_client_->sendReset(*request_encoder_);
-  }
-
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
-  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
-
-  auto upgrade_response_headers(upgradeResponseHeaders("foo"));
-  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
-  codec_client_->close();
-}
-
 } // namespace Envoy

@@ -159,12 +159,12 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   const auto& request_config = config_->requestDirectionConfig();
   // temp variable to preserve old behavior w/ http upgrade. should be removed when
   // enable_compression_without_content_length_header runtime variable would be removed
-  const bool allowUpgrade =
+  const bool is_upgrade_allowed =
       (!Http::Utility::isUpgrade(headers) && !Http::Utility::isH2UpgradeRequest(headers)) ||
       !Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_content_length_header");
 
-  if (!end_stream && request_config.compressionEnabled() && allowUpgrade &&
+  if (!end_stream && request_config.compressionEnabled() && is_upgrade_allowed &&
       request_config.isMinimumContentLength(headers) &&
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
@@ -223,7 +223,6 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
                           StreamInfo::FilterState::StateType::Mutable);
   }
 }
-
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
@@ -231,12 +230,12 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       config.compressionEnabled() && config.isMinimumContentLength(headers);
   // temp variable to preserve old behavior w/ http upgrade. should be removed when
   // enable_compression_without_content_length_header runtime variable would be removed
-  const bool allowUpgrade =
+  const bool is_upgrade_allowed =
       !Http::Utility::isUpgrade(headers) ||
       !Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_content_length_header");
 
-  const bool isCompressible = isEnabledAndContentLengthBigEnough && allowUpgrade &&
+  const bool isCompressible = isEnabledAndContentLengthBigEnough && is_upgrade_allowed &&
                               config.isContentTypeAllowed(headers) &&
                               !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
                               !headers.getInline(response_content_encoding_handle.handle());
@@ -526,7 +525,8 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     // returning true to account for HTTP/2 where content-length is optional
     return true;
   }
-  return false;
+  return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
+                                   Http::Headers::get().TransferEncodingValues.Chunked);
 }
 
 bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const {
