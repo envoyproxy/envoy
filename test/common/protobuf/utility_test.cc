@@ -262,6 +262,13 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
                     Property(&ProtobufUtil::Status::ToString, testing::HasSubstr("bad.type.url"))));
 }
 
+TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrDie(source_any, true),
+              testing::HasSubstr("@type"));
+}
+
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
