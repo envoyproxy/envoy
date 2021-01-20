@@ -10,6 +10,9 @@ option java_outer_classname = "DependencyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#protodoc-title: Filter dependency specification]
+
+// Dependency specification and string identifier.
 message Dependency {
   enum DependencyType {
     Header = 0;
@@ -22,6 +25,7 @@ message Dependency {
   string name = 2;
 }
 
+// Dependency specification for a filter.
 message FilterDependencies {
   repeated Dependency decode_dependencies = 1;
 
