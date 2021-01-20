@@ -109,7 +109,7 @@ def parseAndPrintTestSuiteError(testsuite, log_path):
   if error_msg != "":
     return printTestSuiteError(last_testsuite, last_testcase, log_path, test_duration, test_time,
                                error_msg, test_output)
-  
+
   return ""
 
 
@@ -123,7 +123,7 @@ def parseXML(file, visited):
   for token in log_file[:-1]:
     log_file_path += token
   log_file_path += ".log"
-  
+
   tree = ET.parse(file)
   root = tree.getroot()
 
@@ -177,7 +177,7 @@ def getGitInfo(CI_TARGET):
                                       os.environ['SYSTEM_STAGEJOBNAME'])
 
   if os.getenv('BUILD_REASON') == "PullRequest" and os.getenv('SYSTEM_PULLREQUEST_PULLREQUESTID'):
-    ret += "Pull request:\t{}/pull/{}\n".format(os.environ['REPO_URI'], 
+    ret += "Pull request:\t{}/pull/{}\n".format(os.environ['REPO_URI'],
                                                 os.environ['SYSTEM_PULLREQUEST_PULLREQUESTID'])
   elif os.getenv('BUILD_REASON'):
     ret += "Build reason:\t{}\n".format(os.environ['BUILD_REASON'])
@@ -206,7 +206,7 @@ def getGitInfo(CI_TARGET):
   ret += "Latest ref:\t{}".format(proc.stdout)
 
   ret += "\n"
- 
+
   ret += "Last commit:\n"
   proc = subprocess.run(['git', 'show', '-s'], capture_output=True, encoding='utf-8')
   for line in proc.stdout.splitlines():
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     if didTestPass(k):
       has_flaky_test = True
       failure_output += parseXML(problematic_tests[k], flaky_tests_visited)
-  
+
   if has_flaky_test:
     output_msg = "``` \n" + getGitInfo(CI_TARGET) + "\n" + failure_output + "``` \n"
 
