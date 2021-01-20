@@ -28,7 +28,7 @@ def printTestCaseFailure(testcase, testsuite, failure_msg, log_path):
   ret += "- Test case:\t{}\n".format(testcase)
   ret += "- Log path:\t{}\n".format(log_path)
   ret += "- Details:\n"
-  for line in failure_msg.split('\n'):
+  for line in failure_msg.splitlines():
     ret += "\t" + line + "\n"
   ret += section_delimiter + "\n"
   return ret
@@ -55,13 +55,13 @@ def printTestSuiteError(testsuite, testcase, log_path, duration, time, error_msg
 
   if traceback_index != -1:
     ret += "- Relevant snippet:\n"
-    for line in output[traceback_index:].split('\n'):
+    for line in output[traceback_index:].splitlines():
       ret += "\t" + line + "\n"
   else:
     # No traceback found. Attempt to print the most recent snippet from the last test case.
     max_snippet_size = 20
     last_testcase_index = output.rfind('[ RUN      ]')
-    output_lines = output[last_testcase_index:].split('\n')
+    output_lines = output[last_testcase_index:].splitlines()
     num_lines_to_print = min(len(output_lines), max_snippet_size)
 
     ret += "- Last {} line(s):\n".format(num_lines_to_print)
@@ -102,7 +102,7 @@ def parseAndPrintTestSuiteError(testsuite, log_path):
       # parsed into the XML metadata. Here we attempt to extract those names from the log by
       # finding the last test case to run. The expected format of that is:
       #     "[ RUN      ] <TestParams>/<TestSuite>.<TestCase>\n".
-      last_test_fullname = test_output.split('[ RUN      ]')[-1].split('\n')[0]
+      last_test_fullname = test_output.split('[ RUN      ]')[-1].splitlines()[0]
       last_testsuite = last_test_fullname.split('/')[1].split('.')[0]
       last_testcase = last_test_fullname.split('.')[1]
 
@@ -209,7 +209,7 @@ def getGitInfo(CI_TARGET):
  
   ret += "Last commit:\n"
   proc = subprocess.run(['git', 'show', '-s'], capture_output=True, encoding='utf-8')
-  for line in proc.stdout.split('\n'):
+  for line in proc.stdout.splitlines():
     ret += "\t" + line + "\n"
 
   ret += section_delimiter
