@@ -7,14 +7,15 @@ source_venv() {
     if [[ ! -d "${VENV_DIR}"/venv ]]; then
       virtualenv "${VENV_DIR}"/venv --python=python3
     fi
-    # venv scripts are in a different location on Windows vs everywhere else.
+    # venv scripts are in a different location on Windows vs everywhere else,
+    # but we prefer the original location if that's available.
     # shellcheck disable=SC1090
-    if [[ -f "${VENV_DIR}/venv/Scripts/activate" ]]; then
-      # shellcheck disable=SC1090
-      source "${VENV_DIR}/venv/Scripts/activate"
-    else
+    if [[ -f "${VENV_DIR}/venv/bin/activate" ]]; then
       # shellcheck disable=SC1090
       source "${VENV_DIR}/venv/bin/activate"
+    else
+      # shellcheck disable=SC1090
+      source "${VENV_DIR}/venv/Scripts/activate"
     fi
   else
     echo "Found existing virtualenv"

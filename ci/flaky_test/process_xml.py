@@ -182,34 +182,28 @@ def getGitInfo(CI_TARGET):
   elif os.getenv('BUILD_REASON'):
     ret += "Build reason:\t{}\n".format(os.environ['BUILD_REASON'])
 
-  proc = subprocess.run(['git', 'log', '--format=%H', '-n', '1'],
-                        capture_output=True,
-                        encoding='utf-8')
-  ret += "Commmit:\t{}/commit/{}".format(os.environ['REPO_URI'], proc.stdout)
+  output = subprocess.check_output(['git', 'log', '--format=%H', '-n', '1'], encoding='utf-8')
+  ret += "Commmit:\t{}/commit/{}".format(os.environ['REPO_URI'], output)
 
   build_id = os.environ['BUILD_URI'].split('/')[-1]
   ret += "CI results:\thttps://dev.azure.com/cncf/envoy/_build/results?buildId=" + build_id + "\n"
 
   ret += "\n"
 
-  proc = subprocess.run(['git', 'remote', 'get-url', 'origin'],
-                        capture_output=True,
-                        encoding='utf-8')
-  ret += "Origin:\t\t{}".format(proc.stdout.replace('.git', ''))
+  output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
+  ret += "Origin:\t\t{}".format(output.replace('.git', ''))
 
-  proc = subprocess.run(['git', 'remote', 'get-url', 'upstream'],
-                        capture_output=True,
-                        encoding='utf-8')
-  ret += "Upstream:\t{}".format(proc.stdout.replace('.git', ''))
+  output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
+  ret += "Upstream:\t{}".format(output.replace('.git', ''))
 
-  proc = subprocess.run(['git', 'describe', '--all'], capture_output=True, encoding='utf-8')
-  ret += "Latest ref:\t{}".format(proc.stdout)
+  output = subprocess.check_output(['git', 'describe', '--all'], encoding='utf-8')
+  ret += "Latest ref:\t{}".format(output)
 
   ret += "\n"
 
   ret += "Last commit:\n"
-  proc = subprocess.run(['git', 'show', '-s'], capture_output=True, encoding='utf-8')
-  for line in proc.stdout.splitlines():
+  output = subprocess.check_output(['git', 'show', '-s'], encoding='utf-8')
+  for line in output.splitlines():
     ret += "\t" + line + "\n"
 
   ret += section_delimiter
