@@ -570,13 +570,14 @@ public:
    * The filter will be added as a dual filter, e.g. it will serve as both a decoding and encoding
    * filter.
    *
-   * Expected usage of this API is as follows: filters that might want to inject filters should create
-   * the filter factories that are used to provide the filters as part of its own filter factory creation
-   * (this ensures that filter factories consistently created on the main thread), and invoke the filter factories
-   * to create new filters per stream (this ensures that the lifetime of filters matches regular filters).
+   * Expected usage of this API is as follows: filters that might want to inject filters should
+   * create the filter factories that are used to provide the filters as part of its own filter
+   * factory creation (this ensures that filter factories consistently created on the main thread),
+   * and invoke the filter factories to create new filters per stream (this ensures that the
+   * lifetime of filters matches regular filters).
    *
-   * The filter factories may also be created as part of other factory instantiations that occur during HTTP filter
-   * factory creation (e.g. match actions).
+   * The filter factories may also be created as part of other factory instantiations that occur
+   * during HTTP filter factory creation (e.g. match actions).
    */
   virtual void addStreamFilter(StreamFilterSharedPtr filter) PURE;
 
