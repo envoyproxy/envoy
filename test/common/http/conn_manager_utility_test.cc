@@ -801,42 +801,6 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
   }
 }
 
-TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequestsLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_upgrade_response", "false"}});
-
-  // Test with the request headers not valid upgrade headers
-  {
-    TestRequestHeaderMapImpl request_headers{{"upgrade", "foo"}};
-    TestResponseHeaderMapImpl response_headers{{"connection", "upgrade"},
-                                               {"transfer-encoding", "eep"},
-                                               {"upgrade", "foo"},
-                                               {"custom_header", "custom_value"}};
-    EXPECT_FALSE(Utility::isUpgrade(request_headers));
-    EXPECT_TRUE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                    "");
-
-    EXPECT_EQ(2UL, response_headers.size()) << response_headers;
-    EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
-    EXPECT_EQ("foo", response_headers.get_("upgrade"));
-  }
-
-  // Test with the response headers not valid upgrade headers
-  {
-    TestRequestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
-    TestResponseHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
-    EXPECT_TRUE(Utility::isUpgrade(request_headers));
-    EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                    "");
-
-    EXPECT_EQ(1UL, response_headers.size()) << response_headers;
-    EXPECT_EQ("bar", response_headers.get_("upgrade"));
-  }
-}
-
 // Test that we correctly return x-request-id if we were requested to force a trace.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestResponseHeaderMapImpl response_headers;

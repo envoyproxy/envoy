@@ -390,9 +390,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
     }
   } else {
     response_headers.removeConnection();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_upgrade_response")) {
-      response_headers.removeUpgrade();
-    }
+    response_headers.removeUpgrade();
   }
 
   response_headers.removeTransferEncoding();
