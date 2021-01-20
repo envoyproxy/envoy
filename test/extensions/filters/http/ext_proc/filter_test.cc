@@ -29,9 +29,14 @@ using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
+using testing::Eq;
 using testing::Invoke;
+using testing::Unused;
 
 using namespace std::chrono_literals;
+
+// These tests are all unit tests that directly drive an instance of the
+// ext_proc filter and verify the behavior using mocks.
 
 class HttpFilterTest : public testing::Test {
 protected:
@@ -81,8 +86,8 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -90,6 +95,8 @@ protected:
   Buffer::OwnedImpl data_;
 };
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an empty response
 TEST_F(HttpFilterTest, SimplestPost) {
   initialize(R"EOF(
   grpc_service:
@@ -151,6 +158,9 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with a message that modifies the request
+// headers.
 TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   initialize(R"EOF(
   grpc_service:
@@ -185,22 +195,14 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
   // We should now have changed the original header a bit
-  request_headers_.iterate([](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
-    std::cerr << e.key().getStringView() << ": " << e.value().getStringView() << '\n';
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  auto get1 = request_headers_.get(LowerCaseString("x-new-header"));
-  EXPECT_EQ(get1.size(), 1);
-  EXPECT_EQ(get1[0]->key(), "x-new-header");
-  EXPECT_EQ(get1[0]->value(), "new");
-  auto get2 = request_headers_.get(LowerCaseString("x-some-other-header"));
-  EXPECT_EQ(get2.size(), 2);
-  EXPECT_EQ(get2[0]->key(), "x-some-other-header");
-  EXPECT_EQ(get2[0]->value(), "yes");
-  EXPECT_EQ(get2[1]->key(), "x-some-other-header");
-  EXPECT_EQ(get2[1]->value(), "no");
-  auto get3 = request_headers_.get(LowerCaseString("x-do-we-want-this"));
-  EXPECT_TRUE(get3.empty());
+  Http::TestRequestHeaderMapImpl expected{{":path", "/"},
+                                          {":method", "POST"},
+                                          {":scheme", "http"},
+                                          {"host", "host"},
+                                          {"x-new-header", "new"},
+                                          {"x-some-other-header", "yes"},
+                                          {"x-some-other-header", "no"}};
+  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(expected, request_headers_));
 
   data_.add("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
@@ -221,6 +223,10 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an "immediate response" message
+// that should result in a response being directly sent downstream with
+// custom headers.
 TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   initialize(R"EOF(
   grpc_service:
@@ -233,18 +239,38 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
+                                                 Eq(absl::nullopt), "Got a bad request"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
   immediate_response->set_body("Bad request");
   immediate_response->set_details("Got a bad request");
+  auto* immediate_headers = immediate_response->mutable_headers();
+  auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_header()->set_key("content-type");
+  hdr1->mutable_header()->set_value("text/plain");
+  auto* hdr2 = immediate_headers->add_set_headers();
+  hdr2->mutable_append()->set_value(true);
+  hdr2->mutable_header()->set_key("x-another-thing");
+  hdr2->mutable_header()->set_value("1");
+  auto* hdr3 = immediate_headers->add_set_headers();
+  hdr3->mutable_append()->set_value(true);
+  hdr3->mutable_header()->set_key("x-another-thing");
+  hdr3->mutable_header()->set_value("2");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
-
-  // Immediate response processing not yet implemented -- all we can expect
-  // at this point is that continueDecoding is called and that the
-  // stream is not yet closed.
   EXPECT_FALSE(stream_close_sent_);
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{
+      {"content-type", "text/plain"}, {"x-another-thing", "1"}, {"x-another-thing", "2"}};
+  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(expected_response_headers,
+                                                     immediate_response_headers));
 
   data_.add("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
@@ -265,6 +291,99 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an empty immediate_response message
+TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::OK, "", _, Eq(absl::nullopt), ""))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  /*auto* immediate_response = */ resp1->mutable_immediate_response();
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  EXPECT_FALSE(stream_close_sent_);
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{};
+  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(expected_response_headers,
+                                                     immediate_response_headers));
+
+  data_.add("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  data_.add("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+  EXPECT_TRUE(stream_close_sent_);
+}
+
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with an immediate response message
+// that contains a non-default gRPC status.
+TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+
+  EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, "", _, Eq(999), ""))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           Unused, Unused) { modify_headers(immediate_response_headers); }));
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  auto* immediate_response = resp1->mutable_immediate_response();
+  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::Forbidden);
+  immediate_response->mutable_grpc_status()->set_status(999);
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  EXPECT_FALSE(stream_close_sent_);
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{};
+  EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(expected_response_headers,
+                                                     immediate_response_headers));
+
+  data_.add("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  data_.add("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+  EXPECT_TRUE(stream_close_sent_);
+}
+
+// Using the default configuration, test the filter with a processor that
+// returns an error from from the gRPC stream.
 TEST_F(HttpFilterTest, PostAndFail) {
   initialize(R"EOF(
   grpc_service:
@@ -281,7 +400,11 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_FALSE(stream_close_sent_);
 
   // Oh no! The remote server had a failure!
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError, "", Eq(nullptr), Eq(absl::nullopt),
+                             "ext_proc error: gRPC error 13"));
+  // In this case, this call includes header encoding
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
 
   data_.add("foo");
@@ -303,6 +426,9 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// returns an error from the gRPC stream that is ignored because the
+// failure_mode_allow parameter is set.
 TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   initialize(R"EOF(
   grpc_service:
@@ -343,6 +469,8 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message by closing the gRPC stream.
 TEST_F(HttpFilterTest, PostAndClose) {
   initialize(R"EOF(
   grpc_service:
@@ -385,6 +513,10 @@ TEST_F(HttpFilterTest, PostAndClose) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message incorrectly by sending a
+// request_body message, which should result in the stream being closed
+// and ignored.
 TEST_F(HttpFilterTest, OutOfOrder) {
   initialize(R"EOF(
   grpc_service:

@@ -24,6 +24,9 @@ public:
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr
+  allocateDispatcher(const std::string& name,
+                     const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,
                                           Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
