@@ -23,14 +23,13 @@ namespace GrpcWeb {
 namespace {
 
 // This is arbitrarily chosen. This can be made configurable when it is required.
-constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
+constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 
-// This builds grpc-message header value from a merged data (built from encoding buffer and the last
-// frame when end_stream=true).
-std::string buildGrpcMessage(Buffer::Instance& merged_data) {
-  const uint64_t message_length = merged_data.length();
+// This builds grpc-message header value from body data.
+std::string buildGrpcMessage(Buffer::Instance& body_data) {
+  const uint64_t message_length = body_data.length();
   std::string message(message_length, 0);
-  merged_data.copyOut(0, message_length, message.data());
+  body_data.copyOut(0, message_length, message.data());
 
   return Http::Utility::PercentEncoding::encode(message);
 }
@@ -108,17 +107,16 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
                                                              Buffer::Instance* last_data) {
   const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
   if (encoding_buffer != nullptr) {
-    if (encoding_buffer->length() > MAX_GRPC_MESSAGE_LENGTH) {
-      encoder_callbacks_->modifyEncodingBuffer([](Buffer::Instance& buffered) {
+    if (encoding_buffer->length() > MAX_BUFFERED_PLAINTEXT_LENGTH) {
+      encoder_callbacks_->modifyEncodingBuffer([&output](Buffer::Instance& buffered) {
         Buffer::OwnedImpl needed_buffer;
-        needed_buffer.move(buffered, MAX_GRPC_MESSAGE_LENGTH);
+        needed_buffer.move(buffered, MAX_BUFFERED_PLAINTEXT_LENGTH);
         buffered.drain(buffered.length());
-        buffered.move(needed_buffer);
+        output.move(needed_buffer);
       });
+    } else {
+      output.add(*encoding_buffer);
     }
-
-    ASSERT(encoding_buffer->length() <= MAX_GRPC_MESSAGE_LENGTH);
-    output.add(*encoding_buffer);
 
     encoder_callbacks_->modifyEncodingBuffer(
         [](Buffer::Instance& buffered) { buffered.drain(buffered.length()); });
@@ -128,8 +126,8 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
   if (last_data != nullptr) {
     uint64_t needed = last_data->length();
     // When we have buffered data (from encoding buffer), we limit the final buffer length.
-    if (encoding_buffer != nullptr && (output.length() + needed) >= MAX_GRPC_MESSAGE_LENGTH) {
-      needed = std::min(needed, MAX_GRPC_MESSAGE_LENGTH - output.length());
+    if (encoding_buffer != nullptr && (output.length() + needed) >= MAX_BUFFERED_PLAINTEXT_LENGTH) {
+      needed = std::min(needed, MAX_BUFFERED_PLAINTEXT_LENGTH - output.length());
     }
     output.move(*last_data, needed);
     last_data->drain(last_data->length());
@@ -139,7 +137,7 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
 void GrpcWebFilter::setTransformedNonProtoEncodedResponseHeaders(Buffer::Instance* data) {
   Buffer::OwnedImpl merged_data;
   // When we have buffered data in encoding buffer, we limit the length of the output to be smaller
-  // than MAX_GRPC_MESSAGE_LENGTH. However, when we only have "last" data, we send it all.
+  // than MAX_BUFFERED_PLAINTEXT_LENGTH. However, when we only have "last" data, we send it all.
   mergeAndLimitNonProtoEncodedResponseData(merged_data, data);
 
   const std::string grpc_message = buildGrpcMessage(merged_data);
@@ -276,7 +274,8 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   if (needs_transformation_for_non_proto_encoded_response_) {
     const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
     if (!end_stream) {
-      if (encoding_buffer != nullptr && encoding_buffer->length() >= MAX_GRPC_MESSAGE_LENGTH) {
+      if (encoding_buffer != nullptr &&
+          encoding_buffer->length() >= MAX_BUFFERED_PLAINTEXT_LENGTH) {
         return Http::FilterDataStatus::StopIterationNoBuffer;
       }
       return Http::FilterDataStatus::StopIterationAndBuffer;

@@ -13,7 +13,7 @@ namespace {
 
 constexpr absl::string_view text{"application/grpc-web-text"};
 constexpr absl::string_view binary{"application/grpc-web"};
-constexpr uint64_t MAX_GRPC_MESSAGE_LENGTH = 16384;
+constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 
 using SkipEncodingEmptyTrailers = bool;
 using ContentType = std::string;
@@ -227,8 +227,8 @@ TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnect) {
 
 TEST_P(GrpcWebFilterIntegrationTest, UpstreamDisconnectWithLargeBody) {
   // The local reply is configured to send a large (its length is greater than
-  // MAX_GRPC_MESSAGE_LENGTH) body.
-  const std::string local_reply_body = std::string(2 * MAX_GRPC_MESSAGE_LENGTH, 'a');
+  // MAX_BUFFERED_PLAINTEXT_LENGTH) body.
+  const std::string local_reply_body = std::string(2 * MAX_BUFFERED_PLAINTEXT_LENGTH, 'a');
   const std::string local_reply_config_yaml = fmt::format(R"EOF(
 body_format:
   text_format_source:
@@ -250,16 +250,16 @@ TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseWithoutContentType) {
 }
 
 TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLargeEnd) {
-  // When we have buffered data in encoding buffer, we limit the length to MAX_GRPC_MESSAGE_LENGTH.
-  const std::string start(MAX_GRPC_MESSAGE_LENGTH, 'a');
-  const std::string end(MAX_GRPC_MESSAGE_LENGTH, 'b');
+  // When we have buffered data in encoding buffer, we limit the length to MAX_BUFFERED_PLAINTEXT_LENGTH.
+  const std::string start(MAX_BUFFERED_PLAINTEXT_LENGTH, 'a');
+  const std::string end(MAX_BUFFERED_PLAINTEXT_LENGTH, 'b');
   testBadUpstreamResponse(start, end, /*expected=*/start);
 }
 
 TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLargeFirst) {
-  const std::string start(2 * MAX_GRPC_MESSAGE_LENGTH, 'a');
-  const std::string end(MAX_GRPC_MESSAGE_LENGTH, 'b');
-  testBadUpstreamResponse(start, end, /*expected=*/start.substr(0, MAX_GRPC_MESSAGE_LENGTH));
+  const std::string start(2 * MAX_BUFFERED_PLAINTEXT_LENGTH, 'a');
+  const std::string end(MAX_BUFFERED_PLAINTEXT_LENGTH, 'b');
+  testBadUpstreamResponse(start, end, /*expected=*/start.substr(0, MAX_BUFFERED_PLAINTEXT_LENGTH));
 }
 
 } // namespace
