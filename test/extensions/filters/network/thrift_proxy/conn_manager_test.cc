@@ -1641,6 +1641,55 @@ route_config:
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
+// When a local reply was sent, payload passthrough is disabled because there's no
+// active RPC left.
+TEST_F(ThriftConnectionManagerTest, NoPayloadPassthroughOnLocalReply) {
+  const std::string yaml = R"EOF(
+transport: FRAMED
+protocol: BINARY
+payload_passthrough: true
+stat_prefix: test
+route_config:
+  name: "routes"
+  routes:
+    - match:
+        method_name: not_handled
+      route:
+        cluster: cluster
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  NiceMock<MockDirectResponse> direct_response;
+  EXPECT_CALL(direct_response, encode(_, _, _))
+      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+                           Buffer::Instance& buffer) -> DirectResponse::ResponseType {
+        buffer.add("response");
+        return DirectResponse::ResponseType::ErrorReply;
+      }));
+
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
+        callbacks->sendLocalReply(direct_response, false);
+        return FilterStatus::StopIteration;
+      }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+
+  Router::RouteConstSharedPtr route = callbacks->route();
+  EXPECT_EQ(nullptr, route);
+}
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions
