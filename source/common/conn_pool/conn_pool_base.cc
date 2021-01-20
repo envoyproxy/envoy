@@ -249,8 +249,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 }
 
 bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
-  return tryCreateNewConnection(global_preconnect_ratio) ==
-         ConnectionResult::CreatedNewConnection;
+  return tryCreateNewConnection(global_preconnect_ratio) == ConnectionResult::CreatedNewConnection;
 }
 
 void ConnPoolImplBase::scheduleOnUpstreamReady() {
