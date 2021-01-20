@@ -182,7 +182,7 @@ public:
 
     MOCK_METHOD(void, enable, (), (override));
     MOCK_METHOD(void, disable, (), (override));
-    MOCK_METHOD(void, setRejectFraction, (float));
+    MOCK_METHOD(void, setRejectFraction, (UnitFloat));
     MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
@@ -468,10 +468,10 @@ TEST_F(ConnectionHandlerTest, SetListenerRejectFraction) {
   EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
-  EXPECT_CALL(*listener, setRejectFraction(0.1234f));
+  EXPECT_CALL(*listener, setRejectFraction(UnitFloat(0.1234f)));
   EXPECT_CALL(*listener, onDestroy());
 
-  handler_->setListenerRejectFraction(0.1234f);
+  handler_->setListenerRejectFraction(UnitFloat(0.1234f));
 }
 
 TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
@@ -481,11 +481,11 @@ TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {
   auto listener = new NiceMock<Network::MockListener>();
   TestListener* test_listener =
       addListener(1, false, false, "test_listener", listener, &listener_callbacks);
-  EXPECT_CALL(*listener, setRejectFraction(0.12345f));
+  EXPECT_CALL(*listener, setRejectFraction(UnitFloat(0.12345f)));
   EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
   EXPECT_CALL(*listener, onDestroy());
 
-  handler_->setListenerRejectFraction(0.12345f);
+  handler_->setListenerRejectFraction(UnitFloat(0.12345f));
   handler_->addListener(absl::nullopt, *test_listener);
 }
 

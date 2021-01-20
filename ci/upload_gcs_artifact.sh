@@ -19,7 +19,7 @@ if [ ! -d "${SOURCE_DIRECTORY}" ]; then
 fi
 
 if [[ "$BUILD_REASON" == "PullRequest" ]]; then
-    # non-master upload to the last commit sha (first 7 chars) in the developers branch
+    # non-main upload to the last commit sha (first 7 chars) in the developers branch
     UPLOAD_PATH="$(git log --pretty=%P -n 1 | cut -d' ' -f2 | head -c7)"
 else
     UPLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
