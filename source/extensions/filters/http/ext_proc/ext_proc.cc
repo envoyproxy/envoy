@@ -51,6 +51,11 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of
 }
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_of_stream) {
+  if (pending_error_) {
+    sendImmediateResponse(*pending_error_, false);
+    pending_error_.reset();
+    return FilterHeadersStatus::Continue;
+  }
   if (stream_closed_) {
     return FilterHeadersStatus::Continue;
   }
@@ -161,10 +166,14 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     stream_closed_ = true;
-    ImmediateResponse error_response;
-    error_response.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    error_response.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
-    handleImmediateResponse(error_response);
+    auto error_response = std::make_unique<ImmediateResponse>();
+    error_response->mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    error_response->set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
+    if (!handleImmediateResponse(*error_response)) {
+      // This type of error needs to be delivered the next time that we get
+      // a chance.
+      pending_error_ = std::move(error_response);
+    }
   }
 }
 

@@ -124,6 +124,7 @@ private:
 
   ExternalProcessorStreamPtr stream_;
   bool stream_closed_ = false;
+  std::unique_ptr<envoy::service::ext_proc::v3alpha::ImmediateResponse> pending_error_;
 
   Http::HeaderMap* request_headers_ = nullptr;
   Http::HeaderMap* response_headers_ = nullptr;
