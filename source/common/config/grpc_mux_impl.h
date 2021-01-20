@@ -47,12 +47,13 @@ public:
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
-  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+  GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                           const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder,
                            const bool use_namespace_matching = false) override;
 
-  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -80,11 +81,12 @@ private:
   void sendDiscoveryRequest(const std::string& type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
-    GrpcMuxWatchImpl(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                     OpaqueResourceDecoder& resource_decoder, const std::string& type_url,
-                     GrpcMuxImpl& parent)
-        : resources_(resources), callbacks_(callbacks), resource_decoder_(resource_decoder),
-          type_url_(type_url), parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
+    GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
+                     SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                     const std::string& type_url, GrpcMuxImpl& parent)
+        : callbacks_(callbacks), resource_decoder_(resource_decoder), type_url_(type_url),
+          parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
+      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
       watches_.emplace(watches_.begin(), this);
     }
 
@@ -95,17 +97,19 @@ private:
       }
     }
 
-    void update(const std::set<std::string>& resources) override {
+    void update(const absl::flat_hash_set<std::string>& resources) override {
       watches_.remove(this);
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
       }
-      resources_ = resources;
+      resources_.clear();
+      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
       // move this watch to the beginning of the list
       watches_.emplace(watches_.begin(), this);
       parent_.queueDiscoveryRequest(type_url_);
     }
 
+    // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
     OpaqueResourceDecoder& resource_decoder_;
@@ -184,12 +188,12 @@ public:
     return std::make_unique<Cleanup>([] {});
   }
 
-  GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                           OpaqueResourceDecoder&, const bool) override {
+  GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                           SubscriptionCallbacks&, OpaqueResourceDecoder&, const bool) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 
-  void requestOnDemandUpdate(const std::string&, const std::set<std::string>&) override {
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
