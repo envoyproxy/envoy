@@ -11,7 +11,7 @@ namespace Upstream {
  */
 template <class C> class Scheduler {
 public:
-  virtual ~Scheduler() {}
+  virtual ~Scheduler() = default;
 
   /**
    * Each time peekAgain is called, it will return the best-effort subsequent
