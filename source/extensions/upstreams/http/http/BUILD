@@ -17,7 +17,7 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    category = "SOMECAT",
+    category = "envoy.upstreams",
     security_posture = "robust_to_untrusted_downstream",
     visibility = ["//visibility:public"],
     deps = [
