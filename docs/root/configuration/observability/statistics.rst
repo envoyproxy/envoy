@@ -35,7 +35,7 @@ Server related statistics are rooted at *server.* with following statistics:
   dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
 
 Server Compilation Settings
-------
+---------------------------
 
 Server Compilation Settings related statistics are rooted at *server.compilation_settings.* with following statistics:
 
