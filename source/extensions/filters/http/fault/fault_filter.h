@@ -252,6 +252,7 @@ private:
   void postDelayInjection(const Http::RequestHeaderMap& request_headers);
   void abortWithStatus(Http::Code http_status_code,
                        absl::optional<Grpc::Status::GrpcStatus> grpc_status_code);
+  bool activeFaults();
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
   bool isAbortEnabled(const Http::RequestHeaderMap& request_headers);

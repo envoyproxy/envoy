@@ -434,6 +434,15 @@ void FaultFilter::onDestroy() {
   }
 }
 
+bool FaultFilter::activeFaults() {
+  // Check if there is a delay timer or response rate limiter still applying
+  if (delay_timer_ != nullptr || fault_settings_->responseRateLimit() != nullptr) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_headers) {
   resetTimerState();
 
@@ -445,6 +454,13 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   if (http_status.has_value()) {
     abortWithStatus(http_status.value(), grpc_status);
   } else {
+    // Should not continue to count as an active fault after the delay has elapsed
+    // if no other type of fault is active
+    if (!activeFaults() && fault_active_) {
+      config_->stats().active_faults_.dec();
+      fault_active_ = false;
+    }
+
     // Continue request processing.
     decoder_callbacks_->continueDecoding();
   }
