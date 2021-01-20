@@ -1,4 +1,4 @@
- load(
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
