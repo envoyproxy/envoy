@@ -39,7 +39,7 @@ class ProxyFilter
       public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  ProxyFilter(ProxyFilterConfig& config);
+  ProxyFilter(ProxyFilterConfigSharedPtr config);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override {
@@ -54,7 +54,7 @@ public:
   void onLoadDnsCacheComplete() override;
 
 private:
-  ProxyFilterConfig& config_;
+  const ProxyFilterConfigSharedPtr config_;
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   Network::ReadFilterCallbacks* read_callbacks_{};

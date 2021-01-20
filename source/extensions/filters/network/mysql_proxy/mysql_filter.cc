@@ -16,7 +16,7 @@ namespace MySQLProxy {
 MySQLFilterConfig::MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stats_(generateStats(stat_prefix, scope)) {}
 
-MySQLFilter::MySQLFilter(MySQLFilterConfig& config) : config_(config) {}
+MySQLFilter::MySQLFilter(MySQLFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 void MySQLFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -58,7 +58,7 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
     decoder_->onData(buffer);
   } catch (EnvoyException& e) {
     ENVOY_LOG(info, "mysql_proxy: decoding error: {}", e.what());
-    config_.stats_.decoder_errors_.inc();
+    config_->stats_.decoder_errors_.inc();
     sniffing_ = false;
     read_buffer_.drain(read_buffer_.length());
     write_buffer_.drain(write_buffer_.length());
@@ -69,31 +69,31 @@ DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
 
-void MySQLFilter::onProtocolError() { config_.stats_.protocol_errors_.inc(); }
+void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
 
 void MySQLFilter::onNewMessage(MySQLSession::State state) {
   if (state == MySQLSession::State::ChallengeReq) {
-    config_.stats_.login_attempts_.inc();
+    config_->stats_.login_attempts_.inc();
   }
 }
 
 void MySQLFilter::onClientLogin(ClientLogin& client_login) {
   if (client_login.isSSLRequest()) {
-    config_.stats_.upgraded_to_ssl_.inc();
+    config_->stats_.upgraded_to_ssl_.inc();
   }
 }
 
 void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
   if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
-    config_.stats_.auth_switch_request_.inc();
+    config_->stats_.auth_switch_request_.inc();
   } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-    config_.stats_.login_failures_.inc();
+    config_->stats_.login_failures_.inc();
   }
 }
 
 void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
   if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
-    config_.stats_.login_failures_.inc();
+    config_->stats_.login_failures_.inc();
   }
 }
 
@@ -115,17 +115,17 @@ void MySQLFilter::onCommand(Command& command) {
                  command.getData());
 
   if (!result) {
-    config_.stats_.queries_parse_error_.inc();
+    config_->stats_.queries_parse_error_.inc();
     return;
   }
-  config_.stats_.queries_parsed_.inc();
+  config_->stats_.queries_parsed_.inc();
 
   read_callbacks_->connection().streamInfo().setDynamicMetadata(
       NetworkFilterNames::get().MySQLProxy, metadata);
 }
 
 Network::FilterStatus MySQLFilter::onNewConnection() {
-  config_.stats_.sessions_.inc();
+  config_->stats_.sessions_.inc();
   return Network::FilterStatus::Continue;
 }
 

@@ -245,7 +245,7 @@ class Filter : public Network::ReadFilter,
                protected Logger::Loggable<Logger::Id::filter>,
                public GenericConnectionPoolCallbacks {
 public:
-  Filter(Config& config, Upstream::ClusterManager& cluster_manager);
+  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~Filter() override;
 
   // Network::ReadFilter
@@ -264,7 +264,7 @@ public:
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   absl::optional<uint64_t> computeHashKey() override {
-    auto hash_policy = config_.hashPolicy();
+    auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
       return hash_policy->generateHash(
           downstreamConnection()->addressProvider().remoteAddress().get(),
@@ -337,7 +337,7 @@ protected:
 
   // Callbacks for different error and success states during connection establishment
   virtual RouteConstSharedPtr pickRoute() {
-    return config_.getRouteFromEntries(read_callbacks_->connection());
+    return config_->getRouteFromEntries(read_callbacks_->connection());
   }
 
   virtual void onInitFailure(UpstreamFailureReason) {
@@ -357,7 +357,7 @@ protected:
   void disableIdleTimer();
   void onMaxDownstreamConnectionDuration();
 
-  Config& config_;
+  const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 

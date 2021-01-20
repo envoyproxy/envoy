@@ -32,7 +32,7 @@ public:
 
   void initialize() {
     config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, scope_);
-    filter_ = std::make_unique<ZooKeeperFilter>(*config_, time_system_);
+    filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 

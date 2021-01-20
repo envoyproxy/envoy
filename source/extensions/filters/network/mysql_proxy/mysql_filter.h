@@ -69,7 +69,7 @@ using MySQLFilterConfigSharedPtr = std::shared_ptr<MySQLFilterConfig>;
  */
 class MySQLFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
 public:
-  MySQLFilter(MySQLFilterConfig& config);
+  MySQLFilter(MySQLFilterConfigSharedPtr config);
   ~MySQLFilter() override = default;
 
   // Network::ReadFilter
@@ -97,7 +97,7 @@ public:
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
-  MySQLFilterConfig& config_;
+  MySQLFilterConfigSharedPtr config_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   std::unique_ptr<Decoder> decoder_;

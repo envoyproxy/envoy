@@ -36,7 +36,7 @@ public:
     proto_config.set_port_value(443);
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
-    filter_ = std::make_unique<ProxyFilter>(*filter_config_);
+    filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
 
     // Allow for an otherwise strict mock.

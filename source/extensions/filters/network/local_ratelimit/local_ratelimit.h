@@ -60,7 +60,7 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
  */
 class Filter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(Config& config) : config_(config) {}
+  Filter(const ConfigSharedPtr& config) : config_(config) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override {
@@ -72,7 +72,7 @@ public:
   }
 
 private:
-  Config& config_;
+  const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
