@@ -26,7 +26,9 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 TagExtractorImplBase::TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                                            absl::string_view substr)
-    : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr) {}
+    : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr) {
+  PERF_TAG_INIT;
+}
 
 std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
   std::string prefix;
@@ -90,6 +92,7 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
 
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re-skip", name_);
+    PERF_TAG_INC(skipped_);
     return false;
   }
 
@@ -113,9 +116,11 @@ bool TagExtractorStdRegexImpl::extractTag(absl::string_view stat_name, std::vect
     std::string::size_type end = remove_subexpr.second - stat_name.begin();
     remove_characters.insert(start, end);
     PERF_RECORD(perf, "re-match", name_);
+    PERF_TAG_INC(matched_);
     return true;
   }
   PERF_RECORD(perf, "re-miss", name_);
+  PERF_TAG_INC(missed_);
   return false;
 }
 
@@ -129,6 +134,7 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
 
   if (substrMismatch(stat_name)) {
     PERF_RECORD(perf, "re2-skip", name_);
+    PERF_TAG_INC(skipped_);
     return false;
   }
 
@@ -136,8 +142,8 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
   re2::StringPiece remove_subexpr, value_subexpr;
 
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (re2::RE2::FullMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
-                          &remove_subexpr, &value_subexpr) &&
+  if (re2::RE2::PartialMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
+                             &remove_subexpr, &value_subexpr) &&
       !remove_subexpr.empty()) {
 
     // value_subexpr is the optional second submatch. It is usually inside the first submatch
@@ -155,9 +161,11 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
     remove_characters.insert(start, end);
 
     PERF_RECORD(perf, "re2-match", name_);
+    PERF_TAG_INC(matched_);
     return true;
   }
   PERF_RECORD(perf, "re2-miss", name_);
+  PERF_TAG_INC(missed_);
   return false;
 }
 
