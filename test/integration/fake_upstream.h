@@ -257,17 +257,6 @@ public:
     connection_.addConnectionCallbacks(*this);
   }
 
-  Common::CallbackHandle* addDisconnectCallback(DisconnectCallback callback) {
-    absl::MutexLock lock(&lock_);
-    return disconnect_callback_manager_.add(callback);
-  }
-
-  // Avoid directly removing by caller, since CallbackManager is not thread safe.
-  void removeDisconnectCallback(Common::CallbackHandle* handle) {
-    absl::MutexLock lock(&lock_);
-    handle->remove();
-  }
-
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     // Throughout this entire function, we know that the connection_ cannot disappear, since this
@@ -278,7 +267,6 @@ public:
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
       disconnected_ = true;
-      disconnect_callback_manager_.runCallbacks();
     }
   }
 
@@ -315,6 +303,10 @@ public:
     if (disconnected_) {
       return testing::AssertionSuccess();
     }
+    // Sanity check: detect if the post and wait is attempted from the dispatcher thread; fail
+    // immediately instead of deadlocking.
+    ASSERT(!connection_.dispatcher().isThreadSafe(),
+           "deadlock: executeOnDispatcher called from dispatcher thread.");
     bool callback_ready_event = false;
     bool unexpected_disconnect = false;
     connection_.dispatcher().post(
@@ -345,13 +337,13 @@ public:
 
   void setParented() {
     absl::MutexLock lock(&lock_);
+    ASSERT(!parented_);
     parented_ = true;
   }
 
 private:
   Network::Connection& connection_;
   absl::Mutex lock_;
-  Common::CallbackManager<> disconnect_callback_manager_ ABSL_GUARDED_BY(lock_);
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
 };
@@ -363,7 +355,10 @@ using SharedConnectionWrapperPtr = std::unique_ptr<SharedConnectionWrapper>;
  */
 class FakeConnectionBase : public Logger::Loggable<Logger::Id::testing> {
 public:
-  virtual ~FakeConnectionBase() { ASSERT(initialized_); }
+  virtual ~FakeConnectionBase() {
+    absl::MutexLock lock(&lock_);
+    ASSERT(initialized_);
+  }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult close(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
@@ -380,14 +375,10 @@ public:
   testing::AssertionResult
   waitForHalfClose(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  ABSL_MUST_USE_RESULT
-  virtual testing::AssertionResult initialize() {
+  virtual void initialize() {
+    absl::MutexLock lock(&lock_);
     initialized_ = true;
-    return testing::AssertionSuccess();
   }
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  enableHalfClose(bool enabled, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
@@ -398,9 +389,9 @@ protected:
         time_system_(time_system) {}
 
   SharedConnectionWrapper& shared_connection_;
-  bool initialized_{};
   absl::Mutex& lock_; // TODO(mattklein123): Use the shared connection lock and figure out better
                       // guarded by annotations.
+  bool initialized_ ABSL_GUARDED_BY(lock_){};
   bool half_closed_ ABSL_GUARDED_BY(lock_){};
   Event::TestTimeSystem& time_system_;
 };
@@ -499,8 +490,7 @@ public:
   testing::AssertionResult write(const std::string& data, bool end_stream = false,
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult initialize() override;
+  void initialize() override;
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contained in the incoming data string. Unlike many of Envoy waitFor functions,
@@ -742,6 +732,9 @@ private:
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void onRecvDatagram(Network::UdpRecvData& data);
+  AssertionResult
+  runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
+                               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;

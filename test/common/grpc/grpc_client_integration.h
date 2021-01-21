@@ -69,9 +69,7 @@ public:
     return fmt::format("{}_{}_{}",
                        std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
                        std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-                       std::get<2>(p.param) == envoy::config::core::v3::ApiVersion::V3
-                           ? "V3"
-                           : envoy::config::core::v3::ApiVersion::V2 ? "V2" : "AUTO");
+                       ApiVersion_Name(std::get<2>(p.param)));
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   ClientType clientType() const override { return std::get<1>(GetParam()); }
