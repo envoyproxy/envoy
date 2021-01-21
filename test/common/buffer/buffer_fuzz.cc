@@ -277,7 +277,6 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     if (reserve_length < 16384) {
       auto reservation = target_buffer.reserveSingleSlice(reserve_length);
       ::memset(reservation.slice().mem_, insert_value, reservation.slice().len_);
-      RELEASE_ASSERT(action.reserve_commit().commit_length() <= reserve_length, "");
       reservation.commit(
           std::min<uint64_t>(action.reserve_commit().commit_length(), reservation.length()));
     } else {
