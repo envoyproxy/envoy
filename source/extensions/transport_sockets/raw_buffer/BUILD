@@ -14,7 +14,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "SOMECAT",
+    category = (
+        "envoy.transport_sockets.downstream",
+        "envoy.transport_sockets.upstream",
+    ),
     security_posture = "requires_trusted_downstream_and_upstream",
     # This is core Envoy config.
     visibility = ["//visibility:public"],
