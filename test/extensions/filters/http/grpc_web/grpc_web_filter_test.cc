@@ -304,6 +304,13 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
   Buffer::OwnedImpl data("hello");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(buffer.get()));
+  auto on_modify_encoding_buffer = [encoded_buffer =
+                                        buffer.get()](std::function<void(Buffer::Instance&)> cb) {
+    cb(*encoded_buffer);
+  };
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
+      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
   buffer->add(data);
@@ -375,6 +382,13 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
   Buffer::OwnedImpl data("hello");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(buffer.get()));
+  auto on_modify_encoding_buffer = [encoded_buffer =
+                                        buffer.get()](std::function<void(Buffer::Instance&)> cb) {
+    cb(*encoded_buffer);
+  };
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
+      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
   buffer->add(data);

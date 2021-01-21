@@ -108,16 +108,10 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
                                                              Buffer::Instance* last_data) {
   const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
   if (encoding_buffer != nullptr) {
-    if (encoding_buffer->length() > MAX_BUFFERED_PLAINTEXT_LENGTH) {
-      encoder_callbacks_->modifyEncodingBuffer([&output](Buffer::Instance& buffered) {
-        output.move(buffered, MAX_BUFFERED_PLAINTEXT_LENGTH);
-      });
-    } else {
-      output.add(*encoding_buffer);
-    }
-
-    encoder_callbacks_->modifyEncodingBuffer(
-        [](Buffer::Instance& buffered) { buffered.drain(buffered.length()); });
+    encoder_callbacks_->modifyEncodingBuffer([&output](Buffer::Instance& buffered) {
+      output.move(buffered, MAX_BUFFERED_PLAINTEXT_LENGTH);
+      buffered.drain(buffered.length());
+    });
   }
 
   // In the case of local reply, "encoding_buffer" is nullptr and we only have filled "last_data".
