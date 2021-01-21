@@ -56,6 +56,7 @@ private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
   bool isGrpcWebRequest(const Http::RequestHeaderMap& headers);
+  bool isProtoEncodedGrpcWebResponseHeaders(const Http::ResponseHeaderMap& headers) const;
   bool hasProtoEncodedGrpcWebContentType(const Http::RequestOrResponseHeaderMap& headers) const;
   bool needsTransformationForNonProtoEncodedResponse(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) const;

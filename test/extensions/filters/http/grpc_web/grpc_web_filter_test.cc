@@ -114,6 +114,10 @@ public:
     return filter_.hasProtoEncodedGrpcWebContentType(request_headers);
   }
 
+  bool isProtoEncodedGrpcWebResponseHeaders(const Http::ResponseHeaderMap& headers) {
+    return filter_.isProtoEncodedGrpcWebResponseHeaders(headers);
+  }
+
   void expectMergedAndLimitedResponseData(Buffer::Instance* encoded_buffer,
                                           Buffer::Instance* last_data,
                                           uint64_t expected_merged_length) {
@@ -190,6 +194,20 @@ TEST_F(GrpcWebFilterTest, UnexpectedGrpcWebProtoContentType) {
       isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebText));
   EXPECT_FALSE(
       isProtoEncodedGrpcWebContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto));
+}
+
+TEST_F(GrpcWebFilterTest, ExpectedGrpcWebProtoResponseHeaders) {
+  EXPECT_TRUE(isProtoEncodedGrpcWebResponseHeaders(Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"content-type", "application/grpc-web"}}));
+  EXPECT_TRUE(isProtoEncodedGrpcWebResponseHeaders(Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"content-type", "application/grpc-web+proto"}}));
+}
+
+TEST_F(GrpcWebFilterTest, UnexpectedGrpcWebProtoResponseHeaders) {
+  EXPECT_FALSE(isProtoEncodedGrpcWebResponseHeaders(Http::TestResponseHeaderMapImpl{
+      {":status", "500"}, {"content-type", "application/grpc-web+proto"}}));
+  EXPECT_FALSE(isProtoEncodedGrpcWebResponseHeaders(Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"content-type", "application/grpc-web+json"}}));
 }
 
 TEST_F(GrpcWebFilterTest, MergeAndLimitNonProtoEncodedResponseData) {

@@ -74,6 +74,16 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
   return false;
 }
 
+bool GrpcWebFilter::isProtoEncodedGrpcWebResponseHeaders(
+    const Http::ResponseHeaderMap& headers) const {
+  // We expect the response headers to have 200 OK status (a valid gRPC, also gRPC-Web, response
+  // needs to have 200 OK status
+  // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses) and contain
+  // proto-encoded gRPC-Web content-type.
+  return Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
+         hasProtoEncodedGrpcWebContentType(headers);
+}
+
 bool GrpcWebFilter::hasProtoEncodedGrpcWebContentType(
     const Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
@@ -94,18 +104,15 @@ bool GrpcWebFilter::hasProtoEncodedGrpcWebContentType(
   return false;
 }
 
-// If response headers do not contain gRPC or gRPC-Web response headers, it needs transformation.
+// If response headers do not contain valid response headers, it needs transformation.
 bool GrpcWebFilter::needsTransformationForNonProtoEncodedResponse(Http::ResponseHeaderMap& headers,
                                                                   bool end_stream) const {
   return Runtime::runtimeFeatureEnabled(
              "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling") &&
+         // We do transformation when the response headers is not gRPC response headers and it is
+         // not proto-encoded gRPC-Web response headers.
          !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
-         // We also do transformation when the response status is not OK (since a gRPC (also
-         // gRPC-Web) response should have 200 OK as its response status
-         // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses) and it has no
-         // valid proto-encoded response.
-         !(Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
-           hasProtoEncodedGrpcWebContentType(headers));
+         !isProtoEncodedGrpcWebResponseHeaders(headers);
 }
 
 void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& output,
