@@ -81,6 +81,12 @@ In addition, the following conventions should be followed:
   pattern forces developers to explicitly choose the correct enum value for
   their use case, and avoid misunderstanding of the default behavior.
 
+* For time-related fields, prefer using the well-known types `google.protobuf.Duration` or
+  `google.protobuf.Timestamp` instead of raw integers for seconds.
+
+* If a field is going to contain raw bytes rather than a human-readable string, the field should
+  be of type `bytes` instead of `string`.
+
 * Proto fields should be sorted logically, not by field number.
 
 ## Package organization
