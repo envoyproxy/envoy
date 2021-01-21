@@ -119,7 +119,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
 
       if (saved_errno == ECONNREFUSED) {
         ENVOY_LOG(error, "hot restart sendmsg() connection refused, retrying");
-        std::this_thread::sleep_for(CONNECTION_REFUSED_RETRY_DELAY);
+        absl::SleepFor(absl::Seconds(CONNECTION_REFUSED_RETRY_DELAY));
         continue;
       }
 
