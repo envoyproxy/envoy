@@ -64,7 +64,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.always_nodelay",
     "envoy.reloadable_features.check_ocsp_policy",
     "envoy.reloadable_features.disable_tls_inspector_injection",
-    "envoy.reloadable_features.fix_wildcard_matching",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
     "envoy.reloadable_features.http_default_alpn",
