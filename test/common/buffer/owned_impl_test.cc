@@ -872,7 +872,11 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
   // Commit part of the first slice and none of the second slice.
   const void* first_slice;
   {
+    expectSlices({{8000, 4288, 12288}}, buffer);
     auto reservation = buffer.reserveApproximately(16384);
+
+    // No additional slices are added to the buffer until `commit()` is called
+    // on the reservation.
     expectSlices({{8000, 4288, 12288}}, buffer);
     first_slice = reservation.slices()[0].mem_;
 
