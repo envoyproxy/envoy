@@ -492,6 +492,7 @@ public:
   void commit(uint64_t length) {
     ENVOY_BUG(length <= length_, "commit() length must be <= size of the Reservation");
     buffer_.commit(length, absl::MakeSpan(slices_), absl::MakeSpan(owned_slices_));
+    length_ = 0;
     slices_.clear();
     owned_slices_.clear();
   }
