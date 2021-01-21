@@ -491,6 +491,8 @@ public:
    */
   void commit(uint64_t length) {
     ENVOY_BUG(length <= length_, "commit() length must be <= size of the Reservation");
+    ASSERT(length == 0 || !slices_.empty(),
+           "Reservation.commit() called on empty Reservation; possible double-commit().");
     buffer_.commit(length, absl::MakeSpan(slices_), absl::MakeSpan(owned_slices_));
     length_ = 0;
     slices_.clear();
@@ -557,6 +559,8 @@ public:
    */
   void commit(uint64_t length) {
     ENVOY_BUG(length <= slice_.len_, "commit() length must be <= size of the Reservation");
+    ASSERT(length == 0 || slice_.mem_ != nullptr,
+           "Reservation.commit() called on empty Reservation; possible double-commit().");
     buffer_.commit(length, absl::MakeSpan(&slice_, 1), absl::MakeSpan(&owned_slice_, 1));
     slice_ = {nullptr, 0};
     owned_slice_.reset();
