@@ -482,7 +482,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
   // Reserve and commit additional space on the buffer beyond the expected
   // high_watermark_threshold * overflow_multiplier threshold.
   const uint64_t size = high_watermark_threshold * overflow_multiplier - buffer1.length() + 1;
-  auto reservation = buffer1.reserveApproximately(size);
+  auto reservation = buffer1.reserveSingleSlice(size);
   reservation.commit(size);
   EXPECT_EQ(buffer1.length(), high_watermark_threshold * overflow_multiplier + 1);
   EXPECT_EQ(1, high_watermark_buffer1);
