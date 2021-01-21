@@ -42,7 +42,7 @@ public:
    * Updates the set of resources that the watch is interested in.
    * @param resources set of resource names to watch for
    */
-  virtual void update(const std::set<std::string>& resources) PURE;
+  virtual void update(const absl::flat_hash_set<std::string>& resources) PURE;
 };
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
@@ -100,13 +100,13 @@ public:
    * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
    */
   virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
-                                   const std::set<std::string>& resources,
+                                   const absl::flat_hash_set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
                                    OpaqueResourceDecoder& resource_decoder,
                                    const bool use_namespace_matching) PURE;
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
-                                     const std::set<std::string>& for_update) PURE;
+                                     const absl::flat_hash_set<std::string>& for_update) PURE;
 
   using TypeUrlMap = absl::flat_hash_map<std::string, std::string>;
   static TypeUrlMap& typeUrlMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(TypeUrlMap, {}); }
