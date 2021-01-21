@@ -207,7 +207,8 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
     // indicate request to encrypt.
     if (code >= 0x04d20000) {
       encrypted_ = true;
-      // Handler for SSLRequest.
+      // Handler for SSLRequest (Int32(80877103) = 0x04d2162f)
+      // See details in https://www.postgresql.org/docs/current/protocol-message-formats.html.
       if (code == 0x04d2162f) {
         // Notify the filter that `SSLRequest` message was decoded.
         // If the filter returns true, it means to pass the message upstream

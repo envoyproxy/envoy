@@ -38,6 +38,6 @@ message PostgresProxy {
   // <envoy_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
   // If the filter does not manage to terminate the SSL session, it will close the connection from the client.
   // Refer to official documentation for details
-  // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/13/protocol-flow.html#id-1.10.5.7.11>`_.
+  // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.
   bool terminate_ssl = 3;
 }
