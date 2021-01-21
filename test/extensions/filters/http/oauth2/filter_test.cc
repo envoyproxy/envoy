@@ -195,8 +195,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
                                                 scope_, "test.");
 
   // Auth_scopes was not set, should return default value.
-  std::vector<std::string> default_scope = {TEST_DEFAULT_SCOPE};
-  EXPECT_EQ(test_config_->authScopes(), default_scope);
+  EXPECT_EQ(test_config_->encodedAuthScopes(), TEST_DEFAULT_SCOPE);
 
   // Recreate the filter with current config and test if the scope was added
   // as a query parameter in response headers.
@@ -220,7 +219,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
            "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
   };
 
-  // explicitly tell the validator to fail the validation
+  // explicitly tell the validator to fail the validation.
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
