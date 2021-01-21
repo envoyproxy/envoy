@@ -832,6 +832,7 @@ TEST_F(OwnedImplTest, ReserveCommit) {
       expectSlices({{1, 16383, 16384}}, buffer);
       auto reservation = buffer.reserveApproximately(32768);
       EXPECT_EQ(2, reservation.numSlices());
+      EXPECT_EQ(32767, reservation.length());
       EXPECT_EQ(16383, reservation.slices()[0].len_);
       EXPECT_EQ(16384, reservation.slices()[1].len_);
     }
