@@ -88,10 +88,5 @@ echo "running flaky test reporting script"
 # Build tests that are known flaky or failing to ensure no compilation regressions
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=-skip_on_windows,fails_on_${FAIL_GROUP} --build_tests_only
 
-# Summarize tests bypasssed to monitor the progress of porting to Windows
-echo "Tests bypassed as skip_on_windows: $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l) known unbuildable or inapplicable tests"
-if [[ "${FAIL_GROUP}" == "clang_cl" ]]; then
-  echo "Tests bypassed as fails_on_clang_cl} $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "fails_on_clang_cl}", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
-else
-  echo "Tests bypassed as fails_on_windows} $(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "fails_on_windows}", //test/...))' 2>/dev/null | sort | wc -l) known incompatible tests"
-fi
+# Summarize known unbuildable or inapplicable tests (example)
+# bazel "${BAZEL_STARTUP_OPTIONS[@]}" query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort
