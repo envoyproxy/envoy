@@ -106,7 +106,7 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::Instanc
   Api::IoCallUint64Result result = handle.recvmsg(&slice, 1, local_address.ip()->port(), output);
 
   if (result.ok()) {
-    reservation.commit(std::min(max_packet_size, static_cast<size_t>(result.rc_)));
+    reservation.commit(std::min(max_packet_size, result.rc_));
   }
 
   return result;
@@ -654,7 +654,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
                      output.msg_[i].peer_address_->asString());
 
-      buffers[i].reservation_.commit(std::min(max_packet_size, static_cast<size_t>(msg_len)));
+      buffers[i].reservation_.commit(std::min(max_packet_size, msg_len));
 
       passPayloadToProcessor(msg_len, std::move(buffers[i].buffer_), output.msg_[i].peer_address_,
                              output.msg_[i].local_address_, udp_packet_processor, receive_time);
