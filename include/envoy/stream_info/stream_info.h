@@ -581,16 +581,6 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
-
-  /**
-   * @return Redirect records of the downstream connection, or unset if not available.
-   **/
-  virtual absl::optional<Network::EnvoyRedirectRecords> getRedirectRecords() const PURE;
-
-  /**
-   * @param records records of the downstream connection.
-   **/
-  virtual void setRedirectRecords(Network::EnvoyRedirectRecords& records) PURE;
 };
 
 } // namespace StreamInfo

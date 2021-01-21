@@ -24,6 +24,7 @@
 #include "common/config/well_known_names.h"
 #include "common/network/application_protocol.h"
 #include "common/network/proxy_protocol_filter_state.h"
+#include "common/network/redirect_records_filter_state.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
@@ -439,10 +440,19 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
 
-    if (downstreamConnection()->streamInfo().getRedirectRecords().has_value()) {
+    if (downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .hasData<Network::RedirectRecordsFilterState>(
+                Network::RedirectRecordsFilterState::key())) {
+      auto redirect_records = downstreamConnection()
+                                  ->streamInfo()
+                                  .filterState()
+                                  .getDataReadOnly<Network::RedirectRecordsFilterState>(
+                                      Network::RedirectRecordsFilterState::key())
+                                  .value();
       const Network::Socket::OptionsSharedPtr wfp_socket_options =
-          Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(
-              downstreamConnection()->streamInfo().getRedirectRecords().value());
+          Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(redirect_records);
       Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
     }
   }

@@ -493,3 +493,14 @@ envoy_cc_library(
         "//source/common/common:macros",
     ],
 )
+
+envoy_cc_library(
+    name = "redirect_records_filter_state_lib",
+    srcs = ["redirect_records_filter_state.cc"],
+    hdrs = ["redirect_records_filter_state.h"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)

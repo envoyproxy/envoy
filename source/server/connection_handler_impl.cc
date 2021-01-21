@@ -11,6 +11,7 @@
 
 #include "common/event/deferred_task.h"
 #include "common/network/connection_impl.h"
+#include "common/network/redirect_records_filter_state.h"
 #include "common/network/utility.h"
 #include "common/stats/timespan_impl.h"
 
@@ -494,7 +495,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
                 status.errno_);
       return;
     }
-    stream_info->setRedirectRecords(redirect_records);
+    stream_info->filterState()->setData(
+        Network::RedirectRecordsFilterState::key(), std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
 #endif
 
