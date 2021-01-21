@@ -479,7 +479,7 @@ Custom request/response headers can be added to a request/response at the weight
 route, virtual host, and/or global route configuration level. See the
 :ref:`v3 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` API documentation.
 
-No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
+Neither *:-prefixed* pseudo-headers nor the Host: header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
 :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
 :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`, and
