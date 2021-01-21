@@ -11,6 +11,8 @@ namespace Server {
 using HotRestartMessage = envoy::HotRestartMessage;
 
 static constexpr uint64_t MaxSendmsgSize = 4096;
+static constexpr std::chrono::milliseconds CONNECTION_REFUSED_RETRY_DELAY{5000};
+static constexpr int SENDMSG_MAX_RETRIES = 10;
 
 HotRestartingBase::~HotRestartingBase() {
   if (my_domain_socket_ != -1) {
@@ -107,9 +109,23 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
       ASSERT(sent == total_size, "an fd passing message was too long for one sendmsg().");
     }
 
-    const int rc = sendmsg(my_domain_socket_, &message, 0);
-    RELEASE_ASSERT(rc == static_cast<int>(cur_chunk_size),
-                   fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc, errno));
+    // A transient connection refused error probably means the old process is not ready.
+    for (int i = 0; i < SENDMSG_MAX_RETRIES; i++) {
+      const int rc = sendmsg(my_domain_socket_, &message, 0);
+      const int saved_errno = errno;
+      if (rc == static_cast<int>(cur_chunk_size)) {
+        break;
+      }
+
+      if (saved_errno == ECONNREFUSED) {
+        ENVOY_LOG(error, "hot restart sendmsg() connection refused, retrying");
+        std::this_thread::sleep_for(CONNECTION_REFUSED_RETRY_DELAY);
+        continue;
+      }
+
+      RELEASE_ASSERT(false, fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc,
+                                        saved_errno));
+    }
   }
   RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                  fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
