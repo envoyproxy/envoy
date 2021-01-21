@@ -123,7 +123,6 @@ public:
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
-  const std::vector<std::string>& authScopes() const { return auth_scopes_; }
   const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
 
 private:
