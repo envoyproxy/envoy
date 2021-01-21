@@ -58,7 +58,7 @@ static void addFullSlices(Buffer::Instance& output_buffer, int num_slices, bool 
     for (unsigned i = 0; i < reservation.numSlices(); i++) {
       memset(reservation.slices()[i].mem_, 'a', reservation.slices()[i].len_);
     }
-    reservation.commit(16384);
+    reservation.commit(reservation.length());
     RELEASE_ASSERT(buffer->length() - start_size == 16384, "correct reserve/commit");
   }
 
