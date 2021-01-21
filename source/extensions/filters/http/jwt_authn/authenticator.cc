@@ -3,6 +3,7 @@
 #include "envoy/http/async_client.h"
 
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
@@ -247,9 +248,12 @@ void AuthenticatorImpl::verifyKey() {
 
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
+  std::string payload_str_base64url_with_padding = jwt_->payload_str_base64url_;
+  Base64::completePadding(payload_str_base64url_with_padding);
+
   if (!provider.forward_payload_header().empty()) {
     headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
-                      jwt_->payload_str_base64url_);
+                      payload_str_base64url_with_padding);
   }
 
   if (!provider.forward()) {
