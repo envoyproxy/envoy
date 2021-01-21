@@ -332,7 +332,7 @@ Reservation OwnedImpl::reserveWithLength(uint64_t length) {
     reserved += slice.len_;
   }
 
-  while (bytes_remaining != 0) {
+  while (bytes_remaining != 0 && reservation_slices.size() < reservation.MAX_SLICES_) {
     const uint64_t size = Slice::default_slice_size_;
 
     // If the next slice would go over the desired size, and the amount already reserved is already
@@ -348,9 +348,6 @@ Reservation OwnedImpl::reserveWithLength(uint64_t length) {
     reservation_owned_slices.emplace_back(std::make_unique<SliceDataImpl>(std::move(slice)));
     bytes_remaining -= std::min<uint64_t>(reservation_slices.back().len_, bytes_remaining);
     reserved += reservation_slices.back().len_;
-
-    ASSERT(reservation_slices.size() <= reservation.MAX_SLICES_,
-           "The absl::InlineVector should be sized so that out-of-line storage isn't needed.");
   }
 
   reservation.bufferImplUseOnlySetLength(reserved);

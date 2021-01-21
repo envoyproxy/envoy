@@ -842,6 +842,25 @@ TEST_F(OwnedImplTest, ReserveCommit) {
     }
     EXPECT_EQ(14, buffer.length());
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    uint64_t default_reservation_length;
+    uint64_t default_slice_length;
+    {
+      auto reservation = buffer.reserveForRead();
+      default_reservation_length = reservation.length();
+      default_slice_length = reservation.slices()[0].len_;
+      reservation.commit(default_slice_length / 2);
+    }
+    {
+      // Test that the Reservation size is capped at the available space in the Reservation
+      // inline storage, including using the end of a previous slice, no matter how big the request
+      // is.
+      auto reservation = buffer.reserveForReadWithLengthForTest(UINT64_MAX);
+      EXPECT_EQ(reservation.length(), default_reservation_length - (default_slice_length / 2));
+    }
+  }
 }
 
 TEST_F(OwnedImplTest, ReserveCommitReuse) {
