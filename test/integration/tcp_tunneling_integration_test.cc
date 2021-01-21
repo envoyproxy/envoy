@@ -433,10 +433,15 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
     proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
     proxy_config.mutable_tunneling_config()->set_use_post(true);
 
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* filter = filter_chain->mutable_filters(0);
-    filter->mutable_typed_config()->PackFrom(proxy_config);
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto it = listeners->begin(); it != listeners->end(); it++) {
+      if (it->name() != "tcp_proxy") continue;
+
+      auto* filter_chain = it->mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
   });
 
   initialize();
@@ -446,6 +451,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "POST");
 
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -455,7 +461,6 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
   // Send data from upstream to downstream.
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "POST");
   upstream_request_->encodeData(12, false);
   ASSERT_TRUE(tcp_client->waitForData(12));
 

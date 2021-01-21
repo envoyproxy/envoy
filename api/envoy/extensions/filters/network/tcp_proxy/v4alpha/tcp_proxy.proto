@@ -77,7 +77,8 @@ message TcpProxy {
 
     // Additional request headers to upstream proxy. This is mainly used to
     // trigger upstream to convert POST requests back to CONNECT requests.
-    // The hostname header can be overridden by this field.
+    //
+    // The hostname and method headers are not allowed to be overridden.
     repeated config.core.v4alpha.HeaderValueOption headers_to_add = 3
         [(validate.rules).repeated = {max_items: 1000}];
   }
