@@ -1,25 +1,21 @@
 .. _config_application_logs:
 
-Application logging
-===================
+应用日志
+==========
 
-Envoy and its filters write application logs for debuggability.
-Envoy can be configured to output application logs in a format that is compatible with common log viewers.
-This section documents how Envoy can be configured to enable integration with each log viewer.
+Envoy 及其过滤器会写应用程序日志来实现可调试性。
+可以给 Envoy 配置输出应用程序日志，并且日志格式可以配置成和常见日志查看器兼容的格式。
+本节介绍如何配置 Envoy 以实现与每个日志查看器的集成。
 
-Stackdriver Logging with GKE
-----------------------------
+使用 GKE 记录 Stackdriver
+---------------------------
 
-`Stackdriver Logging <https://cloud.google.com/logging/>`_ can read logs from containers running on
-`Google Kubernetes Engine <https://cloud.google.com/kubernetes-engine/>`_. Envoy should be configured
-with the following :ref:`command line options <operations_cli>`:
+`Stackdriver 记录 <https://cloud.google.com/logging/>`_ 可以读取运行在 `Google Kubernetes Engine <https://cloud.google.com/kubernetes-engine/>`_ 上的容器的日志。Envoy 应该用如下的 :ref:`命令行选项 <operations_cli>` 进行配置：
 
-* ``--log-format '%L%m%d %T.%e %t envoy] [%t][%n]%v'``: Logs are formatted in `glog <https://github.com/google/glog>`_
-  format, allowing Stackdriver to parse the log severity and timestamp.
-* ``--log-format-escaped``: Each string that is logged will be printed in a single line.
-  C-style escape sequences (such as ``\n``) will be escaped and prevent a single string
-  from spanning multiple lines. This ensures each log line is structured with the glog prefix.
-* The ``--log-path`` flag **does not** need to be set, since Stackdriver can read logs from STDERR.
-* The ``--log-level`` flag can be set to control the log severity logged to Stackdriver.
+* ``--log-format '%L%m%d %T.%e %t envoy] [%t][%n]%v'``：使用 `glog <https://github.com/google/glog>`_ 格式对日志进行格式化，允许 Stackdriver 解析日志的级别和时间戳。
+* ``--log-format-escaped``：记录的每个字符串都将打印在一行中。
+  C-style 转移序列 （例如 ``\n``）将被转义，并避免单个字符串跨越多行。这样可以确保每个日志行都使用 glog 前缀进行结构化。
+* **不** 需要设置 ``--log-path`` 选项，因为 Stackdriver 可以从 STDERR 读取日志。
+* 可以设置 ``--log-level`` 选项来控制输出到 Stackdriver 的日志级别。
 
-`Reference documentation <https://cloud.google.com/run/docs/logging#container-logs>`_ for Stackdriver on GKE.
+GKE Stackdriver 的 `参考文档 <https://cloud.google.com/run/docs/logging#container-logs>`_。
