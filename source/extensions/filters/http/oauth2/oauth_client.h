@@ -90,7 +90,13 @@ private:
   Http::RequestMessagePtr createPostRequest() {
     auto request = Http::Utility::prepareHeaders(uri_);
     request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-    request->headers().setContentType(Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+    request->headers().setReferenceContentType(
+        Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+    // Use the Accept header to ensure the Access Token Response is returned as JSON.
+    // Some authorization servers return other encodings (e.g. FormUrlEncoded) in the absence of the
+    // Accept header. RFC 6749 Section 5.1 defines the media type to be JSON, so this is safe.
+    request->headers().setReference(Http::CustomHeaders::get().Accept,
+                                    Http::Headers::get().ContentTypeValues.Json);
     return request;
   }
 };
