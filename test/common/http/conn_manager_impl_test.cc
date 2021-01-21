@@ -2656,7 +2656,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     request_timer->invokeCallback();
     return Http::okStatus();
   }));
@@ -2886,7 +2887,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutCallbackDisarmsAndRetu
     EXPECT_CALL(*request_header_timer, enableTimer(request_headers_timeout_, _));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     return Http::okStatus();
   }));
 
@@ -2971,77 +2973,6 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("426", headers.getStatusValue());
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, Http10ConnCloseLegacy) {
-  http1_settings_.accept_http_10_ = true;
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, protocol()).Times(AnyNumber()).WillRepeatedly(Return(Protocol::Http10));
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host:80"}, {":method", "CONNECT"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ProxyConnectLegacyClose) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-        {":authority", "host:80"}, {":method", "CONNECT"}, {"proxy-connection", "close"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ConnectLegacyClose) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-        {":authority", "host"}, {":method", "CONNECT"}, {"connection", "close"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("close", headers.getConnectionValue());
       }));
 
