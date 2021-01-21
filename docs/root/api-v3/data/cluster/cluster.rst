@@ -1,4 +1,4 @@
-Cluster data
+集群数据
 ============
 
 .. toctree::
