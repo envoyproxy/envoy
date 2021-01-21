@@ -1096,10 +1096,6 @@ void ServerConnectionImpl::sendProtocolErrorOld(absl::string_view details) {
 }
 
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.early_errors_via_hcm")) {
-    sendProtocolErrorOld(details);
-    return okStatus();
-  }
   // We do this here because we may get a protocol error before we have a logical stream.
   if (!active_request_.has_value()) {
     RETURN_IF_ERROR(onMessageBeginBase());
