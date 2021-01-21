@@ -1,5 +1,6 @@
 #include "envoy/server/filter_config.h"
 
+#include "extensions/filters/http/common/pass_through_filter.h"
 #include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
@@ -7,24 +8,6 @@
 
 namespace Envoy {
 namespace {
-
-class TestHttpFilter : public Http::StreamDecoderFilter {
-public:
-  TestHttpFilter() = default;
-
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    return Envoy::Http::FilterDataStatus::Continue;
-  }
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
-    return Envoy::Http::FilterTrailersStatus::Continue;
-  }
-
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override {}
-  void onDestroy() override{};
-};
 
 class TestHttpFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
@@ -34,7 +17,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(std::make_shared<TestHttpFilter>());
+      callbacks.addStreamDecoderFilter(std::make_shared<Http::PassThroughDecoderFilter>());
     };
   }
 
