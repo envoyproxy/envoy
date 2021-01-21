@@ -250,7 +250,8 @@ TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseWithoutContentType) {
 }
 
 TEST_P(GrpcWebFilterIntegrationTest, BadUpstreamResponseLargeEnd) {
-  // When we have buffered data in encoding buffer, we limit the length to MAX_BUFFERED_PLAINTEXT_LENGTH.
+  // When we have buffered data in encoding buffer, we limit the length to
+  // MAX_BUFFERED_PLAINTEXT_LENGTH.
   const std::string start(MAX_BUFFERED_PLAINTEXT_LENGTH, 'a');
   const std::string end(MAX_BUFFERED_PLAINTEXT_LENGTH, 'b');
   testBadUpstreamResponse(start, end, /*expected=*/start);
