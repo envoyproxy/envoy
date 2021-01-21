@@ -137,7 +137,7 @@ TEST(Base64Test, CompletePadding) {
     std::string base64, base64_with_padding;
   };
 
-  // For base64 encoding, there are only three length to test"
+  // For base64 encoding, there are only three length needed to test
   // - 3n bytes => 4n bytes, no padding needed
   // - 3n + 1 bytes => 4n + 2 bytes, 2 padding needed
   // - 3n + 2 bytes => 4n + 3 bytes, 1 padding needed

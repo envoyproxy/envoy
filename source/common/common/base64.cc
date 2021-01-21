@@ -234,7 +234,6 @@ std::string Base64::encode(const char* input, uint64_t length, bool add_padding)
   return ret;
 }
 
-
 void Base64::completePadding(std::string& encoded) {
   if (encoded.length() % 4 != 0) {
     std::string trailing_padding(4 - encoded.length() % 4, '=');
