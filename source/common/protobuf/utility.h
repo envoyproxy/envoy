@@ -452,8 +452,21 @@ public:
     auto json_or_error =
         getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
     RELEASE_ASSERT(json_or_error.ok(), json_or_error.status().ToString());
-    return json_or_error.value();
+    return std::move(json_or_error).value();
   }
+
+  /**
+   * Extract JSON as string from a google.protobuf.Message, returning some error string if the conversion to JSON
+   * fails.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @param pretty_print whether the returned JSON should be formatted.
+   * @param always_print_primitive_fields whether to include primitive fields set to their default
+   * values, e.g. an int32 set to 0 or a bool set to false.
+   * @return std::string of formatted JSON object, or an error message if conversion fails.
+   */
+  static std::string getJsonStringFromMessageOrError(const Protobuf::Message& message,
+                                                     bool pretty_print = false,
+                                                     bool always_print_primitive_fields = false);
 
   /**
    * Utility method to create a Struct containing the passed in key/value strings.

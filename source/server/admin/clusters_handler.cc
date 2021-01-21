@@ -181,7 +181,7 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
       }
     }
   }
-  response.add(MessageUtil::getJsonStringFromMessageOrDie(clusters, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessageOrError(clusters, true)); // pretty-print
 }
 
 // TODO(efimki): Add support of text readouts stats.

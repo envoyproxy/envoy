@@ -640,6 +640,16 @@ MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bo
   return json;
 }
 
+std::string MessageUtil::getJsonStringFromMessageOrError(const Protobuf::Message& message,
+                                                         bool pretty_print,
+                                                         bool always_print_primitive_fields) {
+  auto json_or_error =
+      getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
+  return json_or_error.ok() ? std::move(json_or_error).value()
+                            : fmt::format("Failed to convert protobuf message to JSON string: {}",
+                                          json_or_error.status().ToString());
+}
+
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
   // If we don't have a type URL match, try an earlier version.
   const absl::string_view any_full_name =
@@ -1009,5 +1019,4 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .time_since_epoch()
           .count()));
 }
-
 } // namespace Envoy
