@@ -1,5 +1,5 @@
-Upstream Configuration
-======================
+上游配置
+=============
 
 .. toctree::
   :glob:
