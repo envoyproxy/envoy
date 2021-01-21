@@ -23,8 +23,8 @@ message Dependency {
   // The kind of dependency.
   DependencyType type = 1;
 
-  // String identifier for the dependency.
-  string name = 2;
+  // The string identifier for the dependency.
+  string name = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Dependency specification for a filter. For a filter chain to be valid, any
