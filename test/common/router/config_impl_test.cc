@@ -1721,10 +1721,10 @@ most_specific_header_mutations_wins: true
   }
 }
 
-// Validate that we can't add :-prefixed request headers.
-TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoPseudoHeader) {
+// Validate that we can't add :-prefixed or Host request headers.
+TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoHostOrPseudoHeader) {
   for (const std::string& header :
-       {":path", ":authority", ":method", ":scheme", ":status", ":protocol"}) {
+       {":path", ":authority", ":method", ":scheme", ":status", ":protocol", "host"}) {
     const std::string yaml = fmt::format(R"EOF(
 virtual_hosts:
   - name: www2
@@ -1743,8 +1743,31 @@ virtual_hosts:
         parseRouteConfigurationFromYaml(yaml);
 
     EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context_, true),
-                              EnvoyException, ":-prefixed headers may not be modified");
+                              EnvoyException, ":-prefixed or host headers may not be modified");
   }
+}
+
+TEST_F(RouteMatcherTest, TestRequestHeadersToAddLegacyHostHeader) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.treat_host_like_authority", "false"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: "host"
+          value: vhost-www2
+        append: false
+)EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  envoy::config::route::v3::RouteConfiguration route_config = parseRouteConfigurationFromYaml(yaml);
+
+  EXPECT_NO_THROW(TestConfigImpl config(route_config, factory_context_, true));
 }
 
 // Validate that we can't remove :-prefixed request headers.
