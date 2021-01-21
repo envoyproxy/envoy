@@ -48,18 +48,15 @@ static void appendSlice(Buffer::Instance& buffer, uint32_t size) {
 // If move_slices is true, add full-sized slices using move similar to how HTTP codecs move data
 // from the filter chain buffer to the output buffer. Else, append full-sized slices directly to the
 // output buffer like socket read would do.
-static void addFullSlices(Buffer::Instance& output_buffer, int num_slices, bool move_slices) {
+static void addFullSlices(Buffer::Instance& output_buffer, unsigned num_slices, bool move_slices) {
   Buffer::OwnedImpl tmp_buf;
   Buffer::Instance* buffer = move_slices ? &tmp_buf : &output_buffer;
 
-  for (int i = 0; i < num_slices; i++) {
-    auto start_size = buffer->length();
-    Buffer::Reservation reservation = buffer->reserveApproximately(16384);
-    for (unsigned i = 0; i < reservation.numSlices(); i++) {
-      memset(reservation.slices()[i].mem_, 'a', reservation.slices()[i].len_);
-    }
-    reservation.commit(reservation.length());
-    RELEASE_ASSERT(buffer->length() - start_size == 16384, "correct reserve/commit");
+  const auto initial_slices = buffer->getRawSlices().size();
+  while ((buffer->getRawSlices().size() - initial_slices) < num_slices) {
+    Buffer::Reservation reservation = buffer->reserveForRead();
+    memset(reservation.slices()[0].mem_, 'a', reservation.slices()[0].len_);
+    reservation.commit(reservation.slices()[0].len_);
   }
 
   if (move_slices) {

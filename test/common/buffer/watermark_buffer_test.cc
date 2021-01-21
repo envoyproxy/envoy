@@ -121,10 +121,20 @@ TEST_F(WatermarkBufferTest, PrependBuffer) {
 TEST_F(WatermarkBufferTest, Commit) {
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(0, times_high_watermark_called_);
-  Buffer::Reservation reservation = buffer_.reserveApproximately(10);
-  reservation.commit(10);
+  {
+    auto reservation = buffer_.reserveForRead();
+    reservation.commit(10);
+  }
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(20, buffer_.length());
+
+  {
+    auto reservation = buffer_.reserveSingleSlice(10);
+    reservation.commit(10);
+  }
+  // Buffer is already above high watermark, so it won't be called a second time.
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(30, buffer_.length());
 }
 
 TEST_F(WatermarkBufferTest, Drain) {

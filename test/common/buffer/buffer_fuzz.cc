@@ -141,13 +141,11 @@ public:
     src.size_ -= length;
   }
 
-  Buffer::Reservation reserveApproximately(uint64_t length) override {
-    FUZZ_ASSERT(start_ + size_ + length <= data_.size());
-
+  Buffer::Reservation reserveForRead() override {
     auto reservation = Buffer::Reservation::bufferImplUseOnlyConstruct(*this);
     Buffer::RawSlice slice;
     slice.mem_ = mutableEnd();
-    slice.len_ = length;
+    slice.len_ = data_.size() - (start_ + size_);
     reservation.bufferImplUseOnlySlices().push_back(slice);
     reservation.bufferImplUseOnlyOwnedSlices().push_back(nullptr);
 
@@ -276,13 +274,21 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     if (reserve_length == 0) {
       break;
     }
-    Buffer::Reservation reservation = target_buffer.reserveApproximately(reserve_length);
-    for (uint32_t i = 0; i < reservation.numSlices(); ++i) {
-      ::memset(reservation.slices()[i].mem_, insert_value, reservation.slices()[i].len_);
+    if (reserve_length < 16384) {
+      auto reservation = target_buffer.reserveSingleSlice(reserve_length);
+      ::memset(reservation.slice().mem_, insert_value, reservation.slice().len_);
+      RELEASE_ASSERT(action.reserve_commit().commit_length() <= reserve_length, "");
+      reservation.commit(
+          std::min<uint64_t>(action.reserve_commit().commit_length(), reservation.length()));
+    } else {
+      Buffer::Reservation reservation = target_buffer.reserveForRead();
+      for (uint32_t i = 0; i < reservation.numSlices(); ++i) {
+        ::memset(reservation.slices()[i].mem_, insert_value, reservation.slices()[i].len_);
+      }
+      const uint32_t target_length =
+          std::min<uint32_t>(reservation.length(), action.reserve_commit().commit_length());
+      reservation.commit(target_length);
     }
-    const uint32_t target_length =
-        std::min<uint32_t>(reservation.length(), action.reserve_commit().commit_length());
-    reservation.commit(target_length);
     break;
   }
   case test::common::buffer::Action::kCopyOut: {

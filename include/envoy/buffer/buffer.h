@@ -196,19 +196,12 @@ public:
   virtual void move(Instance& rhs, uint64_t length) PURE;
 
   /**
-   * Reserve space in the buffer.
-   * @param preferred_length the suggested length to reserve. The actual
-   *   reserved size may be differ based on heuristics to maximize performance.
+   * Reserve space in the buffer for reading into. The amount of space reserved is determined
+   * based on buffer settings and performance considerations.
    * @return a `Reservation`, on which `commit()` can be called, or which can
    *   be destructed to discard any resources in the `Reservation`.
    */
-  virtual Reservation reserveApproximately(uint64_t preferred_length) PURE;
-
-  /**
-   * The maximum size that should be passed to `reserveApproximately` to result
-   * in maximum performance.
-   */
-  static constexpr uint64_t MAX_RESERVATION_SIZE = 128 * 1024;
+  virtual Reservation reserveForRead() PURE;
 
   /**
    * Reserve space in the buffer in a single slice.
@@ -497,7 +490,7 @@ public:
    * @note No other methods should be called on the object after `commit()` is called.
    */
   void commit(uint64_t length) {
-    ASSERT(length <= length_);
+    ENVOY_BUG(length <= length_, "commit() length must be <= size of the Reservation");
     buffer_.commit(length, absl::MakeSpan(slices_), absl::MakeSpan(owned_slices_));
     slices_.clear();
     owned_slices_.clear();
@@ -545,9 +538,14 @@ public:
   ~ReservationSingleSlice() = default;
 
   /**
-   * @return an array of `RawSlice` of length `numSlices()`.
+   * @return the slice in the Reservation.
    */
   RawSlice slice() const { return slice_; }
+
+  /**
+   * @return the total length of the Reservation.
+   */
+  uint64_t length() const { return slice_.len_; }
 
   /**
    * Commits some or all of the data in the reservation.
@@ -557,7 +555,7 @@ public:
    * @note No other methods should be called on the object after `commit()` is called.
    */
   void commit(uint64_t length) {
-    ASSERT(length <= slice_.len_);
+    ENVOY_BUG(length <= slice_.len_, "commit() length must be <= size of the Reservation");
     buffer_.commit(length, absl::MakeSpan(&slice_, 1), absl::MakeSpan(&owned_slice_, 1));
     slice_ = {nullptr, 0};
     owned_slice_.reset();

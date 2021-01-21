@@ -528,7 +528,7 @@ public:
   MOCK_METHOD(void*, linearize, (uint32_t), (override));
   MOCK_METHOD(void, move, (Instance&), (override));
   MOCK_METHOD(void, move, (Instance&, uint64_t), (override));
-  MOCK_METHOD(Buffer::Reservation, reserveApproximately, (uint64_t), (override));
+  MOCK_METHOD(Buffer::Reservation, reserveForRead, (), (override));
   MOCK_METHOD(Buffer::ReservationSingleSlice, reserveSingleSlice, (uint64_t, bool), (override));
   MOCK_METHOD(void, commit,
               (uint64_t, absl::Span<Buffer::RawSlice>, absl::Span<Buffer::SliceDataPtr>),

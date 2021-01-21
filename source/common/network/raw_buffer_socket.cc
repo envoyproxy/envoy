@@ -18,8 +18,10 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   uint64_t bytes_read = 0;
   bool end_stream = false;
   do {
-    Api::IoCallUint64Result result =
-        callbacks_->ioHandle().read(buffer, Buffer::Instance::MAX_RESERVATION_SIZE);
+    // The maximum read size will be limited by lower layers, based on configured buffer sizes.
+    // Specifying UINT64_MAX indicates that this layer is not imposing any limit beyond what
+    // the lower layers impose.
+    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, UINT64_MAX);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);

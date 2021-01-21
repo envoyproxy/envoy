@@ -136,10 +136,11 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
                                                       local_valid_address, nullptr);
 
   Buffer::OwnedImpl buffer;
-  auto reservation = buffer.reserveApproximately(100);
+  auto reservation = buffer.reserveSingleSlice(100);
 
-  auto result = socket->ioHandle().sendmsg(reservation.slices(), reservation.numSlices(), 0,
-                                           local_valid_address->ip(), *peer_internal_address);
+  auto slice = reservation.slice();
+  auto result =
+      socket->ioHandle().sendmsg(&slice, 1, 0, local_valid_address->ip(), *peer_internal_address);
   ASSERT_FALSE(result.ok());
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
 }

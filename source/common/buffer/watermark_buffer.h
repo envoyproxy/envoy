@@ -34,9 +34,7 @@ public:
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   SliceDataPtr extractMutableFrontSlice() override;
-  Reservation reserveApproximately(uint64_t preferred_length) override;
-  void commit(uint64_t length, absl::Span<RawSlice> slices,
-              absl::Span<SliceDataPtr> owned_slices) override;
+  Reservation reserveForRead() override;
   void postProcess() override { checkLowWatermark(); }
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
@@ -53,6 +51,9 @@ protected:
   void checkLowWatermark();
 
 private:
+  void commit(uint64_t length, absl::Span<RawSlice> slices,
+              absl::Span<SliceDataPtr> owned_slices) override;
+
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
   std::function<void()> above_overflow_watermark_;

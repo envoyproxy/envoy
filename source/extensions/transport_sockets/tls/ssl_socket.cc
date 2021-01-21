@@ -121,7 +121,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   uint64_t bytes_read = 0;
   while (keep_reading) {
     uint64_t bytes_read_this_iteration = 0;
-    Buffer::Reservation reservation = read_buffer.reserveApproximately(16384);
+    Buffer::Reservation reservation = read_buffer.reserveForRead();
     for (uint64_t i = 0; i < reservation.numSlices(); i++) {
       auto result = sslReadIntoSlice(reservation.slices()[i]);
       bytes_read_this_iteration += result.bytes_read_;

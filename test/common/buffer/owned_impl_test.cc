@@ -785,16 +785,15 @@ TEST_F(OwnedImplTest, ReserveCommit) {
     Buffer::OwnedImpl buffer;
     // A zero-byte reservation should return an empty reservation.
     {
-      auto reservation = buffer.reserveApproximately(0);
-      EXPECT_EQ(0, reservation.numSlices());
+      auto reservation = buffer.reserveSingleSlice(0);
+      EXPECT_EQ(0, reservation.slice().len_);
+      EXPECT_EQ(0, reservation.length());
     }
     EXPECT_EQ(0, buffer.length());
 
     // Test and commit a small reservation. This should succeed.
     {
-      auto reservation = buffer.reserveApproximately(1);
-      EXPECT_EQ(1, reservation.numSlices());
-      EXPECT_EQ(16384, reservation.slices()[0].len_);
+      auto reservation = buffer.reserveForRead();
       reservation.commit(1);
     }
     EXPECT_EQ(1, buffer.length());
@@ -802,10 +801,9 @@ TEST_F(OwnedImplTest, ReserveCommit) {
     // Request a reservation that fits in the remaining space at the end of the last slice.
     const void* slice1;
     {
-      auto reservation = buffer.reserveApproximately(1);
-      EXPECT_EQ(1, reservation.numSlices());
-      EXPECT_EQ(1, reservation.slices()[0].len_);
-      slice1 = reservation.slices()[0].mem_;
+      auto reservation = buffer.reserveSingleSlice(1);
+      EXPECT_EQ(1, reservation.slice().len_);
+      slice1 = reservation.slice().mem_;
     }
 
     // Request a reservation that is too large to fit in the remaining space at the end of
@@ -821,18 +819,11 @@ TEST_F(OwnedImplTest, ReserveCommit) {
     // should result in the buffer creating a second slice and splitting the reservation between the
     // last two slices.
     {
-      auto reservation = buffer.reserveApproximately(16384);
-      EXPECT_EQ(2, reservation.numSlices());
-      EXPECT_EQ(slice1, reservation.slices()[0].mem_);
-    }
-
-    // Request a reservation that too big to fit in the existing slices. This should result
-    // in the creation of a third slice.
-    {
       expectSlices({{1, 16383, 16384}}, buffer);
-      auto reservation = buffer.reserveApproximately(32768);
-      EXPECT_EQ(2, reservation.numSlices());
-      EXPECT_EQ(32767, reservation.length());
+      auto reservation = buffer.reserveForRead();
+      EXPECT_GE(reservation.numSlices(), 2);
+      EXPECT_GE(reservation.length(), 32767);
+      EXPECT_EQ(slice1, reservation.slices()[0].mem_);
       EXPECT_EQ(16383, reservation.slices()[0].len_);
       EXPECT_EQ(16384, reservation.slices()[1].len_);
     }
@@ -844,8 +835,7 @@ TEST_F(OwnedImplTest, ReserveCommit) {
       expectSlices({{1, 16383, 16384}}, buffer);
       buffer.addBufferFragment(fragment);
       EXPECT_EQ(13, buffer.length());
-      auto reservation = buffer.reserveApproximately(1);
-      EXPECT_EQ(1, reservation.numSlices());
+      auto reservation = buffer.reserveForRead();
       EXPECT_NE(slice1, reservation.slices()[0].mem_);
       reservation.commit(1);
       expectSlices({{1, 16383, 16384}, {12, 0, 12}, {1, 16383, 16384}}, buffer);
@@ -869,29 +859,29 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
   }
   EXPECT_EQ(8000, buffer.length());
 
-  // Reserve 16KB. The resulting reservation should span 2 slices.
+  // Reserve some space. The resulting reservation should span 2 slices.
   // Commit part of the first slice and none of the second slice.
   const void* first_slice;
   {
     expectSlices({{8000, 4288, 12288}}, buffer);
-    auto reservation = buffer.reserveApproximately(16384);
+    auto reservation = buffer.reserveForRead();
 
     // No additional slices are added to the buffer until `commit()` is called
     // on the reservation.
     expectSlices({{8000, 4288, 12288}}, buffer);
     first_slice = reservation.slices()[0].mem_;
 
-    EXPECT_EQ(2, reservation.numSlices());
+    EXPECT_GE(reservation.numSlices(), 2);
     reservation.commit(1);
   }
   EXPECT_EQ(8001, buffer.length());
   // The second slice is now released because there's nothing in the second slice.
   expectSlices({{8001, 4287, 12288}}, buffer);
 
-  // Reserve 16KB again.
+  // Reserve again.
   {
-    auto reservation = buffer.reserveApproximately(16384);
-    EXPECT_EQ(2, reservation.numSlices());
+    auto reservation = buffer.reserveForRead();
+    EXPECT_GE(reservation.numSlices(), 2);
     EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1,
               static_cast<const uint8_t*>(reservation.slices()[0].mem_));
   }
@@ -1100,7 +1090,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   buf.addBufferFragment(frag);
   buf.prepend("bbbbb");
   buf.add("");
-  { auto reservation = buf.reserveApproximately(1280); }
+  { auto reservation = buf.reserveSingleSlice(1280); }
   os_fd_t pipe_fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
 #ifdef WIN32

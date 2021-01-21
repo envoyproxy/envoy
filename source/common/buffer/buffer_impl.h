@@ -622,10 +622,8 @@ public:
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  Reservation reserveApproximately(uint64_t preferred_length) override;
+  Reservation reserveForRead() override;
   ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
-  void commit(uint64_t length, absl::Span<RawSlice> slices,
-              absl::Span<SliceDataPtr> owned_slices) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;
@@ -659,6 +657,23 @@ public:
    * bytes in the buffer.
    */
   std::vector<Slice::SliceRepresentation> describeSlicesForTest() const;
+
+  /**
+   * Create a reservation for reading with a non-default length. Used in benchmark tests.
+   */
+  Reservation reserveForReadWithLengthForTest(uint64_t length) { return reserveWithLength(length); }
+
+protected:
+  static constexpr uint64_t default_read_reservation_size_ =
+      Reservation::MAX_SLICES_ * Slice::default_slice_size_;
+
+  /**
+   * Create a reservation with a specific length.
+   */
+  Reservation reserveWithLength(uint64_t length);
+
+  void commit(uint64_t length, absl::Span<RawSlice> slices,
+              absl::Span<SliceDataPtr> owned_slices) override;
 
 private:
   /**

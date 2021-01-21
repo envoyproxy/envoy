@@ -300,7 +300,11 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   other.postProcess();
 }
 
-Reservation OwnedImpl::reserveApproximately(uint64_t length) {
+Reservation OwnedImpl::reserveForRead() {
+  return reserveWithLength(default_read_reservation_size_);
+}
+
+Reservation OwnedImpl::reserveWithLength(uint64_t length) {
   Reservation reservation = Reservation::bufferImplUseOnlyConstruct(*this);
   if (length == 0) {
     return reservation;

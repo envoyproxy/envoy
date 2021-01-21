@@ -112,7 +112,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint6
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
   }
-  Buffer::Reservation reservation = buffer.reserveApproximately(max_length);
+  Buffer::Reservation reservation = buffer.reserveForRead();
   Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
                                          reservation.slices(), reservation.numSlices());
   uint64_t bytes_to_commit = result.ok() ? result.rc_ : 0;
