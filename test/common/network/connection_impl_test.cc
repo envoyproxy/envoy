@@ -2886,7 +2886,7 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
   // Envoy has soft limits, so as long as the first read is <= read_buffer_limit - 1 it will do a
   // second read. The effective chunk size is then read_buffer_limit - 1 + MaxReadSize,
   // which is currently 16384.
-  readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + (8 * 16384));
+  readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + 16384);
 }
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
