@@ -15,6 +15,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/event/scaled_range_timer_manager_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -114,6 +115,7 @@ public:
   bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
+  Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
 
   // Stop the overload manager timer and wait for any pending resource updates to complete.
   // After this returns, overload manager clients should not receive any more callbacks
@@ -122,8 +124,9 @@ public:
 
 protected:
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
-  virtual Event::ScaledRangeTimerManagerPtr
-  createScaledRangeTimerManager(Event::Dispatcher& dispatcher) const;
+  virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
+      Event::Dispatcher& dispatcher,
+      const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const;
 
 private:
   using FlushEpochId = uint64_t;
@@ -170,7 +173,7 @@ private:
   absl::node_hash_map<std::string, Resource> resources_;
   absl::node_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadAction> actions_;
 
-  absl::flat_hash_map<OverloadTimerType, Event::ScaledTimerMinimum> timer_minimums_;
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;
