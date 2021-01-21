@@ -100,6 +100,10 @@ bool GrpcWebFilter::needsTransformationForNonProtoEncodedResponse(Http::Response
   return Runtime::runtimeFeatureEnabled(
              "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling") &&
          !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
+         // We also do transformation when the response status is not OK (since a gRPC (also
+         // gRPC-Web) response should have 200 OK as its response status
+         // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses) and it has no
+         // valid proto-encoded response.
          !(Http::Utility::getResponseStatus(headers) == enumToInt(Http::Code::OK) &&
            hasProtoEncodedGrpcWebContentType(headers));
 }
