@@ -37,7 +37,7 @@ public:
   // Schedule resumption on the IoHandle by posting a callback to the IoHandle's dispatcher. Note
   // that this operation is inherently racy, nothing guarantees that the TestIoSocketHandle is not
   // deleted before the posted callback executes.
-  void activateInDispatcherThreadForTest(uint32_t events) {
+  void activateInDispatcherThread(uint32_t events) {
     absl::MutexLock lock(&mutex_);
     RELEASE_ASSERT(dispatcher_ != nullptr, "null dispatcher");
     dispatcher_->post([this, events]() { activateFileEvents(events); });

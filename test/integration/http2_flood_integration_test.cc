@@ -72,7 +72,7 @@ public:
           },
           &matched_iohandle_));
       writev_returns_egain_ = false;
-      matched_iohandle_->activateInDispatcherThreadForTest(Event::FileReadyType::Write);
+      matched_iohandle_->activateInDispatcherThread(Event::FileReadyType::Write);
     }
 
   private:
