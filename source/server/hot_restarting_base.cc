@@ -11,7 +11,7 @@ namespace Server {
 using HotRestartMessage = envoy::HotRestartMessage;
 
 static constexpr uint64_t MaxSendmsgSize = 4096;
-static constexpr std::chrono::milliseconds CONNECTION_REFUSED_RETRY_DELAY{5000};
+static constexpr absl::Duration CONNECTION_REFUSED_RETRY_DELAY = absl::Seconds(1);
 static constexpr int SENDMSG_MAX_RETRIES = 10;
 
 HotRestartingBase::~HotRestartingBase() {
@@ -119,7 +119,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
 
       if (saved_errno == ECONNREFUSED) {
         ENVOY_LOG(error, "hot restart sendmsg() connection refused, retrying");
-        absl::SleepFor(absl::Seconds(CONNECTION_REFUSED_RETRY_DELAY));
+        absl::SleepFor(CONNECTION_REFUSED_RETRY_DELAY));
         continue;
       }
 
