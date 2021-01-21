@@ -358,7 +358,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
                                true);
 
-  listener.setRejectFraction(0);
+  listener.setRejectFraction(UnitFloat(0));
 
   // This connection will be accepted and not rejected.
   {
@@ -389,7 +389,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
                                true);
 
-  listener.setRejectFraction(0.5f);
+  listener.setRejectFraction(UnitFloat(0.5f));
 
   // The first connection will be rejected because the random value is too small.
   {
@@ -452,7 +452,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
   TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
                                true);
 
-  listener.setRejectFraction(1);
+  listener.setRejectFraction(UnitFloat(1));
 
   {
     testing::InSequence s1;

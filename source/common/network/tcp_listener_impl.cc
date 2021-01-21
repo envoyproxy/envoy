@@ -124,8 +124,7 @@ void TcpListenerImpl::enable() { socket_->ioHandle().enableFileEvents(Event::Fil
 
 void TcpListenerImpl::disable() { socket_->ioHandle().enableFileEvents(0); }
 
-void TcpListenerImpl::setRejectFraction(const float reject_fraction) {
-  ASSERT(0 <= reject_fraction && reject_fraction <= 1);
+void TcpListenerImpl::setRejectFraction(const UnitFloat reject_fraction) {
   reject_fraction_ = reject_fraction;
 }
 

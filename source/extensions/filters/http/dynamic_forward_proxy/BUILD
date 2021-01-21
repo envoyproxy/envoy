@@ -15,7 +15,6 @@ envoy_cc_library(
     hdrs = ["proxy_filter.h"],
     deps = [
         "//include/envoy/http:filter_interface",
-        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/clusters:well_known_names",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/http:well_known_names",
