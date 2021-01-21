@@ -13,7 +13,6 @@
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -52,12 +51,10 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   request_headers.removeEnvoyRetryOn();
   request_headers.removeEnvoyRetryGrpcOn();
   request_headers.removeEnvoyMaxRetries();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consume_all_retry_headers")) {
-    request_headers.removeEnvoyHedgeOnPerTryTimeout();
-    request_headers.removeEnvoyRetriableHeaderNames();
-    request_headers.removeEnvoyRetriableStatusCodes();
-    request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
-  }
+  request_headers.removeEnvoyHedgeOnPerTryTimeout();
+  request_headers.removeEnvoyRetriableHeaderNames();
+  request_headers.removeEnvoyRetriableStatusCodes();
+  request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
 
   return ret;
 }
