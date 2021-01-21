@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/base64.h"
+#include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
@@ -178,7 +179,7 @@ TEST_F(GrpcWebFilterTest, ExpectedGrpcWebProtoContentType) {
 }
 
 TEST_F(GrpcWebFilterTest, UnexpectedGrpcWebProtoContentType) {
-  EXPECT_FALSE(isProtoEncodedGrpcWebContentType(""));
+  EXPECT_FALSE(isProtoEncodedGrpcWebContentType(EMPTY_STRING));
   EXPECT_FALSE(isProtoEncodedGrpcWebContentType("Invalid; ok=1"));
   EXPECT_FALSE(isProtoEncodedGrpcWebContentType("Invalid; ok=1; nok=2"));
   EXPECT_FALSE(
