@@ -456,8 +456,8 @@ public:
   }
 
   /**
-   * Extract JSON as string from a google.protobuf.Message, returning some error string if the conversion to JSON
-   * fails.
+   * Extract JSON as string from a google.protobuf.Message, returning some error string if the
+   * conversion to JSON fails.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default

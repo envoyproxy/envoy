@@ -1522,9 +1522,8 @@ TEST_F(ProtobufUtilityTest, GetYamlStringFromProtoInvalidAny) {
   ProtobufWkt::Any source_any;
   source_any.set_type_url("type.googleapis.com/bad.type.url");
   source_any.set_value("asdf");
-  EXPECT_THROW(MessageUtil::getYamlStringFromMessage(source_any, true) , EnvoyException);
+  EXPECT_THROW(MessageUtil::getYamlStringFromMessage(source_any, true), EnvoyException);
 }
-
 
 TEST(DurationUtilTest, OutOfRange) {
   {

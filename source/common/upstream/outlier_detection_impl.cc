@@ -766,7 +766,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
 
   const auto json =
       MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                 /* always_print_primitive_fields */ true);
+                                                   /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 
@@ -780,7 +780,7 @@ void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
 
   const auto json =
       MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
-                                                 /* always_print_primitive_fields */ true);
+                                                   /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 
