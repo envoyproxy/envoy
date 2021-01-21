@@ -1,13 +1,13 @@
 .. _config_http_filters_jwt_authn:
 
-JWT Authentication
+JWT 认证
 ==================
 
-This HTTP filter can be used to verify JSON Web Token (JWT). It will verify its signature, audiences and issuer. It will also check its time restrictions, such as expiration and nbf (not before) time. If the JWT verification fails, its request will be rejected. If the JWT verification succeeds, its payload can be forwarded to the upstream for further authorization if desired.
+此 HTTP 过滤器可用于验证 JSON Web Token（JWT）。它将验证其签名、受众（audience）和发行人。它还将检查其时间限制，例如到期时间和 nbf（not before 不早于）时间。如果 JWT 验证失败，其请求将被拒绝。如果 JWT 验证成功，则可以将其有效负载转发到上游，以按需进行进一步授权。
 
-JWKS is needed to verify JWT signatures. They can be specified in the filter config or can be fetched remotely from a JWKS server.
+需要 JWKS 来验证 JWT 签名。它们可以在过滤器配置中指定，也可以从 JWKS 服务器远程获取。
 
-Following are supported JWT alg:
+以下是支持的 JWT alg：
 
 .. code-block::
 
@@ -17,52 +17,51 @@ Following are supported JWT alg:
    PS256, PS384, PS512,
    EdDSA
 
-Configuration
--------------
+配置
+--------
 
-This filter should be configured with the name *envoy.filters.http.jwt_authn*.
+此过滤器应的名称应该配置为 *envoy.filters.http.jwt_authn*。
 
-This HTTP :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>` has two fields:
+此 HTTP :ref:`过滤器配置 <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>` 包含两个字段：
 
-* Field *providers* specifies how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and where to output its payload.
-* Field *rules* specifies matching rules and their requirements. If a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be used.
+* 字段 *providers* 指定应如何验证 JWT，例如在哪里提取令牌，在哪里获取公共密钥（JWKS）以及在何处输出其有效负载。
+* 字段 *rules* 指定匹配的规则及其 requirements。如果请求符合规则，则应用其 requirement。该 requirement 指定应使用哪些 JWT providers。
 
 JwtProvider
 ~~~~~~~~~~~
 
-:ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>` specifies how a JWT should be verified. It has the following fields:
+:ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>` 指定应如何验证 JWT。它具有以下字段：
 
-* *issuer*: the principal that issued the JWT, usually a URL or an email address.
-* *audiences*: a list of JWT audiences allowed to access. A JWT containing any of these audiences will be accepted.
-  If not specified, the audiences in JWT will not be checked.
-* *local_jwks*: fetch JWKS in local data source, either in a local file or embedded in the inline string.
-* *remote_jwks*: fetch JWKS from a remote HTTP server, also specify cache duration.
-* *forward*: if true, JWT will be forwarded to the upstream.
-* *from_headers*: extract JWT from HTTP headers.
-* *from_params*: extract JWT from query parameters.
-* *forward_payload_header*: forward the JWT payload in the specified HTTP header.
+* *issuer*: 发行 JWT 的主体，通常是 URL 或电子邮件地址。
+* *audiences*: 允许访问的 JWT 受众列表。包含任何这些受众的 JWT 将被接受。如果未指定，将不检查 JWT 中的受众。
+* *local_jwks*: 在本地数据源中获取 JWKS，可以在本地文件中或嵌入在内联字符串中。
+* *remote_jwks*: 从远程 HTTP 服务器获取 JWKS，还可以指定缓存持续时间。
+* *forward*: 如果为 true，则将 JWT 转发到上游。
+* *from_headers*: 从 HTTP 头部中提取 JWT。
+* *from_params*: 从查询参数中提取 JWT。
+* *forward_payload_header*: 在指定的 HTTP 头部中转发 JWT 有效负载。
 
-Default Extract Location
+默认提取位置
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-If *from_headers* and *from_params* is empty,  the default location to extract JWT is from HTTP header::
+如果 *from_headers* 和 *from_params* 为空，则默认从 HTTP 头部提取 JWT：
 
   Authorization: Bearer <token>
 
-and query parameter key *access_token* as::
+和查询参数的 key *access_token* ::
 
   /path?access_token=<JWT>
 
-If a request has two tokens, one from the header and the other from the query parameter, all of them must be valid.
+如果一个请求有两个 token，一个来自 HTTP 头部，另一个来自 HTTP 查询参数，则所有这些 token 都必须有效。
 
-In the :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`, *providers* is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`. The *provider_name* must be unique, it is referred in the `JwtRequirement <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtRequirement>` in its *provider_name* field.
+在 :ref:`过滤器配置中 <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`，*providers* 是一个映射，用于将 *provider_name* 映射到 :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`。*provider_name* 必须是唯一的，它被 :ref:`JwtRequirement <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtRequirement>` 中的 *provider_name* 字段引用。
 
 .. important::
-   For *remote_jwks*, a **jwks_cluster** cluster is required.
+   对于 *remote_jwks*，**jwks_cluster** cluster 字段是必须提供的。
 
-Due to above requirement, `OpenID Connect Discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
+由于上述要求，`OpenID Connect 发现 <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ 是不支持的，因为要获取 JWKS 的 URL 是基于响应发现的。为动态 URL 设置集群配置并不容易。
 
-Remote JWKS config example
+远程 JWKS 配置示例
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
@@ -80,9 +79,9 @@ Remote JWKS config example
         cache_duration:
           seconds: 300
 
-Above example fetches JWSK from a remote server with URL https://example.com/jwks.json. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.
+上面的示例使用 URL https://example.com/jwks.json 从远程服务器获取 JWSK。令牌将从默认提取位置提取。令牌不会转发到上游。JWT 有效负载不会添加到请求头部中。
 
-Following cluster **example_jwks_cluster** is needed to fetch JWKS.
+需要以下 cluster **example_jwks_cluster** 来获取 JWKS。
 
 .. code-block:: yaml
 
@@ -100,10 +99,10 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
                 port_value: 80
 
 
-Inline JWKS config example
+内联 JWKS 配置示例
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Another config example using inline JWKS:
+使用内联 JWKS 的另一个配置示例：
 
 .. code-block:: yaml
 
@@ -117,28 +116,28 @@ Another config example using inline JWKS:
       forward: true
       forward_payload_header: x-jwt-payload
 
-Above example uses config inline string to specify JWKS. The JWT token will be extracted from HTTP headers as::
+上面的示例使用内联字符指定 JWKS。JWT 令牌将从下面的 HTTP 头部中提取：
 
      jwt-assertion: <JWT>.
 
-JWT payload will be added to the request header as following format::
+JWT 有效负载将以以下格式添加到请求头部：
 
     x-jwt-payload: base64url_encoded(jwt_payload_in_JSON)
 
 RequirementRule
 ~~~~~~~~~~~~~~~
 
-:ref:`RequirementRule <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.RequirementRule>` has two fields:
+:ref:`RequirementRule <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.RequirementRule>` 具有两个字段：
 
-* Field *match* specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes.
-* Field *requires* specifies the JWT requirement, e.g. which provider is required.
+* 字段 *match* 指定如何匹配请求；例如通过 HTTP 头部，查询参数或路径前缀。
+* 字段 *requires* 指定 JWT requirement，例如需要哪个 provider。
 
 .. important::
-   - **If a request matches multiple rules, the first matched rule will apply**.
-   - If the matched rule has empty *requires* field, **JWT verification is not required**.
-   - If a request doesn't match any rules, **JWT verification is not required**.
+   - **如果一个请求匹配多个规则，则将应用第一个匹配的规则。**.
+   - 如果匹配规则的 *requires* 字段为空，**则不需要 JWT 验证**。
+   - 如果请求不符合任何规则，**则不需要 JWT 验证**。
 
-Single requirement config example
+单一 requirement 配置示例
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
@@ -165,9 +164,9 @@ Single requirement config example
     requires:
       provider_name: jwt_provider1
 
-Above config uses single requirement rule, each rule may have either an empty requirement or a single requirement with one provider name.
+上面的配置使用单个 requirement 规则，每个规则可以具有空 requirement 或具有一个 provider 名称的单个 requirement。
 
-Group requirement config example
+组 requirement 配置示例
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
@@ -197,7 +196,7 @@ Group requirement config example
         - provider_name: provider1
         - provider_name: provider2
 
-Above config uses more complex *group* requirements:
+上面的配置使用更复杂的*组* requirements：
 
-* The first *rule* specifies *requires_any*; if any of **provider1** or **provider2** requirement is satisfied, the request is OK to proceed.
-* The second *rule* specifies *requires_all*; only if both **provider1** and **provider2** requirements are satisfied, the request is OK to proceed.
+* 第一条 *rule* 指定 *requires_any*；如果满足 **provider1** 或 **provider2** 的 requirement，请求可以继续。
+* 第二条 *rule* 指定 *requires_all*；只有同时满足 **provider1** 和 **provider2** 的 requirements，请求才能继续。
