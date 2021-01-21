@@ -137,8 +137,12 @@ private:
   const ScopeTrackedObject* scope_;
 };
 
-ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(Dispatcher& dispatcher)
-    : dispatcher_(dispatcher), scale_factor_(1.0) {}
+ScaledRangeTimerManagerImpl::ScaledRangeTimerManagerImpl(
+    Dispatcher& dispatcher, const ScaledTimerTypeMapConstSharedPtr& timer_minimums)
+    : dispatcher_(dispatcher),
+      timer_minimums_(timer_minimums != nullptr ? timer_minimums
+                                                : std::make_shared<ScaledTimerTypeMap>()),
+      scale_factor_(1.0) {}
 
 ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   // Scaled timers created by the manager shouldn't outlive it. This is
@@ -146,13 +150,22 @@ ScaledRangeTimerManagerImpl::~ScaledRangeTimerManagerImpl() {
   ASSERT(queues_.empty());
 }
 
+TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerType timer_type, TimerCb callback) {
+  const auto minimum_it = timer_minimums_->find(timer_type);
+  const Event::ScaledTimerMinimum minimum =
+      minimum_it != timer_minimums_->end()
+          ? minimum_it->second
+          : Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat::max()));
+  return createTimer(minimum, std::move(callback));
+}
+
 TimerPtr ScaledRangeTimerManagerImpl::createTimer(ScaledTimerMinimum minimum, TimerCb callback) {
   return std::make_unique<RangeTimerImpl>(minimum, callback, *this);
 }
 
-void ScaledRangeTimerManagerImpl::setScaleFactor(double scale_factor) {
+void ScaledRangeTimerManagerImpl::setScaleFactor(UnitFloat scale_factor) {
   const MonotonicTime now = dispatcher_.approximateMonotonicTime();
-  scale_factor_ = DurationScaleFactor(scale_factor);
+  scale_factor_ = scale_factor;
   for (auto& queue : queues_) {
     resetQueueTimer(*queue, now);
   }
@@ -171,12 +184,9 @@ ScaledRangeTimerManagerImpl::ScalingTimerHandle::ScalingTimerHandle(Queue& queue
                                                                     Queue::Iterator iterator)
     : queue_(queue), iterator_(iterator) {}
 
-ScaledRangeTimerManagerImpl::DurationScaleFactor::DurationScaleFactor(double value)
-    : value_(std::max(0.0, std::min(value, 1.0))) {}
-
 MonotonicTime ScaledRangeTimerManagerImpl::computeTriggerTime(const Queue::Item& item,
                                                               std::chrono::milliseconds duration,
-                                                              DurationScaleFactor scale_factor) {
+                                                              UnitFloat scale_factor) {
   return item.active_time_ +
          std::chrono::duration_cast<MonotonicTime::duration>(duration * scale_factor.value());
 }

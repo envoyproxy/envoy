@@ -5,8 +5,10 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
+#include "common/config/xds_resource.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/type_util.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -14,17 +16,20 @@ namespace Config {
 
 constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::milliseconds(50);
 
-GrpcSubscriptionImpl::GrpcSubscriptionImpl(
-    GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats, absl::string_view type_url,
-    Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
+GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
+                                           SubscriptionCallbacks& callbacks,
+                                           OpaqueResourceDecoder& resource_decoder,
+                                           SubscriptionStats stats, absl::string_view type_url,
+                                           Event::Dispatcher& dispatcher,
+                                           std::chrono::milliseconds init_fetch_timeout,
+                                           bool is_aggregated, bool use_namespace_matching)
     : grpc_mux_(grpc_mux), callbacks_(callbacks), resource_decoder_(resource_decoder),
       stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
+      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated),
+      use_namespace_matching_(use_namespace_matching) {}
 
 // Config::Subscription
-void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
-                                 const bool use_namespace_matching) {
+void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -34,7 +39,7 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
   }
 
   watch_ =
-      grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, use_namespace_matching);
+      grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, use_namespace_matching_);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
@@ -49,12 +54,13 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources,
 }
 
 void GrpcSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names) {
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
   watch_->update(update_to_these_names);
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::string>& for_update) {
+void GrpcSubscriptionImpl::requestOnDemandUpdate(
+    const absl::flat_hash_set<std::string>& for_update) {
   grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }
@@ -136,6 +142,22 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();
   }
+}
+
+GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
+    const xds::core::v3::ResourceLocator& collection_locator, GrpcMuxSharedPtr grpc_mux,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionStats stats, Event::Dispatcher& dispatcher,
+    std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
+    : GrpcSubscriptionImpl(
+          grpc_mux, callbacks, resource_decoder, stats,
+          TypeUtil::descriptorFullNameToTypeUrl(collection_locator.resource_type()), dispatcher,
+          init_fetch_timeout, is_aggregated, false),
+      collection_locator_(collection_locator) {}
+
+void GrpcCollectionSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
+  ASSERT(resource_names.empty());
+  GrpcSubscriptionImpl::start({XdsResourceIdentifier::encodeUrl(collection_locator_)});
 }
 
 } // namespace Config

@@ -4,6 +4,8 @@
 #include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
 
+#include "xds/core/v3/resource_locator.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -20,17 +22,17 @@ public:
    * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.
    *                  The callbacks must not result in the deletion of the Subscription object.
    * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   * @param use_namespace_matching whether to use namespace match semantics on subscription.
    *
    * @return SubscriptionPtr subscription object corresponding for config and type_url.
    */
-  virtual SubscriptionPtr
-  subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
-                               absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks,
-                               OpaqueResourceDecoder& resource_decoder) PURE;
+  virtual SubscriptionPtr subscriptionFromConfigSource(
+      const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+      Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoder& resource_decoder, bool use_namespace_matching) PURE;
 
   /**
-   * Collection subscription factory interface for UDPA URLs.
+   * Collection subscription factory interface for xDS-TP URLs.
    *
    * @param collection_locator collection resource locator.
    * @param config envoy::config::core::v3::ConfigSource for authority resolution.

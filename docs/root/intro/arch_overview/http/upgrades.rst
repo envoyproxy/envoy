@@ -94,6 +94,8 @@ will synthesize 200 response headers, and then forward the TCP data as the HTTP 
 For an example of proxying connect, please see :repo:`configs/proxy_connect.yaml <configs/proxy_connect.yaml>`
 For an example of terminating connect, please see :repo:`configs/terminate_connect.yaml <configs/terminate_connect.yaml>`
 
+.. _tunneling-tcp-over-http:
+
 Tunneling TCP over HTTP
 ^^^^^^^^^^^^^^^^^^^^^^^
 Envoy also has support for tunneling raw TCP over HTTP CONNECT requests. Find
@@ -123,3 +125,6 @@ and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_con
 In both cases you will be running a first Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP
 CONNECT request, and a second one listening on 10001, stripping the CONNECT headers, and forwarding the 
 original TCP upstream, in this case to google.com.
+
+Envoy waits for the HTTP tunnel to be established (i.e. a successful response to the  CONNECT request is received),
+before start streaming the downstream TCP data to the upstream.

@@ -12,23 +12,20 @@ namespace Tcp {
 namespace Generic {
 
 TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
-    const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
+    Upstream::ThreadLocalCluster& thread_local_cluster,
     const absl::optional<TunnelingConfig>& config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const {
   if (config.has_value()) {
-    auto* cluster = cluster_manager.get(cluster_name);
-    if (!cluster) {
-      return nullptr;
-    }
-    auto pool_type = ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0)
-                         ? Http::CodecClient::Type::HTTP2
-                         : Http::CodecClient::Type::HTTP1;
+    auto pool_type =
+        ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0)
+            ? Http::CodecClient::Type::HTTP2
+            : Http::CodecClient::Type::HTTP1;
     auto ret = std::make_unique<TcpProxy::HttpConnPool>(
-        cluster_name, cluster_manager, context, config.value(), upstream_callbacks, pool_type);
+        thread_local_cluster, context, config.value(), upstream_callbacks, pool_type);
     return (ret->valid() ? std::move(ret) : nullptr);
   }
-  auto ret = std::make_unique<TcpProxy::TcpConnPool>(cluster_name, cluster_manager, context,
-                                                     upstream_callbacks);
+  auto ret =
+      std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context, upstream_callbacks);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 

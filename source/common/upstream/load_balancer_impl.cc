@@ -22,6 +22,12 @@ static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
+bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
+  // Currently we only allow the number of preconnected connections to equal the
+  // number of healthy hosts.
+  return num_preconnect_picks >= healthy_hosts;
+}
+
 // Distributes load between priorities based on the per priority availability and the normalized
 // total availability. Load is assigned to each priority according to how available each priority is
 // adjusted for the normalized total availability.
@@ -108,16 +114,16 @@ LoadBalancerBase::LoadBalancerBase(
       priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
-                                per_priority_health_, per_priority_degraded_);
+                                per_priority_health_, per_priority_degraded_, total_healthy_hosts_);
   }
   // Recalculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
-  priority_set_.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
-        recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
-                                    per_priority_health_, per_priority_degraded_);
-      });
+  priority_set_.addPriorityUpdateCb([this](uint32_t priority, const HostVector&,
+                                           const HostVector&) -> void {
+    recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_,
+                                per_priority_degraded_, total_healthy_hosts_);
+  });
 
   priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
@@ -146,11 +152,13 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
                                                    HealthyAndDegradedLoad& per_priority_load,
                                                    HealthyAvailability& per_priority_health,
-                                                   DegradedAvailability& per_priority_degraded) {
+                                                   DegradedAvailability& per_priority_degraded,
+                                                   uint32_t& total_healthy_hosts) {
   per_priority_load.healthy_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_load.degraded_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_health.get().resize(priority_set.hostSetsPerPriority().size());
   per_priority_degraded.get().resize(priority_set.hostSetsPerPriority().size());
+  total_healthy_hosts = 0;
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy/degraded hosts to total hosts, modified
@@ -232,6 +240,10 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                 per_priority_load.healthy_priority_load_.get().end(), 0) +
                     std::accumulate(per_priority_load.degraded_priority_load_.get().begin(),
                                     per_priority_load.degraded_priority_load_.get().end(), 0));
+
+  for (auto& host_set : priority_set.hostSetsPerPriority()) {
+    total_healthy_hosts += host_set->healthyHosts().size();
+  }
 }
 
 // Method iterates through priority levels and turns on/off panic mode.
@@ -774,6 +786,10 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
+  if (tooManyPreconnects(stashed_random_.size(), total_healthy_hosts_)) {
+    return nullptr;
+  }
+
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
   if (!hosts_source) {
     return nullptr;
@@ -829,8 +845,8 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector&,
                                                                 const HostsSource&) {
-  // LeastRequestLoadBalancer can not do deterministic prefetching, because
-  // any other thread might select the least-requested-host between prefetch and
+  // LeastRequestLoadBalancer can not do deterministic preconnecting, because
+  // any other thread might select the least-requested-host between preconnect and
   // host-pick, and change the rq_active checks.
   return nullptr;
 }
@@ -859,6 +875,9 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
+  if (tooManyPreconnects(stashed_random_.size(), total_healthy_hosts_)) {
+    return nullptr;
+  }
   return peekOrChoose(context, true);
 }
 

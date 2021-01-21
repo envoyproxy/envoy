@@ -30,7 +30,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       }
       bytes_read += result.rc_;
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
         break;
       }
     } else {

@@ -3,8 +3,10 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/context_provider.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace LocalInfo {
@@ -27,6 +29,11 @@ public:
   virtual const std::string& zoneName() const PURE;
 
   /**
+   * @return the zone name as a stat name.
+   */
+  virtual const Stats::StatName& zoneStatName() const PURE;
+
+  /**
    * @return the human readable cluster name. E.g., "eta".
    */
   virtual const std::string& clusterName() const PURE;
@@ -40,6 +47,11 @@ public:
    * @return the full node identity presented to management servers.
    */
   virtual const envoy::config::core::v3::Node& node() const PURE;
+
+  /**
+   * @return the xDS context provider for the node.
+   */
+  virtual const Config::ContextProvider& contextProvider() const PURE;
 };
 
 using LocalInfoPtr = std::unique_ptr<LocalInfo>;

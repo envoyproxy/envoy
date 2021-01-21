@@ -120,7 +120,8 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
     luaL_error(state, "http call timeout must be >= 0");
   }
 
-  if (filter.clusterManager().get(cluster) == nullptr) {
+  const auto thread_local_cluster = filter.clusterManager().getThreadLocalCluster(cluster);
+  if (thread_local_cluster == nullptr) {
     luaL_error(state, "http call cluster invalid. Must be configured");
   }
 
@@ -145,8 +146,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   }
 
   auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout).setParentSpan(parent_span);
-  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(std::move(message),
-                                                                         callbacks, options);
+  return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 } // namespace
 
@@ -418,16 +418,31 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
 int StreamHandleWrapper::luaBody(lua_State* state) {
   ASSERT(state_ == State::Running);
 
+  bool always_wrap_body = false;
+
+  if (lua_gettop(state) >= 2) {
+    luaL_checktype(state, 2, LUA_TBOOLEAN);
+    always_wrap_body = lua_toboolean(state, 2);
+  }
+
   if (end_stream_) {
     if (!buffered_body_ && saw_body_) {
       return luaL_error(state, "cannot call body() after body has been streamed");
-    } else if (callbacks_.bufferedBody() == nullptr) {
-      ENVOY_LOG(debug, "end stream. no body");
-      return 0;
     } else {
       if (body_wrapper_.get() != nullptr) {
         body_wrapper_.pushStack();
       } else {
+        if (callbacks_.bufferedBody() == nullptr) {
+          ENVOY_LOG(debug, "end stream. no body");
+
+          if (!always_wrap_body) {
+            return 0;
+          }
+
+          Buffer::OwnedImpl body(EMPTY_STRING);
+          callbacks_.addData(body);
+        }
+
         body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
                                 state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
                             true);

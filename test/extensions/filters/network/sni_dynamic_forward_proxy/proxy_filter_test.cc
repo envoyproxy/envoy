@@ -22,9 +22,10 @@ namespace NetworkFilters {
 namespace SniDynamicForwardProxy {
 namespace {
 
-using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
+using LoadDnsCacheEntryStatus =
+    Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 using MockLoadDnsCacheEntryResult =
-    Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult;
+    Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult;
 
 class SniDynamicProxyFilterTest
     : public testing::Test,
@@ -72,7 +73,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
   Upstream::ResourceAutoIncDec* circuit_breakers_{
       new Upstream::ResourceAutoIncDec(pending_requests_)};
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -90,7 +91,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
   Upstream::ResourceAutoIncDec* circuit_breakers_{
       new Upstream::ResourceAutoIncDec(pending_requests_)};
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr}));
@@ -103,7 +104,7 @@ TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
   Upstream::ResourceAutoIncDec* circuit_breakers_{
       new Upstream::ResourceAutoIncDec(pending_requests_)};
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr}));
@@ -113,7 +114,7 @@ TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
 
 TEST_F(SniDynamicProxyFilterTest, CircuitBreakerInvoked) {
   EXPECT_CALL(connection_, requestedServerName()).WillRepeatedly(Return("foo"));
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).WillOnce(Return(nullptr));
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }

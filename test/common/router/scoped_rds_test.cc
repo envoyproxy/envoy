@@ -123,7 +123,7 @@ protected:
 
     // srds subscription
     EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
-                subscriptionFromConfigSource(_, _, _, _, _))
+                subscriptionFromConfigSource(_, _, _, _, _, _))
         .Times(AnyNumber());
     // rds subscription
     EXPECT_CALL(
@@ -132,17 +132,17 @@ protected:
             _,
             Eq(Grpc::Common::typeUrl(
                 API_NO_BOOST(envoy::api::v2::RouteConfiguration)().GetDescriptor()->full_name())),
-            _, _, _))
+            _, _, _, _))
         .Times(AnyNumber())
         .WillRepeatedly(
             Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                          Envoy::Config::OpaqueResourceDecoder&) {
+                          Envoy::Config::OpaqueResourceDecoder&, bool) {
               auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
               rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
-              EXPECT_CALL(*ret, start(_, _))
+              EXPECT_CALL(*ret, start(_))
                   .WillOnce(Invoke([this, config_sub_addr = ret.get()](
-                                       const std::set<std::string>& resource_names, const bool) {
+                                       const absl::flat_hash_set<std::string>& resource_names) {
                     EXPECT_EQ(resource_names.size(), 1);
                     auto iter = rds_subscription_by_config_subscription_.find(config_sub_addr);
                     EXPECT_NE(iter, rds_subscription_by_config_subscription_.end());
@@ -1063,7 +1063,7 @@ key:
 
   ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
-  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, post(_));
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                             std::move(route_config_updated_cb));
@@ -1135,8 +1135,8 @@ key:
             "foo_routes");
   ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(1);
-  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
+  EXPECT_CALL(event_dispatcher_, post(_));
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                             std::move(route_config_updated_cb));
@@ -1274,7 +1274,7 @@ key:
   pushRdsConfig({"foo_routes"}, "111");
   // Route table have been fetched, callbacks will be executed immediately.
   for (int i = 0; i < 5; i++) {
-    EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+    EXPECT_CALL(event_dispatcher_, post(_));
     ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
@@ -1304,7 +1304,7 @@ TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
                                             std::move(route_config_updated_cb));
   // Destroy the scoped_rds subscription by destroying its only config provider.
   provider_.reset();
-  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, post(_));
   EXPECT_NO_THROW(temp_post_cb());
 }
 
@@ -1337,7 +1337,7 @@ key:
                                               std::move(route_config_updated_cb));
   }
   // After on demand request, push rds update, the callbacks will be executed.
-  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, post(_));
   pushRdsConfig({"foo_routes"}, "111");
 
   ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
@@ -1345,7 +1345,7 @@ key:
   // Delete the scope route.
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate({}, "2"));
   EXPECT_EQ(0UL, all_scopes_.value());
-  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+  EXPECT_CALL(event_dispatcher_, post(_));
   // Scope no longer exists after srds update.
   std::function<void(bool)> route_config_updated_cb = [](bool scope_exist) {
     EXPECT_FALSE(scope_exist);
