@@ -770,4 +770,17 @@ private:
   char data_[];
 };
 
+class SetUtil {
+public:
+  // Use instead of std::set_difference for unordered absl::flat_hash_set containers.
+  template <typename T>
+  static void setDifference(const absl::flat_hash_set<T>& original_set,
+                            const absl::flat_hash_set<T>& remove_set,
+                            absl::flat_hash_set<T>& result_set) {
+    std::copy_if(original_set.begin(), original_set.end(),
+                 std::inserter(result_set, result_set.begin()),
+                 [&remove_set](const T& v) -> bool { return remove_set.count(v) == 0; });
+  }
+};
+
 } // namespace Envoy

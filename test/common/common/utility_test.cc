@@ -20,6 +20,8 @@
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
+using testing::ElementsAre;
+using testing::WhenSorted;
 #ifdef WIN32
 using testing::HasSubstr;
 using testing::Not;
@@ -996,5 +998,28 @@ TEST(ErrorDetailsTest, WindowsFormatMessage) {
   EXPECT_EQ(errorDetails(99999), "Unknown error");
 }
 #endif
+
+TEST(SetUtil, All) {
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({1, 2, 3}, {1, 3}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre(2)));
+  }
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({1, 2, 3}, {4, 5}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre(1, 2, 3)));
+  }
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({}, {4, 5}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre()));
+  }
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({1, 2, 3}, {}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre(1, 2, 3)));
+  }
+}
 
 } // namespace Envoy
