@@ -38,7 +38,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
         async_client_factory->create(), std::chrono::milliseconds(timeout_ms),
         transport_api_version);
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
-        std::make_shared<Filter>(*ext_authz_config, std::move(client))});
+        std::make_shared<Filter>(ext_authz_config, std::move(client))});
   };
 }
 

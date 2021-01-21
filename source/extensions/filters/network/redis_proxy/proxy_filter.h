@@ -75,7 +75,7 @@ class ProxyFilter : public Network::ReadFilter,
                     public Network::ConnectionCallbacks {
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-              CommandSplitter::Instance& splitter, ProxyFilterConfig& config);
+              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
   ~ProxyFilter() override;
 
   // Network::ReadFilter
@@ -122,7 +122,7 @@ private:
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
   CommandSplitter::Instance& splitter_;
-  ProxyFilterConfig& config_;
+  ProxyFilterConfigSharedPtr config_;
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;

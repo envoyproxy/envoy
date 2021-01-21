@@ -1,6 +1,8 @@
 #include <chrono>
+#include <initializer_list>
 
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
@@ -25,16 +27,22 @@ using testing::_;
 using testing::AllOf;
 using testing::AnyNumber;
 using testing::ByMove;
+using testing::DoAll;
 using testing::FloatNear;
 using testing::Invoke;
-using testing::MockFunction;
+using testing::InvokeArgument;
 using testing::NiceMock;
+using testing::Pointee;
 using testing::Property;
 using testing::Return;
+using testing::SaveArg;
+using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
 namespace Server {
 namespace {
+
+using TimerType = Event::ScaledTimerType;
 
 class FakeResourceMonitor : public ResourceMonitor {
 public:
@@ -120,12 +128,14 @@ public:
   }
 
   MOCK_METHOD(Event::ScaledRangeTimerManagerPtr, createScaledRangeTimerManager,
-              (Event::Dispatcher&), (const, override));
+              (Event::Dispatcher&, const Event::ScaledTimerTypeMapConstSharedPtr&),
+              (const, override));
 
 private:
-  Event::ScaledRangeTimerManagerPtr
-  createDefaultScaledRangeTimerManager(Event::Dispatcher& dispatcher) const {
-    return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher);
+  Event::ScaledRangeTimerManagerPtr createDefaultScaledRangeTimerManager(
+      Event::Dispatcher& dispatcher,
+      const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const {
+    return OverloadManagerImpl::createScaledRangeTimerManager(dispatcher, timer_minimums);
   }
 };
 
@@ -492,97 +502,51 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             saturation_threshold: 1.0
   )YAML";
 
+// These are the timer types according to the reduced timeouts config above.
+constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimums[]{
+    {TimerType::HttpDownstreamIdleConnectionTimeout,
+     Event::AbsoluteMinimum(std::chrono::seconds(2))},
+    {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
+};
+TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
+  auto manager(createOverloadManager(kReducedTimeoutsConfig));
+
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+
+  Event::ScaledTimerTypeMapConstSharedPtr timer_minimums;
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(
+          DoAll(SaveArg<1>(&timer_minimums),
+                Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager}))));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  EXPECT_EQ(scaled_timer_manager.get(), mock_scaled_timer_manager);
+  EXPECT_THAT(timer_minimums, Pointee(UnorderedElementsAreArray(kReducedTimeoutsMinimums)));
+}
+
 TEST_F(OverloadManagerImplTest, AdjustScaleFactor) {
   setDispatcherExpectation();
   auto manager(createOverloadManager(kReducedTimeoutsConfig));
 
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_scaled_timer_manager = new Event::MockScaledRangeTimerManager();
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_scaled_timer_manager})));
+
+  Event::MockDispatcher mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
 
   manager->start();
 
+  EXPECT_CALL(mock_dispatcher, post).WillOnce(InvokeArgument<0>());
   // The scaled trigger has range [0.5, 1.0] so 0.6 should map to a scale value of 0.2, which means
   // a timer scale factor of 0.8 (1 - 0.2).
-  EXPECT_CALL(*scaled_timer_manager,
+  EXPECT_CALL(*mock_scaled_timer_manager,
               setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
   factory1_.monitor_->setPressure(0.6);
 
   timer_cb_();
-}
-
-TEST_F(OverloadManagerImplTest, CreateUnscaledScaledTimer) {
-  setDispatcherExpectation();
-  auto manager(createOverloadManager(kReducedTimeoutsConfig));
-
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
-  EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
-  manager->start();
-
-  auto* mock_scaled_timer = new Event::MockTimer();
-  MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_)
-      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-        // Since this timer was created with the timer type "unscaled", it should use the same value
-        // for the min and max. Test that by checking an arbitrary value.
-        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(55));
-        return mock_scaled_timer;
-      });
-
-  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
-      OverloadTimerType::UnscaledRealTimerForTest, mock_callback.AsStdFunction());
-
-  EXPECT_CALL(*mock_scaled_timer, enableTimer(std::chrono::milliseconds(5 * 1000), _));
-  timer->enableTimer(std::chrono::seconds(5));
-}
-
-TEST_F(OverloadManagerImplTest, CreateScaledTimerWithAbsoluteMinimum) {
-  setDispatcherExpectation();
-  auto manager(createOverloadManager(kReducedTimeoutsConfig));
-
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
-  EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
-  manager->start();
-
-  auto* mock_scaled_timer = new Event::MockTimer();
-  MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_)
-      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-        // This timer was created with an absolute minimum. Test that by checking an arbitrary
-        // value.
-        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(2));
-        return mock_scaled_timer;
-      });
-
-  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
-      OverloadTimerType::HttpDownstreamIdleConnectionTimeout, mock_callback.AsStdFunction());
-  EXPECT_EQ(timer.get(), mock_scaled_timer);
-}
-
-TEST_F(OverloadManagerImplTest, CreateScaledTimerWithProvidedMinimum) {
-  setDispatcherExpectation();
-  auto manager(createOverloadManager(kReducedTimeoutsConfig));
-
-  auto* scaled_timer_manager = new Event::MockScaledRangeTimerManager();
-  EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{scaled_timer_manager})));
-  manager->start();
-
-  auto* mock_scaled_timer = new Event::MockTimer();
-  MockFunction<Event::TimerCb> mock_callback;
-  EXPECT_CALL(*scaled_timer_manager, createTimer_)
-      .WillOnce([&](Event::ScaledTimerMinimum minimum, auto) {
-        // This timer was created with an absolute minimum. Test that by checking an arbitrary
-        // value.
-        EXPECT_EQ(minimum.computeMinimum(std::chrono::seconds(55)), std::chrono::seconds(3));
-        return mock_scaled_timer;
-      });
-
-  auto timer = manager->getThreadLocalOverloadState().createScaledTimer(
-      Event::AbsoluteMinimum(std::chrono::seconds(3)), mock_callback.AsStdFunction());
-  EXPECT_EQ(timer.get(), mock_scaled_timer);
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
