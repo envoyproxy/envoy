@@ -32,6 +32,7 @@ using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Config {
@@ -265,6 +266,44 @@ TEST_F(NewGrpcMuxImplTest, V2ResourceResponseV3ResourceWatch) {
         }));
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
+}
+
+// Validate basic gRPC mux subscriptions to xdstp:// glob collections.
+TEST_F(NewGrpcMuxImplTest, XdsTpGlobCollection) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  MockContextProvider context_provider;
+  EXPECT_CALL(local_info_, contextProvider()).WillOnce(ReturnRef(context_provider));
+  xds::core::v3::ContextParams context_params;
+  EXPECT_CALL(context_provider, nodeContext()).WillOnce(ReturnRef(context_params));
+  // We verify that the gRPC mux normalizes the context parameter order below.
+  auto watch = grpc_mux_->addWatch(
+      type_url,
+      {"xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/*?thing=some&some=thing"},
+      callbacks_, resource_decoder_, true);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("ignore");
+  auto* resource = response->add_resources();
+  resource->set_name(
+      "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/a?some=thing&thing=some");
+  resource->mutable_resource()->PackFrom(load_assignment);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+      .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                          const Protobuf::RepeatedPtrField<std::string>&,
+                                          const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+      }));
+  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 }
 
 } // namespace

@@ -428,6 +428,12 @@ public:
   // Should only be called for HTTP2
   void onGoAway(Http::GoAwayErrorCode code) override;
 
+  // Should only be called for HTTP2, sends a GOAWAY frame with NO_ERROR.
+  void encodeGoAway();
+
+  // Should only be called for HTTP2, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
+  void encodeProtocolError();
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
