@@ -6169,9 +6169,33 @@ TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
 
 class RouteConfigurationDirectResponseBodyTest : public testing::Test, public ConfigImplTestBase {};
 
+TEST_F(RouteConfigurationDirectResponseBodyTest, DirectResponseBodyLargerThanDefault) {
+  // Set the inline direct response body size to be larger than 4K.
+  std::string response_body(2 * 4096, 'A');
+  const std::string yaml = R"EOF(
+max_direct_response_body_size_bytes: 8192
+virtual_hosts:
+  - name: direct
+    domains: [direct.example.com]
+    routes:
+      - match: { prefix: "/"}
+        direct_response:
+          status: 200
+          body:
+            inline_string: )EOF" +
+                           response_body + "\n";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("direct.example.com", "/", true, false);
+  EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
+  EXPECT_EQ(response_body, config.route(headers, 0)->directResponseEntry()->responseBody());
+}
+
 TEST_F(RouteConfigurationDirectResponseBodyTest, DirectResponseBodySizeTooLarge) {
   std::string response_body(2, 'A');
   const std::string yaml = R"EOF(
+# The direct response body size is set to be limited to 1 byte.
 max_direct_response_body_size_bytes: 1
 virtual_hosts:
   - name: direct

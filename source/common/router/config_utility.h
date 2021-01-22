@@ -85,8 +85,8 @@ public:
   /**
    * Returns the content of the response body to send with direct responses from a route.
    * @param route supplies the Route configuration.
-   * @param max_body_size_bytes supplies the maximum response body size in bytes.
    * @param api reference to the Api object
+   * @param max_body_size_bytes supplies the maximum response body size in bytes.
    * @return absl::optional<std::string> the response body provided inline in the route's
    *         direct_response if specified, or the contents of the file named in the
    *         route's direct_response if specified, or an empty string otherwise.
