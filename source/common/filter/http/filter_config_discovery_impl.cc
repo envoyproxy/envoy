@@ -234,7 +234,7 @@ FilterConfigProviderManagerImpl::dumpFilterConfigs() const {
       dynamic_config->set_version_info(subscription->lastConfigVersion());
       dynamic_config->mutable_extension_config()->PackFrom(
           API_RECOVER_ORIGINAL(subscription->lastConfig()));
-      TimestampUtil::systemClockToTimestamp(subscription->lastUpdated,
+      TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
   }
