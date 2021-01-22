@@ -37,10 +37,11 @@ def GetExtensionMetadata(target):
   if not BUILDOZER_PATH:
     raise ExtensionDbError('Buildozer not found!')
   r = subprocess.run(
-      [BUILDOZER_PATH, '-stdout', 'print security_posture status category undocumented', target],
+      [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented category', target],
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE)
-  security_posture, status, category, undocumented = r.stdout.decode('utf-8').strip().split(' ')
+  security_posture, status, undocumented = r.stdout.decode('utf-8').strip().split(' ')[:3]
+  categories = r.stdout.decode('utf-8').strip().split(' ')[3:]
   if IsMissing(security_posture):
     raise ExtensionDbError(
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
@@ -49,7 +50,7 @@ def GetExtensionMetadata(target):
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
       'status': 'stable' if IsMissing(status) else status,
-      'category': 'nocategory' if IsMissing(category) else category,
+      'categories': 'nocategory' if IsMissing(categories) else categories,
   }
 
 
