@@ -37,7 +37,7 @@ public:
 
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
-                   envoy::config::core::v3::SocketOption::SocketState state) const override;
+                   envoy::config::core::v3::SocketOption::SocketState) const override;
 
   bool isSupported() const;
 

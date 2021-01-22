@@ -494,12 +494,18 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
 
-  Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
-  if (downstreamConnection()
+  if (callbacks_->getUpstreamSocketOptions()) {
+    Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
+  }
+
+  auto has_downstream_connection_with_redirect_records =
+      downstreamConnection() &&
+      downstreamConnection()
           ->streamInfo()
           .filterState()
-          .hasData<Network::RedirectRecordsFilterState>(
-              Network::RedirectRecordsFilterState::key())) {
+          .hasData<Network::RedirectRecordsFilterState>(Network::RedirectRecordsFilterState::key());
+
+  if (has_downstream_connection_with_redirect_records) {
     auto redirect_records = downstreamConnection()
                                 ->streamInfo()
                                 .filterState()

@@ -34,7 +34,7 @@ bool IoctlSocketOptionImpl::setOption(
 }
 
 absl::optional<Socket::Option::Details> IoctlSocketOptionImpl::getOptionDetails(
-    const Socket&, envoy::config::core::v3::SocketOption::SocketState state) const {
+    const Socket&, envoy::config::core::v3::SocketOption::SocketState) const {
   return absl::nullopt;
 }
 
