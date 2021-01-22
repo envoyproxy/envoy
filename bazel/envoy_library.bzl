@@ -149,7 +149,7 @@ def envoy_cc_extension(
         # fail("Category not set for %s" % name)
     if type(category) == str:
         category = (category, )
-    for cat in category:
+    for cat in category or []:
         if cat not in EXTENSION_CATEGORIES:
             print("FAILCAT %s %s" % (name, cat))
             # fail("Unknown extension category for %s: %s"
