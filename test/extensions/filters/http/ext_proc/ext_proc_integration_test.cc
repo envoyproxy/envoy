@@ -143,6 +143,48 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
+// successfully, but then sends a gRPC error.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLine) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  // Fail the stream in between messages
+  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
+// successfully, but then sends a gRPC error.
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLineLater) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(nullptr);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ProcessingResponse resp1;
+  resp1.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp1);
+
+  // Fail the stream in between messages
+  processor_stream_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"grpc-status", "13"}});
+
+  verifyDownstreamResponse(*response, 500);
+}
+
+// Test the filter using the default configuration by connecting to
+// an ext_proc server that responds to the request_headers message
 // successfully but closes the stream after response_headers.
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamOnResponse) {
   initializeConfig();

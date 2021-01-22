@@ -326,11 +326,10 @@ TEST_F(OrderingTest, GrpcErrorOutOfLine) {
   sendRequestHeadersReply();
   sendRequestTrailers();
 
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  // sendLocalReply will call this
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   sendGrpcError();
-  // After error we should send no more messages,
-  // but should return an error to the caller
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  sendResponseHeaders(false);
 }
 
 // gRPC close after a proper message means rest of stream is ignored

@@ -51,16 +51,12 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_of
 }
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_of_stream) {
-  if (pending_error_) {
-    sendImmediateResponse(*pending_error_, false);
-    pending_error_.reset();
-    return FilterHeadersStatus::Continue;
-  }
   if (stream_closed_) {
     return FilterHeadersStatus::Continue;
   }
 
   response_headers_ = &headers;
+  encoding_started_ = true;
   ProcessingRequest req;
   auto* headers_req = req.mutable_response_headers();
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
@@ -82,7 +78,8 @@ void Filter::onReceiveMessage(
   } else if (response->has_response_headers()) {
     message_handled = handleResponseHeadersResponse(response->response_headers());
   } else if (response->has_immediate_response()) {
-    message_handled = handleImmediateResponse(response->immediate_response());
+    handleImmediateResponse(response->immediate_response());
+    message_handled = true;
   }
 
   if (message_handled) {
@@ -119,30 +116,21 @@ bool Filter::handleResponseHeadersResponse(const HeadersResponse& response) {
   return false;
 }
 
-bool Filter::handleImmediateResponse(const ImmediateResponse& response) {
-  if (response_state_ == FilterState::HEADERS) {
-    // Waiting for a response headers response, so return immediately now.
-    // Do this first in case both are in progress.
-    // We don't want to process any more stream messages after this.
-    // Close the stream before sending because "sendLocalResponse" triggers
-    // additional calls to this filter.
-    response_state_ = FilterState::IDLE;
-    closeStream();
+void Filter::handleImmediateResponse(const ImmediateResponse& response) {
+  // We don't want to process any more stream messages after this.
+  // Close the stream before sending because "sendLocalResponse" triggers
+  // additional calls to this filter.
+  request_state_ = FilterState::IDLE;
+  response_state_ = FilterState::IDLE;
+  closeStream();
 
+  if (encoding_started_) {
     ENVOY_LOG(debug, "Returning immediate response from processor on encoding path");
     sendImmediateResponse(response, false);
-
-    return true;
-
-  } else if (request_state_ == FilterState::HEADERS) {
+  } else {
     ENVOY_LOG(debug, "Returning immediate response from processor on decoding path");
-    request_state_ = FilterState::IDLE;
-    closeStream();
     sendImmediateResponse(response, true);
-    return true;
   }
-
-  return false;
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
@@ -156,14 +144,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     stream_closed_ = true;
-    auto error_response = std::make_unique<ImmediateResponse>();
-    error_response->mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    error_response->set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
-    if (!handleImmediateResponse(*error_response)) {
-      // This type of error needs to be delivered the next time that we get
-      // a chance.
-      pending_error_ = std::move(error_response);
-    }
+    ImmediateResponse errorResponse;
+    errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", kErrorPrefix, status));
+    handleImmediateResponse(errorResponse);
   }
 }
 

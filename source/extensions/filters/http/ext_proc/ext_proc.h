@@ -107,12 +107,15 @@ private:
   handleRequestHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
   bool
   handleResponseHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
-  bool
+  void
   handleImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
+
+  // Set to true once we get the "encodeHeaders" callback
+  bool encoding_started_ = false;
 
   // The state of the request-processing, or "decoding" side of the filter.
   // We maintain separate states for encoding and decoding since they may
@@ -124,7 +127,6 @@ private:
 
   ExternalProcessorStreamPtr stream_;
   bool stream_closed_ = false;
-  std::unique_ptr<envoy::service::ext_proc::v3alpha::ImmediateResponse> pending_error_;
 
   Http::HeaderMap* request_headers_ = nullptr;
   Http::HeaderMap* response_headers_ = nullptr;
