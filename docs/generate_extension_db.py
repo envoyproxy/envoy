@@ -37,11 +37,10 @@ def GetExtensionMetadata(target):
   if not BUILDOZER_PATH:
     raise ExtensionDbError('Buildozer not found!')
   r = subprocess.run(
-      [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented category', target],
+      [BUILDOZER_PATH, '-stdout', 'print security_posture status undocumented', target],
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE)
-  security_posture, status, undocumented = r.stdout.decode('utf-8').strip().split(' ')[:3]
-  categories = r.stdout.decode('utf-8').strip().split(' ')[3:]
+  security_posture, status, undocumented = r.stdout.decode('utf-8').strip().split(' ')
   if IsMissing(security_posture):
     raise ExtensionDbError(
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
@@ -50,7 +49,6 @@ def GetExtensionMetadata(target):
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
       'status': 'stable' if IsMissing(status) else status,
-      'categories': 'nocategory' if IsMissing(categories) else categories,
   }
 
 
@@ -72,9 +70,5 @@ if __name__ == '__main__':
       '//source/extensions/upstreams/tcp/generic:config')
   extension_db['envoy.upstreams.http.http_protocol_options'] = GetExtensionMetadata(
       '//source/extensions/upstreams/http:config')
-
-  print('EXTENSION DB')
-  print(extension_db)
-  print()
 
   pathlib.Path(output_path).write_text(json.dumps(extension_db))
