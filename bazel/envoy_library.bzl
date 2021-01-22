@@ -145,7 +145,8 @@ def envoy_cc_extension(
         visibility = EXTENSION_CONFIG_VISIBILITY,
         **kwargs):
     if not category:
-        fail("Category not set for %s" % name)
+        print("FAILCAT %s not set" % name)
+        # fail("Category not set for %s" % name)
     if type(category) == str:
         category = (category, )
     for cat in category:
