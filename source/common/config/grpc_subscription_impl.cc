@@ -1,5 +1,7 @@
 #include "common/config/grpc_subscription_impl.h"
 
+#include <chrono>
+
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
@@ -11,6 +13,8 @@
 
 namespace Envoy {
 namespace Config {
+
+constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::milliseconds(50);
 
 GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
                                            SubscriptionCallbacks& callbacks,
@@ -25,7 +29,7 @@ GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
       use_namespace_matching_(use_namespace_matching) {}
 
 // Config::Subscription
-void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
+void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -50,12 +54,13 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
 }
 
 void GrpcSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names) {
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
   watch_->update(update_to_these_names);
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::requestOnDemandUpdate(const std::set<std::string>& for_update) {
+void GrpcSubscriptionImpl::requestOnDemandUpdate(
+    const absl::flat_hash_set<std::string>& for_update) {
   grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }
@@ -68,14 +73,23 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
   // version_info. This way, both types of versions can be tracked and exposed for debugging by
   // the configuration update targets.
+  auto start = dispatcher_.timeSource().monotonicTime();
   callbacks_.onConfigUpdate(resources, version_info);
+  std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      dispatcher_.timeSource().monotonicTime() - start);
   stats_.update_success_.inc();
   stats_.update_attempt_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(version_info));
   stats_.version_text_.set(version_info);
+  stats_.update_duration_.recordValue(update_duration.count());
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
+
+  if (update_duration > UpdateDurationLogThreshold) {
+    ENVOY_LOG(debug, "gRPC config update took {} ms! Resources names: {}", update_duration.count(),
+              absl::StrJoin(resources, ",", ResourceNameFormatter()));
+  }
 }
 
 void GrpcSubscriptionImpl::onConfigUpdate(
@@ -84,11 +98,15 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const std::string& system_version_info) {
   disableInitFetchTimeoutTimer();
   stats_.update_attempt_.inc();
+  auto start = dispatcher_.timeSource().monotonicTime();
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      dispatcher_.timeSource().monotonicTime() - start);
   stats_.update_success_.inc();
   stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
   stats_.version_text_.set(system_version_info);
+  stats_.update_duration_.recordValue(update_duration.count());
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
@@ -137,7 +155,7 @@ GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
           init_fetch_timeout, is_aggregated, false),
       collection_locator_(collection_locator) {}
 
-void GrpcCollectionSubscriptionImpl::start(const std::set<std::string>& resource_names) {
+void GrpcCollectionSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
   ASSERT(resource_names.empty());
   GrpcSubscriptionImpl::start({XdsResourceIdentifier::encodeUrl(collection_locator_)});
 }

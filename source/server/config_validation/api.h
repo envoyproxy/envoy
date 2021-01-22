@@ -21,6 +21,8 @@ public:
 
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,
+                                          const Event::ScaledRangeTimerManagerFactory&) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name,
                                           Buffer::WatermarkFactoryPtr&& watermark_factory) override;
 
 private:
