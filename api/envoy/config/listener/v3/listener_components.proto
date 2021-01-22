@@ -34,7 +34,7 @@ message Filter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
-  // [#protodoc-extension: Filter]
+  // [#protodoc-extension: envoy.filters.network]
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof config_type {
@@ -333,6 +333,7 @@ message ListenerFilter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
+  // [#protodoc-extension: envoy.transport_sockets.downstream]
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated.
