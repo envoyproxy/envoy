@@ -948,6 +948,42 @@ TEST_F(OwnedImplTest, ReserveReuse) {
   }
 }
 
+// Test behavior when the size to commit() is larger than the reservation.
+TEST_F(OwnedImplTest, ReserveOverCommit) {
+  Buffer::OwnedImpl buffer;
+  auto reservation = buffer.reserveForRead();
+  const auto reservation_length = reservation.length();
+  const auto excess_length = reservation_length + 1;
+#ifdef NDEBUG
+  reservation.commit(excess_length);
+
+  // The length should be the Reservation length, not the value passed to commit.
+  EXPECT_EQ(reservation_length, buffer.length());
+#else
+  EXPECT_DEATH(
+      reservation.commit(excess_length),
+      "length <= length_. Details: commit\\(\\) length must be <= size of the Reservation");
+#endif
+}
+
+// Test behavior when the size to commit() is larger than the reservation.
+TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
+  Buffer::OwnedImpl buffer;
+  auto reservation = buffer.reserveSingleSlice(10);
+  const auto reservation_length = reservation.length();
+  const auto excess_length = reservation_length + 1;
+#ifdef NDEBUG
+  reservation.commit(excess_length);
+
+  // The length should be the Reservation length, not the value passed to commit.
+  EXPECT_EQ(reservation_length, buffer.length());
+#else
+  EXPECT_DEATH(
+      reservation.commit(excess_length),
+      "length <= length_. Details: commit\\(\\) length must be <= size of the Reservation");
+#endif
+}
+
 TEST_F(OwnedImplTest, Search) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the search implementation.
