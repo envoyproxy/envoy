@@ -8,6 +8,7 @@
 
 #include "cpp2sky/segment_context.h"
 #include "cpp2sky/tracer.h"
+#include "cpp2sky/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,10 +16,11 @@ namespace Tracers {
 namespace SkyWalking {
 
 using cpp2sky::CurrentSegmentSpanPtr;
+using cpp2sky::kPropagationHeader;
 using cpp2sky::SegmentContextPtr;
 using SkywalkingTracer = cpp2sky::Tracer;
 
-static const Http::LowerCaseString kSkywalkingPropagationHeaderKey{"sw8"};
+const Http::LowerCaseString kSkywalkingPropagationHeaderKey{kPropagationHeader.data()};
 
 class Span : public Tracing::Span {
 public:
