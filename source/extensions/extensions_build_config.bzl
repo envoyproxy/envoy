@@ -240,7 +240,7 @@ EXTENSIONS = {
     # IO socket
     #
 
-    "envoy.io_socket.user_space_socket":                "//source/extensions/io_socket/user_space_io_socket:users_space_file_event_lib",
+    "envoy.io_socket.user_space":                "//source/extensions/io_socket/user_space:file_event_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

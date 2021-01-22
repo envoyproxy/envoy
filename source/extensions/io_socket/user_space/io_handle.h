@@ -11,9 +11,9 @@ namespace UserSpace {
 /**
  * The interface for the peer as a writer and supplied read status query.
  */
-class UserspaceIoHandle {
+class IoHandle {
 public:
-  virtual ~UserspaceIoHandle() = default;
+  virtual ~IoHandle() = default;
 
   /**
    * Set the flag to indicate no further write from peer.

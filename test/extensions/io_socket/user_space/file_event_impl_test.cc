@@ -4,8 +4,8 @@
 
 #include "common/event/dispatcher_impl.h"
 
-#include "extensions/io_socket/user_space_io_socket/user_space_file_event_impl.h"
-#include "extensions/io_socket/user_space_io_socket/user_space_io_handle.h"
+#include "extensions/io_socket/user_space/file_event_impl.h"
+#include "extensions/io_socket/user_space/io_handle.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
@@ -41,7 +41,7 @@ public:
   MOCK_METHOD(void, called, (uint32_t));
 };
 
-class MockUserspaceIoHandle : public UserspaceIoHandle {
+class MockIoHandle : public IoHandle {
 public:
   MOCK_METHOD(void, setWriteEnd, ());
   MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
@@ -67,7 +67,7 @@ public:
   void clearEventExpectation() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
 
 protected:
-  NiceMock<MockUserspaceIoHandle> io_source_;
+  NiceMock<MockIoHandle> io_source_;
   MockReadyCb ready_cb_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

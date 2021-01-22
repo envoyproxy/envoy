@@ -1,10 +1,10 @@
-#include "extensions/io_socket/user_space_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space/file_event_impl.h"
 
 #include <cstdint>
 
 #include "common/common/assert.h"
 
-#include "extensions/io_socket/user_space_io_socket/user_space_io_handle.h"
+#include "extensions/io_socket/user_space/io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,7 +12,7 @@ namespace IoSocket {
 namespace UserSpace {
 
 FileEventImpl::FileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
-                             UserspaceIoHandle& io_source)
+                             IoHandle& io_source)
     : schedulable_(dispatcher.createSchedulableCallback([this, cb]() {
         auto ephemeral_events = event_listener_.getAndClearEphemeralEvents();
         ENVOY_LOG(trace, "User space event {} invokes callbacks on events = {}",
@@ -23,16 +23,16 @@ FileEventImpl::FileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb c
   setEnabled(events);
 }
 
-void EventListenerImpl::clearEphemeralEvents() {
+void FileEventImpl::EventListener::clearEphemeralEvents() {
   // Clear ephemeral events to align with FileEventImpl::setEnabled().
   ephemeral_events_ = 0;
 }
 
-void EventListenerImpl::onEventActivated(uint32_t activated_events) {
+void FileEventImpl::EventListener::onEventActivated(uint32_t activated_events) {
   ephemeral_events_ |= activated_events;
 }
 
-void EventListenerImpl::setEnabledEvents(uint32_t enabled_events) {
+void FileEventImpl::EventListener::setEnabledEvents(uint32_t enabled_events) {
   enabled_events_ = enabled_events;
 }
 

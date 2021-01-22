@@ -9,8 +9,8 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "peer_buffer_lib",
-    hdrs = ["user_space_io_handle.h"],
+    name = "io_handle_lib",
+    hdrs = ["io_handle.h"],
     security_posture = "unknown",
     status = "wip",
     undocumented = True,
@@ -22,18 +22,18 @@ envoy_cc_extension(
 )
 
 envoy_cc_extension(
-    name = "users_space_file_event_lib",
+    name = "file_event_lib",
     srcs = [
-        "user_space_file_event_impl.cc",
+        "file_event_impl.cc",
     ],
     hdrs = [
-        "user_space_file_event_impl.h",
+        "file_event_impl.h",
     ],
     security_posture = "unknown",
     status = "wip",
     undocumented = True,
     deps = [
-        ":peer_buffer_lib",
+        ":io_handle_lib",
         "//source/common/event:dispatcher_includes",
     ],
 )
