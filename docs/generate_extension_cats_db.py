@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-65;6201;1c
+
 import json
 import sys
 
