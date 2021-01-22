@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+65;6201;1c
 import json
 import sys
 
@@ -21,7 +21,7 @@ def main():
     print(categories)
 
     with open(extension_cat_db, 'w') as f:
-        json.dump(f, categories)
+        json.dump(categories, f)
 
 if __name__ == '__main__':
     main()
