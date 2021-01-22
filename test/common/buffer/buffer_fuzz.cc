@@ -148,6 +148,7 @@ public:
     slice.len_ = data_.size() - (start_ + size_);
     reservation.bufferImplUseOnlySlices().push_back(slice);
     reservation.bufferImplUseOnlyOwnedSlices().push_back(nullptr);
+    reservation.bufferImplUseOnlySetLength(slice.len_);
 
     return reservation;
   }
