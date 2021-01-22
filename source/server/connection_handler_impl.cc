@@ -496,7 +496,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
       return;
     }
     stream_info->filterState()->setData(
-        Network::RedirectRecordsFilterState::key(), std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
+        Network::RedirectRecordsFilterState::key(),
+        std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
 #endif
