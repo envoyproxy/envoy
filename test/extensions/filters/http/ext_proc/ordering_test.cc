@@ -176,9 +176,8 @@ TEST_F(OrderingTest, ImmediateResponseOnRequest) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   // sendLocalReply will call this
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   EXPECT_CALL(stream_delegate_, close());
   sendImmediateResponse500();
   // The rest of the filter isn't necessarily called after this.
@@ -275,9 +274,8 @@ TEST_F(OrderingTest, ExtraAfterImmediateResponse) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   // sendLocalReply invokes encoding too
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   EXPECT_CALL(stream_delegate_, close());
   sendImmediateResponse500();
   // Extra messages sent after immediate response shouldn't affect anything
@@ -292,9 +290,8 @@ TEST_F(OrderingTest, GrpcErrorInline) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   // sendLocalReply will call this
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   sendGrpcError();
   // The rest of the filter isn't called after this.
 }
@@ -326,9 +323,8 @@ TEST_F(OrderingTest, GrpcErrorOutOfLine) {
   sendRequestHeadersReply();
   sendRequestTrailers();
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
   // sendLocalReply will call this
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   sendGrpcError();
 }
 

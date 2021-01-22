@@ -304,7 +304,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
                                                  Eq(absl::nullopt), "Got a bad request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
@@ -434,7 +434,7 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::OK, "", _, Eq(absl::nullopt), ""))
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::OK, "", _, Eq(absl::nullopt), ""))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -474,7 +474,7 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, "", _, Eq(999), ""))
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::Forbidden, "", _, Eq(999), ""))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -519,7 +519,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
 
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(decoder_callbacks_,
+  EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
                              "ext_proc error: gRPC error 13"))
       .WillOnce(Invoke([&immediate_response_headers](

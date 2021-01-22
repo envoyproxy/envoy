@@ -56,7 +56,6 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_o
   }
 
   response_headers_ = &headers;
-  encoding_started_ = true;
   ProcessingRequest req;
   auto* headers_req = req.mutable_response_headers();
   MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
@@ -123,14 +122,7 @@ void Filter::handleImmediateResponse(const ImmediateResponse& response) {
   request_state_ = FilterState::IDLE;
   response_state_ = FilterState::IDLE;
   closeStream();
-
-  if (encoding_started_) {
-    ENVOY_LOG(debug, "Returning immediate response from processor on encoding path");
-    sendImmediateResponse(response, false);
-  } else {
-    ENVOY_LOG(debug, "Returning immediate response from processor on decoding path");
-    sendImmediateResponse(response, true);
-  }
+  sendImmediateResponse(response);
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
@@ -171,7 +163,7 @@ void Filter::cleanupState() {
   }
 }
 
-void Filter::sendImmediateResponse(const ImmediateResponse& response, bool on_decoding) {
+void Filter::sendImmediateResponse(const ImmediateResponse& response) {
   const auto status_code = response.has_status() ? response.status().code() : 200;
   const auto grpc_status =
       response.has_grpc_status()
@@ -183,13 +175,8 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response, bool on_de
     }
   };
 
-  if (on_decoding) {
-    decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
-                                       mutate_headers, grpc_status, response.details());
-  } else {
-    encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
-                                       mutate_headers, grpc_status, response.details());
-  }
+  encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
+                                     mutate_headers, grpc_status, response.details());
 }
 
 } // namespace ExternalProcessing
