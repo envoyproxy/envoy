@@ -28,6 +28,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
@@ -79,6 +80,16 @@ namespace Envoy {
 #define EXPECT_THROW_WITHOUT_REGEX(statement, expected_exception, regex_str)                       \
   EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception,                                        \
                              ::testing::Not(::testing::ContainsRegex(regex_str)))
+
+// Expect that the statement hits an ENVOY_BUG containing the specified message.
+#ifdef NDEBUG
+// ENVOY_BUGs in release mode log fatal.
+#define EXPECT_ENVOY_BUG(statement, message) EXPECT_LOG_CONTAINS("error", message, statement)
+#else
+// ENVOY_BUGs in debug mode is fatal.
+#define EXPECT_ENVOY_BUG(statement, message)                                                       \
+  EXPECT_DEBUG_DEATH(statement, ::testing::HasSubstr(message))
+#endif
 
 #define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
   try {                                                                                            \

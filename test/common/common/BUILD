@@ -26,6 +26,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
