@@ -553,6 +553,7 @@ class FormatChecker:
         # If we hit the end of this release note block block, check the prior line.
         if not endsWithPeriod(prior_line):
           reportError("The following release note does not end with a '.'\n %s" % prior_line)
+        prior_line = ''
       elif prior_line:
         prior_line += line
 

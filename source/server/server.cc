@@ -141,7 +141,10 @@ InstanceImpl::~InstanceImpl() {
   ENVOY_LOG(debug, "destroyed listener manager");
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() {
+  ASSERT(config_.clusterManager() != nullptr);
+  return *config_.clusterManager();
+}
 
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
@@ -353,10 +356,17 @@ void InstanceImpl::initialize(const Options& options,
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
+  const std::string server_compilation_settings_stats_prefix = "server.compilation_settings";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
+  server_compilation_settings_stats_ =
+      std::make_unique<CompilationSettings::ServerCompilationSettingsStats>(
+          CompilationSettings::ServerCompilationSettingsStats{ALL_SERVER_COMPILATION_SETTINGS_STATS(
+              POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
+              POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
   validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
   validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
@@ -385,6 +395,9 @@ void InstanceImpl::initialize(const Options& options,
     }
   }
   server_stats_->version_.set(version_int);
+  if (VersionInfo::sslFipsCompliant()) {
+    server_compilation_settings_stats_->fips_mode_.set(1);
+  }
 
   bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
   bootstrap_.mutable_node()->set_user_agent_name("envoy");
@@ -403,8 +416,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      stats().symbolTable(), bootstrap_.node(), local_address, options.serviceZone(),
-      options.serviceClusterName(), options.serviceNodeName());
+      stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
+      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_, options);
 
@@ -566,6 +579,11 @@ void InstanceImpl::initialize(const Options& options,
     // Just setup the timer.
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
+
+  // Now that we are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onServerInitialized();
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are

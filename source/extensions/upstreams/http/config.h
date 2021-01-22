@@ -37,7 +37,7 @@ public:
   // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
   static uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
-                                std::shared_ptr<const ProtocolOptionsConfigImpl> options);
+                                const ProtocolOptionsConfigImpl& options);
 
   const Envoy::Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;

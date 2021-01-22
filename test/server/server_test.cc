@@ -362,6 +362,23 @@ TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
   server_thread->join();
 }
 
+// Validates that the "server.fips_mode" stat indicates the FIPS compliance from the Envoy Build
+TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
+  auto server_thread =
+      startTestServer("test/server/test_data/server/proxy_version_bootstrap.yaml", true);
+
+  if (VersionInfo::sslFipsCompliant()) {
+    EXPECT_EQ(
+        1L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  } else {
+    EXPECT_EQ(
+        0L, TestUtility::findGauge(stats_store_, "server.compilation_settings.fips_mode")->value());
+  }
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/test_data/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -1320,13 +1337,20 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
     return std::make_unique<test::common::config::DummyConfig>();
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
+
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext&) {
-        const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
-        EXPECT_NE(nullptr, proto);
-        EXPECT_EQ(proto->a(), "foo");
-        return std::make_unique<FooBootstrapExtension>();
-      }));
+      .WillOnce(
+          Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
+            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            EXPECT_NE(nullptr, proto);
+            EXPECT_EQ(proto->a(), "foo");
+            auto mock_extension = std::make_unique<MockBootstrapExtension>();
+            EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
+              // call to cluster manager, to make sure it is not nullptr.
+              ctx.clusterManager().clusters();
+            }));
+            return mock_extension;
+          }));
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -1363,7 +1387,7 @@ TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
 #ifndef WIN32
 class SafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called SafeFatalAction" << std::endl;
   }
 
@@ -1372,7 +1396,7 @@ public:
 
 class UnsafeFatalAction : public Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override {
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
     std::cerr << "Called UnsafeFatalAction" << std::endl;
   }
 

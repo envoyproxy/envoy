@@ -49,29 +49,29 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
         project_url = "https://github.com/envoyproxy/envoy-build-tools",
-        version = "3ff9995a5dd3d0e703e602ca3ebd9366de2b5752",
-        sha256 = "a4c74ce9a62b1c907329d248d4c225abfae8646bc77db8d72de65726632d3571",
+        version = "f2a7f9ba09660beacfebcd37fc977480ec9a8f50",
+        sha256 = "ca9975f6d5370843167b9646028ca7a0b546f8821f217c9d9d2e033a94a35f31",
         strip_prefix = "envoy-build-tools-{version}",
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
-        release_date = "2020-12-21",
+        release_date = "2021-01-04",
         use_category = ["build"],
     ),
     boringssl = dict(
         project_name = "BoringSSL",
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
-        version = "1ce6682c7f6cfe0426ed54a37c10775bea9d3502",
-        sha256 = "b878d84f90b9a95fa1e53f46f1b69a5116621e117a6d4dbf602d884311ee6aa7",
-        strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-87.0.4280.66
+        # chromium-88.0.4324.96
+        version = "fbbf8781456c38a90f674d4771126ed39132855b",
+        sha256 = "76a571c1c3f6f6618d538384319ccc2b7ba9f7ae3f60087ba67894faba11a6b6",
+        strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-09-21",
+        release_date = "2020-11-04",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -263,12 +263,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Nghttp2",
         project_desc = "Implementation of HTTP/2 and its header compression algorithm HPACK in Cimplementation of HTTP/2 and its header compression algorithm HPACK in C",
         project_url = "https://nghttp2.org",
-        version = "1.41.0",
-        sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
+        version = "1.42.0",
+        sha256 = "884d18a0158908125d58b1b61d475c0325e5a004e3d61a56b5fcc55d5f4b7af5",
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-06-02",
+        release_date = "2020-11-23",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
     io_opentracing_cpp = dict(
@@ -505,13 +505,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",
         project_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
-        version = "4d095f048889d4fc3b8d4579aa80ca4290319802",
-        sha256 = "7af66e0674340932683ab4f04ea6f03e2550849a54741738d94310b84d396a2c",
+        version = "22160afc7e67b9becce3198f8a6a321f01a3cef8",
+        sha256 = "d761b6442f600b628f5e420b601824757dfdbea6c12ac86cd59dbaa53d20d343",
         strip_prefix = "grpc-httpjson-transcoding-{version}",
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2020-11-13",
+        release_date = "2021-01-06",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
@@ -665,14 +665,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "8.8.278.8",
+        version = "8.9.255.6",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "0c5c7b534a619d3f6077dd3583b7976a2cfe7f8ea71ca1e2d81a9de1d40131f9",
+        sha256 = "34c41e1f62a68f94cc0715fa3dc02e8bdcd35b5ca45a038975d9aa6a3e2688b5",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2020-12-04",
+        release_date = "2021-01-18",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
@@ -713,6 +713,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -734,6 +735,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.rbac",
             "envoy.filters.http.wasm",
             "envoy.filters.network.rbac",
@@ -912,6 +914,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
@@ -931,6 +934,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
+            "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.wasm",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",

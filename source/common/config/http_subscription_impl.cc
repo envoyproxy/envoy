@@ -43,7 +43,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 }
 
 // Config::Subscription
-void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names, const bool) {
+void HttpSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       handleFailure(Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
@@ -53,14 +53,18 @@ void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names, co
 
   Protobuf::RepeatedPtrField<std::string> resources_vector(resource_names.begin(),
                                                            resource_names.end());
+  // Sort to provide stable wire ordering.
+  std::sort(resources_vector.begin(), resources_vector.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
   initialize();
 }
 
 void HttpSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names) {
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
   Protobuf::RepeatedPtrField<std::string> resources_vector(update_to_these_names.begin(),
                                                            update_to_these_names.end());
+  // Sort to provide stable wire ordering.
+  std::sort(resources_vector.begin(), resources_vector.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
 }
 
