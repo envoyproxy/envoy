@@ -4,15 +4,15 @@
 
 #include "common/common/assert.h"
 
-#include "extensions/io_socket/user_space_io_socket/peer_buffer.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_io_handle.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace UserSpaceIoSocket {
+namespace UserSpace {
 
-UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                                               uint32_t events, UserspaceIoHandle& io_source)
+FileEventImpl::FileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
+                             UserspaceIoHandle& io_source)
     : schedulable_(dispatcher.createSchedulableCallback([this, cb]() {
         auto ephemeral_events = event_listener_.getAndClearEphemeralEvents();
         ENVOY_LOG(trace, "User space event {} invokes callbacks on events = {}",
@@ -24,7 +24,7 @@ UserSpaceFileEventImpl::UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Ev
 }
 
 void EventListenerImpl::clearEphemeralEvents() {
-  // Clear ephemeral events to align with FileEventImpl::setEnable().
+  // Clear ephemeral events to align with FileEventImpl::setEnabled().
   ephemeral_events_ = 0;
 }
 
@@ -36,7 +36,7 @@ void EventListenerImpl::setEnabledEvents(uint32_t enabled_events) {
   enabled_events_ = enabled_events;
 }
 
-void UserSpaceFileEventImpl::activate(uint32_t events) {
+void FileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
@@ -44,7 +44,7 @@ void UserSpaceFileEventImpl::activate(uint32_t events) {
   schedulable_->scheduleCallbackNextIteration();
 }
 
-void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
+void FileEventImpl::setEnabled(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
@@ -73,7 +73,7 @@ void UserSpaceFileEventImpl::setEnabled(uint32_t events) {
       static_cast<void*>(this), events, was_enabled ? "not " : "");
 }
 
-void UserSpaceFileEventImpl::poll(uint32_t events) {
+void FileEventImpl::activateIfEnabled(uint32_t events) {
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
   // filtered out disabled events.
@@ -83,7 +83,7 @@ void UserSpaceFileEventImpl::poll(uint32_t events) {
   }
   activate(filter_enabled);
 }
-} // namespace UserSpaceIoSocket
+} // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

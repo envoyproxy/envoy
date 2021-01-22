@@ -7,13 +7,13 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
 
-#include "extensions/io_socket/user_space_io_socket/peer_buffer.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_io_handle.h"
 
 namespace Envoy {
 
 namespace Extensions {
 namespace IoSocket {
-namespace UserSpaceIoSocket {
+namespace UserSpace {
 
 // This class maintains the ephemeral events and enabled events.
 // getAndClearEphemeralEvents
@@ -38,12 +38,12 @@ private:
   uint32_t enabled_events_{};
 };
 
-// A FileEvent implementation which is used to drive UserSpaceIoSocketHandle.
+// A FileEvent implementation which is used to drive UserSpaceHandle.
 // Declare the class final to safely call virtual function setEnabled in constructor.
-class UserSpaceFileEventImpl final : public Event::FileEvent, Logger::Loggable<Logger::Id::io> {
+class FileEventImpl final : public Event::FileEvent, Logger::Loggable<Logger::Id::io> {
 public:
-  UserSpaceFileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
-                         UserspaceIoHandle& io_source);
+  FileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb cb, uint32_t events,
+                UserspaceIoHandle& io_source);
 
   // Event::FileEvent
   void activate(uint32_t events) override;
@@ -56,7 +56,7 @@ public:
 
   // Notify events. Unlike activate() method, this method activates the given events only if the
   // events are enabled.
-  void poll(uint32_t events);
+  void activateIfEnabled(uint32_t events);
 
 private:
   // Used to populate the event operations of enable and activate.
@@ -68,7 +68,7 @@ private:
   // Supplies readable and writable status.
   UserspaceIoHandle& io_source_;
 };
-} // namespace UserSpaceIoSocket
+} // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

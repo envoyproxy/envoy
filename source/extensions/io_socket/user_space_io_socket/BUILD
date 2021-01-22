@@ -10,9 +10,10 @@ envoy_extension_package()
 
 envoy_cc_extension(
     name = "peer_buffer_lib",
-    hdrs = ["peer_buffer.h"],
+    hdrs = ["user_space_io_handle.h"],
     security_posture = "unknown",
-    status = "alpha",
+    status = "wip",
+    undocumented = True,
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
@@ -29,7 +30,7 @@ envoy_cc_extension(
         "user_space_file_event_impl.h",
     ],
     security_posture = "unknown",
-    status = "alpha",
+    status = "wip",
     undocumented = True,
     deps = [
         ":peer_buffer_lib",

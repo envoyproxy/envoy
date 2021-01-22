@@ -4,8 +4,8 @@
 
 #include "common/event/dispatcher_impl.h"
 
-#include "extensions/io_socket/user_space_io_socket/peer_buffer.h"
 #include "extensions/io_socket/user_space_io_socket/user_space_file_event_impl.h"
+#include "extensions/io_socket/user_space_io_socket/user_space_io_handle.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
-namespace UserSpaceIoSocket {
+namespace UserSpace {
 namespace {
 
 using testing::NiceMock;
@@ -54,9 +54,9 @@ public:
   MOCK_METHOD(bool, isReadable, (), (const));
 };
 
-class UserSpaceFileEventImplTest : public testing::Test {
+class FileEventImplTest : public testing::Test {
 public:
-  UserSpaceFileEventImplTest()
+  FileEventImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void setWritable() { EXPECT_CALL(io_source_, isPeerWritable()).WillRepeatedly(Return(true)); }
@@ -71,10 +71,10 @@ protected:
   MockReadyCb ready_cb_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::unique_ptr<UserSpaceFileEventImpl> user_file_event_;
+  std::unique_ptr<FileEventImpl> user_file_event_;
 };
 
-TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
+TEST_F(FileEventImplTest, EnabledEventsTriggeredAfterCreate) {
   for (const auto current_event : events_all_combination) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
     clearEventExpectation();
@@ -88,7 +88,7 @@ TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
       setWriteEnd();
     }
     MockReadyCb ready_cb;
-    auto user_file_event = std::make_unique<UserSpaceFileEventImpl>(
+    auto user_file_event = std::make_unique<FileEventImpl>(
         *dispatcher_, [&ready_cb](uint32_t arg) { ready_cb.called(arg); }, current_event,
         io_source_);
     EXPECT_CALL(ready_cb, called(current_event));
@@ -97,13 +97,13 @@ TEST_F(UserSpaceFileEventImplTest, EnabledEventsTriggeredAfterCreate) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
+TEST_F(FileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
   setWritable();
   setReadable();
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
-  // The above should deliver both Read and Write during the poll. It is not tested here but in
-  // other test case.
+  // The above should deliver both Read and Write during the activateIfEnabled(). It is not tested
+  // here but in other test case.
 
   // Now disable Read.
   user_file_event_->setEnabled(Event::FileReadyType::Write);
@@ -111,8 +111,8 @@ TEST_F(UserSpaceFileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-TEST_F(UserSpaceFileEventImplTest, RescheduleAfterTriggered) {
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+TEST_F(FileEventImplTest, RescheduleAfterTriggered) {
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     SCOPED_TRACE("1st schedule");
@@ -120,7 +120,6 @@ TEST_F(UserSpaceFileEventImplTest, RescheduleAfterTriggered) {
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-
   {
     SCOPED_TRACE("2nd schedule");
     user_file_event_->activate(event_rw);
@@ -134,10 +133,15 @@ TEST_F(UserSpaceFileEventImplTest, RescheduleAfterTriggered) {
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+  {
+    SCOPED_TRACE("no auto reschedule");
+    EXPECT_CALL(ready_cb_, called(_)).Times(0);
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 }
 
-TEST_F(UserSpaceFileEventImplTest, RescheduleIsDeduplicated) {
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+TEST_F(FileEventImplTest, RescheduleIsDeduplicated) {
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     SCOPED_TRACE("1st schedule");
@@ -147,7 +151,6 @@ TEST_F(UserSpaceFileEventImplTest, RescheduleIsDeduplicated) {
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-
   {
     SCOPED_TRACE("further dispatcher drive");
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -155,7 +158,7 @@ TEST_F(UserSpaceFileEventImplTest, RescheduleIsDeduplicated) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
+TEST_F(FileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
   for (const auto current_event : {Event::FileReadyType::Read, Event::FileReadyType::Write,
                                    Event::FileReadyType::Read | Event::FileReadyType::Write}) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
@@ -165,16 +168,32 @@ TEST_F(UserSpaceFileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
     EXPECT_CALL(io_source_, isPeerWritable())
         .WillOnce(Return((current_event & Event::FileReadyType::Write) != 0))
         .RetiresOnSaturation();
-    auto user_file_event = std::make_unique<UserSpaceFileEventImpl>(
+    auto user_file_event = std::make_unique<FileEventImpl>(
         *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
     EXPECT_CALL(ready_cb_, called(current_event));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, ActivateWillSchedule) {
+TEST_F(FileEventImplTest, ActivateDoesNotHonerEnabled) {
+  for (const auto enabled : events_all_combination) {
+    auto user_file_event = std::make_unique<FileEventImpl>(
+        *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, enabled, io_source_);
+    {
+      EXPECT_CALL(ready_cb_, called(_)).Times(0);
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    for (const auto active : events_all_combination) {
+      user_file_event->activate(active);
+      EXPECT_CALL(ready_cb_, called(active));
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+}
+
+TEST_F(FileEventImplTest, ActivateWillSchedule) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -192,9 +211,9 @@ TEST_F(UserSpaceFileEventImplTest, ActivateWillSchedule) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, SuccessPollWillSchedule) {
+TEST_F(FileEventImplTest, ActivateIfEnabledWillSchedule) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_all, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -202,15 +221,15 @@ TEST_F(UserSpaceFileEventImplTest, SuccessPollWillSchedule) {
   }
   for (const auto current_event : events_all_combination) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
-    user_file_event_->poll(current_event);
+    user_file_event_->activateIfEnabled(current_event);
     EXPECT_CALL(ready_cb_, called(current_event));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, ActivateDedup) {
+TEST_F(FileEventImplTest, ActivateDedup) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -230,27 +249,27 @@ TEST_F(UserSpaceFileEventImplTest, ActivateDedup) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, PollDedup) {
+TEST_F(FileEventImplTest, ActivateIfEnabledCanDedup) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_all, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
-    user_file_event_->poll(Event::FileReadyType::Read);
-    user_file_event_->poll(Event::FileReadyType::Write);
-    user_file_event_->poll(Event::FileReadyType::Write);
-    user_file_event_->poll(Event::FileReadyType::Read);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Read);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Read);
     EXPECT_CALL(ready_cb_, called(event_rw));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
-    user_file_event_->poll(Event::FileReadyType::Read);
-    user_file_event_->poll(Event::FileReadyType::Write);
-    user_file_event_->poll(Event::FileReadyType::Write);
-    user_file_event_->poll(Event::FileReadyType::Closed);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Read);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Closed);
     EXPECT_CALL(ready_cb_, called(event_all));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -260,9 +279,9 @@ TEST_F(UserSpaceFileEventImplTest, PollDedup) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
+TEST_F(FileEventImplTest, EnabledClearActivate) {
   // IO is neither readable nor writable.
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -310,49 +329,49 @@ TEST_F(UserSpaceFileEventImplTest, EnabledClearActivate) {
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, PollTriggeredOnlyEnabledEvents) {
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+TEST_F(FileEventImplTest, ActivateIfEnabledTriggerOnlyEnabled) {
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
       Event::FileReadyType::Read | Event::FileReadyType::Closed, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  // All 3 ready types are polled. However, only enabled events are triggered.
+  // All 3 ready types are queried. However, only enabled events are triggered.
   {
-    user_file_event_->poll(Event::FileReadyType::Read | Event::FileReadyType::Write |
-                           Event::FileReadyType::Closed);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write |
+                                        Event::FileReadyType::Closed);
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read | Event::FileReadyType::Closed));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   // Below events contains Read but not Closed. The callback sees Read.
   {
-    user_file_event_->poll(Event::FileReadyType::Read);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Read);
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
-    user_file_event_->poll(Event::FileReadyType::Read | Event::FileReadyType::Write);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Read));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   // Below ready types has no overlap with enabled. No callback is triggered.
   {
-    user_file_event_->poll(Event::FileReadyType::Write);
+    user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   {
-    user_file_event_->poll(0);
+    user_file_event_->activateIfEnabled(0);
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 }
 
-TEST_F(UserSpaceFileEventImplTest, EventClosedIsTriggeredBySetWriteEnd) {
+TEST_F(FileEventImplTest, EventClosedIsTriggeredBySetWriteEnd) {
   setWriteEnd();
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);
 
@@ -360,12 +379,12 @@ TEST_F(UserSpaceFileEventImplTest, EventClosedIsTriggeredBySetWriteEnd) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-TEST_F(UserSpaceFileEventImplTest, EventClosedIsTriggeredByManullyActivate) {
-  user_file_event_ = std::make_unique<UserSpaceFileEventImpl>(
+TEST_F(FileEventImplTest, EventClosedIsTriggeredByManullyActivate) {
+  user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);
   {
-    // No Closed event bit if enabled by not activated.
+    // No Closed event bit if enabled but not activated.
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -381,7 +400,7 @@ TEST_F(UserSpaceFileEventImplTest, EventClosedIsTriggeredByManullyActivate) {
   }
 }
 } // namespace
-} // namespace UserSpaceIoSocket
+} // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions
 } // namespace Envoy

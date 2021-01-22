@@ -220,7 +220,7 @@ EXTENSIONS = {
     #
 
     "envoy.watchdog.profile_action":                    "//source/extensions/watchdog/profile_action:config",
-    
+
     #
     # WebAssembly runtimes
     #
