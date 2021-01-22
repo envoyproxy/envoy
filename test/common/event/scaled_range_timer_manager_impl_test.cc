@@ -162,12 +162,12 @@ TEST_F(ScaledRangeTimerManagerTest, DisableOtherTimerInCallbackEmptiesQueue) {
 
   MockFunction<TimerCb> callback1;
   auto timer1 =
-      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback1.AsStdFunction());
+      manager.createTimer(AbsoluteMinimum(std::chrono::seconds(0)), callback1.AsStdFunction());
   MockFunction<TimerCb> callback2;
   auto timer2 =
       manager.createTimer(AbsoluteMinimum(std::chrono::seconds(5)), callback2.AsStdFunction());
 
-  timer1->enableTimer(std::chrono::seconds(100));
+  timer1->enableTimer(std::chrono::seconds(95));
   timer2->enableTimer(std::chrono::seconds(100));
 
   simTime().advanceTimeAndRun(std::chrono::seconds(5), dispatcher_, Dispatcher::RunType::Block);
