@@ -1577,7 +1577,7 @@ TEST_P(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
   // Non-fatal checks for a deprecated field should throw an exception if the
   // runtime flag is enabled..
   Runtime::LoaderSingleton::getExisting()->mergeValues({
-      {"envoy.restart_features.allow_deprecated_features", "false"},
+      {"envoy.features.allow_deprecated_features", "false"},
   });
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,

@@ -89,7 +89,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.reloadable_features.upstream_http2_flood_checks",
-    "envoy.restart_features.allow_deprecated_features",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
 };
 
