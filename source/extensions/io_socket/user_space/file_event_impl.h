@@ -43,10 +43,7 @@ private:
     ~EventListener() = default;
 
     // Reset the enabled events. The caller must refresh the triggered events.
-    void setEnabledEvents(uint32_t enabled_events) {
-      // Clear ephemeral events to align with FileEventImpl::setEnabled().
-      ephemeral_events_ = 0;
-    }
+    void setEnabledEvents(uint32_t enabled_events) { enabled_events_ = enabled_events; }
 
     // Return the enabled events.
     uint32_t getEnabledEvents() { return enabled_events_; }
@@ -56,10 +53,7 @@ private:
       ephemeral_events_ = 0;
     }
 
-    void onEventActivated(uint32_t activated_events) {
-      // Clear ephemeral events to align with FileEventImpl::setEnabled().
-      ephemeral_events_ = 0;
-    }
+    void onEventActivated(uint32_t activated_events) { ephemeral_events_ |= activated_events; }
 
     uint32_t getAndClearEphemeralEvents() { return std::exchange(ephemeral_events_, 0); }
 
