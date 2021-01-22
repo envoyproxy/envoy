@@ -54,6 +54,7 @@ public:
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
     // Thread local storage assumes a single (main) thread with no workers.
     ON_CALL(factory_context_.admin_, concurrency()).WillByDefault(Return(0));
+    ON_CALL(factory_context_.admin_, getConfigTracker()).WillByDefault(ReturnRef(config_tracker_));
   }
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
@@ -66,13 +67,15 @@ public:
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  testing::NiceMock<Server::MockConfigTracker> config_tracker_;
 };
 
 // Test base class with a single provider.
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() {
-    filter_config_provider_manager_ = std::make_unique<FilterConfigProviderManagerImpl>();
+    filter_config_provider_manager_ =
+        std::make_unique<FilterConfigProviderManagerImpl>(factory_context_.admin_);
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
@@ -93,6 +96,16 @@ public:
       EXPECT_CALL(init_watcher_, ready());
     }
     init_manager_.initialize(init_watcher_);
+    time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  }
+
+  void checkConfigDump(const std::string& expected_dump_yaml) {
+    auto message_ptr = config_tracker_.config_tracker_callbacks_["extension_configurations"]();
+    const auto& extension_config_dump =
+        dynamic_cast<const envoy::admin::v3::ExtensionsConfigDump&>(*message_ptr);
+    envoy::admin::v3::ExtensionsConfigDump expected_extension_config_dump;
+    TestUtility::loadFromYaml(expected_dump_yaml, expected_extension_config_dump);
+    EXPECT_EQ(expected_extension_config_dump.DebugString(), extension_config_dump.DebugString());
   }
 
   std::unique_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
@@ -110,6 +123,18 @@ TEST_F(FilterConfigDiscoveryImplTest, Basic) {
   setup();
   EXPECT_EQ("foo", provider_->name());
   EXPECT_EQ(absl::nullopt, provider_->config());
+  const std::string expected_extension_config_dump = R"EOF(
+dynamic_extension_configs:
+- version_info: "1"
+  last_updated:
+    seconds: 1234567891
+    nanos: 234000000
+  extension_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: "foo"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF";
 
   // Initial request.
   {
@@ -131,6 +156,7 @@ TEST_F(FilterConfigDiscoveryImplTest, Basic) {
     EXPECT_NE(absl::nullopt, provider_->config());
     EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
     EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
+    checkConfigDump(expected_extension_config_dump);
   }
 
   // 2nd request with same response. Based on hash should not reload config.
@@ -150,6 +176,7 @@ TEST_F(FilterConfigDiscoveryImplTest, Basic) {
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
     EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
     EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
+    checkConfigDump(expected_extension_config_dump);
   }
 }
 

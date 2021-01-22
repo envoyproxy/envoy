@@ -381,3 +381,20 @@ message EndpointsConfigDump {
   // The dynamically loaded endpoint configs.
   repeated DynamicEndpointConfig dynamic_endpoint_configs = 3;
 }
+
+// Envoy's admin fills this message with all currently known dynamic extension configurations.
+message ExtensionsConfigDump {
+  message DynamicExtensionConfig {
+    // This is the per-resource version information.
+    string version_info = 1;
+
+    // The extension config.
+    google.protobuf.Any extension_config = 2;
+
+    // The timestamp when the extension configuration was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
+  // The dynamically loaded extension configs.
+  repeated DynamicExtensionConfig dynamic_extension_configs = 1;
+}

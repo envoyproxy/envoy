@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/subscription.h"
@@ -99,6 +100,10 @@ public:
   const Init::SharedTargetImpl& initTarget() { return init_target_; }
   const std::string& name() { return filter_config_name_; }
 
+  const envoy::config::core::v3::TypedExtensionConfig& lastConfig() { return last_config_; }
+  const std::string& lastConfigVersion() { return last_config_version_; }
+  SystemTime lastUpdateTime() { return last_updated_; }
+
 private:
   void start();
 
@@ -113,6 +118,9 @@ private:
 
   const std::string filter_config_name_;
   uint64_t last_config_hash_{0ul};
+  envoy::config::core::v3::TypedExtensionConfig last_config_;
+  std::string last_config_version_;
+  SystemTime last_updated_;
   Server::Configuration::FactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
 
@@ -132,6 +140,8 @@ private:
   // This must be the last since its destructor may call out to stats to report
   // on draining requests.
   std::unique_ptr<Config::Subscription> subscription_;
+
+  TimeSource& time_source_;
 };
 
 /**
@@ -166,6 +176,10 @@ private:
 class FilterConfigProviderManagerImpl : public FilterConfigProviderManager,
                                         public Singleton::Instance {
 public:
+  FilterConfigProviderManagerImpl(Server::Admin& admin)
+      : config_tracker_entry_(admin.getConfigTracker().add(
+            "extension_configurations", [this] { return dumpFilterConfigs(); })) {}
+
   FilterConfigProviderPtr createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ConfigSource& config_source,
       const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
@@ -183,8 +197,12 @@ private:
   getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                   const std::string& name, Server::Configuration::FactoryContext& factory_context,
                   const std::string& stat_prefix);
+  std::unique_ptr<envoy::admin::v3::ExtensionsConfigDump> dumpFilterConfigs() const;
+
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
   friend class FilterConfigSubscription;
+
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 };
 
 } // namespace Http

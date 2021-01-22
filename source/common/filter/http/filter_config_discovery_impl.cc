@@ -83,7 +83,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       stat_prefix_(stat_prefix),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
-      subscription_id_(subscription_id) {
+      subscription_id_(subscription_id), time_source_(factory_context.timeSource()) {
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
@@ -141,6 +141,9 @@ void FilterConfigSubscription::onConfigUpdate(
       }
     });
   }
+  last_config_ = filter_config;
+  last_config_version_ = version_info;
+  last_updated_ = time_source_.systemTime();
   last_config_hash_ = new_hash;
 }
 
@@ -215,6 +218,27 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     factory_context.initManager().add(provider->init_target_);
   }
   return provider;
+}
+
+std::unique_ptr<envoy::admin::v3::ExtensionsConfigDump>
+FilterConfigProviderManagerImpl::dumpFilterConfigs() const {
+  auto config_dump = std::make_unique<envoy::admin::v3::ExtensionsConfigDump>();
+  for (const auto& elem : subscriptions_) {
+    const auto& subscription = elem.second.lock();
+    if (!subscription) {
+      continue;
+    }
+
+    if (!subscription->lastConfigVersion().empty()) {
+      auto* dynamic_config = config_dump->mutable_dynamic_extension_configs()->Add();
+      dynamic_config->set_version_info(subscription->lastConfigVersion());
+      dynamic_config->mutable_extension_config()->PackFrom(
+          API_RECOVER_ORIGINAL(subscription->lastConfig()));
+      TimestampUtil::systemClockToTimestamp(subscription->lastUpdateTime(),
+                                            *dynamic_config->mutable_last_updated());
+    }
+  }
+  return config_dump;
 }
 
 } // namespace Http

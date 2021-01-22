@@ -128,8 +128,9 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
 
   std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager =
       context.singletonManager().getTyped<Filter::Http::FilterConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager),
-          [] { return std::make_shared<Filter::Http::FilterConfigProviderManagerImpl>(); });
+          SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager), [&context] {
+            return std::make_shared<Filter::Http::FilterConfigProviderManagerImpl>(context.admin());
+          });
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
           http_tracer_manager, filter_config_provider_manager};
