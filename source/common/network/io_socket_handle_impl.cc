@@ -108,7 +108,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
   return result;
 }
 
-Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer, uint64_t max_length) {
+Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer,
+                                                 absl::optional<uint64_t> max_length_opt) {
+  const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
   }
