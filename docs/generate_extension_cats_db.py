@@ -21,7 +21,7 @@ def main():
     print(categories)
 
     with open(extension_cat_db, 'w') as f:
-        json.dump(f)
+        json.dump(f, categories)
 
 if __name__ == '__main__':
     main()
