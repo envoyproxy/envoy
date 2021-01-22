@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -9,11 +10,18 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "io_handle_lib",
-    hdrs = ["io_handle.h"],
+    name = "config",
+    srcs = ["config.h"],
     security_posture = "unknown",
     status = "wip",
     undocumented = True,
+    deps = [
+    ],
+)
+
+envoy_cc_library(
+    name = "io_handle_lib",
+    hdrs = ["io_handle.h"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
@@ -21,7 +29,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "file_event_lib",
     srcs = [
         "file_event_impl.cc",
@@ -29,9 +37,6 @@ envoy_cc_extension(
     hdrs = [
         "file_event_impl.h",
     ],
-    security_posture = "unknown",
-    status = "wip",
-    undocumented = True,
     deps = [
         ":io_handle_lib",
         "//source/common/event:dispatcher_includes",

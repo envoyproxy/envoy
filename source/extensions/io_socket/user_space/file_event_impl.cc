@@ -23,19 +23,6 @@ FileEventImpl::FileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb c
   setEnabled(events);
 }
 
-void FileEventImpl::EventListener::clearEphemeralEvents() {
-  // Clear ephemeral events to align with FileEventImpl::setEnabled().
-  ephemeral_events_ = 0;
-}
-
-void FileEventImpl::EventListener::onEventActivated(uint32_t activated_events) {
-  ephemeral_events_ |= activated_events;
-}
-
-void FileEventImpl::EventListener::setEnabledEvents(uint32_t enabled_events) {
-  enabled_events_ = enabled_events;
-}
-
 void FileEventImpl::activate(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
