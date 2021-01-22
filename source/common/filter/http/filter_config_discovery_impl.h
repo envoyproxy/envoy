@@ -102,7 +102,7 @@ public:
 
   const envoy::config::core::v3::TypedExtensionConfig& lastConfig() { return last_config_; }
   const std::string& lastConfigVersion() { return last_config_version_; }
-  SystemTime lastUpdateTime() { return last_updated_; }
+  SystemTime lastUpdated { return last_updated_; }
 
 private:
   void start();
