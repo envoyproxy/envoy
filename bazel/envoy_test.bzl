@@ -121,7 +121,7 @@ def envoy_cc_fuzz_test(
             ],
         }),
         size = size,
-        tags = ["fuzz_target_binary"] + tags,
+        tags = ["fuzz_target_binary", "manual"] + tags,
     )
 
     fuzzing_decoration(
