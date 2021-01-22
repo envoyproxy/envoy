@@ -265,6 +265,8 @@ void GoogleAsyncStreamImpl::onCompletedOps() {
   {
     Thread::LockGuard lock(completed_ops_lock_);
     completed_ops = std::move(completed_ops_);
+    // completed_ops_ should be empty after the move.
+    ASSERT(completed_ops_.empty());
   }
 
   while (!completed_ops.empty()) {
