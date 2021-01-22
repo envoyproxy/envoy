@@ -425,11 +425,11 @@ private:
   TimeSource& time_source_;
   struct orderByCreateDateDesc {
     bool operator()(const HostSharedPtr l, const HostSharedPtr r) const {
-      return l->creationTime() > r->creationTime();
+      return l->creationTime() < r->creationTime();
     }
   };
-  absl::btree_set<HostSharedPtr, orderByCreateDateDesc> hosts_in_slow_start_;
-  std::chrono::milliseconds latest_host_added_time;
+  absl::btree_multiset<HostSharedPtr, orderByCreateDateDesc> hosts_in_slow_start_;
+  friend class EdfLoadBalancerBasePeer;
 };
 
 /**

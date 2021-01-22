@@ -735,13 +735,8 @@ void EdfLoadBalancerBase::initialize() {
   }
 }
 
-// TODO(nezdolik) do we need to purge hosts that are out of the window?
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_added,
                                                       const HostVector& hosts_removed) {
-  // Host exits slow start mode when it leaves the cluster.
-  for (const auto& host : hosts_removed) {
-    hosts_in_slow_start_.erase(host);
-  }
   for (const auto& host : hosts_added) {
     auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         time_source_.monotonicTime() - host->creationTime());
@@ -764,7 +759,20 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts_ad
       default:
         NOT_REACHED_GCOVR_EXCL_LINE;
       }
+    } else if (hosts_in_slow_start_.find(host) != hosts_in_slow_start_.end()) {
+      // Removes all hosts with same creation date, which are outside of slow start window.
+      hosts_in_slow_start_.erase(host);
     }
+  }
+  // Compact hosts_in_slow_start_, erase hosts that are outside of slow start window.
+  auto current_time =
+      std::chrono::time_point_cast<std::chrono::milliseconds>(time_source_.monotonicTime());
+
+  while (!hosts_in_slow_start_.empty() &&
+         (current_time - (std::chrono::time_point_cast<std::chrono::milliseconds>(
+                             (*(--hosts_in_slow_start_.end()))->creationTime())) >
+          slow_start_window)) {
+    hosts_in_slow_start_.erase(--hosts_in_slow_start_.end());
   }
 }
 
@@ -794,8 +802,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       auto host_weight = hostWeight(*host);
       auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
           time_source_.monotonicTime() - host->creationTime());
-      // TODO(nezdolik) Store a collection of hosts that adhere to EP warming policy and are in slow
-      // start window and check if host is there.
       if (host_create_duration <= slow_start_window) {
         time_bias_ = time_bias_runtime_ != nullptr ? time_bias_runtime_->value() : 1.0;
 
