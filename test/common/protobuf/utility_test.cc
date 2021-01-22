@@ -1571,13 +1571,13 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEm
   EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
-TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecatedEmitsCrash)) {
+TEST_P(DeprecatedFieldsTest, IndividualFieldDeprecatedEmitsCrash) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should throw an exception if the
   // runtime flag is enabled..
   Runtime::LoaderSingleton::getExisting()->mergeValues({
-      {"envoy.features.disallow_deprecated_features", "true"},
+      {"envoy.restart_features.allow_deprecated_features", "false"},
   });
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), Envoy::ProtobufMessage::DeprecatedProtoFieldException,

@@ -89,6 +89,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.unify_grpc_handling",
     "envoy.reloadable_features.upstream_http2_flood_checks",
+    "envoy.restart_features.allow_deprecated_features",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
 };
 
@@ -101,8 +102,6 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // deprecated features are fatal-by-default
-    "envoy.features.disallow_deprecated_features",
     // v2 is fatal-by-default.
     "envoy.reloadable_features.enable_deprecated_v2_api",
     // Allow Envoy to upgrade or downgrade version of type url, should be removed when support for

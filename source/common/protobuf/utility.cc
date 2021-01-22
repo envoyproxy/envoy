@@ -191,7 +191,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
 #else
   bool warn_only = true;
 #endif
-  if (Runtime::runtimeFeatureEnabled("envoy.features.disallow_deprecated_features")) {
+  if (runtime && !runtime->snapshot().runtimeFeatureEnabled("envoy.restart_features.allow_deprecated_features")) {
     warn_only = false;
   }
   bool warn_default = warn_only;
