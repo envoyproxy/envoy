@@ -25,6 +25,7 @@ public:
     EXPECT_CALL(encoder_, getStream()).Times(AnyNumber());
     EXPECT_CALL(encoder_, encodeHeaders(_, false));
     EXPECT_CALL(encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+    EXPECT_CALL(encoder_, enableTcpTunneling()).Times(AnyNumber());
     if (typeid(T) == typeid(Http1Upstream)) {
       ON_CALL(encoder_, http1StreamEncoderOptions())
           .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
@@ -160,12 +161,13 @@ public:
   HttpUpstreamRequestEncoderTest() {
     EXPECT_CALL(encoder_, getStream()).Times(AnyNumber());
     EXPECT_CALL(encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+    EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
     if (typeid(T) == typeid(Http1Upstream)) {
       ON_CALL(encoder_, http1StreamEncoderOptions())
           .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options_)));
       is_http2_ = false;
     }
-    EXPECT_CALL(stream_encoder_options_, enableHalfClose()).Times(AnyNumber());
     config_.set_hostname("default.host.com:443");
   }
 
