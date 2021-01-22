@@ -12,7 +12,7 @@ def main():
         data = json.load(f)
 
     categories = {}
-    for k, v in data.items:
+    for k, v in data.items():
         for cat in v['categories']:
             # not sure if this needs to be ordered
             categories[cat] = categories.get(cat, set())
