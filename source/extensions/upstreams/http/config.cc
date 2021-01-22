@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/utility.h"
 #include "common/http/utility.h"
@@ -40,6 +42,26 @@ getHttp2Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
 }
 
 } // namespace
+
+uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
+                                                  const ProtocolOptionsConfigImpl& options) {
+  uint64_t features = 0;
+
+  if (options.use_http2_) {
+    features |= Upstream::ClusterInfo::Features::HTTP2;
+  }
+  if (options.use_downstream_protocol_) {
+    features |= Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL;
+  }
+  if (options.use_alpn_) {
+    features |= Upstream::ClusterInfo::Features::USE_ALPN;
+  }
+
+  if (config.close_connections_on_host_health_failure()) {
+    features |= Upstream::ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
+  }
+  return features;
+}
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options)

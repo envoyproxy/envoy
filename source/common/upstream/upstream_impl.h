@@ -913,13 +913,15 @@ protected:
    * priority.
    * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
    * be updated with the hosts that remain in this priority after the update.
-   * @param all_hosts all known hosts prior to this host update.
+   * @param all_hosts all known hosts prior to this host update across all priorities.
+   * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
    */
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             HostMap& updated_hosts, const HostMap& all_hosts);
+                             HostMap& updated_hosts, const HostMap& all_hosts,
+                             const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 
 /**

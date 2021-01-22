@@ -114,23 +114,6 @@ TEST_F(SslContextImplTest, TestDnsNameMatching) {
   EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", ""));
 }
 
-TEST_F(SslContextImplTest, TestDnsNameMatchingLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("lyft.com", "lyft.com"));
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("a.lyft.com", "*.lyft.com"));
-  // Legacy behavior
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("foo.test.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", ""));
-}
-
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
@@ -172,20 +155,6 @@ TEST_F(SslContextImplTest, TestMultiLevelMatch) {
   EXPECT_FALSE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
-TEST_F(SslContextImplTest, TestMultiLevelMatchLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("foo.api.example.com");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_TRUE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -200,17 +169,6 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltMultiDomain) {
       "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"https://a.www.example.com"};
   EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
-}
-
-TEST_F(SslContextImplTest, TestVerifySubjectAltMultiDomainLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  std::vector<std::string> verify_subject_alt_name_list = {"https://a.www.example.com"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST_F(SslContextImplTest, TestMatchSubjectAltNameURIMatched) {
@@ -1932,6 +1890,78 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
       "Certificate configuration can't have both private_key and private_key_provider");
+}
+
+// Subclass ContextImpl so we can instantiate directly from tests, despite the
+// constructor being protected.
+class TestContextImpl : public ContextImpl {
+public:
+  TestContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+                  TimeSource& time_source)
+      : ContextImpl(scope, config, time_source), pool_(scope.symbolTable()),
+        fallback_(pool_.add("fallback")) {}
+
+  void incCounter(absl::string_view name, absl::string_view value) {
+    ContextImpl::incCounter(pool_.add(name), value, fallback_);
+  }
+
+  Stats::StatNamePool pool_;
+  const Stats::StatName fallback_;
+};
+
+class SslContextStatsTest : public SslContextImplTest {
+protected:
+  SslContextStatsTest() {
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context_);
+    client_context_config_ =
+        std::make_unique<ClientContextConfigImpl>(tls_context_, factory_context_);
+    context_ = std::make_unique<TestContextImpl>(store_, *client_context_config_, time_system_);
+  }
+
+  Stats::TestUtil::TestStore store_;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
+  std::unique_ptr<ClientContextConfigImpl> client_context_config_;
+  std::unique_ptr<TestContextImpl> context_;
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+  )EOF";
+};
+
+TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
+  // Incrementing a value for a cipher that is part of the configuration works, and
+  // we'll be able to find the value in the stats store.
+  for (const auto& cipher :
+       {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"}) {
+    // Test supported built-in TLS v1.3 cipher suites
+    // https://tools.ietf.org/html/rfc8446#appendix-B.4.
+    context_->incCounter("ssl.ciphers", cipher);
+    Stats::CounterOptConstRef stat =
+        store_.findCounterByString(absl::StrCat("ssl.ciphers.", cipher));
+    ASSERT_TRUE(stat.has_value());
+    EXPECT_EQ(1, stat->get().value());
+  }
+
+  // Incrementing a stat for a random unknown cipher does not work. A
+  // rate-limited error log message will also be generated but that is hard to
+  // test as it is dependent on timing and test-ordering.
+  EXPECT_DEBUG_DEATH(context_->incCounter("ssl.ciphers", "unexpected"),
+                     "Unexpected ssl.ciphers value: unexpected");
+  EXPECT_FALSE(store_.findCounterByString("ssl.ciphers.unexpected"));
+
+  // We will account for the 'unexpected' cipher as "fallback", however in debug
+  // mode that will not work as the ENVOY_BUG macro will assert first, thus the
+  // fallback registration does not occur. So we test for the fallback only in
+  // release builds.
+#ifdef NDEBUG
+  Stats::CounterOptConstRef stat = store_.findCounterByString("ssl.ciphers.fallback");
+  ASSERT_TRUE(stat.has_value());
+  EXPECT_EQ(1, stat->get().value());
+#endif
 }
 
 } // namespace Tls

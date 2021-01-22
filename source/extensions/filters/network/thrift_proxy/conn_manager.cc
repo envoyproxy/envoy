@@ -181,9 +181,15 @@ bool ConnectionManager::passthroughEnabled() const {
     return false;
   }
 
-  // This is called right after the metadata has been parsed, and the ActiveRpc being processed must
-  // be in the rpcs_ list.
-  ASSERT(!rpcs_.empty());
+  // If the rpcs list is empty, a local response happened.
+  //
+  // TODO(rgs1): we actually could still enable passthrough for local
+  // responses as long as the transport is framed and the protocol is
+  // not Twitter.
+  if (rpcs_.empty()) {
+    return false;
+  }
+
   return (*rpcs_.begin())->passthroughSupported();
 }
 
@@ -323,12 +329,26 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderF
     for (; entry != decoder_filters_.end(); entry++) {
       const FilterStatus status = filter_action_((*entry)->handle_.get());
       if (local_response_sent_) {
-        // The filter called sendLocalReply: stop processing filters and return
-        // FilterStatus::Continue irrespective of the current result.
+        // The filter called sendLocalReply but _did not_ close the connection.
+        // We return FilterStatus::Continue irrespective of the current result,
+        // which is fine because subsequent calls to this method will skip
+        // filters anyway.
+        //
+        // Note: we need to return FilterStatus::Continue here, in order for decoding
+        // to proceed. This is important because as noted above, the connection remains
+        // open so we need to consume the remaining bytes.
         break;
       }
 
       if (status != FilterStatus::Continue) {
+        // If we got FilterStatus::StopIteration and a local reply happened but
+        // local_response_sent_ was not set, the connection was closed.
+        //
+        // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
+        // dispatch() stops the processing.
+        //
+        // In other words, after a local reply closes the connection and StopIteration
+        // is returned we are done.
         return status;
       }
     }

@@ -4,6 +4,7 @@ load(
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -33,10 +34,21 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "command_extension_lib",
+    srcs = ["command_extension.cc"],
+    hdrs = ["command_extension.h"],
+    deps = [
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
     deps = [
+        ":command_extension_lib",
         "//source/common/common:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
@@ -57,10 +69,12 @@ envoy_cc_test(
     name = "substitution_format_string_test",
     srcs = ["substitution_format_string_test.cc"],
     deps = [
+        ":command_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
