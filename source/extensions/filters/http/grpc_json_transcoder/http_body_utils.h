@@ -5,6 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 #include "common/protobuf/protobuf.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +20,8 @@ public:
   static void
   appendHttpBodyEnvelope(Buffer::Instance& output,
                          const std::vector<const Protobuf::Field*>& request_body_field_path,
-                         std::string content_type, uint64_t content_length);
+                         std::string content_type, uint64_t content_length,
+                         const envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownVariableBindings& unknown_bindings);
 };
 
 } // namespace GrpcJsonTranscoder

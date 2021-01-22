@@ -86,7 +86,8 @@ public:
                    Protobuf::io::ZeroCopyInputStream& request_input,
                    google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                   MethodInfoSharedPtr& method_info) const;
+                   MethodInfoSharedPtr& method_info,
+                   envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownVariableBindings& unknown_bindings) const;
 
   /**
    * Converts an arbitrary protobuf message to JSON.
@@ -198,6 +199,7 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   MethodInfoSharedPtr method_;
   Http::ResponseHeaderMap* response_headers_{};
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownVariableBindings unknown_bindings_;
   Grpc::Decoder decoder_;
 
   // Data of the initial request message, initialized from query arguments, path, etc.

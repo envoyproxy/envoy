@@ -233,3 +233,7 @@ message GrpcJsonTranscoder {
   // This incorrect error message may conflict with other Envoy components, such as retry policies.
   RequestValidationOptions request_validation_options = 11;
 }
+
+message UnknownVariableBindings {
+  map<string, string> bindings = 1;
+}
