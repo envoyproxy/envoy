@@ -980,8 +980,54 @@ TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
 #else
   EXPECT_DEATH(
       reservation.commit(excess_length),
-      "length <= length_. Details: commit\\(\\) length must be <= size of the Reservation");
+      "length <= slice_.len_. Details: commit\\(\\) length must be <= size of the Reservation");
 #endif
+}
+
+// Test functionality of the freelist (a performance optimization)
+TEST_F(OwnedImplTest, SliceFreeList) {
+  Buffer::OwnedImpl b1, b2;
+  void* slice1;
+  void* slice2;
+  {
+    auto r = b1.reserveForRead();
+    slice1 = r.slices()[0].mem_;
+    slice2 = r.slices()[1].mem_;
+    r.commit(1);
+    EXPECT_EQ(slice1, b1.getRawSlices()[0].mem_);
+  }
+
+  {
+    auto r = b2.reserveForRead();
+    EXPECT_EQ(slice2, r.slices()[0].mem_);
+    r.commit(1);
+    EXPECT_EQ(slice2, b2.getRawSlices()[0].mem_);
+  }
+
+  b1.drain(1);
+  EXPECT_EQ(0, b1.getRawSlices().size());
+  {
+    auto r = b2.reserveForRead();
+    // slices()[0] is the partially used slice that is already part of this buffer.
+    EXPECT_EQ(slice1, r.slices()[1].mem_);
+  }
+  {
+    auto r = b1.reserveForRead();
+    EXPECT_EQ(slice1, r.slices()[0].mem_);
+  }
+  {
+    // This underflows the freelist on creation, and overflows it on deletion.
+    auto r1 = b1.reserveForRead();
+    auto r2 = b2.reserveForRead();
+    for (auto& r1_slice : absl::MakeSpan(r1.slices(), r1.numSlices())) {
+      // r1 reservation does not contain the slice that is a part of b2.
+      EXPECT_NE(r1_slice.mem_, b2.getRawSlices()[0].mem_);
+      for (auto& r2_slice : absl::MakeSpan(r2.slices(), r2.numSlices())) {
+        // The two reservations do not share any slices.
+        EXPECT_NE(r1_slice.mem_, r2_slice.mem_);
+      }
+    }
+  }
 }
 
 TEST_F(OwnedImplTest, Search) {

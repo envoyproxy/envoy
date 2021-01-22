@@ -78,6 +78,7 @@ public:
     if (this != &rhs) {
       callAndClearDrainTrackers();
 
+      freeStorage(std::move(storage_), capacity_);
       storage_ = std::move(rhs.storage_);
       drain_trackers_ = std::move(rhs.drain_trackers_);
       base_ = rhs.base_;
@@ -306,10 +307,14 @@ protected:
   static StoragePtr newStorage(uint64_t capacity) {
     ASSERT(sliceSize(default_slice_size_) == default_slice_size_,
            "default_slice_size_ incompatible with sliceSize()");
+    ASSERT(sliceSize(capacity) == capacity,
+           "newStorage should only be called on values returned from sliceSize()");
 
     StoragePtr storage;
     if (capacity == default_slice_size_ && !free_list_.empty()) {
       storage = std::move(free_list_.back());
+      ASSERT(storage != nullptr);
+      ASSERT(free_list_.back() == nullptr);
       free_list_.pop_back();
     } else {
       storage.reset(new uint8_t[capacity]);
@@ -331,7 +336,7 @@ protected:
     }
   }
 
-  static constexpr uint32_t free_list_max_ = 8;
+  static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
   static thread_local absl::InlinedVector<StoragePtr, free_list_max_> free_list_;
 
   /** Length of the byte array that base_ points to. This is also the offset in bytes from the start

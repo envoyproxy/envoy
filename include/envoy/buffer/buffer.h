@@ -464,7 +464,13 @@ using WatermarkFactorySharedPtr = std::shared_ptr<WatermarkFactory>;
 class Reservation final {
 public:
   Reservation(Reservation&&) = default;
-  ~Reservation() = default;
+  ~Reservation() {
+    // Free in reverse-order so that entries go back onto the free-list in the same order they came
+    // off, to slightly improve locality in the case that not all slices were pulled into cache.
+    while (!owned_slices_.empty()) {
+      owned_slices_.pop_back();
+    }
+  }
 
   /**
    * @return an array of `RawSlice` of length `numSlices()`.

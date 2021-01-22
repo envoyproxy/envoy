@@ -389,24 +389,20 @@ void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
                        absl::Span<SliceDataPtr> owned_slices) {
   ASSERT(slices.size() == owned_slices.size());
   uint64_t bytes_remaining = length;
-  for (uint32_t i = 0; i < slices.size(); i++) {
+  for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
     ASSERT((owned_slices[i] != nullptr) ==
            (dynamic_cast<SliceDataImpl*>(owned_slices[i].get()) != nullptr));
     std::unique_ptr<SliceDataImpl> owned_slice(
         static_cast<SliceDataImpl*>(owned_slices[i].release()));
 
-    if (bytes_remaining > 0) {
-      if (owned_slice != nullptr) {
-        slices_.emplace_back(std::move(owned_slice->slice_));
-      }
-      slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
-      bool success = slices_.back().commit(slices[i]);
-      ASSERT(success);
-      length_ += slices[i].len_;
-      bytes_remaining -= slices[i].len_;
-    } else {
-      owned_slice.reset();
+    if (owned_slice != nullptr) {
+      slices_.emplace_back(std::move(owned_slice->slice_));
     }
+    slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
+    bool success = slices_.back().commit(slices[i]);
+    ASSERT(success);
+    length_ += slices[i].len_;
+    bytes_remaining -= slices[i].len_;
   }
 }
 

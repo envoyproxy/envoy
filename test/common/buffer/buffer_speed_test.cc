@@ -228,7 +228,12 @@ static void bufferReserveCommit(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(bufferReserveCommit)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferReserveCommit)
+    ->Arg(1)
+    ->Arg(4 * 1024)
+    ->Arg(16 * 1024)
+    ->Arg(64 * 1024)
+    ->Arg(128 * 1024);
 
 // Test the reserve+commit cycle, for the common case where the reserved space is
 // only partially used (and therefore the commit size is smaller than the reservation size).
@@ -246,7 +251,12 @@ static void bufferReserveCommitPartial(benchmark::State& state) {
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(bufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferReserveCommitPartial)
+    ->Arg(1)
+    ->Arg(4 * 1024)
+    ->Arg(16 * 1024)
+    ->Arg(64 * 1024)
+    ->Arg(128 * 1024);
 
 // Test the linearization of a buffer in the best case where the data is in one slice.
 static void bufferLinearizeSimple(benchmark::State& state) {
