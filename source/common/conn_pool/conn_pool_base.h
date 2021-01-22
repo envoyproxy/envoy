@@ -6,6 +6,7 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/dump_state_utils.h"
 #include "common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
@@ -192,18 +193,38 @@ public:
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
+  void dumpState(std::ostream& os, int indent_level = 0) const {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
+       << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
+       << DUMP_MEMBER(connecting_stream_capacity_) << DUMP_MEMBER(num_active_streams_);
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const ConnPoolImplBase& s) {
+    s.dumpState(os);
+    return os;
+  }
+
 protected:
   // Creates up to 3 connections, based on the preconnect ratio.
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
+  enum class ConnectionResult {
+    CreatedNewConnection,
+    ShouldNotConnect,
+    NoConnectionRateLimited,
+    CreatedButRateLimited,
+  };
+
   // Creates up to 3 connections, based on the preconnect ratio.
-  void tryCreateNewConnections();
+  // Returns the ConnectionResult of the last attempt.
+  ConnectionResult tryCreateNewConnections();
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
   // to avoid starving this pool.
   // Demand is determined either by perUpstreamPreconnectRatio() or global_preconnect_ratio
   // if this is called by maybePreconnect()
-  bool tryCreateNewConnection(float global_preconnect_ratio = 0);
+  ConnectionResult tryCreateNewConnection(float global_preconnect_ratio = 0);
 
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
