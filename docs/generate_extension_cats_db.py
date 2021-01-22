@@ -14,9 +14,8 @@ def main():
     categories = {}
     for k, v in data.items():
         for cat in v['categories']:
-            # not sure if this needs to be ordered
-            categories[cat] = categories.get(cat, set())
-            categories[cat].add(k)
+            categories[cat] = categories.get(cat, [])
+            categories[cat].append(k)
 
     print(categories)
 
