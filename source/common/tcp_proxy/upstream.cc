@@ -266,6 +266,7 @@ bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
 void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
   request_encoder_ = &request_encoder;
   request_encoder_->getStream().addCallbacks(*this);
+
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
@@ -293,7 +294,7 @@ Http1Upstream::Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
 void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
   request_encoder_ = &request_encoder;
   request_encoder_->getStream().addCallbacks(*this);
-
+  request_encoder_->enableTcpTunneling();
   ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
 
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
