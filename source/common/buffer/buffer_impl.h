@@ -661,16 +661,18 @@ public:
   /**
    * Create a reservation for reading with a non-default length. Used in benchmark tests.
    */
-  Reservation reserveForReadWithLengthForTest(uint64_t length) { return reserveWithLength(length); }
+  Reservation reserveForReadWithLengthForTest(uint64_t length) {
+    return reserveWithMaxLength(length);
+  }
 
 protected:
   static constexpr uint64_t default_read_reservation_size_ =
       Reservation::MAX_SLICES_ * Slice::default_slice_size_;
 
   /**
-   * Create a reservation with a specific length.
+   * Create a reservation with a maximum length.
    */
-  Reservation reserveWithLength(uint64_t length);
+  Reservation reserveWithMaxLength(uint64_t max_length);
 
   void commit(uint64_t length, absl::Span<RawSlice> slices,
               absl::Span<SliceDataPtr> owned_slices) override;

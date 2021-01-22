@@ -78,7 +78,7 @@ Reservation WatermarkBuffer::reserveForRead() {
     }
   }
 
-  return OwnedImpl::reserveWithLength(adjusted_length);
+  return OwnedImpl::reserveWithMaxLength(adjusted_length);
 }
 
 void WatermarkBuffer::appendSliceForTest(const void* data, uint64_t size) {

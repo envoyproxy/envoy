@@ -301,12 +301,12 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
 }
 
 Reservation OwnedImpl::reserveForRead() {
-  return reserveWithLength(default_read_reservation_size_);
+  return reserveWithMaxLength(default_read_reservation_size_);
 }
 
-Reservation OwnedImpl::reserveWithLength(uint64_t length) {
+Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
   Reservation reservation = Reservation::bufferImplUseOnlyConstruct(*this);
-  if (length == 0) {
+  if (max_length == 0) {
     return reservation;
   }
 
@@ -315,14 +315,14 @@ Reservation OwnedImpl::reserveWithLength(uint64_t length) {
     slices_.pop_back();
   }
 
-  uint64_t bytes_remaining = length;
+  uint64_t bytes_remaining = max_length;
   uint64_t reserved = 0;
   auto& reservation_slices = reservation.bufferImplUseOnlySlices();
   auto& reservation_owned_slices = reservation.bufferImplUseOnlyOwnedSlices();
 
   // Check whether there are any empty slices with reservable space at the end of the buffer.
   uint64_t reservable_size = slices_.empty() ? 0 : slices_.back().reservableSize();
-  if (reservable_size >= length || reservable_size >= (Slice::default_slice_size_ / 8)) {
+  if (reservable_size >= max_length || reservable_size >= (Slice::default_slice_size_ / 8)) {
     auto& last_slice = slices_.back();
     const uint64_t reservation_size = std::min(last_slice.reservableSize(), bytes_remaining);
     auto slice = last_slice.reserve(reservation_size);
