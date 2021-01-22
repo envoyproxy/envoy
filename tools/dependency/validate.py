@@ -125,9 +125,12 @@ class BuildGraph(object):
       deps = subprocess.check_output(['bazel', 'query', deps_query],
                                      stderr=subprocess.PIPE).decode().splitlines()
     except Exception as e:
+      result = subprocess.run(['bazel', 'query', deps_query], capture_output=True)
       print('FAIL')
       print(targets)
-      print(e)
+      print('STDERR')
+      print(result.stderr)
+      print('FAILED')
       raise e
 
     ext_deps = set()
