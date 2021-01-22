@@ -220,8 +220,7 @@ TimerPtr DispatcherImpl::createScaledTimer(ScaledTimerMinimum minimum, TimerCb c
 }
 
 Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
-  // TODO(antoniovicente) Merge in https://github.com/envoyproxy/envoy/pull/14526 and restore ASSERT
-  // ASSERT(isThreadSafe());
+  ASSERT(isThreadSafe());
   return base_scheduler_.createSchedulableCallback([this, cb]() {
     touchWatchdog();
     cb();
