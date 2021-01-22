@@ -146,7 +146,7 @@ def envoy_cc_extension(
         **kwargs):
     if not category:
         fail("Category not set for %s" % name)
-    if isinstance(category, str):
+    if type(category) == str:
         category = (category, )
     for cat in category:
         if cat not in EXTENSION_CATEGORIES:
