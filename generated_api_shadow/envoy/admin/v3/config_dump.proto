@@ -385,7 +385,9 @@ message EndpointsConfigDump {
 // Envoy's admin fills this message with all currently known dynamic extension configurations.
 message ExtensionsConfigDump {
   message DynamicExtensionConfig {
-    // This is the per-resource version information.
+    // This is the per-resource version information. This version is currently taken from the
+    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+    // the extension configuration was loaded.
     string version_info = 1;
 
     // The extension config.
