@@ -88,9 +88,7 @@ public:
     onEncodeComplete();
   }
 
-  void enableTcpTunneling() override {
-    inner_.enableTcpTunneling();
-  }
+  void enableTcpTunneling() override { inner_.enableTcpTunneling(); }
 
   void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
     inner_.encodeMetadata(metadata_map_vector);
