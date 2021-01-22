@@ -477,12 +477,6 @@ TEST_P(HeaderMapImplTest, InlineAppend) {
     headers.setVia("2.0 override");
     EXPECT_EQ(headers.getViaValue(), "2.0 override");
   }
-  {
-    // Set a string. This mimics how GrpcTimeout is set in Grpc::Common::toGrpcTimeout.
-    TestRequestHeaderMapImpl headers;
-    headers.setGrpcTimeout("42s");
-    EXPECT_EQ(headers.getGrpcTimeoutValue(), "42s");
-  }
 }
 
 TEST_P(HeaderMapImplTest, MoveIntoInline) {
