@@ -19,10 +19,6 @@ struct ScaledMinimum {
   inline bool operator==(const ScaledMinimum& other) const {
     return other.scale_factor_.value() == scale_factor_.value();
   }
-  inline friend std::ostream& operator<<(std::ostream& output, const ScaledMinimum& minimum) {
-    return output << "ScaledMinimum { scale_factor_ = " << minimum.scale_factor_.value() << " }";
-  }
-
   const UnitFloat scale_factor_;
 };
 
@@ -32,9 +28,6 @@ struct ScaledMinimum {
 struct AbsoluteMinimum {
   explicit constexpr AbsoluteMinimum(std::chrono::milliseconds value) : value_(value) {}
   inline bool operator==(const AbsoluteMinimum& other) const { return other.value_ == value_; }
-  inline friend std::ostream& operator<<(std::ostream& output, const AbsoluteMinimum& minimum) {
-    return output << "AbsoluteMinimum { value = " << minimum.value_.count() << "ms }";
-  }
   const std::chrono::milliseconds value_;
 };
 
@@ -69,11 +62,6 @@ public:
   }
 
   inline bool operator==(const ScaledTimerMinimum& other) const { return impl_ == other.impl_; }
-
-  inline friend std::ostream& operator<<(std::ostream& output, const ScaledTimerMinimum& minimum) {
-    return absl::visit([&](const auto& minimum) -> std::ostream& { return output << minimum; },
-                       minimum.impl_);
-  }
 
 private:
   absl::variant<ScaledMinimum, AbsoluteMinimum> impl_;
