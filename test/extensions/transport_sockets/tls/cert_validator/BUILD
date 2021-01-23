@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "context_impl_test",
+    name = "default_validator_test",
     srcs = [
         "default_validator_test.cc",
     ],

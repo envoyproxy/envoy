@@ -29,23 +29,6 @@ TEST(DefaultCertValidatorTest, TestDnsNameMatching) {
   EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", ""));
 }
 
-TEST(DefaultCertValidatorTest, TestDnsNameMatchingLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("lyft.com", "lyft.com"));
-  EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("a.lyft.com", "*.lyft.com"));
-  // Legacy behavior
-  EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("foo.test.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", "*lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("", "*lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", ""));
-}
-
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameDNSMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
@@ -87,20 +70,6 @@ TEST(DefaultCertValidatorTest, TestMultiLevelMatch) {
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
-TEST(DefaultCertValidatorTest, TestMultiLevelMatchLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("foo.api.example.com");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameURIMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -116,17 +85,6 @@ TEST(DefaultCertValidatorTest, TestVerifySubjectAltMultiDomain) {
   std::vector<std::string> verify_subject_alt_name_list = {"https://a.www.example.com"};
   EXPECT_FALSE(
       DefaultCertValidator::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
-}
-
-TEST(DefaultCertValidatorTest, TestVerifySubjectAltMultiDomainLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  std::vector<std::string> verify_subject_alt_name_list = {"https://a.www.example.com"};
-  EXPECT_TRUE(DefaultCertValidator::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURIMatched) {
