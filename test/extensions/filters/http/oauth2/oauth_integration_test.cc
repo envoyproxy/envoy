@@ -58,6 +58,10 @@ typed_config:
         name: token
       hmac_secret:
         name: hmac
+    auth_scopes:
+    - user
+    - openid
+    - email
 )EOF");
 
     // Add the OAuth cluster.
