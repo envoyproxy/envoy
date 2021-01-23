@@ -261,7 +261,7 @@ void StreamEncoderImpl::endEncode() {
 
   connection_.flushOutput(true);
   connection_.onEncodeComplete();
-  // With CONNECT or TPC tunneling, half-closing the connection is used to signal end stream.
+  // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
   if (connect_request_ || is_tcp_tunneling_) {
     connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
   }
