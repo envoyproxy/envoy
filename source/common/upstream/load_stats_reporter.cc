@@ -174,15 +174,16 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // Reset stats for all hosts in clusters we are tracking.
   auto handle_cluster_func = [this, &existing_clusters,
                               &all_clusters](const std::string& cluster_name) {
-    clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
-                                        ? existing_clusters[cluster_name]
+    auto existing_cluster_it = existing_clusters.find(cluster_name);
+    clusters_.emplace(cluster_name, existing_cluster_it != existing_clusters.end()
+                                        ? existing_cluster_it->second
                                         : time_source_.monotonicTime().time_since_epoch());
     auto it = all_clusters.active_clusters_.find(cluster_name);
     if (it == all_clusters.active_clusters_.end()) {
       return;
     }
     // Don't reset stats for existing tracked clusters.
-    if (existing_clusters.count(cluster_name) > 0) {
+    if (existing_cluster_it != existing_clusters.end()) {
       return;
     }
     auto& cluster = it->second.get();
