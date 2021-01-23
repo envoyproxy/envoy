@@ -123,22 +123,19 @@ TEST(ConfigTest, InvalidHeadersToAdd) {
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
   config.mutable_tunneling_config()->set_hostname("example.com:80");
+
   auto* header = config.mutable_tunneling_config()->add_headers_to_add();
   auto* hdr = header->mutable_header();
   hdr->set_key(":method");
   hdr->set_value("GET");
-
   EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), EnvoyException);
 
-  /*
   config.mutable_tunneling_config()->clear_headers_to_add();
   header = config.mutable_tunneling_config()->add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("host");
   hdr->set_value("example.net:80");
-
   EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), EnvoyException);
-  */
 }
 
 // Test that a minimal TcpProxy v2 config works.
