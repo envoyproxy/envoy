@@ -191,7 +191,7 @@ upon configuration load and cache the contents.
    body in memory, so the 4KB default is intended to keep the proxy's memory footprint
    from growing too large. However, if required, this limit can be changed through setting
    the :ref:`max_direct_response_body_size_bytes
-   <envoy_api_field_config.route.v3.RouteConfiguration.max_direct_response_body_size_bytes>`
+   <envoy_v3_api_field_config.route.v3.RouteConfiguration.max_direct_response_body_size_bytes>`
    field.
 
 If **response_headers_to_add** has been set for the Route or the enclosing Virtual Host,
