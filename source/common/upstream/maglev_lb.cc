@@ -86,6 +86,7 @@ void MaglevTable::chooseHosts(uint64_t hash, HostConstSharedPtr * hosts, uint8_t
   std::mt19937 random(seed);
   bool unique;
 
+  // Generate shard, regardless of health
   for (uint8_t i = 0; i < shard_size_; i++) {
     unique = false;
     for(uint64_t c = 0; !unique && c < table_size_; c++) {
@@ -102,6 +103,7 @@ void MaglevTable::chooseHosts(uint64_t hash, HostConstSharedPtr * hosts, uint8_t
     hash = random();
   }
 
+  // Find the max health
   Envoy::Upstream::Host::Health max_health = Envoy::Upstream::Host::Health::Unhealthy;
   for (uint8_t i = 0; i < shard_size_; i++) {
     max_health = std::max(max_health, hosts[i]->health());
@@ -110,6 +112,7 @@ void MaglevTable::chooseHosts(uint64_t hash, HostConstSharedPtr * hosts, uint8_t
   }
   ENVOY_LOG(info, "maglev: health={}", max_health);
 
+  // Remove all hosts that aren't at max health
   uint8_t c = 0;
   for (uint8_t i = 0; i < shard_size_; i++) {
     if (hosts[i]->health() == max_health) {
