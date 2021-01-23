@@ -63,6 +63,8 @@ private:
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+    // HostConstSharedPtr * chooseHosts(uint64_t /*hash*/, uint32_t /*attempt*/) const override {
+    void chooseHosts(uint64_t /*hash*/, HostConstSharedPtr * /*hosts*/, uint8_t * /* max_hosts */ ) const override { }
 
     std::vector<RingEntry> ring_;
 
