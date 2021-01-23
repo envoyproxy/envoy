@@ -434,11 +434,10 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
     proxy_config.mutable_tunneling_config()->set_use_post(true);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
-    for (auto it = listeners->begin(); it != listeners->end(); it++) {
-      if (it->name() != "tcp_proxy")
-        continue;
-
-      auto* filter_chain = it->mutable_filter_chains(0);
+    //for (auto it = listeners->begin(); it != listeners->end(); it++) {
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") { continue; }
+      auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
       filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
