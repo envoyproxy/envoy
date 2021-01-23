@@ -40,7 +40,9 @@ void FileEventImpl::setEnabled(uint32_t events) {
   bool was_enabled = schedulable_->enabled();
   // Recalculate activated events.
   uint32_t events_to_notify = 0;
-  if ((events & Event::FileReadyType::Read) && io_source_.isReadable()) {
+  if ((events & Event::FileReadyType::Read) && (io_source_.isReadable() ||
+                                                // Notify Read event when `EOS` is received.
+                                                io_source_.isPeerShutDownWrite())) {
     events_to_notify |= Event::FileReadyType::Read;
   }
   if ((events & Event::FileReadyType::Write) && io_source_.isPeerWritable()) {
@@ -63,12 +65,12 @@ void FileEventImpl::setEnabled(uint32_t events) {
 void FileEventImpl::activateIfEnabled(uint32_t events) {
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
-  // filtered out disabled events.
-  uint32_t filter_enabled = events & event_listener_.getEnabledEvents();
-  if (filter_enabled == 0) {
+  // Filter out disabled events.
+  uint32_t filtered_events = events & event_listener_.getEnabledEvents();
+  if (filtered_events == 0) {
     return;
   }
-  activate(filter_enabled);
+  activate(filtered_events);
 }
 } // namespace UserSpace
 } // namespace IoSocket

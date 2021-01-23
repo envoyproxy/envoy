@@ -97,6 +97,22 @@ TEST_F(FileEventImplTest, EnabledEventsTriggeredAfterCreate) {
   }
 }
 
+TEST_F(FileEventImplTest, ReadEventIsTriggeredWhenThePeerSetWriteEnd) {
+  for (const auto current_event :
+       {Event::FileReadyType::Read, Event::FileReadyType::Read | Event::FileReadyType::Closed}) {
+    SCOPED_TRACE(absl::StrCat("current event:", current_event));
+    clearEventExpectation();
+    setWriteEnd();
+    MockReadyCb ready_cb;
+    auto user_file_event = std::make_unique<FileEventImpl>(
+        *dispatcher_, [&ready_cb](uint32_t arg) { ready_cb.called(arg); }, current_event,
+        io_source_);
+    EXPECT_CALL(ready_cb, called(current_event));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    testing::Mock::VerifyAndClearExpectations(&ready_cb);
+  }
+}
+
 TEST_F(FileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
   setWritable();
   setReadable();
