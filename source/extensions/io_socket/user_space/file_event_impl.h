@@ -4,6 +4,7 @@
 
 #include "envoy/event/file_event.h"
 
+#include "common/common/assert.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"
 
@@ -28,8 +29,8 @@ public:
 
   // This event always acts as edge triggered regardless the underlying OS is level or
   // edge triggered. The event owner on windows platform should not emulate edge events.
-  void unregisterEventIfEmulatedEdge(uint32_t) override {}
-  void registerEventIfEmulatedEdge(uint32_t) override {}
+  void unregisterEventIfEmulatedEdge(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void registerEventIfEmulatedEdge(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // Notify events. Unlike activate() method, this method activates the given events only if the
   // events are enabled.
@@ -37,7 +38,6 @@ public:
 
 private:
   // This class maintains the ephemeral events and enabled events.
-  // getAndClearEphemeralEvents
   class EventListener {
   public:
     ~EventListener() = default;
