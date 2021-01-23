@@ -248,35 +248,6 @@ stages:
               AZP_SHA1: $(Build.SourceVersion)
               DOCKERHUB_USERNAME: $(DockerUsername)
               DOCKERHUB_PASSWORD: $(DockerPassword)
-          - bash: |
-              echo "disk space at end of build:"
-              df -h
-            displayName: "Check disk space at end"
-            condition: always()
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathtoPublish: "$(Build.StagingDirectory)/build_images"
-              artifactName: docker
-            condition: always()
-
-  - stage: verify
-    dependsOn: ["docker"]
-    jobs:
-      - job: examples
-        pool:
-          vmImage: "ubuntu-18.04"
-        steps:
-          - task: DownloadBuildArtifacts@0
-            inputs:
-              buildType: current
-              artifactName: "docker"
-              itemPattern: "docker/envoy-docker-images.tar.xz"
-              downloadType: single
-              targetPath: $(Build.StagingDirectory)
-          - bash: ./ci/do_ci.sh verify_examples
-            env:
-              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-              NO_BUILD_SETUP: 1
 
   - stage: macos
     dependsOn: ["precheck"]
