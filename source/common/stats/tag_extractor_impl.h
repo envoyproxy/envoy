@@ -67,7 +67,7 @@ protected:
 class TagExtractorStdRegexImpl : public TagExtractorImplBase {
 public:
   TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
-                           absl::string_view substr = "");
+                           absl::string_view substr);
 
   bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
@@ -79,7 +79,7 @@ private:
 class TagExtractorRe2Impl : public TagExtractorImplBase {
 public:
   TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
-                      absl::string_view substr = "");
+                      absl::string_view substr);
 
   bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
@@ -87,6 +87,19 @@ public:
 private:
   const re2::RE2 regex_;
 };
+
+/*class TagExtractorSymbolicImpl : public TagExtractorImplBase {
+public:
+  TagExtractorSymbolicImpl(absl::string_view name, absl::string_view regex,
+                           absl::string_view substr = "");
+
+  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
+
+private:
+  StatNamePool pool_;
+  const re2::RE2 regex_;
+  };*/
 
 } // namespace Stats
 } // namespace Envoy
