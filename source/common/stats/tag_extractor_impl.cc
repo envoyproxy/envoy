@@ -174,7 +174,7 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
 TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::string_view tokens,
                                                absl::string_view substr)
     : TagExtractorImplBase(name, tokens, substr),
-      tokens_(absl::StrSplit(tokens, ".")), match_index_{findMatchIndex(tokens_)} {}
+      tokens_(absl::StrSplit(tokens, '.')), match_index_{findMatchIndex(tokens_)} {}
 
 uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& tokens) {
   uint32_t index = tokens.size();
@@ -198,7 +198,7 @@ bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, std::vector
     return false;
   }
 
-  std::vector<absl::string_view> tokens = absl::StrSplit(stat_name, ".");
+  std::vector<absl::string_view> tokens = absl::StrSplit(stat_name, '.');
   bool match_all_at_end = tokens.size() > tokens_.size() && (tokens_[tokens_.size() - 1] == "*");
   if (tokens.size() < tokens_.size() || (tokens.size() > tokens_.size() && !match_all_at_end)) {
     PERF_RECORD(perf, "tokens-miss", name_);
