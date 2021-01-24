@@ -131,6 +131,7 @@ def envoy_cc_fuzz_test(
         corpus = [corpus_name],
         dicts = dictionaries,
         tags = ["fuzz_target"] + tags,
+        external_instrumentation = True,
     )
 
 # Envoy C++ test targets should be specified with this function.
