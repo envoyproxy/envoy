@@ -11,6 +11,8 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::ElementsAre;
+
 namespace Envoy {
 namespace Stats {
 
@@ -394,6 +396,73 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
   EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("no such default tag", ""),
                           EnvoyException, "^No regex specified for tag specifier and no default");
+}
+
+class TagExtractorTokensTest : public testing::Test {
+protected:
+  bool extract(absl::string_view tag_name, absl::string_view pattern, absl::string_view stat_name) {
+    TagExtractorTokensImpl tokens(tag_name, pattern);
+    IntervalSetImpl<size_t> remove_characters;
+    tags_.clear();
+    bool ret = tokens.extractTag(stat_name, tags_, remove_characters);
+    if (ret) {
+      tag_extracted_name_ = StringUtil::removeCharacters(stat_name, remove_characters);
+    } else {
+      tag_extracted_name_.clear();
+    }
+    return ret;
+  }
+
+  std::vector<Tag> tags_;
+  std::string tag_extracted_name_;
+};
+
+TEST_F(TagExtractorTokensTest, TokensMatchStart) {
+  EXPECT_TRUE(extract("when", "$.is.the.time", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_EQ("is.the.time", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchStartWild) {
+  EXPECT_TRUE(extract("when", "$.is.the.*", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_EQ("is.the.time", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchStartWildLong) {
+  EXPECT_TRUE(extract("when", "$.is.the.*", "now.is.the.time.to.come.to.the.aid"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"when", "now"}));
+  EXPECT_EQ("is.the.time.to.come.to.the.aid", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchMiddle) {
+  EXPECT_TRUE(extract("article", "now.is.$.time", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"article", "the"}));
+  EXPECT_EQ("now.is.time", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchMiddleWild) {
+  EXPECT_TRUE(extract("article", "now.*.$.time", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"article", "the"}));
+  EXPECT_EQ("now.is.time", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMatchEnd) {
+  EXPECT_TRUE(extract("what", "now.is.the.$", "now.is.the.time"));
+  EXPECT_THAT(tags_, ElementsAre(Tag{"what", "time"}));
+  EXPECT_EQ("now.is.the", tag_extracted_name_);
+}
+
+TEST_F(TagExtractorTokensTest, TokensMismatchString) {
+  EXPECT_FALSE(extract("article", "now.is.$.time", "now.was.the.time"));
+}
+
+TEST_F(TagExtractorTokensTest, TokensMismatchNameTooLong) {
+  EXPECT_FALSE(extract("article", "now.$.the", "now.is.the.time"));
+}
+
+TEST_F(TagExtractorTokensTest, TokensMismatchPatternTooLong) {
+  EXPECT_FALSE(extract("article", "now.$.the.time.to", "now.is.the.time"));
 }
 
 } // namespace Stats

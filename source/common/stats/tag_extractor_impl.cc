@@ -12,6 +12,8 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Stats {
@@ -167,6 +169,71 @@ bool TagExtractorRe2Impl::extractTag(absl::string_view stat_name, std::vector<Ta
   PERF_RECORD(perf, "re2-miss", name_);
   PERF_TAG_INC(missed_);
   return false;
+}
+
+TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::string_view tokens,
+                                               absl::string_view substr)
+    : TagExtractorImplBase(name, tokens, substr),
+      tokens_(absl::StrSplit(tokens, ".")), match_index_{findMatchIndex(tokens_)} {}
+
+uint32_t TagExtractorTokensImpl::findMatchIndex(const std::vector<std::string>& tokens) {
+  uint32_t index = tokens.size();
+  for (uint32_t i = 0; i < tokens.size(); ++i) {
+    if (tokens[i] == "$") {
+      ASSERT(index == tokens.size(), absl::StrJoin(tokens, "."));
+      index = i;
+    }
+  }
+  ASSERT(index != tokens.size(), absl::StrJoin(tokens, "."));
+  return index;
+}
+
+bool TagExtractorTokensImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
+                                        IntervalSet<size_t>& remove_characters) const {
+  PERF_OPERATION(perf);
+
+  if (substrMismatch(stat_name)) {
+    PERF_RECORD(perf, "tokens-skip", name_);
+    PERF_TAG_INC(skipped_);
+    return false;
+  }
+
+  std::vector<absl::string_view> tokens = absl::StrSplit(stat_name, ".");
+  bool match_all_at_end = tokens.size() > tokens_.size() && (tokens_[tokens_.size() - 1] == "*");
+  if (tokens.size() < tokens_.size() || (tokens.size() > tokens_.size() && !match_all_at_end)) {
+    PERF_RECORD(perf, "tokens-miss", name_);
+    PERF_TAG_INC(missed_);
+    return false;
+  }
+
+  uint32_t index = 0, start = 0, end = 0;
+  absl::string_view tag;
+  for (uint32_t i = 0; i < tokens_.size(); ++i) {
+    if (i == match_index_) {
+      ASSERT(tag.empty());
+      tag = tokens[i];
+      start = index;
+      end = start + tokens[i].size();
+      if (index > 0) {
+        --start; // Remove dot leading to this token.
+      } else if (i < (tokens.size() - 1)) {
+        ++end; // Remove dot leading to next token
+      }
+    } else if (tokens_[i] != "*" && (tokens_[i] != tokens[i])) {
+      PERF_RECORD(perf, "tokens-miss", name_);
+      PERF_TAG_INC(missed_);
+      return false;
+    } else if (end == 0) {
+      index += tokens[i].size() + 1;
+    }
+  }
+
+  ASSERT(!tag.empty());
+  addTag(tags) = std::string(tag);
+  remove_characters.insert(start, end);
+  PERF_RECORD(perf, "tokens-match", name_);
+  PERF_TAG_INC(matched_);
+  return true;
 }
 
 } // namespace Stats
