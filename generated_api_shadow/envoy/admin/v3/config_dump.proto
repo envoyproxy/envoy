@@ -49,6 +49,7 @@ message UpdateFailureState {
       "envoy.admin.v2alpha.UpdateFailureState";
 
   // What the component configuration would have been if the update had succeeded.
+  // This field may not be populated by xDS clients due to storage overhead.
   google.protobuf.Any failed_configuration = 1;
 
   // Time of the latest failed update attempt.
@@ -56,6 +57,10 @@ message UpdateFailureState {
 
   // Details about the last failed update attempt.
   string details = 3;
+
+  // This is the version of the rejected resource.
+  // [#not-implemented-hide:]
+  string version_info = 4;
 }
 
 // This message describes the bootstrap configuration that Envoy was started with. This includes
@@ -134,6 +139,9 @@ message ListenersConfigDump {
     DynamicListenerState draining_state = 4;
 
     // Set if the last update failed, cleared after the next successful update.
+    // The *error_state* field contains the rejected version of this particular
+    // resource along with the reason and timestamp. For successfully updated or
+    // acknowledged resource, this field should be empty.
     UpdateFailureState error_state = 5;
   }
 
@@ -184,6 +192,13 @@ message ClustersConfigDump {
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 3;
+
+    // Set if the last update failed, cleared after the next successful update.
+    // The *error_state* field contains the rejected version of this particular
+    // resource along with the reason and timestamp. For successfully updated or
+    // acknowledged resource, this field should be empty.
+    // [#not-implemented-hide:]
+    UpdateFailureState error_state = 4;
   }
 
   // This is the :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` in the
@@ -239,6 +254,13 @@ message RoutesConfigDump {
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 3;
+
+    // Set if the last update failed, cleared after the next successful update.
+    // The *error_state* field contains the rejected version of this particular
+    // resource along with the reason and timestamp. For successfully updated or
+    // acknowledged resource, this field should be empty.
+    // [#not-implemented-hide:]
+    UpdateFailureState error_state = 4;
   }
 
   // The statically loaded route configs.
@@ -270,6 +292,7 @@ message ScopedRoutesConfigDump {
     google.protobuf.Timestamp last_updated = 3;
   }
 
+  // [#next-free-field: 6]
   message DynamicScopedRouteConfigs {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v2alpha.ScopedRoutesConfigDump.DynamicScopedRouteConfigs";
@@ -287,6 +310,13 @@ message ScopedRoutesConfigDump {
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 4;
+
+    // Set if the last update failed, cleared after the next successful update.
+    // The *error_state* field contains the rejected version of this particular
+    // resource along with the reason and timestamp. For successfully updated or
+    // acknowledged resource, this field should be empty.
+    // [#not-implemented-hide:]
+    UpdateFailureState error_state = 5;
   }
 
   // The statically loaded scoped route configs.
@@ -302,6 +332,7 @@ message SecretsConfigDump {
       "envoy.admin.v2alpha.SecretsConfigDump";
 
   // DynamicSecret contains secret information fetched via SDS.
+  // [#next-free-field: 6]
   message DynamicSecret {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.admin.v2alpha.SecretsConfigDump.DynamicSecret";
@@ -319,6 +350,13 @@ message SecretsConfigDump {
     // Security sensitive information is redacted (replaced with "[redacted]") for
     // private keys and passwords in TLS certificates.
     google.protobuf.Any secret = 4;
+
+    // Set if the last update failed, cleared after the next successful update.
+    // The *error_state* field contains the rejected version of this particular
+    // resource along with the reason and timestamp. For successfully updated or
+    // acknowledged resource, this field should be empty.
+    // [#not-implemented-hide:]
+    UpdateFailureState error_state = 5;
   }
 
   // StaticSecret specifies statically loaded secret in bootstrap.
@@ -373,6 +411,13 @@ message EndpointsConfigDump {
 
     // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
     google.protobuf.Timestamp last_updated = 3;
+
+    // Set if the last update failed, cleared after the next successful update.
+    // The *error_state* field contains the rejected version of this particular
+    // resource along with the reason and timestamp. For successfully updated or
+    // acknowledged resource, this field should be empty.
+    // [#not-implemented-hide:]
+    UpdateFailureState error_state = 4;
   }
 
   // The statically loaded endpoint configs.
