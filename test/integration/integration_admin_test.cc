@@ -349,11 +349,11 @@ TEST_P(IntegrationAdminTest, Admin) {
   size_t index = 0;
   const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.ExtensionsConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
-
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
     index++;
@@ -362,17 +362,17 @@ TEST_P(IntegrationAdminTest, Admin) {
   // Validate we can parse as proto.
   envoy::admin::v3::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
-  EXPECT_EQ(6, config_dump.configs_size());
+  EXPECT_EQ(7, config_dump.configs_size());
 
   // .. and that we can unpack one of the entries.
   envoy::admin::v3::RoutesConfigDump route_config_dump;
-  config_dump.configs(4).UnpackTo(&route_config_dump);
+  config_dump.configs(5).UnpackTo(&route_config_dump);
   envoy::config::route::v3::RouteConfiguration route_config;
   EXPECT_TRUE(route_config_dump.static_route_configs(0).route_config().UnpackTo(&route_config));
   EXPECT_EQ("route_config_0", route_config.name());
 
   envoy::admin::v3::SecretsConfigDump secret_config_dump;
-  config_dump.configs(5).UnpackTo(&secret_config_dump);
+  config_dump.configs(6).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
@@ -383,6 +383,7 @@ TEST_P(IntegrationAdminTest, Admin) {
       "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
       "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
       "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ExtensionsConfigDump",
       "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
       "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
       "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
@@ -396,7 +397,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   // Validate we can parse as proto.
   envoy::admin::v3::ConfigDump config_dump_with_eds;
   TestUtility::loadFromJson(response->body(), config_dump_with_eds);
-  EXPECT_EQ(7, config_dump_with_eds.configs_size());
+  EXPECT_EQ(8, config_dump_with_eds.configs_size());
 
   // Validate that the "inboundonly" does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",

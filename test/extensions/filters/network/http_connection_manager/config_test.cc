@@ -1271,6 +1271,13 @@ http_filters:
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.thread_local_, allocateSlot());
+  // Set config tracker add method to avoid failure because of duplicated extension config tracker
+  // adding.
+  ON_CALL(context_.admin_.config_tracker_, add_(_, _))
+      .WillByDefault(Invoke(
+          [](const std::string&, Server::ConfigTracker::Cb) -> Server::ConfigTracker::EntryOwner* {
+            return new Server::MockConfigTracker::MockEntryOwner();
+          }));
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
   EXPECT_TRUE(factory.isTerminalFilter());
