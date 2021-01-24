@@ -222,8 +222,9 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
 }
 
 Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
+Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                           Stats::SymbolTable& symbol_table) {
+  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), symbol_table);
 }
 
 Stats::StatsMatcherPtr

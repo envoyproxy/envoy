@@ -207,6 +207,7 @@ envoy_cc_library(
     hdrs = ["tag_producer_impl.h"],
     external_deps = ["abseil_node_hash_set"],
     deps = [
+        ":symbol_table_lib",
         ":tag_extractor_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:perf_annotation_lib",

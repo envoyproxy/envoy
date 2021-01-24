@@ -399,7 +399,8 @@ public:
    * @throws EnvoyException when the conflict of tag names is found.
    */
   static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                    Stats::SymbolTable& symbol_table);
 
   /**
    * Create StatsMatcher instance.

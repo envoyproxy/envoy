@@ -90,7 +90,8 @@ const std::vector<Params> params = {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void BM_ExtractTags(benchmark::State& state) {
-  TagProducerImpl tag_extractors{envoy::config::metrics::v3::StatsConfig()};
+  Stats::SymbolTableImpl symbol_table;
+  TagProducerImpl tag_extractors{envoy::config::metrics::v3::StatsConfig(), symbol_table};
   const auto idx = state.range(0);
   const auto& p = params[idx];
   absl::string_view str = std::get<0>(p);

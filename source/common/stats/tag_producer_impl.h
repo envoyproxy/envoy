@@ -14,6 +14,7 @@
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -28,8 +29,8 @@ namespace Stats {
  */
 class TagProducerImpl : public TagProducer {
 public:
-  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config);
-  TagProducerImpl() = default;
+  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config, SymbolTable& symbol_table);
+  explicit TagProducerImpl(SymbolTable& symbol_table);
 
   /**
    * Take a metric name and a vector then add proper tags into the vector and
@@ -38,6 +39,9 @@ public:
    * @param tags std::vector a set of Stats::Tag.
    */
   std::string produceTags(absl::string_view metric_name, TagVector& tags) const override;
+
+  bool produceTagsFromStatName(StatName metric_name, StatNameTagVector& tags,
+                               StatName& tag_extracted_name, StatNamePool& pool) const override;
 
 private:
   friend class DefaultTagRegexTester;
@@ -92,6 +96,7 @@ private:
   void forEachExtractorMatching(absl::string_view stat_name,
                                 std::function<void(const TagExtractorPtr&)> f) const;
 
+  Stats::SymbolTable& symbol_table_;
   std::vector<TagExtractorPtr> tag_extractors_without_prefix_;
 
   // Maps a prefix word extracted out of a regex to a vector of TagExtractors. Note that

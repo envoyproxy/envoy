@@ -83,7 +83,8 @@ TEST(TagExtractorTest, BadRegex) {
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v3::StatsConfig()) {}
+  DefaultTagRegexTester()
+      : tag_extractors_(envoy::config::metrics::v3::StatsConfig(), symbol_table_) {}
 
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
                  const TagVector& expected_tags) {
@@ -146,6 +147,7 @@ public:
     return StringUtil::removeCharacters(metric_name, remove_characters);
   }
 
+  SymbolTableImpl symbol_table_;
   TagProducerImpl tag_extractors_;
 };
 

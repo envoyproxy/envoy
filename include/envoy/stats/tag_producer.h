@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Stats {
 
+class StatNamePool;
+
 class TagProducer {
 public:
   virtual ~TagProducer() = default;
@@ -30,6 +32,9 @@ public:
    * @param tags TagVector a set of Stats::Tag.
    */
   virtual std::string produceTags(absl::string_view metric_name, TagVector& tags) const PURE;
+
+  virtual bool produceTagsFromStatName(StatName metric_name, StatNameTagVector& tags,
+                                       StatName& tag_extracted_name, StatNamePool& pool) const PURE;
 };
 
 using TagProducerPtr = std::unique_ptr<const TagProducer>;

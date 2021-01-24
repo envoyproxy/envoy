@@ -11,7 +11,9 @@
 namespace Envoy {
 namespace Stats {
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config) {
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                                 SymbolTable& symbol_table)
+    : symbol_table_(symbol_table) {
   // To check name conflict.
   reserveResources(config);
   absl::node_hash_set<std::string> names = addDefaultExtractors(config);
@@ -42,6 +44,8 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
     }
   }
 }
+
+TagProducerImpl::TagProducerImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
 
 int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   int num_found = 0;
@@ -91,6 +95,12 @@ std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVecto
         tag_extractor->extractTag(metric_name, tags, remove_characters);
       });
   return StringUtil::removeCharacters(metric_name, remove_characters);
+}
+
+bool TagProducerImpl::produceTagsFromStatName(StatName /*metric_name*/, StatNameTagVector& /*tags*/,
+                                              StatName& /*tag_extracted_name*/,
+                                              StatNamePool& /*pool*/) const {
+  return false;
 }
 
 void TagProducerImpl::reserveResources(const envoy::config::metrics::v3::StatsConfig& config) {
