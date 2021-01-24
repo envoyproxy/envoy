@@ -179,24 +179,21 @@ public:
    * Start a configuration subscription asynchronously. This should be called once and will continue
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
-   * @param use_namespace_matching if the subscription is for a collection of resources. In such a
-   * case a namespace watch will be created.
    */
-  virtual void start(const std::set<std::string>& resource_names,
-                     const bool use_namespace_matching = false) PURE;
+  virtual void start(const absl::flat_hash_set<std::string>& resource_names) PURE;
 
   /**
    * Update the resources to fetch.
-   * @param resources vector of resource names to fetch. It's a (not unordered_)set so that it can
-   * be passed to std::set_difference, which must be given sorted collections.
+   * @param resources vector of resource names to fetch.
    */
-  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+  virtual void
+  updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) PURE;
 
   /**
    * Creates a discovery request for resources.
    * @param add_these_names resource ids for inclusion in the discovery request.
    */
-  virtual void requestOnDemandUpdate(const std::set<std::string>& add_these_names) PURE;
+  virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;
@@ -204,7 +201,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
 /**
  * Per subscription stats. @see stats_macros.h
  */
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT)                                       \
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT, HISTOGRAM)                            \
   COUNTER(init_fetch_timeout)                                                                      \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_failure)                                                                          \
@@ -212,6 +209,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
   GAUGE(version, NeverImport)                                                                      \
+  HISTOGRAM(update_duration, Milliseconds)                                                         \
   TEXT_READOUT(version_text)
 
 /**
@@ -219,7 +217,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
  */
 struct SubscriptionStats {
   ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
-                         GENERATE_TEXT_READOUT_STRUCT)
+                         GENERATE_TEXT_READOUT_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 } // namespace Config

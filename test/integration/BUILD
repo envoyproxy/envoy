@@ -326,6 +326,7 @@ envoy_cc_test(
     deps = [
         ":autonomous_upstream_lib",
         ":http_integration_lib",
+        ":tracked_watermark_buffer_lib",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:backpressure_filter_config_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
@@ -876,6 +877,8 @@ envoy_cc_test(
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
         "//test/integration/filters:process_context_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_response_code_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -1075,6 +1078,7 @@ envoy_cc_test(
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
     ],
@@ -1247,6 +1251,28 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "tracked_watermark_buffer_lib",
+    srcs = [
+        "tracked_watermark_buffer.cc",
+    ],
+    hdrs = [
+        "tracked_watermark_buffer.h",
+    ],
+    deps = [
+        "//source/common/buffer:watermark_buffer_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "tracked_watermark_buffer_test",
+    srcs = ["tracked_watermark_buffer_test.cc"],
+    deps = [
+        ":tracked_watermark_buffer_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -1555,6 +1581,18 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "command_formatter_extension_integration_test",
+    srcs = [
+        "command_formatter_extension_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/formatter:command_extension_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -723,7 +723,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   setup(false, "");
   // Enable port removal
-  strip_matching_port_ = true;
+  strip_port_type_ = Http::StripPortType::MatchingHost;
   const std::string original_host = "host:443";
   const std::string normalized_host = "host";
 
@@ -765,7 +765,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
 TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   setup(false, "");
   // Enable port removal
-  strip_matching_port_ = true;
+  strip_port_type_ = Http::StripPortType::MatchingHost;
   const std::string original_host = "host:443";
   const std::string normalized_host = "host";
 
@@ -1539,7 +1539,7 @@ TEST_F(HttpConnectionManagerImplTest,
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
-  static constexpr char local_address[] = "0.0.0.0";
+  static constexpr char remote_address[] = "0.0.0.0";
   static constexpr char xff_address[] = "1.2.3.4";
 
   // stream_info.downstreamRemoteAddress will infer the address from request
@@ -1561,14 +1561,16 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
 
-        EXPECT_EQ(stream_info.downstreamRemoteAddress()->ip()->addressAsString(), xff_address);
-        EXPECT_EQ(stream_info.downstreamDirectRemoteAddress()->ip()->addressAsString(),
-                  local_address);
+        EXPECT_EQ(stream_info.downstreamAddressProvider().remoteAddress()->ip()->addressAsString(),
+                  xff_address);
+        EXPECT_EQ(
+            stream_info.downstreamAddressProvider().directRemoteAddress()->ip()->addressAsString(),
+            remote_address);
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -1700,9 +1702,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
 
@@ -1750,9 +1752,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(400));
         EXPECT_EQ("missing_host_header", stream_info.responseCodeDetails().value());
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_EQ(nullptr, stream_info.routeEntry());
       }));
 
@@ -1847,9 +1849,9 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
                           const StreamInfo::StreamInfo& stream_info) {
         EXPECT_TRUE(stream_info.responseCode());
         EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamSslConnection());
         EXPECT_NE(nullptr, stream_info.routeEntry());
       }));
@@ -2654,7 +2656,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     request_timer->invokeCallback();
     return Http::okStatus();
   }));
@@ -2884,7 +2887,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestHeaderTimeoutCallbackDisarmsAndRetu
     EXPECT_CALL(*request_header_timer, enableTimer(request_headers_timeout_, _));
 
     conn_manager_->newStream(response_encoder_);
-    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, pushTrackedObject(_));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, popTrackedObject(_));
     return Http::okStatus();
   }));
 
@@ -2969,77 +2973,6 @@ TEST_F(HttpConnectionManagerImplTest, Http10Rejected) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("426", headers.getStatusValue());
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, Http10ConnCloseLegacy) {
-  http1_settings_.accept_http_10_ = true;
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, protocol()).Times(AnyNumber()).WillRepeatedly(Return(Protocol::Http10));
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host:80"}, {":method", "CONNECT"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ProxyConnectLegacyClose) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-        {":authority", "host:80"}, {":method", "CONNECT"}, {"proxy-connection", "close"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("close", headers.getConnectionValue());
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-}
-
-TEST_F(HttpConnectionManagerImplTest, ConnectLegacyClose) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fixed_connection_close", "false"}});
-  setup(false, "");
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-        {":authority", "host"}, {":method", "CONNECT"}, {"connection", "close"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("close", headers.getConnectionValue());
       }));
 

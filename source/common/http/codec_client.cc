@@ -49,7 +49,9 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
-  connection_->noDelay(true);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
+    connection_->noDelay(true);
+  }
 }
 
 CodecClient::~CodecClient() = default;

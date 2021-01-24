@@ -463,32 +463,52 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
-  // To enumerate the required builtin ciphers, curves, algorithms, and
-  // versions, uncomment '#define LOG_BUILTIN_STAT_NAMES' below, and run
-  //  bazel test //test/extensions/transport_sockets/tls/... --test_output=streamed
-  //      | grep " Builtin ssl." | sort | uniq
-  // #define LOG_BUILTIN_STAT_NAMES
+  // Use the SSL library to iterate over the configured ciphers.
   //
-  // TODO(#8035): improve tooling to find any other built-ins needed to avoid
-  // contention.
+  // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
+  for (TlsContext& tls_context : tls_contexts_) {
+    for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
+      stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
+    }
+  }
 
-  // Ciphers
-  stat_name_set_->rememberBuiltin("AEAD-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-AES128-SHA");
-  stat_name_set_->rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
-  stat_name_set_->rememberBuiltin("TLS_AES_128_GCM_SHA256");
-
-  // Curves from
-  // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
+  // Add supported cipher suites from the TLS 1.3 spec:
+  // https://tools.ietf.org/html/rfc8446#appendix-B.4
+  // AES-CCM cipher suites are removed (no BoringSSL support).
+  //
+  // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
   stat_name_set_->rememberBuiltins(
-      {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
+      {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"});
 
-  // Algorithms
-  stat_name_set_->rememberBuiltins({"ecdsa_secp256r1_sha256", "rsa_pss_rsae_sha256"});
+  // All supported curves. Source:
+  // https://github.com/google/boringssl/blob/3743aafdacff2f7b083615a043a37101f740fa53/ssl/ssl_key_share.cc#L302-L309
+  //
+  // Note that if a negotiated curve is outside of this set, we'll issue an ENVOY_BUG.
+  stat_name_set_->rememberBuiltins({"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2"});
 
-  // Versions
+  // All supported signature algorithms. Source:
+  // https://github.com/google/boringssl/blob/3743aafdacff2f7b083615a043a37101f740fa53/ssl/ssl_privkey.cc#L436-L453
+  //
+  // Note that if a negotiated algorithm is outside of this set, we'll issue an ENVOY_BUG.
+  stat_name_set_->rememberBuiltins({
+      "rsa_pkcs1_md5_sha1",
+      "rsa_pkcs1_sha1",
+      "rsa_pkcs1_sha256",
+      "rsa_pkcs1_sha384",
+      "rsa_pkcs1_sha512",
+      "ecdsa_sha1",
+      "ecdsa_secp256r1_sha256",
+      "ecdsa_secp384r1_sha384",
+      "ecdsa_secp521r1_sha512",
+      "rsa_pss_rsae_sha256",
+      "rsa_pss_rsae_sha384",
+      "rsa_pss_rsae_sha512",
+      "ed25519",
+  });
+
+  // All supported protocol versions.
+  //
+  // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
   stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
 }
 
@@ -640,14 +660,10 @@ Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
                              const Stats::StatName fallback) const {
-  Stats::Counter& counter = Stats::Utility::counterFromElements(
-      scope_, {name, stat_name_set_->getBuiltin(value, fallback)});
-  counter.inc();
-
-#ifdef LOG_BUILTIN_STAT_NAMES
-  std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")
-            << std::flush;
-#endif
+  const Stats::StatName value_stat_name = stat_name_set_->getBuiltin(value, fallback);
+  ENVOY_BUG(value_stat_name != fallback,
+            absl::StrCat("Unexpected ", scope_.symbolTable().toString(name), " value: ", value));
+  Stats::Utility::counterFromElements(scope_, {name, value_stat_name}).inc();
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
@@ -741,12 +757,8 @@ bool ContextImpl::dnsNameMatch(const absl::string_view dns_name, const absl::str
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
       const size_t off = dns_name.length() - pattern_len + 1;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
-        return dns_name.substr(0, off).find('.') == std::string::npos &&
-               dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
-      } else {
-        return dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
-      }
+      return dns_name.substr(0, off).find('.') == std::string::npos &&
+             dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
     }
   }
 
