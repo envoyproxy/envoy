@@ -141,9 +141,13 @@ void FilterConfigSubscription::onConfigUpdate(
       }
     });
   }
-  last_config_ = filter_config;
-  last_config_version_ = version_info;
-  last_updated_ = time_source_.systemTime();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.extension_config_dump")) {
+    // Skip storing last config if extension config dump is disabled.
+    // This is because extension config could be potentially very large, such as inline Wasm bytes.
+    last_config_ = filter_config;
+    last_config_version_ = version_info;
+    last_updated_ = time_source_.systemTime();
+  }
   last_config_hash_ = new_hash;
 }
 
