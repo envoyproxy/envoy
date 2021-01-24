@@ -50,11 +50,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Bazel rules for fuzz tests",
         project_url = "https://github.com/bazelbuild/rules_fuzzing",
         # TODO(sbucur): DO NOT SUBMIT before updating to versioned release.
-        version = "5ea191be65ba41eee3a83aadc1b8bd8b4562a81d",
-        sha256 = "07f67909bf4cb07b740c78346c304ab41c6e2a56b977e1a267a261bc19dd6e4e",
+        version = "8dcdb86f367d5c98b0d7182f5267e66885f9609b",
+        sha256 = "28079db0a4aa660b4d99423695c3d8fdf73bed42873a36616bb72049256ce6e3",
         strip_prefix = "rules_fuzzing-{version}",
         urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/{version}.tar.gz"],
-        release_date = "2021-01-19",
+        release_date = "2021-01-23",
         use_category = ["test_only"],
         implied_untracked_deps = [
             "rules_fuzzing_oss_fuzz",
