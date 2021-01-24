@@ -96,7 +96,7 @@ void ThreadAwareLoadBalancerBase::initialize() {
   // think the synchronous/asynchronous split is probably the best option.
   if (update_)
     priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
+        [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
 
   refresh();
 }
@@ -160,7 +160,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   }
 
   if (shard_size_ > 1) {
-    HostConstSharedPtr hosts [5] = { };
+    HostConstSharedPtr hosts[5] = {};
     uint8_t max_hosts = 0;
     per_priority_state->current_lb_->chooseHosts(h, hosts, &max_hosts);
     return (this->*load_balancer_)(hosts, max_hosts);

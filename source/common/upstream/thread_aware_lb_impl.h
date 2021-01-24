@@ -26,7 +26,8 @@ public:
   public:
     virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
-    virtual void chooseHosts(uint64_t hash, HostConstSharedPtr * hosts, uint8_t * max_hosts) const PURE;
+    virtual void chooseHosts(uint64_t hash, HostConstSharedPtr* hosts,
+                             uint8_t* max_hosts) const PURE;
   };
   using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
 
@@ -48,10 +49,9 @@ public:
       ASSERT(hash_balance_factor > 0);
     }
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
-    void chooseHosts(uint64_t hash, HostConstSharedPtr * hosts, uint8_t * max_hosts) const override {
+    void chooseHosts(uint64_t hash, HostConstSharedPtr* hosts, uint8_t* max_hosts) const override {
       hashing_lb_ptr_->chooseHosts(hash, hosts, max_hosts);
     };
-
 
   protected:
     virtual double hostOverloadFactor(const Host& host, double weight) const;
@@ -88,8 +88,8 @@ protected:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
         factory_(new LoadBalancerFactoryImpl(stats, random, common_config)),
-        update_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            common_config.consistent_hashing_lb_config(), shard_size, 1) == 1) {}
+        update_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.consistent_hashing_lb_config(),
+                                                shard_size, 1) == 1) {}
 
 private:
   struct PerPriorityState {
@@ -100,20 +100,22 @@ private:
 
   struct LoadBalancerImpl : public LoadBalancer {
     LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-        : stats_(stats), random_(random), shard_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            common_config.consistent_hashing_lb_config(), shard_size, 1)) {
-          switch (common_config.consistent_hashing_lb_config().lb_policy()) {
-          case envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig::LEAST_REQUEST:
-            load_balancer_ = &LoadBalancerImpl::least_request_lb;
-            break;
-          case envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig::RANDOM:
-            load_balancer_ = &LoadBalancerImpl::random_lb;
-            break;
-          default:
-            NOT_REACHED_GCOVR_EXCL_LINE;
-          }
-        }
+                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+        : stats_(stats), random_(random),
+          shard_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.consistent_hashing_lb_config(),
+                                                      shard_size, 1)) {
+      switch (common_config.consistent_hashing_lb_config().lb_policy()) {
+      case envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig::
+          LEAST_REQUEST:
+        load_balancer_ = &LoadBalancerImpl::least_request_lb;
+        break;
+      case envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig::RANDOM:
+        load_balancer_ = &LoadBalancerImpl::random_lb;
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+    }
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -122,7 +124,7 @@ private:
 
     HostConstSharedPtr random_lb(HostConstSharedPtr* hosts, uint8_t shard_size) {
       const uint64_t shard_index = random_.random() % shard_size;
-      return *(hosts+shard_index);
+      return *(hosts + shard_index);
     }
 
     HostConstSharedPtr least_request_lb(HostConstSharedPtr* hosts, uint8_t shard_size) {
@@ -150,16 +152,18 @@ private:
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
     const uint32_t shard_size_;
-    HostConstSharedPtr (Envoy::Upstream::ThreadAwareLoadBalancerBase::LoadBalancerImpl::* load_balancer_)(HostConstSharedPtr*, uint8_t);
+    HostConstSharedPtr (Envoy::Upstream::ThreadAwareLoadBalancerBase::LoadBalancerImpl::*
+                            load_balancer_)(HostConstSharedPtr*, uint8_t);
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-        : stats_(stats), random_(random), common_config_(common_config) { }
+    LoadBalancerFactoryImpl(
+        ClusterStats& stats, Random::RandomGenerator& random,
+        const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+        : stats_(stats), random_(random), common_config_(common_config) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;

@@ -20,6 +20,8 @@ public:
     }
     return ring_.at(hash).first;
   }
+  void chooseHosts(uint64_t /* hash */, HostConstSharedPtr* /* hosts */,
+                   uint8_t* /* max_hosts */) const override{};
 
 private:
   const NormalizedHostWeightVector ring_;

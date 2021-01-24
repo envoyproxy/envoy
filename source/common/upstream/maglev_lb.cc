@@ -1,8 +1,9 @@
 #include "common/upstream/maglev_lb.h"
 
-#include "envoy/config/cluster/v3/cluster.pb.h"
-#include <random>
 #include <algorithm>
+#include <random>
+
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -76,7 +77,7 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
   }
 }
 
-void MaglevTable::chooseHosts(uint64_t hash, HostConstSharedPtr * hosts, uint8_t * max_hosts) const {
+void MaglevTable::chooseHosts(uint64_t hash, HostConstSharedPtr* hosts, uint8_t* max_hosts) const {
   if (table_.empty()) {
     return;
   }
@@ -89,7 +90,7 @@ void MaglevTable::chooseHosts(uint64_t hash, HostConstSharedPtr * hosts, uint8_t
   // Generate shard, regardless of health
   for (uint8_t i = 0; i < shard_size_; i++) {
     unique = false;
-    for(uint64_t c = 0; !unique && c < table_size_; c++) {
+    for (uint64_t c = 0; !unique && c < table_size_; c++) {
       unique = true;
       for (uint8_t j = 0; j < i; j++) {
         if (hosts[j] == table_[hash % table_size_]) {
@@ -160,8 +161,8 @@ MaglevLoadBalancer::MaglevLoadBalancer(
               : false),
       hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)),
-      shard_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          common_config.consistent_hashing_lb_config(), shard_size, 1)) {
+      shard_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.consistent_hashing_lb_config(),
+                                                  shard_size, 1)) {
   ENVOY_LOG(debug, "maglev table size: {}", table_size_);
   // The table size must be prime number.
   if (!Primes::isPrime(table_size_)) {
