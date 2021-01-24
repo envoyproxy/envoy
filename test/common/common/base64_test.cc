@@ -160,9 +160,7 @@ TEST(Base64Test, CompletePadding) {
        // 1 padding added.
        "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lZSIsImlhdCI6MTUx"
        "NjIzOTAyMn0="}};
-  for (int i = 0; i < 3; i++) {
-    struct CompletePaddingBase64UrlTestCases& tc = testCases[i];
-
+  for (auto& tc : testCases) {
     // Ensure these two base64 binaries are equivalent after decoding.
     EXPECT_EQ(Base64::decodeWithoutPadding(tc.base64),
               Base64::decodeWithoutPadding(tc.base64_with_padding));
