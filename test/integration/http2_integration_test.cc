@@ -100,6 +100,21 @@ TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader();
 
 TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
 
+// Verify that request with headers with multiple schemes are rejected
+TEST_P(Http2IntegrationTest, DisallowMultipleScheme) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"}});
+  response->waitForReset();
+  codec_client_->close();
+  ASSERT_TRUE(response->reset());
+}
+
 // Verify downstream codec stream flush timeout.
 TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
   config_helper_.setBufferLimits(1024, 1024);

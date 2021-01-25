@@ -7,7 +7,7 @@
 namespace Envoy {
 void HttpTestUtility::addDefaultHeaders(Http::RequestHeaderMap& headers,
                                         const std::string default_method) {
-  headers.setScheme("http");
+  headers.setReferenceKey(Http::Headers::get().Scheme, Http::Headers::get().SchemeValues.Http);
   headers.setMethod(default_method);
   headers.setHost("host");
   headers.setPath("/");

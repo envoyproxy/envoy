@@ -5,6 +5,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -66,8 +67,10 @@ std::string targetOriginValue(const Http::RequestHeaderMap& headers) {
     return EMPTY_STRING;
   }
 
-  const auto absolute_url = fmt::format(
-      "{}://{}", headers.Scheme() != nullptr ? headers.getSchemeValue() : "http", host_value);
+  auto scheme =
+      Http::HeaderUtility::getLegacyScheme(headers, Http::Headers::get().SchemeValues.Http);
+  // TODO(#14587) determine if this should be getDownstreamScheme.
+  const auto absolute_url = fmt::format("{}://{}", scheme, host_value);
   return hostAndPort(absolute_url);
 }
 

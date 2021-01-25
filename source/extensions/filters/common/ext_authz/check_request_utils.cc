@@ -111,7 +111,8 @@ void CheckRequestUtils::setHttpRequest(
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
   httpreq.set_host(getHeaderStr(headers.Host()));
-  httpreq.set_scheme(getHeaderStr(headers.Scheme()));
+  // TODO(#14587) determine if this should be getDownstreamScheme.
+  httpreq.set_scheme(std::string(Http::HeaderUtility::getLegacyScheme(headers)));
   httpreq.set_size(stream_info.bytesReceived());
 
   if (stream_info.protocol()) {

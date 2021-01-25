@@ -320,5 +320,25 @@ bool HeaderUtility::isModifiableHeader(absl::string_view header) {
           !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
 }
 
+absl::string_view HeaderUtility::getDownstreamScheme(const Http::RequestHeaderMap& headers,
+                                                     absl::string_view default_scheme) {
+  if (!headers.getForwardedProtoValue().empty()) {
+    return headers.getForwardedProtoValue();
+  }
+  return default_scheme;
+}
+
+absl::string_view HeaderUtility::getLegacyScheme(const Http::RequestHeaderMap& headers,
+                                                 absl::string_view default_scheme) {
+  const auto header = headers.get(Http::Headers::get().Scheme);
+  if (!header.empty()) {
+    ASSERT(header.size() == 1);
+    if (!header[0]->value().getStringView().empty()) {
+      return header[0]->value().getStringView();
+    }
+  }
+  return default_scheme;
+}
+
 } // namespace Http
 } // namespace Envoy

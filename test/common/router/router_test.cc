@@ -6123,8 +6123,9 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
 
   // :authority header in the outgoing request should match the DNS name of
   // the selected upstream host
-  EXPECT_CALL(encoder, encodeHeaders(HeaderMapEqualRef(&outgoing_headers), true))
-      .WillOnce(Invoke([&](const Http::HeaderMap&, bool) -> Http::Status {
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> Http::Status {
+        EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(headers, outgoing_headers));
         encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
         return Http::okStatus();
       }));

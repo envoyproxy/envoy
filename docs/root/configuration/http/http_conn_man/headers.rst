@@ -334,7 +334,17 @@ x-forwarded-proto
 
 It is a common case where a service wants to know what the originating protocol (HTTP or HTTPS) was
 of the connection terminated by front/edge Envoy. *x-forwarded-proto* contains this information. It
-will be set to either *http* or *https*.
+will be set to either *http* or *https* based on the downstream scheme or, if scheme was not present,
+the security of the underlying downstream connection.
+
+    .. note::
+
+      The x-forwarded-proto should be used in Envoy filters rather than the :scheme header
+      as :scheme may not be set for HTTP/1.1 requests.
+
+      In future, Envoy may remove the :scheme header entirely during request processing to make
+      the unreliability of the :scheme header crystal clear.
+
 
 .. _config_http_conn_man_headers_x-request-id:
 

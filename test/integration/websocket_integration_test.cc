@@ -69,10 +69,12 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   ASSERT_TRUE(proxied_request_headers.EnvoyExpectedRequestTimeoutMs() != nullptr);
   proxied_request_headers.removeEnvoyExpectedRequestTimeoutMs();
 
-  if (proxied_request_headers.Scheme()) {
-    ASSERT_EQ(proxied_request_headers.getSchemeValue(), "http");
+  absl::string_view scheme = Http::HeaderUtility::getLegacyScheme(proxied_request_headers);
+  if (!scheme.empty()) {
+    ASSERT_EQ(scheme, "http");
   } else {
-    proxied_request_headers.setScheme("http");
+    proxied_request_headers.setReferenceKey(Http::Headers::get().Scheme,
+                                            Http::Headers::get().SchemeValues.Http);
   }
 
   // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding

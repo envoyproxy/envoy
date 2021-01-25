@@ -278,14 +278,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // Construct the correct scheme. We default to https since this is a requirement for OAuth to
     // succeed. However, if a downstream client explicitly declares the "http" scheme for whatever
     // reason, we also use "http" when constructing our redirect uri to the authorization server.
-    auto scheme = Http::Headers::get().SchemeValues.Https;
-
-    const auto* scheme_header = headers.Scheme();
-    if ((scheme_header != nullptr &&
-         scheme_header->value().getStringView() == Http::Headers::get().SchemeValues.Http)) {
-      scheme = Http::Headers::get().SchemeValues.Http;
-    }
-
+    // TODO(#14587) determine if this should be getDownstreamScheme.
+    absl::string_view scheme =
+        Http::HeaderUtility::getLegacyScheme(headers, Http::Headers::get().SchemeValues.Https);
     const std::string base_path = absl::StrCat(scheme, "://", host_);
     const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
     const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");

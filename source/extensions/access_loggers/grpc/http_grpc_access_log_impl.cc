@@ -78,8 +78,10 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   // HTTP request properties.
   // TODO(mattklein123): Populate port field.
   auto* request_properties = log_entry.mutable_request();
-  if (request_headers.Scheme() != nullptr) {
-    request_properties->set_scheme(std::string(request_headers.getSchemeValue()));
+  // TODO(#14587) this should probably be getDownstreamScheme()
+  const auto scheme = Http::HeaderUtility::getLegacyScheme(request_headers);
+  if (!scheme.empty()) {
+    request_properties->set_scheme(std::string(scheme));
   }
   if (request_headers.Host() != nullptr) {
     request_properties->set_authority(std::string(request_headers.getHostValue()));

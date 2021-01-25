@@ -292,7 +292,6 @@ private:
   HEADER_FUNC(Method)                                                                              \
   HEADER_FUNC(Path)                                                                                \
   HEADER_FUNC(Protocol)                                                                            \
-  HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(TE)                                                                                  \
   HEADER_FUNC(UserAgent)
 

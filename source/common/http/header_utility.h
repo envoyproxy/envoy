@@ -200,6 +200,36 @@ public:
    * may not be modified.
    */
   static bool isModifiableHeader(absl::string_view header);
+
+  /**
+   * Returns the downstream scheme.
+   *
+   * The downstream scheme in Envoy is stored in the X-Forwarded-Proto header, not
+   * the :scheme header. The value of the header, and the return value of this function,
+   * is derived from the down :scheme header, if present, or otherwise
+   * will be http or https, infered from the encryption level of the downstream
+   * connection. This function will return default_scheme ifd some filter removed
+   * the X-Forwarded-Proto header entirely.
+   */
+  static absl::string_view getDownstreamScheme(const Http::RequestHeaderMap& headers,
+                                               absl::string_view default_scheme);
+
+  /**
+   * Returns the scheme header, if present, else returns default_scheme.
+   * Use of this function is HIGHLY discouraged.
+   * Code sites should be evaluated to determine what the intended usage is.
+   *
+   * Before request headers are sent upstream, the scheme header will be what
+   * the downstream sent, so present for HTTP/2, and HTTP/1.1 requests with fully qualified URLs,
+   * and absent for most HTTP/1.1 requests and below.
+   *
+   * After request headers are sent upstream, the scheme header will always be
+   * set, and will indicate the encryption level of the upstream connection.
+   *
+   * Generally getDownstreamScheme is preferred.
+   */
+  static absl::string_view getLegacyScheme(const Http::RequestHeaderMap& headers,
+                                           absl::string_view default_scheme = "");
 };
 } // namespace Http
 } // namespace Envoy

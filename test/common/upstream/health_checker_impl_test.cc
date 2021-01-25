@@ -55,6 +55,10 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+absl::string_view getSchemeValue(const Http::RequestHeaderMap& headers) {
+  return Http::HeaderUtility::getLegacyScheme(headers);
+}
+
 envoy::config::core::v3::HealthCheck createGrpcHealthCheckConfig() {
   envoy::config::core::v3::HealthCheck health_check;
   health_check.mutable_timeout()->set_seconds(1);
@@ -1056,7 +1060,7 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
       .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
-        EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(getSchemeValue(headers), Http::Headers::get().SchemeValues.Http);
         return Http::okStatus();
       }));
   health_checker_->start();
@@ -1132,7 +1136,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
       .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
-        EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(getSchemeValue(headers), Http::Headers::get().SchemeValues.Http);
         return Http::okStatus();
       }));
   health_checker_->start();
@@ -1167,7 +1171,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServicePrefixPatternCheck) {
       .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
-        EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(getSchemeValue(headers), Http::Headers::get().SchemeValues.Http);
         return Http::okStatus();
       }));
   health_checker_->start();
@@ -1202,7 +1206,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceExactPatternCheck) {
       .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
-        EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(getSchemeValue(headers), Http::Headers::get().SchemeValues.Http);
         return Http::okStatus();
       }));
   health_checker_->start();
@@ -1237,7 +1241,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
       .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
-        EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(getSchemeValue(headers), Http::Headers::get().SchemeValues.Http);
         return Http::okStatus();
       }));
   health_checker_->start();
@@ -3035,7 +3039,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
       .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
-        EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(getSchemeValue(headers), Http::Headers::get().SchemeValues.Http);
         return Http::okStatus();
       }));
   health_checker_->start();
@@ -4195,7 +4199,7 @@ public:
         .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, headers.getContentTypeValue());
           EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.getPathValue());
-          EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.getSchemeValue());
+          EXPECT_EQ(Http::Headers::get().SchemeValues.Http, getSchemeValue(headers));
           EXPECT_NE(nullptr, headers.Method());
           EXPECT_EQ(expected_host, headers.getHostValue());
           EXPECT_EQ(std::chrono::milliseconds(1000).count(),

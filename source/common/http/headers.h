@@ -76,6 +76,7 @@ public:
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Pragma{"pragma"};
   const LowerCaseString Referer{"referer"};
+  const LowerCaseString Scheme{":scheme"}; // FIXME
   const LowerCaseString Vary{"vary"};
 
   struct {

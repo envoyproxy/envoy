@@ -62,6 +62,11 @@ bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
 
+// Annoyingly, we can't use Http::Headers::get().Scheme as it results in the
+// header singleton being created before bootstrap can set the header prefix.
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    scheme_handle(Http::CustomHeaders::get().Scheme);
+
 } // namespace
 
 // Express percentage as [0, TimeoutPrecisionFactor] because stats do not accept floating point
@@ -79,9 +84,9 @@ uint64_t FilterUtility::percentageOfTimeout(const std::chrono::milliseconds resp
 
 void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport) {
   if (use_secure_transport) {
-    headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
+    headers.setInline(scheme_handle.handle(), Http::Headers::get().SchemeValues.Https);
   } else {
-    headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
+    headers.setInline(scheme_handle.handle(), Http::Headers::get().SchemeValues.Http);
   }
 }
 
@@ -562,9 +567,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers,
                                    host->transportSocketFactory().implementsSecureTransport());
-
-  // Ensure an http transport scheme is selected before continuing with decoding.
-  ASSERT(headers.Scheme());
 
   retry_state_ = createRetryState(
       route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, config_.runtime_,
@@ -1485,19 +1487,16 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   // Copy the old values, so they can be restored if the redirect fails.
   const std::string original_host(downstream_headers.getHostValue());
   const std::string original_path(downstream_headers.getPathValue());
-  const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
+  // TOOD(#14587) should this be x-forwarded-proto?
   Cleanup restore_original_headers(
-      [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
+      [&downstream_headers, original_host, original_path, scheme_is_http]() {
         downstream_headers.setHost(original_host);
         downstream_headers.setPath(original_path);
-        if (scheme_is_set) {
-          downstream_headers.setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
-                                                      : Http::Headers::get().SchemeValues.Https);
-        }
+        FilterUtility::setUpstreamScheme(downstream_headers, !scheme_is_http);
       });
 
   // Replace the original host, scheme and path.
-  downstream_headers.setScheme(absolute_url.scheme());
+  downstream_headers.setInline(scheme_handle.handle(), absolute_url.scheme());
   downstream_headers.setHost(absolute_url.hostAndPort());
   downstream_headers.setPath(absolute_url.pathAndQueryParams());
 

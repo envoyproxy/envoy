@@ -710,5 +710,21 @@ TEST(RequiredHeaders, IsModifiableHeader) {
   EXPECT_TRUE(HeaderUtility::isRemovableHeader("Content-Type"));
 }
 
+TEST(Scheme, GetScheme) {
+  EXPECT_EQ("http", HeaderUtility::getDownstreamScheme(
+                        TestRequestHeaderMapImpl{{"x-forwarded-proto", "http"}}, "asd"));
+  EXPECT_EQ("asd", HeaderUtility::getDownstreamScheme(
+                       TestRequestHeaderMapImpl{{"x-forwarded-proto", ""}}, "asd"));
+  EXPECT_EQ("asd", HeaderUtility::getDownstreamScheme(TestRequestHeaderMapImpl{}, "asd"));
+}
+
+TEST(Scheme, GetLegacyScheme) {
+  EXPECT_EQ("http",
+            HeaderUtility::getLegacyScheme(TestRequestHeaderMapImpl{{":scheme", "http"}}, "asd"));
+  EXPECT_EQ("asd",
+            HeaderUtility::getLegacyScheme(TestRequestHeaderMapImpl{{":scheme", ""}}, "asd"));
+  EXPECT_EQ("asd", HeaderUtility::getLegacyScheme(TestRequestHeaderMapImpl{}, "asd"));
+}
+
 } // namespace Http
 } // namespace Envoy

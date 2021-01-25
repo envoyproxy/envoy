@@ -725,6 +725,14 @@ TEST_P(IntegrationTest, BadHeader) {
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
+TEST_P(IntegrationTest, Http2Scheme) {
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\nHost: host\r\n:scheme: http\r\n\r\n", &response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+}
+
 TEST_P(IntegrationTest, Http10Disabled) {
   initialize();
   std::string response;

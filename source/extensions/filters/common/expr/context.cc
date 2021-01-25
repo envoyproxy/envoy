@@ -2,6 +2,7 @@
 
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/common/expr/cel_state.h"
@@ -120,7 +121,8 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else if (value == Host) {
       return convertHeaderEntry(headers_.value_->Host());
     } else if (value == Scheme) {
-      return convertHeaderEntry(headers_.value_->Scheme());
+      // TODO(#14587) determine if this should be getDownstreamScheme
+      return CelValue::CreateStringView(Http::HeaderUtility::getLegacyScheme(*headers_.value_));
     } else if (value == Method) {
       return convertHeaderEntry(headers_.value_->Method());
     } else if (value == Referer) {

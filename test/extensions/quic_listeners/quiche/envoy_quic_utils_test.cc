@@ -12,6 +12,7 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "common/http/header_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -54,7 +55,10 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(headers_block.size(), envoy_headers->size());
   EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
   EXPECT_EQ("/index.hml", envoy_headers->getPathValue());
-  EXPECT_EQ("https", envoy_headers->getSchemeValue());
+  const auto result =
+      Http::HeaderUtility::getAllOfHeaderAsString(*envoy_headers, Http::Headers::get().Scheme);
+  ASSERT_TRUE(result.result().has_value());
+  EXPECT_EQ("https", result.result().value());
 
   quic::QuicHeaderList quic_headers = quic::test::AsHeaderList(headers_block);
   auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers);

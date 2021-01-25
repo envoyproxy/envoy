@@ -107,7 +107,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   headers.setMethod(method);
   headers.setPath(url);
   headers.setHost(host);
-  headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
+  headers.setReferenceKey(Http::Headers::get().Scheme, Http::Headers::get().SchemeValues.Http);
   if (!content_type.empty()) {
     headers.setContentType(content_type);
   }
