@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
@@ -788,7 +789,8 @@ void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::millise
   }
   if (transport_socket_connect_timer_ == nullptr) {
     transport_socket_connect_timer_ =
-        dispatcher_.createTimer([this] { onTransportSocketConnectTimeout(); });
+        dispatcher_.createScaledTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
+                                      [this] { onTransportSocketConnectTimeout(); });
   }
   transport_socket_connect_timer_->enableTimer(timeout);
 }

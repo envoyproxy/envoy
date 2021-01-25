@@ -129,6 +129,8 @@ Event::ScaledTimerType parseTimerType(
     return Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout;
   case Config::HTTP_DOWNSTREAM_STREAM_IDLE:
     return Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout;
+  case Config::TRANSPORT_SOCKET_CONNECT:
+    return Event::ScaledTimerType::TransportSocketConnectTimeout;
   default:
     throw EnvoyException(fmt::format("Unknown timer type {}", config_timer_type));
   }

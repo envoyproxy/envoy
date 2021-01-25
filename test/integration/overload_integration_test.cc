@@ -7,9 +7,12 @@
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
 
 #include "absl/strings/str_cat.h"
+
+using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 
@@ -355,6 +358,88 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
 
   EXPECT_EQ(response->headers().getStatusValue(), "408");
   EXPECT_THAT(response->body(), HasSubstr("stream timeout"));
+}
+
+TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
+  // Set up the Envoy to expect a TLS connection, with a 20 second timeout that can scale down to 5
+  // seconds.
+  config_helper_.addSslConfig();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    auto* connect_timeout = filter_chain->mutable_transport_socket_connect_timeout();
+    connect_timeout->set_seconds(20);
+    connect_timeout->set_nanos(0);
+  });
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: TRANSPORT_SOCKET_CONNECT
+          min_timeout: 5s
+    )EOF"));
+
+  // Set up a delinquent transport socket that causes the dispatcher to exit on every read & write
+  // instead of actually doing anything useful.
+  auto bad_transport_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
+  Network::TransportSocketCallbacks* transport_callbacks;
+  EXPECT_CALL(*bad_transport_socket, setTransportSocketCallbacks)
+      .WillOnce(SaveArgAddress(&transport_callbacks));
+  ON_CALL(*bad_transport_socket, doRead).WillByDefault(InvokeWithoutArgs([&] {
+    Buffer::OwnedImpl buffer;
+    transport_callbacks->connection().dispatcher().exit();
+    // Read some amount of data; what's more important is whether the socket was remote-closed. That
+    // needs to be propagated to the socket.
+    return Network::IoResult{transport_callbacks->ioHandle().read(buffer, 2 * 1024).rc_ == 0
+                                 ? Network::PostIoAction::Close
+                                 : Network::PostIoAction::KeepOpen,
+                             0, false};
+  }));
+  ON_CALL(*bad_transport_socket, doWrite).WillByDefault(InvokeWithoutArgs([&] {
+    transport_callbacks->connection().dispatcher().exit();
+    return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
+  }));
+
+  ConnectionStatusCallbacks connect_callbacks;
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("http"));
+  auto bad_ssl_client =
+      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                          std::move(bad_transport_socket), nullptr);
+  bad_ssl_client->addConnectionCallbacks(connect_callbacks);
+  bad_ssl_client->enableHalfClose(true);
+  bad_ssl_client->connect();
+
+  // Run the dispatcher until it exits due to a read/write.
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+
+  // At this point, the connection should be idle but the SSL handshake isn't done.
+  EXPECT_FALSE(connect_callbacks.connected());
+
+  // Set the load so the timer is reduced but not to the minimum value.
+  updateResource(0.8);
+  test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
+
+  // Advancing past the minimum time shouldn't close the connection, but it shouldn't complete it
+  // either.
+  timeSystem().advanceTimeWait(std::chrono::seconds(5));
+  EXPECT_FALSE(connect_callbacks.connected());
+
+  // At this point, Envoy has been waiting for the (bad) client to finish the TLS handshake for 5
+  // seconds. Increase the load so that the minimum time has now elapsed. This should cause Envoy to
+  // close the connection on its end.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // The bad client will continue attempting to read, eventually noticing the remote close and
+  // closing the connection.
+  while (!connect_callbacks.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // The transport-level connection was never completed, and the connection was closed.
+  EXPECT_FALSE(connect_callbacks.connected());
+  EXPECT_TRUE(connect_callbacks.closed());
 }
 
 } // namespace Envoy

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <ostream>
 
 #include "common/common/interval_value.h"
 
@@ -75,6 +76,10 @@ enum class ScaledTimerType {
   // The amount of time an HTTP stream from a downstream client can remain idle. This corresponds to
   // the HTTP_DOWNSTREAM_STREAM_IDLE TimerType in overload.proto.
   HttpDownstreamIdleStreamTimeout,
+  // The amount of time a connection to a downstream client can spend waiting for the transport to
+  // report connection establishment before the connection is closed. This corresponds to the
+  // TRANSPORT_SOCKET_CONNECT_TIMEOUT TimerType in overload.proto.
+  TransportSocketConnectTimeout,
 };
 
 using ScaledTimerTypeMap = absl::flat_hash_map<ScaledTimerType, ScaledTimerMinimum>;

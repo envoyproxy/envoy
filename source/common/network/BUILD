@@ -80,6 +80,7 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
+        "//include/envoy/server/overload:thread_local_overload_state",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
