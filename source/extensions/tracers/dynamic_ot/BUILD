@@ -29,7 +29,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.stats_sinks",
+    category = "envoy.tracers",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":dynamic_opentracing_driver_lib",
