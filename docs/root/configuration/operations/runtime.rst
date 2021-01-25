@@ -256,7 +256,7 @@ as soon as possible. Fatal-by-default configuration indicates that the removal o
 imminent. It is far better for both Envoy users and for Envoy contributors if any bugs or feature gaps
 with the new code paths are flushed out ahead of time, rather than after the code is removed!
 
-By disabling the the runtime flag `envoy.restart_features.allow_deprecated_features`, Envoy users can
+By enabling the the runtime key `envoy.features.fail_on_any_deprecated_feature`, Envoy users can
 trigger a configuration load failure during the typical warn-by-default phase. This is a useful way to
 verify what fields you are using ahead of Envoy's deprecation schedule.
 
