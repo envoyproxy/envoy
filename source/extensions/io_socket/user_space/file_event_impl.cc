@@ -41,7 +41,7 @@ void FileEventImpl::setEnabled(uint32_t events) {
   // Recalculate activated events.
   uint32_t events_to_notify = 0;
   if ((events & Event::FileReadyType::Read) && (io_source_.isReadable() ||
-                                                // Notify Read event when `EOS` is received.
+                                                // Notify Read event when end-of-stream is received.
                                                 io_source_.isPeerShutDownWrite())) {
     events_to_notify |= Event::FileReadyType::Read;
   }
