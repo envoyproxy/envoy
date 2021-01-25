@@ -64,11 +64,6 @@ void GrpcOpenTelemetryAccessLoggerImpl::addEntry(
   root_->mutable_logs()->Add(std::move(entry));
 }
 
-void GrpcOpenTelemetryAccessLoggerImpl::addEntry(
-    opentelemetry::proto::logs::v1::ResourceLogs&& entry) {
-  (void)entry;
-}
-
 bool GrpcOpenTelemetryAccessLoggerImpl::isEmpty() { return root_->logs().empty(); }
 
 // The message is already initialized in the c'tor, and only the logs are cleared.
