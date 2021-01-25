@@ -120,6 +120,7 @@ EXTENSION_CATEGORIES = [
     "testing",
     "testing.published",
     "testing.published.additional.category",
+    "SOMECAT",
 ]
 
 EXTENSION_STATUS_VALUES = [
