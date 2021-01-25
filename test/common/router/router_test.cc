@@ -7,6 +7,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/upstreams/http/http/v3/http_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
+#include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -6265,6 +6266,38 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Invalid upstream will fail over to generic in opt mode, but crash in debug mode.
+TEST_F(RouterTest, InvalidUpstream) {
+  // Explicitly configure an HTTP upstream, to test factory creation.
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  // Configure a TCP upstream rather than an HTTP upstream.
+  envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+      .mutable_typed_config()
+      ->PackFrom(generic_config);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  ON_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillByDefault(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  EXPECT_DEBUG_DEATH(router_.decodeHeaders(headers, false),
+                     "envoy bug failure: factory != nullptr.");
+
+  router_.onDestroy();
 }
 
 // Verify that CONNECT payload is not sent upstream if non-200 response headers are received.

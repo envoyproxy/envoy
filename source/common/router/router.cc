@@ -599,9 +599,13 @@ std::unique_ptr<GenericConnPool>
 Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
-    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().value());
-  } else {
+    ENVOY_BUG(factory != nullptr,
+              fmt::format("invalid factory type '{}', failing over to default upstream",
+                          cluster_->upstreamConfig().value().DebugString()));
+  }
+  if (!factory) {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.http.generic");
   }
