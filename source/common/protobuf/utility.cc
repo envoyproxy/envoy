@@ -311,8 +311,46 @@ void MessageUtil::onVersionUpgradeDeprecation(absl::string_view desc, bool rejec
   }
 }
 
+class HashOutputStreamAdapter : public google::protobuf::io::ZeroCopyOutputStream {
+public:
+  HashOutputStreamAdapter() : buffer_(std::make_unique<decltype(buffer_)::element_type>()) {}
+
+  uint64_t hash() {
+    if (valid_bytes_ > 0) {
+      hash_.update(absl::string_view(buffer_->data(), valid_bytes_));
+    }
+    valid_bytes_ = 0;
+    return hash_.digest();
+  }
+
+  // ZeroCopyOutputStream
+  bool Next(void** data, int* size) override {
+    if (valid_bytes_ > 0) {
+      hash_.update(absl::string_view(buffer_->data(), valid_bytes_));
+    }
+    *data = buffer_->data();
+    *size = buffer_->size();
+    valid_bytes_ = buffer_->size();
+    total_bytes_written_ += buffer_->size();
+    return true;
+  }
+
+  void BackUp(int count) override {
+    valid_bytes_ -= count;
+    total_bytes_written_ -= count;
+  }
+
+  int64_t ByteCount() const override { return total_bytes_written_; }
+
+private:
+  HashUtil::XxHash64 hash_;
+  size_t total_bytes_written_{0};
+  size_t valid_bytes_{0};
+  std::unique_ptr<std::array<char, 1024>> buffer_;
+};
+
 size_t MessageUtil::hash(const Protobuf::Message& message) {
-  std::string text_format;
+  HashOutputStreamAdapter adapter;
 
   {
     Protobuf::TextFormat::Printer printer;
@@ -320,10 +358,10 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
     printer.SetUseFieldNumber(true);
     printer.SetSingleLineMode(true);
     printer.SetHideUnknownFields(true);
-    printer.PrintToString(message, &text_format);
+    printer.Print(message, &adapter);
   }
 
-  return HashUtil::xxHash64(text_format);
+  return adapter.hash();
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,

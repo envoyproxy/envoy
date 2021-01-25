@@ -37,6 +37,31 @@ public:
     };
     return hash;
   }
+
+  /**
+   * Class for producing 64-bit hashes for xxHash from streaming data.
+   */
+  class XxHash64 {
+  public:
+    /**
+     * Construct a new hash with no data and the given seed
+     */
+    explicit XxHash64(uint64_t seed = 0);
+    /**
+     * Add data to be hashed.
+     */
+    XxHash64& update(absl::string_view input);
+    /**
+     * Return the 64-bit hash of all data previously passed to update()
+     */
+    uint64_t digest() const;
+
+  private:
+    struct XxDeleter {
+      void operator()(XXH64_state_t* state);
+    };
+    std::unique_ptr<XXH64_state_t, XxDeleter> xx_state_;
+  };
 };
 
 /**

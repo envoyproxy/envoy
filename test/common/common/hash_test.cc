@@ -11,6 +11,14 @@ TEST(Hash, xxHash) {
   EXPECT_EQ(17241709254077376921U, HashUtil::xxHash64(""));
 }
 
+TEST(Hash, xxHashStreaming) {
+  EXPECT_EQ(HashUtil::xxHash64("foo"), HashUtil::XxHash64().update("foo").digest());
+  EXPECT_EQ(HashUtil::xxHash64("bar"), HashUtil::XxHash64().update("b").update("ar").digest());
+  EXPECT_EQ(HashUtil::xxHash64("foo\nbar"),
+            HashUtil::XxHash64().update("foo").update("\n").update("bar").digest());
+  EXPECT_EQ(HashUtil::xxHash64(""), HashUtil::XxHash64().update("").update("").update("").digest());
+}
+
 TEST(Hash, djb2CaseInsensitiveHash) {
   EXPECT_EQ(211616621U, HashUtil::djb2CaseInsensitiveHash("foo"));
   EXPECT_EQ(211611524U, HashUtil::djb2CaseInsensitiveHash("bar"));

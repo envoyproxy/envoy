@@ -1,8 +1,24 @@
 #include "common/common/hash.h"
 
+#include "common/common/assert.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+HashUtil::XxHash64::XxHash64(uint64_t seed) {
+  xx_state_.reset(XXH64_createState());
+  XXH64_reset(xx_state_.get(), seed);
+}
+
+HashUtil::XxHash64& HashUtil::XxHash64::update(absl::string_view data) {
+  XXH64_update(xx_state_.get(), data.data(), data.length());
+  return *this;
+}
+
+uint64_t HashUtil::XxHash64::digest() const { return XXH64_digest(xx_state_.get()); }
+
+void HashUtil::XxHash64::XxDeleter::operator()(XXH64_state_t* state) { XXH64_freeState(state); }
 
 // Computes a 64-bit murmur hash 2, only works with 64-bit platforms. Revisit if support for 32-bit
 // platforms are needed.
