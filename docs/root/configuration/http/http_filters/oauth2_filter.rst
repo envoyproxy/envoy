@@ -153,12 +153,12 @@ Below is a complete code example of how we employ the filter as one of
               socket_address:
                 address: 127.0.0.1
                 port_value: 8080
-  - name: auth
+  - name: oauth
     connect_timeout: 5s
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: auth
+      cluster_name: oauth
       endpoints:
       - lb_endpoints:
         - endpoint:
