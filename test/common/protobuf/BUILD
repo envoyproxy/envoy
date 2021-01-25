@@ -3,6 +3,8 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
 )
 
 licenses(["notice"])  # Apache 2
@@ -18,6 +20,18 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "utility_speed_test",
+    srcs = ["utility_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = ["//source/common/common:minimal_logger_lib"],
+)
+
+envoy_benchmark_test(
+    name = "utility_speed_benchmark_test",
+    benchmark_binary = "utilty_speed_test",
 )
 
 envoy_cc_test(
