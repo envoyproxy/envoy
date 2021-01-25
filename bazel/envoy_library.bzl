@@ -146,15 +146,12 @@ def envoy_cc_extension(
         **kwargs):
     if not category:
         fail("Category not set for %s" % name)
-    print('checking type for: %s' % category)
     if type(category) == str:
-        print('converting to tuple: %s' % category)
         category = (category, )
     for cat in category or []:
         if cat not in EXTENSION_CATEGORIES:
-            print("FAILCAT %s %s" % (name, cat))
-            # fail("Unknown extension category for %s: %s"
-            #      % (name, cat))
+            fail("Unknown extension category for %s: %s"
+                 % (name, cat))
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:
