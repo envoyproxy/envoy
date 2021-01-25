@@ -1416,13 +1416,9 @@ ConnectionImpl::Http2Options::Http2Options(
     ENVOY_LOG(trace, "Codec does not have Metadata frame support.");
   }
 
-  // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames.
-  // This new limit may cause the internal nghttp2 mitigation to trigger more often (as it
-  // requires just 9K of incoming bytes for smallest 9 byte SETTINGS frame), bypassing the same
-  // mitigation and its associated behavior in the envoy HTTP/2 codec. Since envoy does not rely
-  // on this mitigation, set back to the old 10K number to avoid any changes in the HTTP/2 codec
-  // behavior.
-  nghttp2_option_set_max_outbound_ack(options_, 10000);
+  // Envoy implements flood protection on its own. Effectively disable nghttp2 outbound queue flood
+  // protections by setting the limit to a large number.
+  nghttp2_option_set_max_outbound_ack(options_, std::numeric_limits<size_t>::max());
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
