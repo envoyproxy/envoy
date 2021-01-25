@@ -622,7 +622,6 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
       should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
     }
   }
-
   return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }

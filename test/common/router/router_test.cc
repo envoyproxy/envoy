@@ -5833,6 +5833,18 @@ TEST_F(RouterTest, PostExplicitTcpUpstream) {
   router_.onDestroy();
 }
 
+TEST_F(RouterTest, PostHttpUpstream) {
+  // Make sure POST request result in the HTTP pool.
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+  router_.decodeHeaders(headers, false);
+
+  router_.onDestroy();
+}
+
 class WatermarkTest : public RouterTest {
 public:
   void sendRequest(bool header_only_request = true, bool pool_ready = true) {

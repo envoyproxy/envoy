@@ -741,7 +741,7 @@ message RouteAction {
         "envoy.api.v2.route.RouteAction.UpgradeConfig";
 
     // Configuration for sending data upstream as a raw data payload. This is used for
-    // CONNECT requests, when forwarding CONNECT payload as raw TCP. It also allow using POST
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP. It also allows using POST
     // payload as raw TCP if configured.
     message ConnectConfig {
       // If present, the proxy protocol header will be prepended to the CONNECT payload sent upstream.
