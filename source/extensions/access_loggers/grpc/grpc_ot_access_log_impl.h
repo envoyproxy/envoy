@@ -32,6 +32,7 @@ class GrpcOpenTelemetryAccessLoggerImpl
           opentelemetry::proto::logs::v1::LogRecord,
           // OTLP logging uses LogRecord for both HTTP and TCP, so protobuf::Empty is used as an
           // empty placeholder for the non-used addEntry method.
+          // TODO(itamarkam): Don't cache OTLP loggers by type (HTTP/TCP).
           ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
@@ -77,11 +78,11 @@ private:
 /**
  * Aliases for class interfaces for mock definitions.
  */
-using GrpcAccessLogger = GrpcOpenTelemetryAccessLoggerImpl::Interface;
-using GrpcAccessLoggerSharedPtr = GrpcAccessLogger::SharedPtr;
+using GrpcOpenTelemetryAccessLogger = GrpcOpenTelemetryAccessLoggerImpl::Interface;
+using GrpcOpenTelemetryAccessLoggerSharedPtr = GrpcOpenTelemetryAccessLogger::SharedPtr;
 
-using GrpcAccessLoggerCache = GrpcOpenTelemetryAccessLoggerCacheImpl::Interface;
-using GrpcAccessLoggerCacheSharedPtr = GrpcAccessLoggerCache::SharedPtr;
+using GrpcOpenTelemetryAccessLoggerCache = GrpcOpenTelemetryAccessLoggerCacheImpl::Interface;
+using GrpcOpenTelemetryAccessLoggerCacheSharedPtr = GrpcOpenTelemetryAccessLoggerCache::SharedPtr;
 
 } // namespace GrpcCommon
 } // namespace AccessLoggers

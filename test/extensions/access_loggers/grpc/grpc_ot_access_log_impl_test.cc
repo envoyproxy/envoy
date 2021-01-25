@@ -179,7 +179,7 @@ TEST_F(GrpcOpenTelemetryAccessLoggerCacheImplTest, LoggerCreation) {
   // Force a flush for every log entry.
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
-  GrpcAccessLoggerSharedPtr logger =
+  GrpcOpenTelemetryAccessLoggerSharedPtr logger =
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
