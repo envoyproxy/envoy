@@ -12,7 +12,7 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    category = "SOMECAT",
+    category = "envoy.wasm.runtime",
     security_posture = "unknown",
     status = "alpha",
     deps = [

@@ -93,6 +93,7 @@ EXTENSION_CATEGORIES = [
     "envoy.transport_sockets.downstream",
     "envoy.transport_sockets.upstream",
     "envoy.upstreams",
+    "envoy.wasm.runtime",
     "SOMECAT",
 ]
 
