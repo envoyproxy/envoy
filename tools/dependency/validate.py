@@ -128,6 +128,9 @@ class BuildGraph(object):
       result = subprocess.run(['bazel', 'query', deps_query], stderr=subprocess.PIPE)
       print('FAIL')
       print(targets)
+      print('STDOUT')
+      print(result.stdout)
+
       print('STDERR')
       print(result.stderr)
       print('FAILED')
