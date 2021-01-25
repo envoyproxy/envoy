@@ -64,7 +64,7 @@ TEST_F(PrevioustHostsIntegrationTest, BasicFlow) {
   // RANDOM hit the same host twice, we instead opt for some careful sequencing of requests: Issue
   // the first request which should fail, but before it does so issue another request that succeeds.
   // This should mean that the next host to hit for the retry of the original request would be the
-  // same as the host targetted. We can then verify that we *don't* route to this host, due to retry
+  // same as the host targeted. We can then verify that we *don't* route to this host, due to retry
   // plugin rejecting the first host selection.
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl headers{
@@ -95,7 +95,7 @@ TEST_F(PrevioustHostsIntegrationTest, BasicFlow) {
   waitForNextUpstreamRequest(1);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  // Since the retry suceeded we end up returning 200.
+  // Since the retry succeeded we end up returning 200.
   first_response->waitForHeaders();
   EXPECT_EQ("200", first_response->headers().getStatusValue());
 }
