@@ -10,7 +10,9 @@
 #include "envoy/network/connection.h"
 
 #include "common/common/cleanup.h"
+#include "common/common/dump_state_utils.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracker.h"
 #include "common/common/statusor.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -67,7 +69,6 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
 
   return nullptr;
 }
-
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
@@ -568,6 +569,8 @@ Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
+  // Add self to the Dispatcher's tracked object stack.
+  ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
   // http_parser exits early with an error code.
@@ -859,6 +862,58 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   ASSERT(!reset_stream_called_);
   reset_stream_called_ = true;
   onResetStream(reason);
+}
+
+void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  // Dump all bool to provide context
+  os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
+     << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
+     << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
+     << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_);
+
+  // Dump the first slice of the dispatching buffer and buffered_body if
+  // applicable.
+  auto dumpBuffer = [](auto* instance) {
+    auto slice = instance->frontSlice();
+    return absl::string_view(static_cast<const char*>(slice.mem_), slice.len_);
+  };
+
+  os << DUMP_NULLABLE_MEMBER(current_dispatching_buffer_, dumpBuffer(current_dispatching_buffer_));
+  os << DUMP_MEMBER(buffered_body_, dumpBuffer(&buffered_body_));
+
+  // Dump header parsing state, and any progress on other headers.
+  os << DUMP_MEMBER(header_parsing_state_);
+  if (header_parsing_state_ == HeaderParsingState::Field) {
+    os << DUMP_MEMBER(current_header_field_, current_header_field_.getStringView());
+  } else if (header_parsing_state_ == HeaderParsingState::Value) {
+    os << DUMP_MEMBER(current_header_field_, current_header_field_.getStringView());
+    os << DUMP_MEMBER(current_header_value_, current_header_value_.getStringView());
+  }
+
+  // Dump Child
+  os << "\n";
+  dumpAdditionalState(os, indent_level);
+}
+
+void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  // Dump header map, it may be null if it was moved to the request.
+  if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
+  }
+}
+
+void ClientConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
+  const char* spaces = spacesForLevel(indent_level);
+  // Dump header map, it may be null if it was moved to the request.
+  if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+  } else {
+    DUMP_DETAILS(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_));
+  }
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
