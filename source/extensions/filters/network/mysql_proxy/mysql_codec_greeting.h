@@ -54,8 +54,8 @@ private:
   union {
     uint32_t server_cap_{0};
     struct {
-      uint16_t ext_server_cap_;
       uint16_t base_server_cap_;
+      uint16_t ext_server_cap_;
     };
   };
   uint8_t server_charset_{0};
