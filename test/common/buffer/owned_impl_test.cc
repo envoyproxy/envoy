@@ -984,7 +984,7 @@ TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
 #endif
 }
 
-// Test functionality of the freelist (a performance optimization)
+// Test functionality of the `freelist` (a performance optimization)
 TEST_F(OwnedImplTest, SliceFreeList) {
   Buffer::OwnedImpl b1, b2;
   void* slice1;
@@ -1016,7 +1016,7 @@ TEST_F(OwnedImplTest, SliceFreeList) {
     EXPECT_EQ(slice1, r.slices()[0].mem_);
   }
   {
-    // This underflows the freelist on creation, and overflows it on deletion.
+    // This causes an underflow in the `freelist` on creation, and overflows it on deletion.
     auto r1 = b1.reserveForRead();
     auto r2 = b2.reserveForRead();
     for (auto& r1_slice : absl::MakeSpan(r1.slices(), r1.numSlices())) {
