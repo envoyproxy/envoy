@@ -757,12 +757,8 @@ bool ContextImpl::dnsNameMatch(const absl::string_view dns_name, const absl::str
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
       const size_t off = dns_name.length() - pattern_len + 1;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
-        return dns_name.substr(0, off).find('.') == std::string::npos &&
-               dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
-      } else {
-        return dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
-      }
+      return dns_name.substr(0, off).find('.') == std::string::npos &&
+             dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
     }
   }
 
