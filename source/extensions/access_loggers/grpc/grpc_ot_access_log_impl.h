@@ -7,6 +7,8 @@
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
+#include "common/protobuf/protobuf.h"
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -28,8 +30,9 @@ namespace GrpcCommon {
 class GrpcOpenTelemetryAccessLoggerImpl
     : public Common::GrpcAccessLogger<
           opentelemetry::proto::logs::v1::LogRecord,
-          opentelemetry::proto::logs::v1::ResourceLogs /*TCP*/,
-          opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
+          // OTLP logging uses LogRecord for both HTTP and TCP, so protobuf::Empty is used as an
+          // empty placeholder for the non-used addEntry method.
+          ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
   GrpcOpenTelemetryAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
@@ -42,7 +45,8 @@ private:
   void initMessageRoot(const std::string& log_name, const LocalInfo::LocalInfo& local_info);
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
-  void addEntry(opentelemetry::proto::logs::v1::ResourceLogs&& entry) override;
+  // Non used addEntry method (the above is used for both TCP and HTTP).
+  void addEntry(ProtobufWkt::Empty&& entry) override { (void)entry; };
   bool isEmpty() override;
   void initMessage() override;
   void clearMessage() override;
