@@ -7,8 +7,8 @@ Incompatible Behavior Changes
 
 * grpc_stats: the default value for :ref:`stats_for_all_methods <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>` is switched
   from true to false, in order to avoid possible memory exhaustion due to an untrusted downstream sending a large number of unique method names. The previous
-  default value was deprecated in version 1.14.0. This only changes the behavior when teh value is not set. The previous behavior can be used by setting the value
-  to true. This behavior change by be overriden by setting enabling runtime feature `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
+  default value was deprecated in version 1.14.0. This only changes the behavior when the value is not set. The previous behavior can be used by setting the value
+  to true. This behavior change by be overridden by setting enabling runtime feature `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
 
 Minor Behavior Changes
 ----------------------
