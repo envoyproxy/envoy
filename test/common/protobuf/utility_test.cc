@@ -38,6 +38,7 @@ using namespace std::chrono_literals;
 namespace Envoy {
 
 using testing::AllOf;
+using testing::HasSubstr;
 using testing::Property;
 
 class RuntimeStatsHelper : public TestScopedRuntime {
@@ -267,6 +268,20 @@ TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
   source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
   EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrDie(source_any, true),
               testing::HasSubstr("@type"));
+}
+
+TEST_F(ProtobufUtilityTest, JsonConvertOrErrorAnyWithUnknownMessageType) {
+  ProtobufWkt::Any source_any;
+  source_any.set_type_url("type.googleapis.com/bad.type.url");
+  source_any.set_value("asdf");
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any), HasSubstr("unknown type"));
+}
+
+TEST_F(ProtobufUtilityTest, JsonConvertOrDieAnyWithUnknownMessageType) {
+  ProtobufWkt::Any source_any;
+  source_any.set_type_url("type.googleapis.com/bad.type.url");
+  source_any.set_value("asdf");
+  EXPECT_DEATH(MessageUtil::getJsonStringFromMessageOrDie(source_any), "bad.type.url");
 }
 
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
