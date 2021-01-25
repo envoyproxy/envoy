@@ -23,7 +23,7 @@ namespace GrpcCommon {
 // Note: OpenTelemetry protos are extra flexible and used also in the OT collector for batching and
 // so forth. As a result, some fields are repeated, but for our use case we assume the following
 // structure:
-// ExportLogsServiceRequest -> (single) ResourceLogs -> (single) InstrumentationLibrary ->
+// ExportLogsServiceRequest -> (single) ResourceLogs -> (single) InstrumentationLibraryLogs ->
 // (repeated) LogRecord.
 class GrpcOpenTelemetryAccessLoggerImpl
     : public Common::GrpcAccessLogger<
