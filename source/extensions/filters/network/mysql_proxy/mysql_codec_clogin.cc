@@ -1,9 +1,9 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 
+#include <bits/stdint-uintn.h>
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include <bits/stdint-uintn.h>
 
 namespace Envoy {
 namespace Extensions {

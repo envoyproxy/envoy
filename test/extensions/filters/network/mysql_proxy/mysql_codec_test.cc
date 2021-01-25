@@ -1,4 +1,7 @@
+#include <bits/stdint-uintn.h>
+
 #include "common/buffer/buffer_impl.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
@@ -8,7 +11,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <bits/stdint-uintn.h>
 #include "mysql_test_utils.h"
 
 namespace Envoy {

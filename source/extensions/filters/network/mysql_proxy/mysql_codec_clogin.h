@@ -1,8 +1,9 @@
 #pragma once
+#include <bits/stdint-uintn.h>
+
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include <bits/stdint-uintn.h>
 
 namespace Envoy {
 namespace Extensions {

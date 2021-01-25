@@ -1,12 +1,16 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 
+#include <bits/stdint-uintn.h>
+
+#include <string>
+
+#include "envoy/buffer/buffer.h"
+
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "envoy/buffer/buffer.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include <bits/stdint-uintn.h>
-#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -351,7 +355,7 @@ int ClientLoginResponse::parseOk(Buffer::Instance& buffer, uint32_t) {
     ENVOY_LOG(info, "error parsing status in mysql Login Ok msg");
     return MYSQL_FAILURE;
   }
-  // the exist of warning feild is determined by server cap flag, but a decoder can not know the
+  // the exist of warning field is determined by server cap flag, but a decoder can not know the
   // cap flag, so just assume the CLIENT_PROTOCOL_41 is always set. ref
   // https://github.com/mysql/mysql-connector-j/blob/release/8.0/src/main/protocol-impl/java/com/mysql/cj/protocol/a/result/OkPacket.java#L48
   if (BufferHelper::readUint16(buffer, ok_.warnings_) != MYSQL_SUCCESS) {

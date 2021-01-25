@@ -70,7 +70,6 @@ envoy_extension_cc_test(
     ],
 )
 
-
 envoy_extension_cc_test(
     name = "mysql_filter_tests",
     srcs = [

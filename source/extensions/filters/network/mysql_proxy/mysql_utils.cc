@@ -1,10 +1,14 @@
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "common/buffer/buffer_impl.h"
-#include "envoy/common/exception.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 #include <bits/stdint-uintn.h>
+
 #include <iterator>
+
+#include "envoy/common/exception.h"
+
+#include "common/buffer/buffer_impl.h"
+
+#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -187,7 +191,6 @@ int BufferHelper::peekUint32(Buffer::Instance& buffer, uint32_t& val) {
     val = buffer.peekLEInt<uint32_t>(0);
     return MYSQL_SUCCESS;
   } catch (EnvoyException& e) {
-    // buffer underflow
     return MYSQL_FAILURE;
   }
 }
@@ -197,7 +200,6 @@ int BufferHelper::peekUint16(Buffer::Instance& buffer, uint16_t& val) {
     val = buffer.peekLEInt<uint16_t>(0);
     return MYSQL_SUCCESS;
   } catch (EnvoyException& e) {
-    // buffer undeflow
     return MYSQL_FAILURE;
   }
 }
@@ -207,10 +209,10 @@ int BufferHelper::peekUint8(Buffer::Instance& buffer, uint8_t& val) {
     val = buffer.peekLEInt<uint8_t>(0);
     return MYSQL_SUCCESS;
   } catch (EnvoyException& e) {
-    // buffer undeflow
     return MYSQL_FAILURE;
   }
 }
+
 void BufferHelper::consumeHdr(Buffer::Instance& buffer) { buffer.drain(sizeof(uint32_t)); }
 
 int BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq) {

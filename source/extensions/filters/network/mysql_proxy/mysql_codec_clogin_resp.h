@@ -1,10 +1,12 @@
 #pragma once
 #include <bits/stdint-uintn.h>
+
 #include <cstdint>
+
+#include "envoy/buffer/buffer.h"
 
 #include "common/buffer/buffer_impl.h"
 
-#include "envoy/buffer/buffer.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 
@@ -15,7 +17,7 @@ namespace MySQLProxy {
 
 enum ClientLoginResponseType { Null, Ok, Err, AuthSwitch, AuthMoreData };
 
-// ClientLoginResponse colud be
+// ClientLoginResponse could be
 // Protocol::OldAuthSwitchRequest, Protocol::AuthSwitchRequest when server want switch auth method
 // or OK_Packet, ERR_Packet when server auth ok or error
 class ClientLoginResponse : public MySQLCodec {
