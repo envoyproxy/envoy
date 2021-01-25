@@ -145,9 +145,10 @@ def envoy_cc_extension(
         visibility = EXTENSION_CONFIG_VISIBILITY,
         **kwargs):
     if not category:
-        print("FAILCAT %s not set" % name)
-        # fail("Category not set for %s" % name)
+        fail("Category not set for %s" % name)
+    print('checking type for: %s' % category)
     if type(category) == str:
+        print('converting to tuple: %s' % category)
         category = (category, )
     for cat in category or []:
         if cat not in EXTENSION_CATEGORIES:
