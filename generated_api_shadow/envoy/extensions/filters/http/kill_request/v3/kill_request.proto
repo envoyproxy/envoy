@@ -6,6 +6,7 @@ import "envoy/type/v3/percent.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.kill_request.v3";
 option java_outer_classname = "KillRequestProto";
@@ -22,5 +23,6 @@ message KillRequest {
   type.v3.FractionalPercent probability = 1;
 
   // The name of the kill request header. If this field is not empty, it will override the :ref:`default header <config_http_filters_kill_request_http_header>` name. Otherwise the default header name will be used.
-  string kill_request_header = 2;
+  string kill_request_header = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 }
