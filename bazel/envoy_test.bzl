@@ -99,11 +99,13 @@ def envoy_cc_fuzz_test(
         **kwargs
     )
 
-    raw_binary_name = name + "_raw"
     cc_test(
-        name = raw_binary_name,
+        name = name,
         copts = envoy_copts("@envoy", test = True),
-        linkopts = _envoy_test_linkopts(),
+        linkopts = _envoy_test_linkopts() + select({
+            "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
+            "//conditions:default": [],
+        }),
         linkstatic = envoy_linkstatic(),
         args = select({
             "@envoy//bazel:libfuzzer_coverage": ["$(locations %s)" % corpus_name],
@@ -121,17 +123,17 @@ def envoy_cc_fuzz_test(
             ],
         }),
         size = size,
-        tags = ["fuzz_target_binary", "manual"] + tags,
+        tags = ["fuzz_target"] + tags,
     )
 
     fuzzing_decoration(
         base_name = name,
-        raw_binary = raw_binary_name,
+        raw_binary = name,
         engine = "@envoy//bazel:fuzzing_engine",
         corpus = [corpus_name],
         dicts = dictionaries,
-        tags = ["fuzz_target"] + tags,
         external_instrumentation = True,
+        define_regression_test = False,
     )
 
 # Envoy C++ test targets should be specified with this function.
