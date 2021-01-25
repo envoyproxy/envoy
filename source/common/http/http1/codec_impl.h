@@ -224,9 +224,6 @@ public:
 
   bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
 
-  int setAndCheckCallbackStatus(Status&& status);
-  int setAndCheckCallbackStatusOr(Envoy::StatusOr<int>&& statusor);
-
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
   Envoy::Http::Status codec_status_;
@@ -253,6 +250,8 @@ protected:
     // nor any further data on the connection.
     NoBodyData = 2,
   };
+  int setAndCheckCallbackStatus(Status&& status);
+  int setAndCheckCallbackStatusOr(Envoy::StatusOr<HttpParserCode>&& statusor);
 
   bool resetStreamCalled() { return reset_stream_called_; }
   Status onMessageBeginBase();
@@ -378,10 +377,10 @@ private:
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked. Note that this only applies to headers and NOT trailers. End of
    * trailers are signaled via onMessageCompleteBase().
-   * @return An error status or an integer representing 0 if no error, 1 if there should be no body.
+   * @return An error status or a HttpParserCode.
    */
-  Envoy::StatusOr<int> onHeadersCompleteBase();
-  virtual Envoy::StatusOr<int> onHeadersComplete() PURE;
+  Envoy::StatusOr<HttpParserCode> onHeadersCompleteBase();
+  virtual Envoy::StatusOr<HttpParserCode> onHeadersComplete() PURE;
 
   /**
    * Called to see if upgrade transition is allowed.
@@ -504,7 +503,7 @@ private:
   void onEncodeComplete() override;
   Status onMessageBegin() override;
   Status onUrl(const char* data, size_t length) override;
-  Envoy::StatusOr<int> onHeadersComplete() override;
+  Envoy::StatusOr<HttpParserCode> onHeadersComplete() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
   bool upgradeAllowed() const override { return true; }
   void onBody(Buffer::Instance& data) override;
@@ -588,7 +587,7 @@ private:
   void onEncodeComplete() override {}
   Status onMessageBegin() override { return okStatus(); }
   Status onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Envoy::StatusOr<int> onHeadersComplete() override;
+  Envoy::StatusOr<HttpParserCode> onHeadersComplete() override;
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
