@@ -16,7 +16,7 @@ PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, bool 
     : enable_sql_parsing_(enable_sql_parsing), scope_{scope}, stats_{generateStats(stat_prefix,
                                                                                    scope)} {}
 
-PostgresFilter::PostgresFilter(PostgresFilterConfig& config) : config_{config} {
+PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
     decoder_ = createDecoder(this);
   }
@@ -55,108 +55,108 @@ DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
 }
 
 void PostgresFilter::incMessagesBackend() {
-  config_.stats_.messages_.inc();
-  config_.stats_.messages_backend_.inc();
+  config_->stats_.messages_.inc();
+  config_->stats_.messages_backend_.inc();
 }
 
 void PostgresFilter::incMessagesFrontend() {
-  config_.stats_.messages_.inc();
-  config_.stats_.messages_frontend_.inc();
+  config_->stats_.messages_.inc();
+  config_->stats_.messages_frontend_.inc();
 }
 
 void PostgresFilter::incMessagesUnknown() {
-  config_.stats_.messages_.inc();
-  config_.stats_.messages_unknown_.inc();
+  config_->stats_.messages_.inc();
+  config_->stats_.messages_unknown_.inc();
 }
 
 void PostgresFilter::incSessionsEncrypted() {
-  config_.stats_.sessions_.inc();
-  config_.stats_.sessions_encrypted_.inc();
+  config_->stats_.sessions_.inc();
+  config_->stats_.sessions_encrypted_.inc();
 }
 
 void PostgresFilter::incSessionsUnencrypted() {
-  config_.stats_.sessions_.inc();
-  config_.stats_.sessions_unencrypted_.inc();
+  config_->stats_.sessions_.inc();
+  config_->stats_.sessions_unencrypted_.inc();
 }
 
 void PostgresFilter::incTransactions() {
   if (!decoder_->getSession().inTransaction()) {
-    config_.stats_.transactions_.inc();
+    config_->stats_.transactions_.inc();
   }
 }
 
 void PostgresFilter::incTransactionsCommit() {
   if (!decoder_->getSession().inTransaction()) {
-    config_.stats_.transactions_commit_.inc();
+    config_->stats_.transactions_commit_.inc();
   }
 }
 
 void PostgresFilter::incTransactionsRollback() {
   if (decoder_->getSession().inTransaction()) {
-    config_.stats_.transactions_rollback_.inc();
+    config_->stats_.transactions_rollback_.inc();
   }
 }
 
 void PostgresFilter::incNotices(NoticeType type) {
-  config_.stats_.notices_.inc();
+  config_->stats_.notices_.inc();
   switch (type) {
   case DecoderCallbacks::NoticeType::Warning:
-    config_.stats_.notices_warning_.inc();
+    config_->stats_.notices_warning_.inc();
     break;
   case DecoderCallbacks::NoticeType::Notice:
-    config_.stats_.notices_notice_.inc();
+    config_->stats_.notices_notice_.inc();
     break;
   case DecoderCallbacks::NoticeType::Debug:
-    config_.stats_.notices_debug_.inc();
+    config_->stats_.notices_debug_.inc();
     break;
   case DecoderCallbacks::NoticeType::Info:
-    config_.stats_.notices_info_.inc();
+    config_->stats_.notices_info_.inc();
     break;
   case DecoderCallbacks::NoticeType::Log:
-    config_.stats_.notices_log_.inc();
+    config_->stats_.notices_log_.inc();
     break;
   case DecoderCallbacks::NoticeType::Unknown:
-    config_.stats_.notices_unknown_.inc();
+    config_->stats_.notices_unknown_.inc();
     break;
   }
 }
 
 void PostgresFilter::incErrors(ErrorType type) {
-  config_.stats_.errors_.inc();
+  config_->stats_.errors_.inc();
   switch (type) {
   case DecoderCallbacks::ErrorType::Error:
-    config_.stats_.errors_error_.inc();
+    config_->stats_.errors_error_.inc();
     break;
   case DecoderCallbacks::ErrorType::Fatal:
-    config_.stats_.errors_fatal_.inc();
+    config_->stats_.errors_fatal_.inc();
     break;
   case DecoderCallbacks::ErrorType::Panic:
-    config_.stats_.errors_panic_.inc();
+    config_->stats_.errors_panic_.inc();
     break;
   case DecoderCallbacks::ErrorType::Unknown:
-    config_.stats_.errors_unknown_.inc();
+    config_->stats_.errors_unknown_.inc();
     break;
   }
 }
 
 void PostgresFilter::incStatements(StatementType type) {
-  config_.stats_.statements_.inc();
+  config_->stats_.statements_.inc();
 
   switch (type) {
   case DecoderCallbacks::StatementType::Insert:
-    config_.stats_.statements_insert_.inc();
+    config_->stats_.statements_insert_.inc();
     break;
   case DecoderCallbacks::StatementType::Delete:
-    config_.stats_.statements_delete_.inc();
+    config_->stats_.statements_delete_.inc();
     break;
   case DecoderCallbacks::StatementType::Select:
-    config_.stats_.statements_select_.inc();
+    config_->stats_.statements_select_.inc();
     break;
   case DecoderCallbacks::StatementType::Update:
-    config_.stats_.statements_update_.inc();
+    config_->stats_.statements_update_.inc();
     break;
   case DecoderCallbacks::StatementType::Other:
-    config_.stats_.statements_other_.inc();
+    config_->stats_.statements_other_.inc();
     break;
   case DecoderCallbacks::StatementType::Noop:
     break;
@@ -164,19 +164,19 @@ void PostgresFilter::incStatements(StatementType type) {
 }
 
 void PostgresFilter::processQuery(const std::string& sql) {
-  if (config_.enable_sql_parsing_) {
+  if (config_->enable_sql_parsing_) {
     ProtobufWkt::Struct metadata;
 
     auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, decoder_->getAttributes(), metadata);
 
     if (!result) {
-      config_.stats_.statements_parse_error_.inc();
+      config_->stats_.statements_parse_error_.inc();
       ENVOY_CONN_LOG(trace, "postgres_proxy: cannot parse SQL: {}", read_callbacks_->connection(),
                      sql.c_str());
       return;
     }
 
-    config_.stats_.statements_parsed_.inc();
+    config_->stats_.statements_parsed_.inc();
     ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
                    sql.c_str());
 

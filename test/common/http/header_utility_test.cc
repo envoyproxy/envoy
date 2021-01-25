@@ -701,5 +701,14 @@ TEST(RequiredHeaders, IsRemovableHeader) {
   EXPECT_TRUE(HeaderUtility::isRemovableHeader("Content-Type"));
 }
 
+TEST(RequiredHeaders, IsModifiableHeader) {
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader(":path"));
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader("host"));
+  EXPECT_FALSE(HeaderUtility::isRemovableHeader("Host"));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader(""));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader("hostname"));
+  EXPECT_TRUE(HeaderUtility::isRemovableHeader("Content-Type"));
+}
+
 } // namespace Http
 } // namespace Envoy
