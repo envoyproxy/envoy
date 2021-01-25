@@ -1,6 +1,8 @@
 #include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 
+#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include <bits/stdint-uintn.h>
 
 namespace Envoy {
 namespace Extensions {
@@ -48,18 +50,27 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     client_login_resp.decode(message, seq, len);
     callbacks_.onClientLoginResponse(client_login_resp);
 
-    if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
+    switch (client_login_resp.type()) {
+    case Ok: {
       session_.setState(MySQLSession::State::Req);
       // reset seq# when entering the REQ state
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
+      break;
+    }
+    case AuthSwitch: {
       session_.setState(MySQLSession::State::AuthSwitchResp);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+      break;
+    }
+    case Err: {
       // client/server should close the connection:
       // https://dev.mysql.com/doc/internals/en/connection-phase.html
       session_.setState(MySQLSession::State::Error);
-    } else {
+      break;
+    }
+    case AuthMoreData:
+    default:
       session_.setState(MySQLSession::State::NotHandled);
+      break;
     }
     break;
   }
@@ -78,16 +89,25 @@ void DecoderImpl::parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t 
     client_login_resp.decode(message, seq, len);
     callbacks_.onMoreClientLoginResponse(client_login_resp);
 
-    if (client_login_resp.getRespCode() == MYSQL_RESP_OK) {
+    switch (client_login_resp.type()) {
+    case Ok: {
       session_.setState(MySQLSession::State::Req);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_MORE) {
+      break;
+    }
+    case AuthMoreData: {
       session_.setState(MySQLSession::State::AuthSwitchResp);
-    } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+      break;
+    }
+    case Err: {
       // stop parsing auth req/response, attempt to resync in command state
       session_.setState(MySQLSession::State::Resync);
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
-    } else {
+      break;
+    }
+    case AuthSwitch:
+    default:
       session_.setState(MySQLSession::State::NotHandled);
+      break;
     }
     break;
   }

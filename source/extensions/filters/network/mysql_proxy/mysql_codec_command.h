@@ -1,6 +1,7 @@
 #pragma once
 #include "common/buffer/buffer_impl.h"
 
+#include "envoy/buffer/buffer.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
@@ -36,15 +37,15 @@ public:
 
   // MySQLCodec
   int parseMessage(Buffer::Instance&, uint32_t len) override;
-  std::string encode() override;
+  void encode(Buffer::Instance&) override;
 
   Cmd parseCmd(Buffer::Instance& data);
   Cmd getCmd() const { return cmd_; }
   const std::string& getData() const { return data_; }
   std::string& getDb() { return db_; }
   void setCmd(Cmd cmd);
-  void setData(std::string& data);
-  void setDb(std::string db);
+  void setData(const std::string& data);
+  void setDb(const std::string db);
   bool isQuery() { return is_query_; }
 
 private:
@@ -58,7 +59,7 @@ class CommandResponse : public MySQLCodec {
 public:
   // MySQLCodec
   int parseMessage(Buffer::Instance&, uint32_t) override { return MYSQL_SUCCESS; }
-  std::string encode() override { return ""; }
+  void encode(Buffer::Instance&) override {}
 
   void setServerStatus(uint16_t status);
   void setWarnings(uint16_t warnings);

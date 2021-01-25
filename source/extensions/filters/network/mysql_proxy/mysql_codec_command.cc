@@ -1,5 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 
+#include "envoy/buffer/buffer.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -52,15 +53,11 @@ int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   return MYSQL_SUCCESS;
 }
 
-void Command::setData(std::string& data) { data_.assign(data); }
+void Command::setData(const std::string& data) { data_.assign(data); }
 
-std::string Command::encode() {
-  Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-
-  BufferHelper::addUint8(*buffer, static_cast<int>(cmd_));
-  BufferHelper::addString(*buffer, data_);
-  std::string e_string = buffer->toString();
-  return e_string;
+void Command::encode(Buffer::Instance& out) {
+  BufferHelper::addUint8(out, static_cast<int>(cmd_));
+  BufferHelper::addString(out, data_);
 }
 
 } // namespace MySQLProxy

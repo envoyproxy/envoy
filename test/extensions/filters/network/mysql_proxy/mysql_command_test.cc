@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "common/buffer/buffer_impl.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
@@ -26,15 +27,16 @@ public:
     uint32_t len = 0u;
     mysql_cmd_encode.setCmd(Command::Cmd::Query);
     mysql_cmd_encode.setData(query);
-    std::string data = mysql_cmd_encode.encode();
-    std::string mysql_msg = BufferHelper::encodeHdr(data, 0);
 
-    Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(mysql_msg));
-    if (BufferHelper::peekHdr(*decode_data, len, seq) != MYSQL_SUCCESS) {
+    Buffer::OwnedImpl decode_data;
+    mysql_cmd_encode.encode(decode_data);
+    BufferHelper::encodeHdr(decode_data, 0);
+
+    if (BufferHelper::peekHdr(decode_data, len, seq) != MYSQL_SUCCESS) {
       return MYSQL_FAILURE;
     }
-    BufferHelper::consumeHdr(*decode_data);
-    if (mysql_cmd_decode.decode(*decode_data, seq, len) != MYSQL_SUCCESS) {
+    BufferHelper::consumeHdr(decode_data);
+    if (mysql_cmd_decode.decode(decode_data, seq, len) != MYSQL_SUCCESS) {
       return MYSQL_FAILURE;
     }
     hsql::SQLParser::parse(mysql_cmd_decode.getData(), &result);

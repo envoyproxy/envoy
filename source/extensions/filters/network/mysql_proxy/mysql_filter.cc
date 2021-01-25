@@ -84,15 +84,15 @@ void MySQLFilter::onClientLogin(ClientLogin& client_login) {
 }
 
 void MySQLFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
+  if (client_login_resp.type() == AuthSwitch) {
     config_->stats_.auth_switch_request_.inc();
-  } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+  } else if (client_login_resp.type() == Err) {
     config_->stats_.login_failures_.inc();
   }
 }
 
 void MySQLFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
-  if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
+  if (client_login_resp.type() == Err) {
     config_->stats_.login_failures_.inc();
   }
 }

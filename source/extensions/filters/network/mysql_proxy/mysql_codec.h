@@ -1,6 +1,8 @@
 #pragma once
+#include <bits/stdint-uintn.h>
 #include <cstdint>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -69,17 +71,20 @@ constexpr uint16_t MYSQL_SERVER_CAPAB = 0x0101;
 constexpr uint8_t MYSQL_SERVER_LANGUAGE = 0x21;
 constexpr uint16_t MYSQL_SERVER_STATUS = 0x0200;
 constexpr uint16_t MYSQL_SERVER_EXT_CAPAB = 0x0200;
-constexpr uint8_t MYSQL_AUTHPLGIN = 0x00;
-constexpr uint8_t MYSQL_UNSET = 0x00;
-constexpr uint8_t MYSQL_UNSET_SIZE = 10;
-constexpr uint16_t MYSQL_CLIENT_CONNECT_WITH_DB = 0x0008;
-constexpr uint16_t MYSQL_CLIENT_CAPAB_41VS320 = 0x0200;
-constexpr uint16_t MYSQL_CLIENT_CAPAB_SSL = 0x0800;
 constexpr uint16_t MYSQL_EXT_CLIENT_CAPAB = 0x0300;
-constexpr uint16_t MYSQL_EXT_CL_PLG_AUTH_CL_DATA = 0x0020;
-constexpr uint16_t MYSQL_EXT_CL_SECURE_CONNECTION = 0x8000;
+
+constexpr uint32_t CLIENT_PLUGIN_AUTH = 0x00080000;
+constexpr uint32_t CLIENT_SECURE_CONNECTION = 0x8000;
+constexpr uint32_t CLIENT_PROTOCOL_41 = 0x00000200;
+constexpr uint32_t CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA = 0x00200000;
+constexpr uint32_t CLIENT_CONNECT_WITH_DB = 0x00000008;
+constexpr uint32_t CLIENT_CONNECT_ATTRS = 0x00100000;
+constexpr uint32_t CLIENT_SSL = 0x00000800;
+constexpr uint16_t MYSQL_EXT_CL_PLUGIN_AUTH = 0x8;
 constexpr uint32_t MYSQL_MAX_PACKET = 0x00000001;
 constexpr uint8_t MYSQL_CHARSET = 0x21;
+
+constexpr uint8_t MYSQL_SQL_STATE_LEN = 5;
 
 constexpr uint8_t LENENCODINT_1BYTE = 0xfb;
 constexpr uint8_t LENENCODINT_2BYTES = 0xfc;
@@ -89,6 +94,9 @@ constexpr uint8_t LENENCODINT_8BYTES = 0xfe;
 constexpr int MYSQL_SUCCESS = 0;
 constexpr int MYSQL_FAILURE = -1;
 constexpr char MYSQL_STR_END = '\0';
+
+// error code
+constexpr uint16_t MYSQL_CR_AUTH_PLUGIN_ERR = 2061;
 
 class MySQLCodec : public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -104,7 +112,7 @@ public:
     return parseMessage(data, len);
   }
 
-  virtual std::string encode() PURE;
+  virtual void encode(Buffer::Instance& out) PURE;
 
 protected:
   virtual int parseMessage(Buffer::Instance& data, uint32_t len) PURE;

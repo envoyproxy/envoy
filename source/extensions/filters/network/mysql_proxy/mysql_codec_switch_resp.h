@@ -1,6 +1,7 @@
 #pragma once
 #include "common/buffer/buffer_impl.h"
 
+#include "envoy/buffer/buffer.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
@@ -12,9 +13,9 @@ class ClientSwitchResponse : public MySQLCodec {
 public:
   // MySQLCodec
   int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
-  std::string encode() override;
+  void encode(Buffer::Instance&) override;
 
-  void setAuthPluginResp(std::string& auth_swith_resp);
+  void setAuthPluginResp(const std::string& auth_swith_resp);
 
 private:
   std::string auth_plugin_resp_;

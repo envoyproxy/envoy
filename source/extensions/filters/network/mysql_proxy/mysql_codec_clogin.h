@@ -2,6 +2,7 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include <bits/stdint-uintn.h>
 
 namespace Envoy {
 namespace Extensions {
@@ -13,37 +14,47 @@ class ClientLogin : public MySQLCodec {
 public:
   // MySQLCodec
   int parseMessage(Buffer::Instance& buffer, uint32_t len) override;
-  std::string encode() override;
+  void encode(Buffer::Instance&) override;
 
-  int getClientCap() const { return client_cap_; }
-  int getExtendedClientCap() const { return extended_client_cap_; }
-  int getMaxPacket() const { return max_packet_; }
-  int getCharset() const { return charset_; }
-  const std::string& getUsername() const { return username_; }
-  const std::string& getAuthResp() const { return auth_resp_; }
-  const std::string& getDb() const { return db_; }
+  uint32_t getClientCap() const { return client_cap_; }
+  uint16_t getBaseClientCap() const { return base_cap_; }
+  uint16_t getExtendedClientCap() const { return ext_cap_; }
+  uint32_t getMaxPacket() const { return max_packet_; }
+  uint8_t getCharset() const { return charset_; }
+  std::string getUsername() const { return username_; }
+  std::string getAuthResp() const { return auth_resp_; }
+  std::string getDb() const { return db_; }
+  std::string getAuthPluginName() const { return auth_plugin_name_; }
   bool isResponse41() const;
   bool isResponse320() const;
   bool isSSLRequest() const;
   bool isConnectWithDb() const;
   bool isClientAuthLenClData() const;
   bool isClientSecureConnection() const;
-  void setClientCap(int client_cap);
-  void setExtendedClientCap(int extended_client_cap);
-  void setMaxPacket(int max_packet);
-  void setCharset(int charset);
-  void setUsername(std::string& username);
-  void setAuthResp(std::string& auth_resp);
-  void setDb(std::string& db);
+  void setClientCap(uint32_t client_cap);
+  void setBaseClientCap(uint16_t base_cap);
+  void setExtendedClientCap(uint16_t ext_cap);
+  void setMaxPacket(uint32_t max_packet);
+  void setCharset(uint8_t charset);
+  void setUsername(const std::string& username);
+  void setAuthResp(const std::string& auth_resp);
+  void setDb(const std::string& db);
+  void setAuthPluginName(const std::string& auth_plugin_name);
 
 private:
-  int client_cap_;
-  int extended_client_cap_;
-  int max_packet_;
-  int charset_;
+  union {
+    uint32_t client_cap_;
+    struct {
+      uint16_t base_cap_;
+      uint16_t ext_cap_;
+    };
+  };
+  uint32_t max_packet_;
+  uint8_t charset_;
   std::string username_;
   std::string auth_resp_;
   std::string db_;
+  std::string auth_plugin_name_;
 };
 
 } // namespace MySQLProxy
