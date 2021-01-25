@@ -218,6 +218,11 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
         EXPECT_EQ("0", headers->get(Http::LowerCaseString("i"))[0]->value().getStringView());
         quic_stream_->encodeData(request_body_, true);
       }));
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
+        EXPECT_EQ("103", headers->getStatusValue());
+        EXPECT_EQ("1", headers->get(Http::LowerCaseString("i"))[0]->value().getStringView());
+      }));
   size_t offset = 0;
   size_t i = 0;
   // Receive several 10x headers, only the first 100 Continue header should be
@@ -243,6 +248,29 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
   }
 
   receiveResponse(response_body_, true, offset);
+}
+
+TEST_P(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
+  const auto result = quic_stream_->encodeHeaders(request_headers_, false);
+  EXPECT_TRUE(result.ok());
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  // Receive several 10x headers, only the first 100 Continue header should be
+  // delivered.
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    spdy::SpdyHeaderBlock continue_header;
+    continue_header[":status"] = "101";
+    std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
+    quic::QuicStreamFrame frame(stream_id_, false, 0u, data);
+    quic_stream_->OnStreamFrame(frame);
+  } else {
+    quic::QuicHeaderList continue_header;
+    continue_header.OnHeaderBlockStart();
+    continue_header.OnHeader(":status", "101");
+    continue_header.OnHeaderBlockEnd(0, 0);
+    quic_stream_->OnStreamHeaderList(/*fin=*/false, continue_header.uncompressed_header_bytes(),
+                                     continue_header);
+  }
 }
 
 TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
