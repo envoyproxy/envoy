@@ -14,6 +14,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace PlatformBridge {
 
+class PlatformBridgeFilter;
+
 class PlatformBridgeFilterConfig {
 public:
   PlatformBridgeFilterConfig(
@@ -77,45 +79,54 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
 private:
-  static void replaceHeaders(Http::HeaderMap& headers, envoy_headers c_headers);
+  /**
+   * Internal delegate for managing logic and state that exists for both the request (decoding)
+   * and response (encoding) paths.
+   */
+  struct FilterBase : public Logger::Loggable<Logger::Id::filter> {
+    FilterBase(PlatformBridgeFilter& parent, envoy_filter_on_headers_f on_headers,
+               envoy_filter_on_data_f on_data, envoy_filter_on_trailers_f on_trailers,
+               envoy_filter_on_resume_f on_resume)
+        : iteration_state_(IterationState::Ongoing), parent_(parent), on_headers_(on_headers),
+          on_data_(on_data), on_trailers_(on_trailers), on_resume_(on_resume) {}
 
-  Http::FilterHeadersStatus onHeaders(Http::HeaderMap& headers, bool end_stream,
-                                      envoy_filter_on_headers_f on_headers);
+    static FilterBase createRequestBase(PlatformBridgeFilter& parent);
 
-  Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream,
-                                Buffer::Instance* internal_buffer,
-                                Http::HeaderMap** pending_headers, envoy_filter_on_data_f on_data);
+    static FilterBase createResponseBase(PlatformBridgeFilter& parent);
 
-  Http::FilterTrailersStatus onTrailers(Http::HeaderMap& trailers,
-                                        Buffer::Instance* internal_buffer,
-                                        Http::HeaderMap** pending_headers,
-                                        envoy_filter_on_trailers_f on_trailers);
+    Http::FilterHeadersStatus onHeaders(Http::HeaderMap& headers, bool end_stream);
 
-  // Scheduled on the dispatcher when resumeRequest is called from platform
-  // filter callbacks. Provides a snapshot of pending request state to the
-  // platform filter, and consumes invocation results to modify pending HTTP
-  // entities before resuming decoding.
-  void onResumeDecoding();
+    Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream,
+                                  Buffer::Instance* internal_buffer);
 
-  // Scheduled on the dispatcher when resumeResponse is called from platform
-  // filter callbacks. Provides a snapshot of pending response state to the
-  // platform filter, and consumes invocation results to modify pending HTTP
-  // entities before resuming encoding.
-  void onResumeEncoding();
+    Http::FilterTrailersStatus onTrailers(Http::HeaderMap& trailers,
+                                          Buffer::Instance* internal_buffer);
+
+    // Scheduled on the dispatcher when resume* is called from platform
+    // filter callbacks. Provides a snapshot of pending HTTP stream state to the
+    // platform filter, and consumes invocation results to modify pending HTTP
+    // entities before resuming iteration.
+    void onResume(Buffer::Instance* internal_buffer, std::function<void()> resume_call);
+
+    IterationState iteration_state_;
+    PlatformBridgeFilter& parent_;
+    envoy_filter_on_headers_f on_headers_;
+    envoy_filter_on_data_f on_data_;
+    envoy_filter_on_trailers_f on_trailers_;
+    envoy_filter_on_resume_f on_resume_;
+    bool stream_complete_{};
+    Http::HeaderMap* pending_headers_{};
+    Http::HeaderMap* pending_trailers_{};
+  };
 
   Event::Dispatcher& dispatcher_;
-  Http::HeaderMap* pending_request_headers_{};
-  Http::HeaderMap* pending_response_headers_{};
-  Http::HeaderMap* pending_request_trailers_{};
-  Http::HeaderMap* pending_response_trailers_{};
-  IterationState iteration_state_;
   const std::string filter_name_;
   envoy_http_filter platform_filter_;
+  FilterBase request_filter_base_;
+  FilterBase response_filter_base_;
   envoy_http_filter_callbacks platform_request_callbacks_{};
   envoy_http_filter_callbacks platform_response_callbacks_{};
   bool error_response_{};
-  bool request_complete_{};
-  bool response_complete_{};
 };
 
 using PlatformBridgeFilterSharedPtr = std::shared_ptr<PlatformBridgeFilter>;
