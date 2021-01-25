@@ -146,11 +146,9 @@ def envoy_cc_extension(
         **kwargs):
     if not category:
         fail("Category not set for %s" % name)
-    if type(category) == str:
-        _category = (category, )
-    else:
-        _category = category
-    for cat in _category or []:
+    if type(category) == "string":
+        category = (category, )
+    for cat in category or []:
         if cat not in EXTENSION_CATEGORIES:
             fail("Unknown extension category for %s: %s"
                  % (name, cat))
