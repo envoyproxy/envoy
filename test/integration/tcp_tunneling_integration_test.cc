@@ -434,7 +434,6 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
     proxy_config.mutable_tunneling_config()->set_use_post(true);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
-    //for (auto it = listeners->begin(); it != listeners->end(); it++) {
     for (auto& listener : *listeners) {
       if (listener.name() != "tcp_proxy") {
         continue;
