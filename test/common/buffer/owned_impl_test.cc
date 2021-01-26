@@ -993,21 +993,21 @@ TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
 // Test functionality of the `freelist` (a performance optimization)
 TEST_F(OwnedImplTest, SliceFreeList) {
   Buffer::OwnedImpl b1, b2;
-  void* slice1;
-  void* slice2;
+  std::vector<void*> slices;
   {
     auto r = b1.reserveForRead();
-    slice1 = r.slices()[0].mem_;
-    slice2 = r.slices()[1].mem_;
+    for (auto& slice : absl::MakeSpan(r.slices(), r.numSlices())) {
+      slices.push_back(slice.mem_);
+    }
     r.commit(1);
-    EXPECT_EQ(slice1, b1.getRawSlices()[0].mem_);
+    EXPECT_EQ(slices[0], b1.getRawSlices()[0].mem_);
   }
 
   {
     auto r = b2.reserveForRead();
-    EXPECT_EQ(slice2, r.slices()[0].mem_);
+    EXPECT_EQ(slices[1], r.slices()[0].mem_);
     r.commit(1);
-    EXPECT_EQ(slice2, b2.getRawSlices()[0].mem_);
+    EXPECT_EQ(slices[1], b2.getRawSlices()[0].mem_);
   }
 
   b1.drain(1);
@@ -1015,11 +1015,11 @@ TEST_F(OwnedImplTest, SliceFreeList) {
   {
     auto r = b2.reserveForRead();
     // slices()[0] is the partially used slice that is already part of this buffer.
-    EXPECT_EQ(slice1, r.slices()[1].mem_);
+    EXPECT_EQ(slices[2], r.slices()[1].mem_);
   }
   {
     auto r = b1.reserveForRead();
-    EXPECT_EQ(slice1, r.slices()[0].mem_);
+    EXPECT_EQ(slices[2], r.slices()[0].mem_);
   }
   {
     // This causes an underflow in the `freelist` on creation, and overflows it on deletion.
