@@ -1982,8 +1982,9 @@ TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   // Check dump contents
   EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 11, header_parsing_state_: "
                                             "Done\n, active_request_.request_url_: null"));
-  EXPECT_THAT(ostream.contents(), HasSubstr("front_slice.length(): 50, front_slice: \n  POST / "
-                                            "HTTP/1.1\r\nContent-Length: 11\r\n\r\nHello Envoy"));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("front_slice.length(): 50, front_slice: \n  POST / "
+                        "HTTP/1.1\\r\\nContent-Length: 11\\r\\n\\r\\nHello Envoy"));
 }
 
 class Http1ClientConnectionImplTest : public Http1CodecTestBase {
@@ -3093,7 +3094,7 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
                                             "Done\n"));
   EXPECT_THAT(ostream.contents(),
               testing::HasSubstr("front_slice.length(): 50, front_slice: \n  HTTP/1.1 200 "
-                                 "OK\r\nContent-Length: 11\r\n\r\nHello Envoy"));
+                                 "OK\\r\\nContent-Length: 11\\r\\n\\r\\nHello Envoy"));
 }
 
 } // namespace Http

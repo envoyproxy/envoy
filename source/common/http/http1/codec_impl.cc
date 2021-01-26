@@ -883,7 +883,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   }
 
   // Dump Child
-  os << "\n";
+  os << '\n';
   dumpAdditionalState(os, indent_level);
 
   // Dump the first slice of the dispatching buffer if not drained.
@@ -901,8 +901,12 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
     os << spaces << DUMP_MEMBER(front_slice.length(), front_slice.length()) << ", front_slice: \n";
     {
       const char* spaces = spacesForLevel(indent_level + 1);
-      // Dump buffer data. TODO(kbaichoo): escape?
-      os << spaces << front_slice;
+      // Dump buffer data escaping \r, \n, \t, ", ', and \.
+      // This is not the most performant implementation, but we're crashing and
+      // cannot allocate memory.
+      os << spaces;
+      StringUtil::escapeToOstream(os, front_slice);
+      os << '\n';
     }
   }
 }

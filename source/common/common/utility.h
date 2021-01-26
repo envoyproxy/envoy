@@ -383,6 +383,16 @@ public:
   static std::string escape(const std::string& source);
 
   /**
+   * Outputs the string to the provided ostream, while escaping \n, \r, \t, and "
+   * (double quote), ' (single quote), and \ (backslash) escaped.
+   * This may be particularly useful if you cannot allocate memory, and the
+   * ostream being written to is backed by an entity that won't allocate memory.
+   * @param os the ostream to output to.
+   * @param view a string view to output
+   */
+  static void escapeToOstream(std::ostream& os, absl::string_view view);
+
+  /**
    * Provide a default value for a string if empty.
    * @param s string.
    * @param default_value replacement for s if empty.
