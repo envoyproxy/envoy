@@ -530,7 +530,8 @@ public:
   MOCK_METHOD(void, move, (Instance&, uint64_t), (override));
   MOCK_METHOD(Buffer::Reservation, reserveForRead, (), (override));
   MOCK_METHOD(Buffer::ReservationSingleSlice, reserveSingleSlice, (uint64_t, bool), (override));
-  MOCK_METHOD(void, commit, (uint64_t, absl::Span<Buffer::RawSlice>, ReservationSlicesOwnerPtr),
+  MOCK_METHOD(void, commit,
+              (uint64_t, absl::Span<Buffer::RawSlice>, Buffer::ReservationSlicesOwnerPtr),
               (override));
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
