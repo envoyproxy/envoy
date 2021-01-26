@@ -34,7 +34,7 @@ envoy_cc_benchmark_binary(
 
 envoy_benchmark_test(
     name = "utility_speed_benchmark_test",
-    benchmark_binary = "utilty_speed_test",
+    benchmark_binary = "utility_speed_test",
 )
 
 envoy_cc_test(
