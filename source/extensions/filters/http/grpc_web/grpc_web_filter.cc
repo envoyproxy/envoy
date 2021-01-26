@@ -31,6 +31,7 @@ std::string buildGrpcMessage(Buffer::Instance& body_data) {
   const uint64_t message_length = body_data.length();
   std::string message;
   message.reserve(message_length);
+  message.resize(message_length);
   body_data.copyOut(0, message_length, message.data());
 
   return Http::Utility::PercentEncoding::encode(message);
@@ -85,6 +86,7 @@ bool GrpcWebFilter::isProtoEncodedGrpcWebResponseHeaders(
          hasProtoEncodedGrpcWebContentType(headers);
 }
 
+// TODO(dio): Move this as a shared utility function.
 bool GrpcWebFilter::hasProtoEncodedGrpcWebContentType(
     const Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
@@ -120,21 +122,18 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
                                                              Buffer::Instance* last_data) {
   const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
   if (encoding_buffer != nullptr) {
+    if (last_data != nullptr) {
+      encoder_callbacks_->addEncodedData(*last_data, false);
+    }
     encoder_callbacks_->modifyEncodingBuffer([&output](Buffer::Instance& buffered) {
+      // When we have buffered data (encoding buffer is filled), we limit the final buffer length.
       output.move(buffered, MAX_BUFFERED_PLAINTEXT_LENGTH);
       buffered.drain(buffered.length());
     });
-  }
-
-  // In the case of local reply and when the response only contains single data chunk,
-  // "encoding_buffer" is nullptr and we only have filled "last_data".
-  if (last_data != nullptr) {
-    uint64_t needed = last_data->length();
-    // When we have buffered data (from encoding buffer), we limit the final buffer length.
-    if (encoding_buffer != nullptr && (output.length() + needed) >= MAX_BUFFERED_PLAINTEXT_LENGTH) {
-      needed = std::min(needed, MAX_BUFFERED_PLAINTEXT_LENGTH - output.length());
-    }
-    output.move(*last_data, needed);
+  } else if (last_data != nullptr) {
+    // In the case of local reply and when the response only contains a single data chunk,
+    // "encoding_buffer" is nullptr and we only have filled "last_data".
+    output.move(*last_data);
     last_data->drain(last_data->length());
   }
 }

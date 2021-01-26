@@ -125,6 +125,10 @@ public:
       auto on_modify_encoding_buffer = [encoded_buffer](std::function<void(Buffer::Instance&)> cb) {
         cb(*encoded_buffer);
       };
+      if (last_data != nullptr) {
+        EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { encoded_buffer->move(data); }));
+      }
       EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(encoded_buffer));
       EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
           .WillRepeatedly(Invoke(on_modify_encoding_buffer));
@@ -323,6 +327,9 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
   };
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
       .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { buffer->move(data); }));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
