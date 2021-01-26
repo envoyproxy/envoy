@@ -8,13 +8,13 @@
 
 namespace Envoy {
 
-class SharedSharedTokenBucketImplTest : public testing::Test {
+class SharedTokenBucketImplTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
 };
 
 // Verifies TokenBucket initialization.
-TEST_F(SharedSharedTokenBucketImplTest, Initialization) {
+TEST_F(SharedTokenBucketImplTest, Initialization) {
   SharedTokenBucketImpl token_bucket{1, time_system_, -1.0};
 
   EXPECT_EQ(1, token_bucket.consume(1, false));
@@ -22,7 +22,7 @@ TEST_F(SharedSharedTokenBucketImplTest, Initialization) {
 }
 
 // Verifies TokenBucket's maximum capacity.
-TEST_F(SharedSharedTokenBucketImplTest, MaxBucketSize) {
+TEST_F(SharedTokenBucketImplTest, MaxBucketSize) {
   SharedTokenBucketImpl token_bucket{3, time_system_, 1};
 
   EXPECT_EQ(3, token_bucket.consume(3, false));
@@ -32,7 +32,7 @@ TEST_F(SharedSharedTokenBucketImplTest, MaxBucketSize) {
 }
 
 // Verifies that TokenBucket can consume tokens.
-TEST_F(SharedSharedTokenBucketImplTest, Consume) {
+TEST_F(SharedTokenBucketImplTest, Consume) {
   SharedTokenBucketImpl token_bucket{10, time_system_, 1};
 
   EXPECT_EQ(0, token_bucket.consume(20, false));
@@ -52,7 +52,7 @@ TEST_F(SharedSharedTokenBucketImplTest, Consume) {
 }
 
 // Verifies that TokenBucket can refill tokens.
-TEST_F(SharedSharedTokenBucketImplTest, Refill) {
+TEST_F(SharedTokenBucketImplTest, Refill) {
   SharedTokenBucketImpl token_bucket{1, time_system_, 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
@@ -64,7 +64,7 @@ TEST_F(SharedSharedTokenBucketImplTest, Refill) {
   EXPECT_EQ(1, token_bucket.consume(1, false));
 }
 
-TEST_F(SharedSharedTokenBucketImplTest, NextTokenAvailable) {
+TEST_F(SharedTokenBucketImplTest, NextTokenAvailable) {
   SharedTokenBucketImpl token_bucket{10, time_system_, 5};
   EXPECT_EQ(9, token_bucket.consume(9, false));
   EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable());
@@ -74,7 +74,7 @@ TEST_F(SharedSharedTokenBucketImplTest, NextTokenAvailable) {
 }
 
 // Test partial consumption of tokens.
-TEST_F(SharedSharedTokenBucketImplTest, PartialConsumption) {
+TEST_F(SharedTokenBucketImplTest, PartialConsumption) {
   SharedTokenBucketImpl token_bucket{16, time_system_, 16};
   EXPECT_EQ(16, token_bucket.consume(18, true));
   EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
@@ -86,7 +86,7 @@ TEST_F(SharedSharedTokenBucketImplTest, PartialConsumption) {
 }
 
 // Test reset functionality for a shared token bucket.
-TEST_F(SharedSharedTokenBucketImplTest, Reset) {
+TEST_F(SharedTokenBucketImplTest, Reset) {
   SharedTokenBucketImpl token_bucket{16, time_system_, 16};
   token_bucket.synchronizer().enable();
   // Start a thread and call consume. This will wait post checking reset_once flag.
@@ -112,7 +112,7 @@ TEST_F(SharedSharedTokenBucketImplTest, Reset) {
 }
 
 // Verifies that TokenBucket can consume tokens with thread safety.
-TEST_F(SharedSharedTokenBucketImplTest, SynchronizedConsume) {
+TEST_F(SharedTokenBucketImplTest, SynchronizedConsume) {
   SharedTokenBucketImpl token_bucket{10, time_system_, 1};
 
   token_bucket.synchronizer().enable();
@@ -130,7 +130,7 @@ TEST_F(SharedSharedTokenBucketImplTest, SynchronizedConsume) {
   EXPECT_FALSE(token_bucket.isMutexLocked());
 }
 
-TEST_F(SharedSharedTokenBucketImplTest, SynchronizedNextTokenAvailable) {
+TEST_F(SharedTokenBucketImplTest, SynchronizedNextTokenAvailable) {
   SharedTokenBucketImpl token_bucket{10, time_system_, 16};
 
   token_bucket.synchronizer().enable();

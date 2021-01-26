@@ -1,9 +1,8 @@
 #pragma once
 
-#include "common/common/token_bucket_impl.h"
-
 #include "common/common/thread.h"
 #include "common/common/thread_synchronizer.h"
+#include "common/common/token_bucket_impl.h"
 
 namespace Envoy {
 
@@ -30,16 +29,16 @@ public:
 
   // TokenBucket
   uint64_t consume(uint64_t tokens, bool allow_partial)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) override;
+      /*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ override;
 
-  std::chrono::milliseconds nextTokenAvailable() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) override;
+  std::chrono::milliseconds nextTokenAvailable() /*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ override;
 
   /**
    * Resets the bucket to contain tokens equal to @param num_tokens
    * Since the token bucket is shared, only the first reset call will work. Subsequent calls to
    * reset method will be ignored.
    */
-  void reset(uint64_t num_tokens) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) override;
+  void reset(uint64_t num_tokens) /*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ override;
 
   // Used only for testing.
   Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; };
