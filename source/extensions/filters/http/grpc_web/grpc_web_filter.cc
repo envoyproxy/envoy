@@ -22,8 +22,10 @@ namespace GrpcWeb {
 
 namespace {
 
-// This is the maximum buffered plaintext data length to be converted into grpc-message header. This
-// is arbitrarily chosen. This can be made configurable when it is required.
+// This is the maximum buffered plaintext data length when we have buffered data in the encoding
+// buffer. This is effectively used (to limit the length of grpc-message) only when we have encoding
+// buffer filled with data. The value is arbitrarily chosen. This can be made configurable when it
+// is required.
 constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 
 // This builds grpc-message header value from body data.
