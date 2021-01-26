@@ -35,7 +35,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/rbac:87.5"
 "source/extensions/filters/http/cache:92.4"
 "source/extensions/filters/http/cache/simple_http_cache:95.2"
-"source/extensions/filters/http/dynamic_forward_proxy:95.0"
 "source/extensions/filters/http/grpc_json_transcoder:94.8"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/kill_request:95.0" # Death tests don't report LCOV
@@ -57,6 +56,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/opencensus:91.6"
 "source/extensions/tracers/xray:94.0"
 "source/extensions/transport_sockets:95.1"
+"source/extensions/transport_sockets/tls/cert_validator:95.1"
 "source/extensions/transport_sockets/tls/private_key:76.9"
 "source/extensions/transport_sockets/tls:94.4"
 "source/extensions/wasm_runtime:50.0"
@@ -66,7 +66,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:85.7"
 "source/server:94.5"
 "source/server/admin:95.1"
-"source/server/config_validation:76.6"
+"source/server/config_validation:75.6"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

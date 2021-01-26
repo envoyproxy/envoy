@@ -1077,29 +1077,7 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   active_request_.reset();
 }
 
-void ServerConnectionImpl::sendProtocolErrorOld(absl::string_view details) {
-  if (active_request_.has_value()) {
-    active_request_.value().response_encoder_.setDetails(details);
-  }
-  // We do this here because we may get a protocol error before we have a logical stream. Higher
-  // layers can only operate on streams, so there is no coherent way to allow them to send an error
-  // "out of band." On one hand this is kind of a hack but on the other hand it normalizes HTTP/1.1
-  // to look more like HTTP/2 to higher layers.
-  if (!active_request_.has_value() ||
-      !active_request_.value().response_encoder_.startedResponse()) {
-    Buffer::OwnedImpl bad_request_response(
-        absl::StrCat("HTTP/1.1 ", error_code_, " ", CodeUtility::toString(error_code_),
-                     "\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"));
-
-    connection_.write(bad_request_response, false);
-  }
-}
-
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.early_errors_via_hcm")) {
-    sendProtocolErrorOld(details);
-    return okStatus();
-  }
   // We do this here because we may get a protocol error before we have a logical stream.
   if (!active_request_.has_value()) {
     RETURN_IF_ERROR(onMessageBeginBase());
@@ -1212,15 +1190,6 @@ Envoy::StatusOr<int> ClientConnectionImpl::onHeadersComplete() {
         pending_response_.value().encoder_.connectRequest()) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;
-
-      // For responses to connect requests, do not accept the chunked
-      // encoding header: https://tools.ietf.org/html/rfc7231#section-4.3.6
-      if (headers->TransferEncoding() &&
-          absl::EqualsIgnoreCase(headers->TransferEncoding()->value().getStringView(),
-                                 Headers::get().TransferEncodingValues.Chunked)) {
-        RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));
-        return codecProtocolError("http/1.1 protocol error: unsupported transfer encoding");
-      }
     }
 
     if (strict_1xx_and_204_headers_ && (parser_.status_code < 200 || parser_.status_code == 204)) {

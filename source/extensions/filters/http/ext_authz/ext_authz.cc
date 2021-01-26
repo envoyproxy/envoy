@@ -252,8 +252,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     for (const auto& header : response->headers_to_remove) {
       // We don't allow removing any :-prefixed headers, nor Host, as removing
       // them would make the request malformed.
-      if (absl::StartsWithIgnoreCase(absl::string_view(header.get()), ":") ||
-          header == Http::Headers::get().HostLegacy) {
+      if (!Http::HeaderUtility::isRemovableHeader(header.get())) {
         continue;
       }
       ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, header.get());

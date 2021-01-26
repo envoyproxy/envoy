@@ -11,14 +11,11 @@ You can also :ref:`build it <building>` from source.
 These examples use the :ref:`v3 Envoy API <envoy_api_reference>`.
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
 
     install
     quick-start/index
+    sandboxes/index
     docker
     building
 
-.. toctree::
-    :maxdepth: 2
-
-    sandboxes/index

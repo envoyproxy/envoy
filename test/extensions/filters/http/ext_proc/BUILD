@@ -5,6 +5,7 @@ load(
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
+    "envoy_extension_cc_test_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -27,7 +28,23 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
+        ":mock_server_lib",
+        ":utils_lib",
         "//source/extensions/filters/http/ext_proc",
+        "//test/common/http:common_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ordering_test",
+    srcs = ["ordering_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        ":mock_server_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/common/http:common_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:test_runtime_lib",
     ],
@@ -43,6 +60,55 @@ envoy_extension_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "mutation_utils_test",
+    srcs = ["mutation_utils_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_proc_integration_test",
+    srcs = ["ext_proc_integration_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test_library(
+    name = "mock_server_lib",
+    srcs = ["mock_server.cc"],
+    hdrs = ["mock_server.h"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        "//source/extensions/filters/http/ext_proc:client_interface",
+    ],
+)
+
+envoy_extension_cc_test_library(
+    name = "utils_lib",
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

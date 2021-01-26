@@ -309,5 +309,16 @@ Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& h
   return Http::okStatus();
 }
 
+bool HeaderUtility::isRemovableHeader(absl::string_view header) {
+  return (header.empty() || header[0] != ':') &&
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
+}
+
+bool HeaderUtility::isModifiableHeader(absl::string_view header) {
+  return (header.empty() || header[0] != ':') &&
+         (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.treat_host_like_authority") ||
+          !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
+}
+
 } // namespace Http
 } // namespace Envoy
