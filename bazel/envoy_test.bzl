@@ -35,14 +35,17 @@ def _envoy_cc_test_infrastructure_library(
     # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
     deps += tcmalloc_external_deps(repository)
     pch_deps = []
+    pch_copts = []
     if not exclude_pch_dep:
         pch_deps = [repository + "//test:test_pch"]
+        pch_copts = envoy_pch_copts(repository, "//test:test_pch")
+
     cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
+        copts = envoy_copts(repository, test = True) + copts + pch_copts,
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + pch_deps,
         tags = tags,
@@ -166,7 +169,7 @@ def envoy_cc_test(
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
+        deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:test_pch",
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
@@ -196,6 +199,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
+    exclude_pch_dep = kargs.pop("exclude_pch_dep", True)
     _envoy_cc_test_infrastructure_library(
         name,
         srcs,
@@ -209,6 +213,7 @@ def envoy_cc_test_library(
         copts,
         visibility = ["//visibility:public"],
         alwayslink = alwayslink,
+        exclude_pch_dep = exclude_pch_dep,
         **kargs
     )
 

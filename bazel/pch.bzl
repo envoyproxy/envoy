@@ -63,13 +63,16 @@ def _pch(ctx):
         variables = cc_compile_variables,
     )
 
+    transitive_headers = []
+    for dep in ctx.attr.deps:
+        transitive_headers.append(dep[CcInfo].compilation_context.headers)
     ctx.actions.run(
         executable = cc_compiler_path,
         arguments = command_line,
         env = env,
         inputs = depset(
             items = [generated_header_file],
-            transitive = [cc_toolchain.all_files],
+            transitive = [cc_toolchain.all_files] + transitive_headers,
         ),
         outputs = [pch_file],
     )
