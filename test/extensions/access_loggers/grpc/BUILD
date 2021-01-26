@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -113,10 +114,10 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
+# TODO(itamarkam): Make this an envoy_cc_extension_test once the API is defined.
+envoy_cc_test(
     name = "grpc_ot_access_log_impl_test",
     srcs = ["grpc_ot_access_log_impl_test.cc"],
-    extension_name = "envoy.access_loggers.http_grpc",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/extensions/access_loggers/grpc:grpc_ot_access_log_lib",
