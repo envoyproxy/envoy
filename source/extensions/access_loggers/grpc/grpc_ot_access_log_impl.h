@@ -2,20 +2,20 @@
 
 #include <memory>
 
-#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
-#include "opentelemetry/proto/logs/v1/logs.pb.h"
-#include "opentelemetry/proto/resource/v1/resource.pb.h"
-
-#include "common/protobuf/protobuf.h"
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/protobuf/protobuf.h"
+
 #include "extensions/access_loggers/common/grpc_access_logger.h"
+
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/logs/v1/logs.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 namespace Envoy {
 namespace Extensions {
