@@ -51,7 +51,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   SegmentContextPtr segment_context;
   // TODO(shikugawa): support extension span header.
-  auto propagation_header = request_headers.get(kSkywalkingPropagationHeaderKey);
+  auto propagation_header = request_headers.get(skywalkingPropagationHeaderKey());
   if (propagation_header.empty()) {
     segment_context = segment_context_factory_->create();
     // Sampling status is always true on SkyWalking. But with disabling skip_analysis,

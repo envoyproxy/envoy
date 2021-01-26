@@ -20,7 +20,7 @@ using cpp2sky::kPropagationHeader;
 using cpp2sky::SegmentContextPtr;
 using SkywalkingTracer = cpp2sky::Tracer;
 
-const Http::LowerCaseString kSkywalkingPropagationHeaderKey{kPropagationHeader.data()};
+const Http::LowerCaseString& skywalkingPropagationHeaderKey();
 
 class Span : public Tracing::Span {
 public:

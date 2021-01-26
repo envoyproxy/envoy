@@ -12,6 +12,10 @@ static constexpr absl::string_view StatusCodeTag = "status_code";
 static constexpr absl::string_view UrlTag = "url";
 } // namespace
 
+const Http::LowerCaseString& skywalkingPropagationHeaderKey() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "sw8");
+}
+
 void Span::setTag(absl::string_view name, absl::string_view value) {
   if (name == Tracing::Tags::get().HttpUrl) {
     span_entity_->addTag(UrlTag.data(), value.data());
@@ -42,7 +46,7 @@ void Span::finishSpan() {
 
 void Span::injectContext(Http::RequestHeaderMap& request_headers) {
   request_headers.setReferenceKey(
-      kSkywalkingPropagationHeaderKey,
+      skywalkingPropagationHeaderKey(),
       segment_context_->createSW8HeaderValue(std::string(request_headers.getHostValue())));
 }
 
