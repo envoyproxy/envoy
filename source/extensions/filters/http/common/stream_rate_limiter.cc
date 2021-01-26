@@ -6,6 +6,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
+#include "common/common/token_bucket_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +19,7 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
                                      std::function<void(Buffer::Instance&, bool)> write_data_cb,
                                      std::function<void()> continue_cb, TimeSource& time_source,
                                      Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
-                                     std::shared_ptr<TokenBucketImpl> token_bucket,
+                                     std::shared_ptr<TokenBucket> token_bucket,
                                      uint64_t fill_rate)
     : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
       bytes_per_time_slice_((max_kbps * 1024) / fill_rate), write_data_cb_(write_data_cb),

@@ -62,6 +62,7 @@ envoy_cc_library(
     srcs = ["stream_rate_limiter.cc"],
     hdrs = ["stream_rate_limiter.h"],
     deps = [
+        "//include/envoy/common:token_bucket_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/buffer:watermark_buffer_lib",

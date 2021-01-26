@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/token_bucket.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/buffer/watermark_buffer.h"
-#include "common/common/token_bucket_impl.h"
 
 namespace Envoy {
 
@@ -52,7 +52,7 @@ public:
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
                     Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
-                    std::shared_ptr<TokenBucketImpl> token_bucket = nullptr,
+                    std::shared_ptr<TokenBucket> token_bucket = nullptr,
                     uint64_t fill_rate = DefaultFillRate);
 
   /**
@@ -83,7 +83,7 @@ private:
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
   const ScopeTrackedObject& scope_;
-  std::shared_ptr<TokenBucketImpl> token_bucket_;
+  std::shared_ptr<TokenBucket> token_bucket_;
   Event::TimerPtr token_timer_;
   bool saw_data_{};
   bool saw_end_stream_{};
