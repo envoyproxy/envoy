@@ -92,10 +92,9 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
-with open(EXTENSION_CATEGORY_DB) as f:
-  EXTENSION_CATEGORIES = json.load(
-    pathlib.Path(
-      os.getenv('EXTENSION_CAT_DB_PATH')).read_text())
+EXTENSION_CATEGORIES = json.loads(
+  pathlib.Path(
+    os.getenv('EXTENSION_CAT_DB_PATH')).read_text())
 
 
 class ProtodocError(Exception):
