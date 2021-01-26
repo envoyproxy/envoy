@@ -343,7 +343,7 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
       break;
     }
 
-    Slice slice(size);
+    Slice slice(size, slices_owner->free_list_);
     reservation_slices.push_back(slice.reserve(size));
     slices_owner->owned_slices_.emplace_back(std::move(slice));
     ASSERT(slice.dataSize() == 0);
