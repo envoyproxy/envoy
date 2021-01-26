@@ -29,7 +29,8 @@ constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 // This builds grpc-message header value from body data.
 std::string buildGrpcMessage(Buffer::Instance& body_data) {
   const uint64_t message_length = body_data.length();
-  std::string message(message_length, 0);
+  std::string message;
+  message.reserve(message_length);
   body_data.copyOut(0, message_length, message.data());
 
   return Http::Utility::PercentEncoding::encode(message);
@@ -109,8 +110,8 @@ bool GrpcWebFilter::needsTransformationForNonProtoEncodedResponse(Http::Response
                                                                   bool end_stream) const {
   return Runtime::runtimeFeatureEnabled(
              "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling") &&
-         // We do transformation when the response headers is not gRPC response headers and it is
-         // not proto-encoded gRPC-Web response headers.
+         // We transform the response unless it is already a gRPC or proto-encoded gRPC-Web
+         // response.
          !Grpc::Common::isGrpcResponseHeaders(headers, end_stream) &&
          !isProtoEncodedGrpcWebResponseHeaders(headers);
 }
@@ -125,7 +126,8 @@ void GrpcWebFilter::mergeAndLimitNonProtoEncodedResponseData(Buffer::OwnedImpl& 
     });
   }
 
-  // In the case of local reply, "encoding_buffer" is nullptr and we only have filled "last_data".
+  // In the case of local reply and when the response only contains single data chunk,
+  // "encoding_buffer" is nullptr and we only have filled "last_data".
   if (last_data != nullptr) {
     uint64_t needed = last_data->length();
     // When we have buffered data (from encoding buffer), we limit the final buffer length.
@@ -277,6 +279,9 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool en
   if (needs_transformation_for_non_proto_encoded_response_) {
     const auto* encoding_buffer = encoder_callbacks_->encodingBuffer();
     if (!end_stream) {
+      // We limit the buffered data in encoding buffer here to eliminate the possibility of
+      // buffering too large data from upstream. Note that the buffered data here will be
+      // transformed as grpc-message later.
       if (encoding_buffer != nullptr &&
           encoding_buffer->length() >= MAX_BUFFERED_PLAINTEXT_LENGTH) {
         return Http::FilterDataStatus::StopIterationNoBuffer;
