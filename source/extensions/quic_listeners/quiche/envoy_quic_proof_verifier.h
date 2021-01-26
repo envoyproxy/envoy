@@ -1,6 +1,7 @@
 #pragma once
 
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier_base.h"
+#include "extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
 
 namespace Envoy {

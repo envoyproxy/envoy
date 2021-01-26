@@ -36,7 +36,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       quic::CertificateView::ParseSingleCertificate(certs[0]);
   ASSERT(cert_view != nullptr);
   for (const absl::string_view& config_san : cert_view->subject_alt_name_domains()) {
-    if (Extensions::TransportSockets::Tls::ContextImpl::dnsNameMatch(hostname, config_san)) {
+    if (Extensions::TransportSockets::Tls::DefaultCertValidator::dnsNameMatch(hostname,
+                                                                              config_san)) {
       return quic::QUIC_SUCCESS;
     }
   }
