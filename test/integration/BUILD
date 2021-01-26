@@ -1578,7 +1578,7 @@ envoy_cc_test(
     srcs = ["direct_response_integration_test.cc"],
     deps = [
         ":http_integration_lib",
-    ]
+    ],
 )
 
 envoy_cc_test(
