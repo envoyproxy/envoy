@@ -61,9 +61,8 @@ pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
 rm -rf bazel-bin/external/envoy_api_canonical
 
 EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
-export EXTENSION_DB_PATH
-
 EXTENSION_CAT_DB_PATH="$(realpath "${BUILD_DIR}/extension_cat_db.json")"
+export EXTENSION_DB_PATH EXTENSION_CAT_DB_PATH
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"

@@ -92,6 +92,11 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
+with open(EXTENSION_CATEGORY_DB) as f:
+  EXTENSION_CATEGORIES = json.load(
+    pathlib.Path(
+      os.getenv('EXTENSION_CAT_DB_PATH')).read_text())
+
 
 class ProtodocError(Exception):
   """Base error class for the protodoc module."""
@@ -134,7 +139,7 @@ def FormatCommentWithAnnotations(comment, type_name=''):
     formatted_extension = FormatExtension(extension)
   formatted_extension_type = ''
   if annotations.EXTENSION_TYPE_ANNOTATION in comment.annotations:
-    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE 8)\n\n"
+    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE %s\n\n" % comment.annotations[annotations.EXTENSION_TYPE_ANNOTATION]
   return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_type
 
 
