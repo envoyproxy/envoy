@@ -16,7 +16,6 @@ namespace Tracers {
 namespace SkyWalking {
 
 using cpp2sky::CurrentSegmentSpanPtr;
-using cpp2sky::kPropagationHeader;
 using cpp2sky::SegmentContextPtr;
 using SkywalkingTracer = cpp2sky::Tracer;
 
