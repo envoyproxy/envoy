@@ -70,7 +70,8 @@ BAZEL_BUILD_OPTIONS+=(
     "--remote_download_outputs=all"
     "--strategy=protodoc=sandboxed,local"
     "--action_env=ENVOY_BLOB_SHA"
-    "--action_env=EXTENSION_DB_PATH")
+    "--action_env=EXTENSION_DB_PATH"
+    "--action_env=EXTENSION_CAT_DB_PATH")
 
 # Generate extension database. This maps from extension name to extension
 # metadata, based on the envoy_cc_extension() Bazel target attributes.
