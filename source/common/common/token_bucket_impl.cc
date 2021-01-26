@@ -1,7 +1,8 @@
 #include "common/common/token_bucket_impl.h"
-#include "common/common/lock_guard.h"
 
 #include <chrono>
+
+#include "common/common/lock_guard.h"
 
 namespace Envoy {
 
