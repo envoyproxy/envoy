@@ -104,6 +104,13 @@ private:
   // implementation, may need make a copy of the prefix.
   absl::flat_hash_map<absl::string_view, std::vector<TagExtractorPtr>> tag_extractor_prefix_map_;
   TagVector default_tags_;
+
+  struct TokenNode {
+    absl;:flat_hash_map<Symbol, std::vector<std::uniuqe_ptr<TokenNode>>> next_;
+    StatNme tag_name_;
+    bool wildcard_{false};
+  };
+  std::unique_ptr<TokenNode> token_root_;
 };
 
 } // namespace Stats

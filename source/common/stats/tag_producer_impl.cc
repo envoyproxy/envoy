@@ -7,6 +7,7 @@
 
 #include "common/common/utility.h"
 #include "common/stats/tag_extractor_impl.h"
+#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Stats {
@@ -97,9 +98,69 @@ std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVecto
   return StringUtil::removeCharacters(metric_name, remove_characters);
 }
 
-bool TagProducerImpl::produceTagsFromStatName(StatName /*metric_name*/, StatNameTagVector& /*tags*/,
-                                              StatName& /*tag_extracted_name*/,
-                                              StatNamePool& /*pool*/) const {
+class TagFromStatNameContext {
+ public:
+  using Segment = absl::variant<Element, absl::string_view>;
+  using SegmentVec = std::vector<Segment>;
+
+  TagFromStatNameContext(StatName metric_name, StatNameTagVector& tags,
+                         StatName& tag_extracted_name, StatNamePool& pool)
+      : tags_(tags), tag_extracted_name_(tag_extracted_name), pool_(pool) {
+    symbol_table_.decode(metric_name,
+                         [this](Symbol symbol) { segment_vec_.push_back(symbol); },
+                         [thi](absl::string_view name) { segment_vec_.push_back(name); });
+  }
+
+  void visit(TokenNode* node, uint32_t index) {
+  }
+
+  StatNameTagVector& tags_;
+  StatName& tag_extracted_name_;
+  StatNamePool& pool_;
+  SegmentVec segment_vec_;
+};
+
+bool TagProducerImpl::produceTagsFromStatNameHelper(
+    StatName metric_name, StatNameTagVector& tags,
+    StatName& tag_extracted_name,
+    StatNamePool& pool) const {
+}
+
+bool TagProducerImpl::produceTagsFromStatName(StatName metric_name, StatNameTagVector& tags,
+                                              StatName& tag_extracted_name,
+                                              StatNamePool& pool) const {
+  bool mismatch = false;
+  std::set<uint32_t> tag_indices;
+  uint32_t index = 0;
+  nodes.push_back(token_root_.get());
+  SegmentVec v;
+
+
+    if (mismatch) {
+      return;
+    }
+    std::vector<TokenNode*> new_nodes;
+    for (TokenNode* node : nodes) {
+      if (node.next_.empty()) {
+        // This is a terminal node
+        tag_indices.insert(index);
+        tags.emplace_back(StatNameTag{
+      } else {
+        auto iter = node->next_.find(symbol);
+        if (iter != node->next_.end()) {
+          for (std::unique_ptr<TokenNode>& node = iter->second) {
+            new_nodes.push_back(node.get());
+          }
+        }
+      }
+    }
+    if (new_nodes.empty()) {
+      mismatch = true;
+      return;
+    }
+      for
+    const std::vector<std::unique_ptr<TokenNode>>& matches = next_.
+  }
   return false;
 }
 

@@ -209,6 +209,7 @@ envoy_cc_library(
     deps = [
         ":symbol_table_lib",
         ":tag_extractor_lib",
+        ":utility_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:perf_annotation_lib",
         "//source/common/config:well_known_names",

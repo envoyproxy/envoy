@@ -154,6 +154,12 @@ void SymbolTableImpl::Encoding::decodeTokens(
   }
 }
 
+void SymbolTableImpl::decode(
+    StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
+    const std::function<void(absl::string_view)>& string_view_token_fn) const {
+  Encoding::decodeTokens(stat_name.data(), stat_name.size(), symbol_token_fn, string_view_token_fn);
+}
+
 std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable::Storage array,
                                                               size_t size) const {
   std::vector<absl::string_view> strings;
