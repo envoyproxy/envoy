@@ -1,32 +1,29 @@
 .. _config_http_filters_compressor:
 
-Compressor
+压缩器
 ==========
-Compressor is an HTTP filter which enables Envoy to compress dispatched data
-from an upstream service upon client request. Compression is useful in
-situations when bandwidth is scarce and large payloads can be effectively compressed
-at the expense of higher CPU load or offloading it to a compression accelerator.
+压缩器是一个 HTTP 过滤器，它允许 Envoy 基于客户端请求将从上游服务发过来的数据进行压缩。
+当带宽有限或者负载（payload）很大时，压缩是非常有用的，只不过代价是更高的 CPU 负载或者
+把压缩卸载到一个压缩加速器。
 
 .. note::
 
- This filter deprecates the :ref:`HTTP Gzip filter <config_http_filters_gzip>`.
+ 这个过滤器是为了替换 :ref:`HTTP Gzip 过滤器 <config_http_filters_gzip>`
 
-Configuration
+配置说明
 -------------
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
-* This filter should be configured with the name *envoy.filters.http.compressor*.
+* :ref:`v3 API 参考 <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
+* 这个过滤器配置的名称为 *envoy.filters.http.compressor*
 
-How it works
+工作原理
 ------------
-When compressor filter is enabled, request and response headers are inspected to
-determine whether or not the content should be compressed. The content is
-compressed and then sent to the client with the appropriate headers, if
-response and request allow.
+当过滤器启用后，会根据请求和应答报文头判断是否需要压缩报文体。
+如果请求与应答允许，则正文将被压缩，然后使用适当的报文头将其发送到客户端。
 
-Currently the filter supports :ref:`gzip compression <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
-only. Other compression libraries can be supported as extensions.
+当前过滤器只支持 :ref:`gzip compression <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+其它压缩库可作为扩展来支持。
 
-An example configuration of the filter may look like the following:
+配置示例如下：
 
 .. code-block:: yaml
 
@@ -48,68 +45,61 @@ An example configuration of the filter may look like the following:
             compression_level: best_compression
             compression_strategy: default_strategy
 
-By *default* compression will be *skipped* when:
+这些情况下，压缩器将不启用：
 
-- A request does NOT contain *accept-encoding* header.
-- A request includes *accept-encoding* header, but it does not contain "gzip" or "\*".
-- A request includes *accept-encoding* with "gzip" or "\*" with the weight "q=0". Note
-  that the "gzip" will have a higher weight then "\*". For example, if *accept-encoding*
-  is "gzip;q=0,\*;q=1", the filter will not compress. But if the header is set to
-  "\*;q=0,gzip;q=1", the filter will compress.
-- A request whose *accept-encoding* header includes any encoding type with a higher
-  weight than "gzip"'s given the corresponding compression filter is present in the chain.
-- A response contains a *content-encoding* header.
-- A response contains a *cache-control* header whose value includes "no-transform".
-- A response contains a *transfer-encoding* header whose value includes "gzip".
-- A response does not contain a *content-type* value that matches one of the selected
-  mime-types, which default to *application/javascript*, *application/json*,
+- 请求头中不包含 *accept-encoding*
+- 请求头中虽然包含 *accept-encoding* ，但取值中不包含“gzip”或者“\*”
+- 请求头中 *accept-encoding* 取值包含“gzip” or “\*”但权重配置“q=0”
+  需要注意的是：“gzip”优先级比“\*”高。例如，当 *accept-encoding*
+  取值为“gzip;q=0,\*;q=1”，过滤器将不会压缩。但如果它取值为
+  “\*;q=0,gzip;q=1”，过滤器将进行压缩
+- 请求头中 *accept-encoding* 中包含其它比“gzip”权重更高的压缩算法，
+  且该算法过滤器在处理链中存在。
+- 应答报文头中包含 *content-encoding*
+- 应答报文头中 *cache-control* 取值包含“no-transform”
+- 应答报文头中 *transfer-encoding* 取值包含“gzip”
+- 应答报文头中 *content-type* 取值不在这些当中：*application/javascript*, *application/json*,
   *application/xhtml+xml*, *image/svg+xml*, *text/css*, *text/html*, *text/plain*,
-  *text/xml*.
-- Neither *content-length* nor *transfer-encoding* headers are present in
-  the response.
-- Response size is smaller than 30 bytes (only applicable when *transfer-encoding*
-  is not chunked).
+  *text/xml*
+- 应答报文头中不包含 *content-length* 和 *transfer-encoding*
+- 应答报文体小于 30 字节 (仅适用于 *transfer-encoding* 取值不为：chunked)
 
-Please note that in case the filter is configured to use a compression library extension
-other than gzip it looks for content encoding in the *accept-encoding* header provided by
-the extension.
+需要注意的是，如果过滤器配置的是 gzip 之外的扩展压缩库，将从扩展提供的报文头 *accept-encoding* 中获取
+编码方式。
 
-When compression is *applied*:
 
-- The *content-length* is removed from response headers.
-- Response headers contain "*transfer-encoding: chunked*" and do not contain
-  "*content-encoding*" header.
-- The "*vary: accept-encoding*" header is inserted on every response.
+当压缩器生效，将有如下影响：
 
-Also the "*vary: accept-encoding*" header may be inserted even if compression is *not*
-applied due to incompatible "*accept-encoding*" header in a request. This happens
-when the requested resource still can be compressed given compatible "*accept-encoding*".
-Otherwise, if an uncompressed response is cached by a caching proxy in front of Envoy,
-the proxy won't know to fetch a new incoming request with compatible "*accept-encoding*"
-from upstream.
+- 应答报文头中 *content-length* 字段将被去除
+- 应答报文头中包含“*transfer-encoding: chunked*”且不包含“*content-encoding*”。
+- 每个应答报文头中都会带上“*vary: accept-encoding*”
+
+同时，即使由于不兼容的 “accept-encoding” 头部，压缩没有被启用，"*vary: accept-encoding*" 头部也可以被插入。
+当给定兼容的 "*accept-encoding*" 仍可以被压缩时，这种情况就会发生。否则，如果未压缩的响应被 Envoy
+前面的缓存代理缓存，那么该代理将不知道如何用兼容的 "*accept-encoding*" 从上游获取新传入的请求。
 
 .. _compressor-statistics:
 
-Statistics
+统计信息
 ----------
 
-Every configured Compressor filter has statistics rooted at
+所有配置压缩过滤器的指标前缀为
 <stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*
-with the following:
+指标项如下:
 
 .. csv-table::
-  :header: Name, Type, Description
+  :header: 名称, 类型, 描述
   :widths: 1, 1, 2
 
-  compressed, Counter, Number of requests compressed.
-  not_compressed, Counter, Number of requests not compressed.
-  no_accept_header, Counter, Number of requests with no accept header sent.
-  header_identity, Counter, Number of requests sent with "identity" set as the *accept-encoding*.
-  header_compressor_used, Counter, Number of requests sent with "gzip" set as the *accept-encoding*.
-  header_compressor_overshadowed, Counter, Number of requests skipped by this filter instance because they were handled by another filter in the same filter chain.
-  header_wildcard, Counter, Number of requests sent with "\*" set as the *accept-encoding*.
-  header_not_valid, Counter, Number of requests sent with a not valid *accept-encoding* header (aka "q=0" or an unsupported encoding type).
-  total_uncompressed_bytes, Counter, The total uncompressed bytes of all the requests that were marked for compression.
-  total_compressed_bytes, Counter, The total compressed bytes of all the requests that were marked for compression.
-  content_length_too_small, Counter, Number of requests that accepted gzip encoding but did not compress because the payload was too small.
-  not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. *disable_on_etag_header* must be turned on for this to happen.
+  compressed, Counter, 已压缩的请求数
+  not_compressed, Counter, 未压缩的请求数
+  no_accept_header, Counter, 请求头不匹配的请求数
+  header_identity, Counter, 请求头中包含 *accept-encoding* 的请求数
+  header_compressor_used, Counter, 请求头中 *accept-encoding* 设置为“gzip”的请求数
+  header_compressor_overshadowed, Counter, 由于已经匹配链路中其它过滤器而跳过的请求数
+  header_wildcard, Counter, 请求头中 *accept-encoding* 设置为“\*”的请求数
+  header_not_valid, Counter, 请求头中 *accept-encoding* 取值不合法的请求数（比如“q=0”或者其它不支持的压缩方式）
+  total_uncompressed_bytes, Counter, 标记为需要压缩但未进行压缩的字节总数
+  total_compressed_bytes, Counter, 标记为需要压缩且已经压缩的字节总数
+  content_length_too_small, Counter, 标记为需要压缩但由于报文字节数太小未进行压缩的请求数
+  not_compressed_etag, Counter, 由于扩展报文头而未进行压缩的请求数。只有当开启 *disable_on_etag_header* 时才有该指标
