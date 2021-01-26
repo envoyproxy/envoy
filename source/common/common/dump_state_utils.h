@@ -27,7 +27,7 @@ namespace Envoy {
   ", " #member ": " << ((member).has_value() ? absl::StrCat((member).value()) : "null")
 
 #define DUMP_NULLABLE_MEMBER(member, value)                                                        \
-  ", " #member ": " << ((member) != nullptr ? value : "null")
+  ", " #member ": " << ((member) != nullptr ? (value) : "null")
 
 // Macro assumes local member variables
 // os (ostream)

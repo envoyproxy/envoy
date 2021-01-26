@@ -870,17 +870,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
-     << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_);
-
-  // Dump the first slice of the dispatching buffer and buffered_body if
-  // applicable.
-  auto dumpBuffer = [](auto* instance) {
-    auto slice = instance->frontSlice();
-    return absl::string_view(static_cast<const char*>(slice.mem_), slice.len_);
-  };
-
-  os << DUMP_NULLABLE_MEMBER(current_dispatching_buffer_, dumpBuffer(current_dispatching_buffer_));
-  os << DUMP_MEMBER(buffered_body_, dumpBuffer(&buffered_body_));
+     << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
+     << DUMP_MEMBER(buffered_body_.length(), buffered_body_.length());
 
   // Dump header parsing state, and any progress on other headers.
   os << DUMP_MEMBER(header_parsing_state_);
@@ -894,11 +885,37 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   // Dump Child
   os << "\n";
   dumpAdditionalState(os, indent_level);
+
+  // Dump the first slice of the dispatching buffer if not drained.
+  if (current_dispatching_buffer_ == nullptr || dispatching_slice_already_drained_) {
+    // Buffer is either null or already drained (in the body).
+    // Use the macro for consistent formatting.
+    os << DUMP_NULLABLE_MEMBER(current_dispatching_buffer_, "null");
+    return;
+  } else {
+    auto front_slice = [](Buffer::Instance* instance) {
+      auto slice = instance->frontSlice();
+      return absl::string_view(static_cast<const char*>(slice.mem_), slice.len_);
+    }(current_dispatching_buffer_);
+
+    os << spaces << DUMP_MEMBER(front_slice.length(), front_slice.length()) << ", front_slice: \n";
+    {
+      const char* spaces = spacesForLevel(indent_level + 1);
+      // Dump buffer data. TODO(kbaichoo): escape?
+      os << spaces << front_slice;
+    }
+  }
 }
 
 void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  // Dump header map, it may be null if it was moved to the request.
+  os << DUMP_MEMBER(active_request_.request_url_,
+                    active_request_.has_value() &&
+                            !active_request_.value().request_url_.getStringView().empty()
+                        ? active_request_.value().request_url_.getStringView()
+                        : "null\n");
+  // Dump header map, it may be null if it was moved to the request, and
+  // request_url.
   if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
     DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
   } else {

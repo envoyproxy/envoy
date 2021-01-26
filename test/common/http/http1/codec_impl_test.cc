@@ -1952,7 +1952,7 @@ TEST_F(Http1ServerConnectionImplTest,
                                  "Unfinished-Header, current_header_value_: Not-Finished-Value"));
 }
 
-TEST_F(Http1ServerConnectionImplTest, ShouldDumpBuffersWithoutAllocatingMemory) {
+TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -1980,10 +1980,10 @@ TEST_F(Http1ServerConnectionImplTest, ShouldDumpBuffersWithoutAllocatingMemory) 
   EXPECT_TRUE(status.ok());
 
   // Check dump contents
-  EXPECT_THAT(
-      ostream.contents(),
-      HasSubstr("current_dispatching_buffer_: POST / HTTP/1.1\r\nContent-Length: 11\r\n\r\nHello "
-                "Envoy, buffered_body_: Hello Envoy, header_parsing_state_: Done"));
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 11, header_parsing_state_: "
+                                            "Done\n, active_request_.request_url_: null"));
+  EXPECT_THAT(ostream.contents(), HasSubstr("front_slice.length(): 50, front_slice: \n  POST / "
+                                            "HTTP/1.1\r\nContent-Length: 11\r\n\r\nHello Envoy"));
 }
 
 class Http1ClientConnectionImplTest : public Http1CodecTestBase {
@@ -3062,7 +3062,7 @@ TEST_F(Http1ClientConnectionImplTest,
                                  "Content-Length, current_header_value_: 8"));
 }
 
-TEST_F(Http1ClientConnectionImplTest, ShouldDumpBuffersWithoutAllocatingMemory) {
+TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
   initialize();
 
   // Send request
@@ -3089,10 +3089,11 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpBuffersWithoutAllocatingMemory) 
   EXPECT_TRUE(status.ok());
 
   // Check for body data.
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 11, header_parsing_state_: "
+                                            "Done\n"));
   EXPECT_THAT(ostream.contents(),
-              testing::HasSubstr(
-                  "current_dispatching_buffer_: HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nHello "
-                  "Envoy, buffered_body_: Hello Envoy, header_parsing_state_: Done"));
+              testing::HasSubstr("front_slice.length(): 50, front_slice: \n  HTTP/1.1 200 "
+                                 "OK\r\nContent-Length: 11\r\n\r\nHello Envoy"));
 }
 
 } // namespace Http
