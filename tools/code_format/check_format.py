@@ -523,8 +523,9 @@ class FormatChecker:
         match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
         if not match:
           reportError("Version history line malformed. "
-                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" %
-                      line)
+                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s\n"
+                      "Please use messages in the form 'category: feature explanation.', "
+                      "starting with a lower-cased letter and ending with a period." % line)
         else:
           first_word = match.groups()[0]
           next_word = match.groups()[1]
