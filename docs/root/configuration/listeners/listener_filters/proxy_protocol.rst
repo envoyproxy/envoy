@@ -15,8 +15,8 @@
 
 如果有协议错误或者不支持的地址簇（比如 AF_UNIX），则连接将被关闭且抛出错误。
 
-* :ref:`v3 API reference <envoy_v3_api_field_config.listener.v3.Filter.name>`
-* This filter should be configured with the name *envoy.filters.listener.proxy_protocol*.
+* :ref:`v3 API 参考 <envoy_v3_api_field_config.listener.v3.Filter.name>`
+* 此过滤器应使用 *envoy.filters.listener.proxy_protocol* 名称进行配置。
 
 统计
 ------
