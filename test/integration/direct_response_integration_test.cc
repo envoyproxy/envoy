@@ -11,7 +11,7 @@ public:
 
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
-  // The default value for default body size bytes is 4K.
+  // The default value for body size in bytes is 4096.
   void testDirectResponseBodySize(uint32_t body_size_bytes = 4096) {
     const std::string body_content(body_size_bytes, 'a');
     config_helper_.addConfigModifier(
