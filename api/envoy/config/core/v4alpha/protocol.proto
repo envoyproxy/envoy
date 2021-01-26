@@ -382,3 +382,11 @@ message GrpcProtocolOptions {
 
   Http2ProtocolOptions http2_protocol_options = 1;
 }
+
+// [#not-implemented-hide:]
+message Http3ProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.Http3ProtocolOptions";
+
+  Http2ProtocolOptions http2_protocol_options = 1;
+}

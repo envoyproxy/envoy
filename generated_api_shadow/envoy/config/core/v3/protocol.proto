@@ -389,3 +389,8 @@ message GrpcProtocolOptions {
 
   Http2ProtocolOptions http2_protocol_options = 1;
 }
+
+// [#not-implemented-hide:]
+message Http3ProtocolOptions {
+  Http2ProtocolOptions http2_protocol_options = 1;
+}
