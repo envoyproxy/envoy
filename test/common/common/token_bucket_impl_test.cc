@@ -11,14 +11,6 @@ namespace Envoy {
 class TokenBucketImplTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
-
-  bool isMutexLocked(Thread::MutexBasicLockable& mutex) {
-    auto locked = mutex.tryLock();
-    if (locked) {
-      mutex.unlock();
-    }
-    return !locked;
-  }
 };
 
 // Verifies TokenBucket initialization.
@@ -99,75 +91,6 @@ TEST_F(TokenBucketImplTest, Reset) {
   token_bucket.reset(1);
   EXPECT_EQ(1, token_bucket.consume(2, true));
   EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
-
-  // Reset again. Should be honored.
-  token_bucket.reset(5);
-  EXPECT_EQ(5, token_bucket.consume(5, true));
-}
-
-// Verifies that TokenBucket can consume tokens with thread safety.
-TEST_F(TokenBucketImplTest, SharedBucketSynchronizedConsume) {
-  Thread::MutexBasicLockable mutex;
-  TokenBucketImpl token_bucket{10, time_system_, 1, &mutex};
-
-  token_bucket.synchronizer().enable();
-  // Start a thread and call consume. This will wait post lock.
-  token_bucket.synchronizer().waitOn(TokenBucketImpl::MutexLockedSyncPoint);
-  std::thread thread([&] { EXPECT_EQ(10, token_bucket.consume(20, true)); });
-
-  // Wait until the thread is actually waiting.
-  token_bucket.synchronizer().barrierOn(TokenBucketImpl::MutexLockedSyncPoint);
-
-  // Mutex should be already locked.
-  EXPECT_TRUE(isMutexLocked(mutex));
-  token_bucket.synchronizer().signal(TokenBucketImpl::MutexLockedSyncPoint);
-  thread.join();
-  EXPECT_FALSE(isMutexLocked(mutex));
-}
-
-TEST_F(TokenBucketImplTest, SharedBucketNextTokenAvailable) {
-  Thread::MutexBasicLockable mutex;
-  TokenBucketImpl token_bucket{10, time_system_, 16, &mutex};
-
-  token_bucket.synchronizer().enable();
-  // Start a thread and call consume. This will wait post lock.
-  token_bucket.synchronizer().waitOn(TokenBucketImpl::MutexLockedSyncPoint);
-  std::thread thread(
-      [&] { EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable()); });
-
-  // Wait until the thread is actually waiting.
-  token_bucket.synchronizer().barrierOn(TokenBucketImpl::MutexLockedSyncPoint);
-
-  // Mutex should be already locked.
-  EXPECT_TRUE(isMutexLocked(mutex));
-  token_bucket.synchronizer().signal(TokenBucketImpl::MutexLockedSyncPoint);
-  thread.join();
-  EXPECT_FALSE(isMutexLocked(mutex));
-}
-
-// Test reset functionality for a shared token bucket.
-TEST_F(TokenBucketImplTest, SharedBucketReset) {
-  Thread::MutexBasicLockable mutex;
-  TokenBucketImpl token_bucket{16, time_system_, 16, &mutex};
-  token_bucket.synchronizer().enable();
-  // Start a thread and call consume. This will wait post lock.
-  token_bucket.synchronizer().waitOn(TokenBucketImpl::MutexLockedSyncPoint);
-  std::thread thread([&] { token_bucket.reset(1); });
-  // Wait until the thread is actually waiting.
-  token_bucket.synchronizer().barrierOn(TokenBucketImpl::MutexLockedSyncPoint);
-
-  // Mutex should be already locked.
-  EXPECT_TRUE(isMutexLocked(mutex));
-  token_bucket.synchronizer().signal(TokenBucketImpl::MutexLockedSyncPoint);
-  thread.join();
-  EXPECT_FALSE(isMutexLocked(mutex));
-
-  EXPECT_EQ(1, token_bucket.consume(2, true));
-  EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
-
-  // Reset again. Should be ignored for shared bucket.
-  token_bucket.reset(5);
-  EXPECT_EQ(0, token_bucket.consume(5, true));
 }
 
 } // namespace Envoy

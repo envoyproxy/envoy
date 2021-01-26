@@ -397,6 +397,17 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/common:token_bucket_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "shared_token_bucket_impl_lib",
+    srcs = ["shared_token_bucket_impl.cc"],
+    hdrs = ["shared_token_bucket_impl.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//source/common/common:token_bucket_impl_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:utility_lib",
