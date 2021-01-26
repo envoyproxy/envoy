@@ -539,6 +539,7 @@ public:
   COUNTER(upstream_cx_destroy_with_active_rq)                                                      \
   COUNTER(upstream_cx_http1_total)                                                                 \
   COUNTER(upstream_cx_http2_total)                                                                 \
+  COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \

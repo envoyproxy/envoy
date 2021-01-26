@@ -123,9 +123,15 @@ common_tls_context:
   }
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context_);
-  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+  if (upstream_config_.upstream_protocol_ != FakeHttpConnection::Type::HTTP3) {
+    static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+  } else {
+    return Config::Utility::getAndCheckFactoryByName<Http::QuicServerTransportSocketFactory>(
+               Http::QuicCodecNames::get().Quiche)
+        .createQuicServerTransportSocketFactory(std::move(cfg));
+  }
 }
 
 void BaseIntegrationTest::createUpstreams() {
@@ -211,13 +217,25 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
-  } else {
-    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
+  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
           ConfigHelper::HttpProtocolOptions protocol_options;
           protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  } else {
+    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP3, "");
+    setUdpFakeUpstream(true);
+    upstream_tls_ = true;
+    config_helper_.configureUpstreamTls(false);
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()->mutable_http3_protocol_options();
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });

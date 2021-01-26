@@ -9,6 +9,25 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "quic_protocol_integration_test",
+    size = "medium",
+    srcs = [
+        "quic_protocol_integration_test.cc",
+    ],
+    data = ["//test/config/integration/certs"],
+    shard_count = 6,
+    tags = [
+        "fails_on_clang_cl",
+        "fails_on_windows",
+        "nofips",
+    ],
+    deps = [
+        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
+        "//test/integration:protocol_integration_test_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "quic_http_integration_test",
     size = "medium",
     srcs = ["quic_http_integration_test.cc"],

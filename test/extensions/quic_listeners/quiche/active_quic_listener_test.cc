@@ -61,7 +61,7 @@ public:
     return *listener.crypto_config_;
   }
 
-  static bool enabled(ActiveQuicListener& listener) { return listener.enabled_.enabled(); }
+  static bool enabled(ActiveQuicListener& listener) { return listener.enabled_->enabled(); }
 };
 
 class ActiveQuicListenerFactoryPeer {

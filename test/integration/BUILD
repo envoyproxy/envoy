@@ -680,6 +680,8 @@ envoy_cc_test_library(
         "//source/common/grpc:common_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/http3:quic_codec_factory_lib",
+        "//source/common/http/http3:well_known_names",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",

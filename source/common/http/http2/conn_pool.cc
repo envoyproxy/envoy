@@ -10,13 +10,12 @@
 
 namespace Envoy {
 namespace Http {
-namespace Http2 {
 
 // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
 // side we do 2^29.
 static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 
-void ActiveClient::onGoAway(Http::GoAwayErrorCode) {
+void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
   if (state_ != ActiveClient::State::DRAINING) {
@@ -28,7 +27,7 @@ void ActiveClient::onGoAway(Http::GoAwayErrorCode) {
   }
 }
 
-void ActiveClient::onStreamDestroy() {
+void MultiplexedActiveClientBase::onStreamDestroy() {
   parent().onStreamClosed(*this, false);
 
   // If we are destroying this stream because of a disconnect, do not check for drain here. We will
@@ -39,7 +38,7 @@ void ActiveClient::onStreamDestroy() {
   }
 }
 
-void ActiveClient::onStreamReset(Http::StreamResetReason reason) {
+void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) {
   if (reason == StreamResetReason::ConnectionTermination ||
       reason == StreamResetReason::ConnectionFailure) {
     parent_.host()->cluster().stats().upstream_rq_pending_failure_eject_.inc();
@@ -55,30 +54,44 @@ uint64_t maxStreamsPerConnection(uint64_t max_streams_config) {
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 
-ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
+MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& parent,
+                                                         Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value()) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
-  parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
+  cx_total.inc();
 }
 
-ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
-                           Upstream::Host::CreateConnectionData& data)
+MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,
+                                                         Upstream::Host::CreateConnectionData& data,
+                                                         Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value(), data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
-  parent.host()->cluster().stats().upstream_cx_http2_total_.inc();
+  cx_total.inc();
 }
 
-bool ActiveClient::closingWithIncompleteStream() const { return closed_with_active_rq_; }
+bool MultiplexedActiveClientBase::closingWithIncompleteStream() const {
+  return closed_with_active_rq_;
+}
 
-RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
+RequestEncoder& MultiplexedActiveClientBase::newStreamEncoder(ResponseDecoder& response_decoder) {
   return codec_client_->newStream(response_decoder);
 }
+
+namespace Http2 {
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
+    : MultiplexedActiveClientBase(parent,
+                                  parent.host()->cluster().stats().upstream_cx_http2_total_) {}
+
+ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+                           Upstream::Host::CreateConnectionData& data)
+    : MultiplexedActiveClientBase(parent, data,
+                                  parent.host()->cluster().stats().upstream_cx_http2_total_) {}
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,

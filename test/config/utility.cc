@@ -702,6 +702,8 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn) {
         tls_context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    // The test certs are for *.lyft.com, so make sure SNI matches.
+    tls_context.set_sni("foo.lyft.com");
     cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
     cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
   });
