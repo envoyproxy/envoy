@@ -47,10 +47,8 @@ message FilterConfig {
     //
     // .. attention::
     //   If neither `individual_method_stats_allowlist` nor `stats_for_all_methods` is set, the
-    //   behavior will default to `stats_for_all_methods=true`. This default value is deprecated,
-    //   and in a future release, if neither field is set, it will default to
-    //   `stats_for_all_methods=false` in order to be safe by default. This behavior can be
-    //   controlled with runtime override
+    //   behavior will default to `stats_for_all_methods=false`. This default value is changed due
+    //   to the previous value being deprecated. This behavior can be changed with runtime override
     //   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
     google.protobuf.BoolValue stats_for_all_methods = 3;
   }
