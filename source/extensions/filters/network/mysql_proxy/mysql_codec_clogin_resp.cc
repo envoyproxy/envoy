@@ -1,7 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 
-#include <bits/stdint-uintn.h>
-
 #include <string>
 
 #include "envoy/buffer/buffer.h"

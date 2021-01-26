@@ -1,7 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 
-#include <bits/stdint-uintn.h>
-
 #include "envoy/buffer/buffer.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"

@@ -1,9 +1,5 @@
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
-#include <bits/stdint-uintn.h>
-
-#include <iterator>
-
 #include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
