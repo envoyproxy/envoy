@@ -59,11 +59,6 @@ Envoy 中的每一个配置资源，在 `typed_config` 中都有一个类型 URL
 
 扩展配置可以使用 :ref:`ExtensionConfiguration 发现服务 <envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>` 的 :ref:`xDS 管理服务器 <xds_protocol>` 来动态提供。扩展配置中的 name 字段充当资源标识符。比如，HTTP 连接管理器支持 HTTP 过滤器的 :ref:`动态过滤器重配置 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`。
 
-Extension config discovery service has a :ref:`statistics
-<subscription_statistics>` tree rooted at
-*<stat_prefix>.extension_config_discovery.<extension_config_name>*. In addition
-to the common subscription statistics, it also provides the following:
-
 扩展配置发现服务有一个以 *<stat_prefix>.extension_config_discovery.<extension_config_name>* 为根的 :ref:`统计 <subscription_statistics>` 树。除了公共订阅统计，它还提供如下统计：
 
 .. csv-table::
