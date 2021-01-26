@@ -1,8 +1,10 @@
-#include "common/protobuf/utility.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "benchmark/benchmark.h"
+#include "common/protobuf/utility.h"
+
 #include "test/test_common/utility.h"
+
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 

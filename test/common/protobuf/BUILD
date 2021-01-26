@@ -1,10 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
 )
 
 licenses(["notice"])  # Apache 2
@@ -26,7 +26,10 @@ envoy_cc_benchmark_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
     external_deps = ["benchmark"],
-    deps = ["//source/common/common:minimal_logger_lib"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_benchmark_test(
