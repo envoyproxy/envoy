@@ -19,6 +19,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/common/fault/fault_config.h"
+#include "extensions/filters/http/common/stream_rate_limiter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -145,67 +146,6 @@ private:
 
 using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
 
-/**
- * An HTTP stream rate limiter. Split out for ease of testing and potential code reuse elsewhere.
- */
-class StreamRateLimiter : Logger::Loggable<Logger::Id::filter> {
-public:
-  /**
-   * @param max_kbps maximum rate in KiB/s.
-   * @param max_buffered_data maximum data to buffer before invoking the pause callback.
-   * @param pause_data_cb callback invoked when the limiter has buffered too much data.
-   * @param resume_data_cb callback invoked when the limiter has gone under the buffer limit.
-   * @param write_data_cb callback invoked to write data to the stream.
-   * @param continue_cb callback invoked to continue the stream. This is only used to continue
-   *                    trailers that have been paused during body flush.
-   * @param time_source the time source to run the token bucket with.
-   * @param dispatcher the stream's dispatcher to use for creating timers.
-   * @param scope the stream's scope
-   */
-  StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
-                    std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
-                    std::function<void(Buffer::Instance&, bool)> write_data_cb,
-                    std::function<void()> continue_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope);
-
-  /**
-   * Called by the stream to write data. All data writes happen asynchronously, the stream should
-   * be stopped after this call (all data will be drained from incoming_buffer).
-   */
-  void writeData(Buffer::Instance& incoming_buffer, bool end_stream);
-
-  /**
-   * Called if the stream receives trailers.
-   */
-  Http::FilterTrailersStatus onTrailers();
-
-  /**
-   * Like the owning filter, we must handle inline destruction, so we have a destroy() method which
-   * kills any callbacks.
-   */
-  void destroy() { token_timer_.reset(); }
-  bool destroyed() { return token_timer_ == nullptr; }
-
-private:
-  void onTokenTimer();
-
-  // We currently divide each second into 16 segments for the token bucket. Thus, the rate limit is
-  // KiB per second, divided into 16 segments, ~63ms apart. 16 is used because it divides into 1024
-  // evenly.
-  static constexpr uint64_t SecondDivisor = 16;
-
-  const uint64_t bytes_per_time_slice_;
-  const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
-  const std::function<void()> continue_cb_;
-  const ScopeTrackedObject& scope_;
-  TokenBucketImpl token_bucket_;
-  Event::TimerPtr token_timer_;
-  bool saw_data_{};
-  bool saw_end_stream_{};
-  bool saw_trailers_{};
-  Buffer::WatermarkBuffer buffer_;
-};
-
 using AbortHttpAndGrpcStatus =
     std::pair<absl::optional<Http::Code>, absl::optional<Grpc::Status::GrpcStatus>>;
 /**
@@ -278,7 +218,7 @@ private:
   std::unique_ptr<Stats::StatNameDynamicStorage> downstream_cluster_storage_;
   const FaultSettings* fault_settings_;
   bool fault_active_{};
-  std::unique_ptr<StreamRateLimiter> response_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
   std::string downstream_cluster_delay_percent_key_{};
   std::string downstream_cluster_abort_percent_key_{};
   std::string downstream_cluster_delay_duration_key_{};
