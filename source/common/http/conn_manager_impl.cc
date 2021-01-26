@@ -10,6 +10,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/drain_decision.h"
@@ -121,8 +122,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_.idleTimeout()) {
-    connection_idle_timer_ = overload_state_.createScaledTimer(
-        Server::OverloadTimerType::HttpDownstreamIdleConnectionTimeout,
+    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createScaledTimer(
+        Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout,
         [this]() -> void { onIdleTimeout(); });
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
@@ -627,9 +628,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
-    stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
-        Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
-        [this]() -> void { onIdleTimeout(); });
+    stream_idle_timer_ =
+        connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
+            Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
+            [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
 
@@ -858,12 +860,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
-  const bool fixed_connection_close =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close");
-  if (fixed_connection_close) {
-    state_.saw_connection_close_ =
-        HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
-  }
+  state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
   if (HeaderUtility::isConnect(*request_headers_) && !request_headers_->Path() &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.stop_faking_paths")) {
     request_headers_->setPath("/");
@@ -930,14 +927,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       sendLocalReply(false, Code::UpgradeRequired, "", nullptr, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
-    } else if (!fixed_connection_close) {
-      // HTTP/1.0 defaults to single-use connections. Make sure the connection
-      // will be closed unless Keep-Alive is present.
-      state_.saw_connection_close_ = true;
-      if (absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
-                                 Http::Headers::get().ConnectionValues.KeepAlive)) {
-        state_.saw_connection_close_ = false;
-      }
     }
     if (!request_headers_->Host() &&
         !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
@@ -988,20 +977,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ConnectionManagerUtility::maybeNormalizeHost(*request_headers_, connection_manager_.config_,
                                                localPort());
 
-  if (!fixed_connection_close && protocol == Protocol::Http11 &&
-      absl::EqualsIgnoreCase(request_headers_->getConnectionValue(),
-                             Http::Headers::get().ConnectionValues.Close)) {
-    state_.saw_connection_close_ = true;
-  }
-  // Note: Proxy-Connection is not a standard header, but is supported here
-  // since it is supported by http-parser the underlying parser for http
-  // requests.
-  if (!fixed_connection_close && protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
-      absl::EqualsIgnoreCase(request_headers_->getProxyConnectionValue(),
-                             Http::Headers::get().ConnectionValues.Close)) {
-    state_.saw_connection_close_ = true;
-  }
-
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
     filter_manager_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
@@ -1051,9 +1026,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       if (idle_timeout_ms_.count()) {
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
-          stream_idle_timer_ = connection_manager_.overload_state_.createScaledTimer(
-              Server::OverloadTimerType::HttpDownstreamIdleStreamTimeout,
-              [this]() -> void { onIdleTimeout(); });
+          stream_idle_timer_ =
+              connection_manager_.read_callbacks_->connection().dispatcher().createScaledTimer(
+                  Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
+                  [this]() -> void { onIdleTimeout(); });
         }
       } else if (stream_idle_timer_ != nullptr) {
         // If we had a global stream idle timeout but the route-level idle timeout is set to zero

@@ -4,6 +4,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/network/address.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -403,7 +404,10 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   // Avoid setting noDelay on the fake fd of 0.
   auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
 
-  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mocks.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::TransportSocketConnectTimeout, _))
+      .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, nullptr),
@@ -442,7 +446,10 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
 
-  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mocks.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::TransportSocketConnectTimeout, _))
+      .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, nullptr),
@@ -2017,7 +2024,8 @@ public:
         TransportSocketPtr(transport_socket_), stream_info_, true);
     connection_->addConnectionCallbacks(callbacks_);
     // File events will trigger setTrackedObject on the dispatcher.
-    EXPECT_CALL(dispatcher_, setTrackedObject(_)).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
+    EXPECT_CALL(dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
 
   ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }

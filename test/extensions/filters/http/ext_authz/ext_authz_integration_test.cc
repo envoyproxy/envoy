@@ -560,7 +560,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.
