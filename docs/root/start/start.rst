@@ -154,8 +154,6 @@
   $ chown 777 logs
   $ docker run -d -v `pwd`/logs:/var/log --name envoy -e ENVOY_UID=777 -p 9901:9901 -p 10000:10000 envoy:v1
 
-You can then configure ``envoy`` to log to files in ``/var/log``
-
 随后，你可以配置 ``envoy`` 将日志文件输出在 ``/var/log`` 文件里。
 
 ``envoy`` ``uid`` 和 ``gid`` 的默认值都是 ``101`` 。
