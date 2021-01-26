@@ -44,29 +44,21 @@ std::string formatPerRequestStateParseException(absl::string_view params) {
 }
 
 // Parses a substitution format field and returns a function that formats it.
-// Use the given empty_value if any of the underlying formatters yield no value.
-// In practice, this lets the caller decide if empty string or "-" is desired.
-std::function<std::string(const Envoy::StreamInfo::StreamInfo&)> parseSubstitutionFormatField(
-    absl::string_view field_name,
-    StreamInfoHeaderFormatter::FormatterProviderListMap& formatter_providers,
-    const std::string& empty_value) {
+std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
+parseSubstitutionFormatField(absl::string_view field_name,
+                             StreamInfoHeaderFormatter::FormatterPtrMap& formatter_map) {
   const std::string pattern = fmt::format("%{}%", field_name);
-  if (formatter_providers.find(pattern) == formatter_providers.end()) {
-    formatter_providers.emplace(
-        std::make_pair(pattern, Formatter::SubstitutionFormatParser::parse(pattern)));
+  if (formatter_map.find(pattern) == formatter_map.end()) {
+    formatter_map.emplace(
+        std::make_pair(pattern, Formatter::FormatterPtr(new Formatter::FormatterImpl(
+                                    pattern, /*omit_empty_values=*/true))));
   }
-  return [&formatter_providers, pattern,
-          empty_value](const Envoy::StreamInfo::StreamInfo& stream_info) {
-    const auto& formatters = formatter_providers.at(pattern);
-    std::string formatted;
-    for (const auto& formatter : formatters) {
-      const auto bit = formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
-                                         *Http::StaticEmptyHeaders::get().response_headers,
-                                         *Http::StaticEmptyHeaders::get().response_trailers,
-                                         stream_info, absl::string_view());
-      absl::StrAppend(&formatted, bit.value_or(empty_value));
-    }
-    return formatted;
+  return [&formatter_map, pattern](const Envoy::StreamInfo::StreamInfo& stream_info) {
+    const auto& formatter = formatter_map.at(pattern);
+    return formatter->format(*Http::StaticEmptyHeaders::get().request_headers,
+                             *Http::StaticEmptyHeaders::get().response_headers,
+                             *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                             absl::string_view());
   };
 }
 
@@ -326,9 +318,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
           return connection_info.urlEncodedPemEncodedPeerCertificate();
         });
   } else if (absl::StartsWith(field_name, "DOWNSTREAM_PEER_CERT_V_START")) {
-    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_providers_, "");
+    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_map_);
   } else if (absl::StartsWith(field_name, "DOWNSTREAM_PEER_CERT_V_END")) {
-    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_providers_, "");
+    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_map_);
   } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
       if (stream_info.upstreamHost()) {
@@ -337,7 +329,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return "";
     };
   } else if (absl::StartsWith(field_name, "START_TIME")) {
-    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_providers_, "-");
+    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_map_);
   } else if (absl::StartsWith(field_name, "UPSTREAM_METADATA")) {
     field_extractor_ = parseMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
   } else if (absl::StartsWith(field_name, "DYNAMIC_METADATA")) {
