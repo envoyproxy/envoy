@@ -680,7 +680,7 @@ protected:
   Reservation reserveWithMaxLength(uint64_t max_length);
 
   void commit(uint64_t length, absl::Span<RawSlice> slices,
-              absl::Span<SliceDataPtr> owned_slices) override;
+              ReservationSlicesOwnerPtr slices_owner) override;
 
 private:
   /**
@@ -705,6 +705,22 @@ private:
 
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
+
+  struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
+    virtual absl::Span<Slice> ownedSlices() PURE;
+  };
+
+  struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
+    absl::Span<Slice> ownedSlices() override { return absl::MakeSpan(owned_slices_); }
+
+    absl::InlinedVector<Slice, Buffer::Reservation::MAX_SLICES_> owned_slices_;
+  };
+
+  struct OwnedImplReservationSlicesOwnerSingle : public OwnedImplReservationSlicesOwner {
+    absl::Span<Slice> ownedSlices() override { return absl::MakeSpan(&owned_slice_, 1); }
+
+    Slice owned_slice_;
+  };
 };
 
 using BufferFragmentPtr = std::unique_ptr<BufferFragment>;

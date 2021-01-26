@@ -318,7 +318,7 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
   uint64_t bytes_remaining = max_length;
   uint64_t reserved = 0;
   auto& reservation_slices = reservation.bufferImplUseOnlySlices();
-  auto& reservation_owned_slices = reservation.bufferImplUseOnlyOwnedSlices();
+  auto slices_owner = std::make_unique<OwnedImplReservationSlicesOwnerMultiple>();
 
   // Check whether there are any empty slices with reservable space at the end of the buffer.
   uint64_t reservable_size = slices_.empty() ? 0 : slices_.back().reservableSize();
@@ -327,7 +327,7 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
     const uint64_t reservation_size = std::min(last_slice.reservableSize(), bytes_remaining);
     auto slice = last_slice.reserve(reservation_size);
     reservation_slices.push_back(slice);
-    reservation_owned_slices.push_back(nullptr);
+    slices_owner->owned_slices_.emplace_back(Slice());
     bytes_remaining -= slice.len_;
     reserved += slice.len_;
   }
@@ -345,14 +345,16 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
 
     Slice slice(size);
     reservation_slices.push_back(slice.reserve(size));
-    reservation_owned_slices.emplace_back(std::make_unique<SliceDataImpl>(std::move(slice)));
+    slices_owner->owned_slices_.emplace_back(std::move(slice));
+    ASSERT(slice.dataSize() == 0);
     bytes_remaining -= std::min<uint64_t>(reservation_slices.back().len_, bytes_remaining);
     reserved += reservation_slices.back().len_;
   }
 
+  ASSERT(reservation_slices.size() == slices_owner->owned_slices_.size());
+  reservation.bufferImplUseOnlySlicesOwner() = std::move(slices_owner);
   reservation.bufferImplUseOnlySetLength(reserved);
 
-  ASSERT(reservation_slices.size() == reservation_owned_slices.size());
   return reservation;
 }
 
@@ -368,35 +370,42 @@ ReservationSingleSlice OwnedImpl::reserveSingleSlice(uint64_t length, bool separ
   }
 
   auto& reservation_slice = reservation.bufferImplUseOnlySlice();
-  auto& reservation_owned_slice = reservation.bufferImplUseOnlyOwnedSlice();
+  auto slice_owner = std::make_unique<OwnedImplReservationSlicesOwnerSingle>();
 
   // Check whether there are any empty slices with reservable space at the end of the buffer.
   uint64_t reservable_size =
       (separate_slice || slices_.empty()) ? 0 : slices_.back().reservableSize();
   if (reservable_size >= length) {
     reservation_slice = slices_.back().reserve(length);
-    reservation_owned_slice = nullptr;
   } else {
     Slice slice(length);
     reservation_slice = slice.reserve(length);
-    reservation_owned_slice = std::make_unique<SliceDataImpl>(std::move(slice));
+    slice_owner->owned_slice_ = std::move(slice);
   }
+
+  reservation.bufferImplUseOnlySliceOwner() = std::move(slice_owner);
 
   return reservation;
 }
 
 void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
-                       absl::Span<SliceDataPtr> owned_slices) {
+                       ReservationSlicesOwnerPtr slices_owner_base) {
+  if (length == 0) {
+    return;
+  }
+
+  ASSERT(dynamic_cast<OwnedImplReservationSlicesOwner*>(slices_owner_base.get()) != nullptr);
+  std::unique_ptr<OwnedImplReservationSlicesOwner> slices_owner(
+      static_cast<OwnedImplReservationSlicesOwner*>(slices_owner_base.release()));
+
+  absl::Span<Slice> owned_slices = slices_owner->ownedSlices();
   ASSERT(slices.size() == owned_slices.size());
+
   uint64_t bytes_remaining = length;
   for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
-    ASSERT((owned_slices[i] != nullptr) ==
-           (dynamic_cast<SliceDataImpl*>(owned_slices[i].get()) != nullptr));
-    std::unique_ptr<SliceDataImpl> owned_slice(
-        static_cast<SliceDataImpl*>(owned_slices[i].release()));
-
-    if (owned_slice != nullptr) {
-      slices_.emplace_back(std::move(owned_slice->slice_));
+    Slice& owned_slice = owned_slices[i];
+    if (owned_slice.data() != nullptr) {
+      slices_.emplace_back(std::move(owned_slice));
     }
     slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
     bool success = slices_.back().commit(slices[i]);

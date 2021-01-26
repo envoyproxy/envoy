@@ -52,7 +52,7 @@ protected:
 
 private:
   void commit(uint64_t length, absl::Span<RawSlice> slices,
-              absl::Span<SliceDataPtr> owned_slices) override;
+              ReservationSlicesOwnerPtr slices_owner) override;
 
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;

@@ -147,7 +147,6 @@ public:
     slice.mem_ = mutableEnd();
     slice.len_ = data_.size() - (start_ + size_);
     reservation.bufferImplUseOnlySlices().push_back(slice);
-    reservation.bufferImplUseOnlyOwnedSlices().push_back(nullptr);
     reservation.bufferImplUseOnlySetLength(slice.len_);
 
     return reservation;
@@ -167,7 +166,7 @@ public:
   }
 
   void commit(uint64_t length, absl::Span<Buffer::RawSlice>,
-              absl::Span<Buffer::SliceDataPtr>) override {
+              Buffer::ReservationSlicesOwnerPtr) override {
     size_ += length;
     FUZZ_ASSERT(start_ + size_ + length <= data_.size());
   }

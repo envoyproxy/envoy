@@ -76,6 +76,15 @@ using SliceDataPtr = std::unique_ptr<SliceData>;
 class Reservation;
 class ReservationSingleSlice;
 
+// Base class for an object to manage the ownership for slices in a `Reservation` or
+// `ReservationSingleSlice`.
+class ReservationSlicesOwner {
+public:
+  virtual ~ReservationSlicesOwner() = default;
+};
+
+using ReservationSlicesOwnerPtr = std::unique_ptr<ReservationSlicesOwner>;
+
 /**
  * A basic buffer abstraction.
  */
@@ -427,7 +436,7 @@ private:
    * reservation.
    */
   virtual void commit(uint64_t length, absl::Span<RawSlice> slices,
-                      absl::Span<SliceDataPtr> owned_slices) PURE;
+                      ReservationSlicesOwnerPtr slices_owner) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
@@ -464,13 +473,7 @@ using WatermarkFactorySharedPtr = std::shared_ptr<WatermarkFactory>;
 class Reservation final {
 public:
   Reservation(Reservation&&) = default;
-  ~Reservation() {
-    // Free in reverse-order so that entries go back onto the free-list in the same order they came
-    // off, to slightly improve locality in the case that not all slices were pulled into cache.
-    while (!owned_slices_.empty()) {
-      owned_slices_.pop_back();
-    }
-  }
+  ~Reservation() = default;
 
   /**
    * @return an array of `RawSlice` of length `numSlices()`.
@@ -499,10 +502,10 @@ public:
     ENVOY_BUG(length <= length_, "commit() length must be <= size of the Reservation");
     ASSERT(length == 0 || !slices_.empty(),
            "Reservation.commit() called on empty Reservation; possible double-commit().");
-    buffer_.commit(length, absl::MakeSpan(slices_), absl::MakeSpan(owned_slices_));
+    buffer_.commit(length, absl::MakeSpan(slices_), std::move(slices_owner_));
     length_ = 0;
     slices_.clear();
-    owned_slices_.clear();
+    ASSERT(slices_owner_ == nullptr);
   }
 
   // Tuned to allow reads of 128k, using 16k slices.
@@ -520,10 +523,9 @@ private:
   // The RawSlices in the reservation, usable by operations such as `::readv()`.
   absl::InlinedVector<RawSlice, MAX_SLICES_> slices_;
 
-  // An array of the same length as `slices_`, in which each element is either nullptr
-  // if no operation needs to be performed to transfer ownership during commit/destructor,
-  // or a pointer to the object that needs to be moved/deleted.
-  absl::InlinedVector<SliceDataPtr, MAX_SLICES_> owned_slices_;
+  // An owner that can be set by the creator of the `Reservation` to free slices upon
+  // destruction.
+  ReservationSlicesOwnerPtr slices_owner_;
 
 public:
   // The following are for use only by implementations of Buffer. Because c++
@@ -531,7 +533,7 @@ public:
   // misuse easy to spot in a code review.
   static Reservation bufferImplUseOnlyConstruct(Instance& buffer) { return Reservation(buffer); }
   decltype(slices_)& bufferImplUseOnlySlices() { return slices_; }
-  decltype(owned_slices_)& bufferImplUseOnlyOwnedSlices() { return owned_slices_; }
+  ReservationSlicesOwnerPtr& bufferImplUseOnlySlicesOwner() { return slices_owner_; }
   void bufferImplUseOnlySetLength(uint64_t length) { length_ = length; }
 };
 
@@ -567,9 +569,9 @@ public:
     ENVOY_BUG(length <= slice_.len_, "commit() length must be <= size of the Reservation");
     ASSERT(length == 0 || slice_.mem_ != nullptr,
            "Reservation.commit() called on empty Reservation; possible double-commit().");
-    buffer_.commit(length, absl::MakeSpan(&slice_, 1), absl::MakeSpan(&owned_slice_, 1));
+    buffer_.commit(length, absl::MakeSpan(&slice_, 1), std::move(slice_owner_));
     slice_ = {nullptr, 0};
-    owned_slice_.reset();
+    ASSERT(slice_owner_ == nullptr);
   }
 
 private:
@@ -582,9 +584,9 @@ private:
   // and length to read into.
   RawSlice slice_{};
 
-  // Contains either nullptr if no operation needs to be performed to transfer ownership during
-  // commit/destructor, or a pointer to the object that needs to be moved/deleted.
-  SliceDataPtr owned_slice_{};
+  // An owner that can be set by the creator of the `ReservationSingleSlice` to free the slice upon
+  // destruction.
+  ReservationSlicesOwnerPtr slice_owner_;
 
 public:
   // The following are for use only by implementations of Buffer. Because c++
@@ -594,7 +596,7 @@ public:
     return ReservationSingleSlice(buffer);
   }
   RawSlice& bufferImplUseOnlySlice() { return slice_; }
-  SliceDataPtr& bufferImplUseOnlyOwnedSlice() { return owned_slice_; }
+  ReservationSlicesOwnerPtr& bufferImplUseOnlySliceOwner() { return slice_owner_; }
 };
 
 } // namespace Buffer

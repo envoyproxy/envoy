@@ -32,8 +32,8 @@ void WatermarkBuffer::prepend(Instance& data) {
 }
 
 void WatermarkBuffer::commit(uint64_t length, absl::Span<RawSlice> slices,
-                             absl::Span<SliceDataPtr> owned_slices) {
-  OwnedImpl::commit(length, slices, owned_slices);
+                             ReservationSlicesOwnerPtr slices_owner) {
+  OwnedImpl::commit(length, slices, std::move(slices_owner));
   checkHighAndOverflowWatermarks();
 }
 

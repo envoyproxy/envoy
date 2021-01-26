@@ -910,6 +910,12 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
 TEST_F(OwnedImplTest, ReserveReuse) {
   Buffer::OwnedImpl buffer;
 
+  // Test a zero-length reservation and commit.
+  {
+    auto reservation = buffer.reserveSingleSlice(0);
+    reservation.commit(0);
+  }
+
   // Reserve some space and leave it uncommitted.
   const void* first_slice;
   {
