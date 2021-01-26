@@ -113,7 +113,6 @@ envoy_extension_cc_test(
     ],
 )
 
-
 envoy_extension_cc_test(
     name = "grpc_ot_access_log_impl_test",
     srcs = ["grpc_ot_access_log_impl_test.cc"],
@@ -130,4 +129,3 @@ envoy_extension_cc_test(
         "@opentelemetry_proto//:logs_cc_proto",
     ],
 )
-

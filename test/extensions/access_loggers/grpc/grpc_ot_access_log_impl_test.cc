@@ -1,10 +1,5 @@
 #include <memory>
 
-#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
-#include "opentelemetry/proto/logs/v1/logs.pb.h"
-#include "opentelemetry/proto/resource/v1/resource.pb.h"
-
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
@@ -16,6 +11,11 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "opentelemetry/proto/logs/v1/logs.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 using testing::_;
 using testing::Invoke;
