@@ -221,7 +221,7 @@ static void bufferReserveCommit(benchmark::State& state) {
     UNREFERENCED_PARAMETER(_);
     auto size = state.range(0);
     Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
-    reservation.commit(size);
+    reservation.commit(reservation.length());
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
     }
