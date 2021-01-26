@@ -346,7 +346,6 @@ Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
     Slice slice(size, slices_owner->free_list_);
     reservation_slices.push_back(slice.reserve(size));
     slices_owner->owned_slices_.emplace_back(std::move(slice));
-    ASSERT(slice.dataSize() == 0);
     bytes_remaining -= std::min<uint64_t>(reservation_slices.back().len_, bytes_remaining);
     reserved += reservation_slices.back().len_;
   }

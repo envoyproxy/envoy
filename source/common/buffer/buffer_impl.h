@@ -738,7 +738,7 @@ private:
     // Optimization: get the thread_local freeList() once per Reservation, outside the loop.
     OwnedImplReservationSlicesOwnerMultiple() : free_list_(Slice::freeList()) {}
 
-    ~OwnedImplReservationSlicesOwnerMultiple() {
+    ~OwnedImplReservationSlicesOwnerMultiple() override {
       while (!owned_slices_.empty()) {
         owned_slices_.back().freeStorage(free_list_);
         owned_slices_.pop_back();
