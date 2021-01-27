@@ -1,0 +1,162 @@
+# TODO(dio): Consider to remove compiler specific part of this patch when we solely compile the
+# project using clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
+
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+index 0cd36dc..8c4cbd4 100644
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -7,10 +7,6 @@
+
+ #include "build/build_config.h"
+
+-#if defined(COMPILER_MSVC) && !defined(__clang__)
+-#error "Only clang-cl is supported on Windows, see https://crbug.com/988071"
+-#endif
+-
+ // Annotate a variable indicating it's ok if the variable is not used.
+ // (Typically used to silence a compiler warning when the assignment
+ // is important for some other reason.)
+@@ -55,8 +51,12 @@
+ // prevent code folding, see gurl_base::debug::Alias.
+ // Use like:
+ //   void NOT_TAIL_CALLED FooBar();
+-#if defined(__clang__) && __has_attribute(not_tail_called)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(not_tail_called)
+ #define NOT_TAIL_CALLED __attribute__((not_tail_called))
++#endif
++#endif
+ #else
+ #define NOT_TAIL_CALLED
+ #endif
+@@ -226,7 +226,9 @@
+ #endif
+ #endif
+
+-#if defined(__clang__) && __has_attribute(uninitialized)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(uninitialized)
+ // Attribute "uninitialized" disables -ftrivial-auto-var-init=pattern for
+ // the specified variable.
+ // Library-wide alternative is
+@@ -257,6 +259,8 @@
+ // E.g. platform, bot, benchmark or test name in patch description or next to
+ // the attribute.
+ #define STACK_UNINITIALIZED __attribute__((uninitialized))
++#endif
++#endif
+ #else
+ #define STACK_UNINITIALIZED
+ #endif
+
+# TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
+# library from the upstream Chromium project. This is tracked in:
+# https://github.com/envoyproxy/envoy/issues/14743.
+
+diff --git a/url/BUILD b/url/BUILD
+index f2ec8da..714f90e 100644
+--- a/url/BUILD
++++ b/url/BUILD
+@@ -7,7 +7,6 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
+ cc_library(
+     name = "url",
+     srcs = [
+-        "gurl.cc",
+         "third_party/mozilla/url_parse.cc",
+         "url_canon.cc",
+         "url_canon_etc.cc",
+@@ -26,17 +25,14 @@ cc_library(
+         "url_canon_stdstring.cc",
+         "url_canon_stdurl.cc",
+         "url_constants.cc",
+-        "url_idna_icu.cc",
+         "url_parse_file.cc",
+         "url_parse_internal.h",
+         "url_util.cc",
+         "url_util_internal.h",
+     ],
+     hdrs = [
+-        "gurl.h",
+         "third_party/mozilla/url_parse.h",
+         "url_canon.h",
+-        "url_canon_icu.h",
+         "url_canon_ip.h",
+         "url_canon_stdstring.h",
+         "url_constants.h",
+@@ -44,11 +40,10 @@ cc_library(
+         "url_util.h",
+     ],
+     copts = build_config.default_copts,
+-    linkopts = build_config.url_linkopts,
+     visibility = ["//visibility:public"],
+     deps = [
+         "//base",
+         "//base/strings",
+         "//polyfills",
+-    ] + build_config.icuuc_deps,
++    ]
+ )
+diff --git a/url/url_canon_host.cc b/url/url_canon_host.cc
+index 28a7c38..dd18acf 100644
+--- a/url/url_canon_host.cc
++++ b/url/url_canon_host.cc
+@@ -175,55 +175,7 @@ bool DoSimpleHost(const INCHAR* host,
+
+ // Canonicalizes a host that requires IDN conversion. Returns true on success
+ bool DoIDNHost(const gurl_base::char16* src, int src_len, CanonOutput* output) {
+-  int original_output_len = output->length();  // So we can rewind below.
+-
+-  // We need to escape URL before doing IDN conversion, since punicode strings
+-  // cannot be escaped after they are created.
+-  RawCanonOutputW<kTempHostBufferLen> url_escaped_host;
+-  bool has_non_ascii;
+-  DoSimpleHost(src, src_len, &url_escaped_host, &has_non_ascii);
+-  if (url_escaped_host.length() > kMaxHostBufferLength) {
+-    AppendInvalidNarrowString(src, 0, src_len, output);
+-    return false;
+-  }
+-
+-  StackBufferW wide_output;
+-  if (!IDNToASCII(url_escaped_host.data(),
+-                  url_escaped_host.length(),
+-                  &wide_output)) {
+-    // Some error, give up. This will write some reasonable looking
+-    // representation of the string to the output.
+-    AppendInvalidNarrowString(src, 0, src_len, output);
+-    return false;
+-  }
+-
+-  // Now we check the ASCII output like a normal host. It will also handle
+-  // unescaping. Although we unescaped everything before this function call, if
+-  // somebody does %00 as fullwidth, ICU will convert this to ASCII.
+-  bool success = DoSimpleHost(wide_output.data(),
+-                              wide_output.length(),
+-                              output, &has_non_ascii);
+-  if (has_non_ascii) {
+-    // ICU generated something that DoSimpleHost didn't think looked like
+-    // ASCII. This is quite rare, but ICU might convert some characters to
+-    // percent signs which might generate new escape sequences which might in
+-    // turn be invalid. An example is U+FE6A "small percent" which ICU will
+-    // name prep into an ASCII percent and then we can interpret the following
+-    // characters as escaped characters.
+-    //
+-    // If DoSimpleHost didn't think the output was ASCII, just escape the
+-    // thing we gave ICU and give up. DoSimpleHost will have handled a further
+-    // level of escaping from ICU for simple ASCII cases (i.e. if ICU generates
+-    // a new escaped ASCII sequence like "%41" we'll unescape it) but it won't
+-    // do more (like handle escaped non-ASCII sequences). Handling the escaped
+-    // ASCII isn't strictly necessary, but DoSimpleHost handles this case
+-    // anyway so we handle it/
+-    output->set_length(original_output_len);
+-    AppendInvalidNarrowString(wide_output.data(), 0, wide_output.length(),
+-                              output);
+-    return false;
+-  }
+-  return success;
++  return false;
+ }
+
+ // 8-bit convert host to its ASCII version: this converts the UTF-8 input to
+
