@@ -48,21 +48,18 @@ def GetExtensionMetadata(target):
     raise ExtensionDbError(
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
         % target)
-  print(target)
+  # evaluate tuples/lists
+  # wrap strings in a list
+  # use empty list for missing (this should not be necessary)
   categories = (
     '[]'
     if IsMissing(categories)
     else categories)
-  print(categories)
-  # evaluate tuples/lists
-  # wrap strings in a list
   categories = (
     ast.literal_eval(categories)
     if ('[' in categories
         or '(' in categories)
     else [categories])
-  print('mangled cats...')
-  print(categories)
   return {
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
