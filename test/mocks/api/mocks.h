@@ -65,6 +65,9 @@ public:
   MOCK_METHOD(SysCallSocketResult, accept, (os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen));
   MOCK_METHOD(SysCallIntResult, bind, (os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD(SysCallIntResult, ioctl, (os_fd_t sockfd, unsigned long int request, void* argp));
+  MOCK_METHOD(SysCallIntResult, genericIoctl,
+              (os_fd_t sockfd, unsigned long controlCode, void* InBuffer, unsigned long InBufferLen,
+               void* OutBuffer, unsigned long OutBufferLen, unsigned long& bytesReturned));
   MOCK_METHOD(SysCallIntResult, close, (os_fd_t));
   MOCK_METHOD(SysCallSizeResult, writev, (os_fd_t, const iovec*, int));
   MOCK_METHOD(SysCallSizeResult, sendmsg, (os_fd_t fd, const msghdr* msg, int flags));
