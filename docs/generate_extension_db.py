@@ -48,7 +48,10 @@ def GetExtensionMetadata(target):
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
         % target)
   print(target)
-  categories = categories or '[]'
+  categories = (
+    '[]'
+    if IsMissing(categories)
+    else categories)
   print(categories)
   # evaluate tuples/lists
   # wrap strings in a list
