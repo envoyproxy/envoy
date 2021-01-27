@@ -185,7 +185,7 @@ message BufferSettings {
 // <envoy_api_field_extensions.filters.http.ext_authz.v4alpha.AuthorizationResponse.allowed_upstream_headers>`
 // for details. Additionally, the filter may add additional headers to the client's response. See
 // :ref:`allowed_client_headers_on_success
-// envoy_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.allowed_client_headers_on_success>`
+// <envoy_api_field_extensions.filters.http.ext_authz.v4alpha.AuthorizationResponse.allowed_client_headers_on_success>`
 // for details.
 //
 // On other authorization response statuses, the filter will not allow traffic. Additional headers
