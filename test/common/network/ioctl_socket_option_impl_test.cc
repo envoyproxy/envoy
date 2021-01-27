@@ -1,5 +1,4 @@
 #include "common/common/scalar_to_byte_vector.h"
-
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/ioctl_socket_option_impl.h"
 #include "common/network/socket_interface.h"
