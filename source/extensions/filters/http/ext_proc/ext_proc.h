@@ -48,7 +48,8 @@ public:
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
-  const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processingMode() const {
+  const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode&
+  processingMode() const {
     return processing_mode_;
   }
 
