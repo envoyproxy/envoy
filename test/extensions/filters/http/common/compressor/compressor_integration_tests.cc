@@ -1,4 +1,4 @@
-#include "test/extensions/filters/http/common/compressor/websocket_with_compressor_integration_test.h"
+#include "test/extensions/filters/http/common/compressor/compressor_integration_tests.h"
 
 #include <string>
 
@@ -34,6 +34,16 @@ Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type 
   return Http::TestResponseHeaderMapImpl{
       {":status", "101"}, {"connection", "upgrade"}, {"upgrade", upgrade_type}};
 }
+
+const std::string compressorFilterConfig = R"EOF(
+name: envoy.filters.http.compressor
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+  compressor_library:
+    name: test
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+)EOF";
 
 template <class ProxiedHeaders, class OriginalHeaders>
 void commonValidate(ProxiedHeaders& proxied_headers, const OriginalHeaders& original_headers) {
@@ -133,15 +143,7 @@ void WebsocketWithCompressorIntegrationTest::initialize() {
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   }
-  config_helper_.addFilter(R"EOF(
-name: envoy.filters.http.compressor
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-  compressor_library:
-    name: test
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
-)EOF");
+  config_helper_.addFilter(compressorFilterConfig);
   HttpProtocolIntegrationTest::initialize();
 }
 
@@ -213,6 +215,60 @@ TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
   auto upgrade_response_headers(upgradeResponseHeaders("foo"));
   validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
   codec_client_->close();
+}
+
+INSTANTIATE_TEST_SUITE_P(Protocols, CompressorProxyingConnectIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+void CompressorProxyingConnectIntegrationTest::initialize() {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false); });
+  config_helper_.addFilter(compressorFilterConfig);
+  HttpProtocolIntegrationTest::initialize();
+}
+
+TEST_P(CompressorProxyingConnectIntegrationTest, ProxyConnect) {
+  initialize();
+
+  // Send request headers.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Wait for them to arrive upstream.
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
+  } else {
+    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
+              "bytestream");
+  }
+
+  // Send response headers
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Wait for them to arrive downstream.
+  response_->waitForHeaders();
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Make sure that even once the response has started, that data can continue to go upstream.
+  codec_client_->sendData(*request_encoder_, "hello", false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  // Also test upstream to downstream data.
+  upstream_request_->encodeData(12, false);
+  response_->waitForBodyData(12);
+
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy

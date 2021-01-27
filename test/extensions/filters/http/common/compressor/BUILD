@@ -48,10 +48,10 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_cc_test(
-    name = "websocket_with_compressor_integration_test",
+    name = "compressor_integration_tests",
     srcs = [
-        "websocket_with_compressor_integration_test.cc",
-        "websocket_with_compressor_integration_test.h",
+        "compressor_integration_tests.cc",
+        "compressor_integration_tests.h",
     ],
     deps = [
         "//source/common/http:header_map_lib",
