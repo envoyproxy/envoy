@@ -138,7 +138,7 @@ def FormatCommentWithAnnotations(comment, type_name=''):
     formatted_extension = FormatExtension(extension)
   formatted_extension_type = ''
   if annotations.EXTENSION_TYPE_ANNOTATION in comment.annotations:
-    formatted_extension_type = "INFO ABOUT THE EXTENSION TYPE %s\n\n" % comment.annotations[annotations.EXTENSION_TYPE_ANNOTATION]
+    formatted_extension_type = FormatExtensionType(comment.annotations[annotations.EXTENSION_TYPE_ANNOTATION])
   return annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n') + formatted_extension + formatted_extension_type
 
 
@@ -208,6 +208,23 @@ def FormatExtension(extension):
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
+    exit(1)  # Raising the error buries the above message in tracebacks.
+
+
+def FormatExtensionType(extension_type):
+  """Format extension metadata as RST.
+
+  Args:
+    extension: the name of the extension, e.g. com.acme.foo.
+
+  Returns:
+    RST formatted extension description.
+  """
+  try:
+    "INFO ABOUT THE EXTENSION TYPE %s\n\n" % EXTENSION_CATEGORIES[extension_type]
+  except KeyError as e:
+    sys.stderr.write(
+        '\n\nUnable to find extension type: %s\n\n' % extension_type)
     exit(1)  # Raising the error buries the above message in tracebacks.
 
 
