@@ -15,6 +15,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/application_protocol.h"
+#include "common/network/ioctl_socket_option_impl.h"
+#include "common/network/redirect_records_filter_state.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
@@ -910,7 +912,7 @@ public:
     return config;
   }
 
-  void setup(uint32_t connections,
+  void setup(uint32_t connections, bool set_redirect_records,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
     configure(config);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
@@ -955,6 +957,18 @@ public:
     }
 
     {
+      if (set_redirect_records) {
+        auto redirect_records = std::make_shared<Network::EnvoyRedirectRecords>();
+        memcpy(redirect_records->buf_ptr_, reinterpret_cast<void*>(redirect_records_data_.data()),
+               redirect_records_data_.size());
+        redirect_records->buf_size_ = redirect_records_data_.size();
+
+        filter_callbacks_.connection_.streamInfo().filterState()->setData(
+            Network::RedirectRecordsFilterState::key(),
+            std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
+            StreamInfo::FilterState::StateType::Mutable,
+            StreamInfo::FilterState::LifeSpan::Connection);
+      }
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
@@ -969,7 +983,16 @@ public:
     }
   }
 
-  void setup(uint32_t connections) { setup(connections, defaultConfig()); }
+  void setup(uint32_t connections,
+             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
+    setup(connections, false, config);
+  }
+
+  void setup(uint32_t connections, bool set_redirect_records) {
+    setup(connections, set_redirect_records, defaultConfig());
+  }
+
+  void setup(uint32_t connections) { setup(connections, false, defaultConfig()); }
 
   void raiseEventUpstreamConnected(uint32_t conn_index) {
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
@@ -1021,6 +1044,7 @@ public:
   std::list<std::function<Tcp::ConnectionPool::Cancellable*(Tcp::ConnectionPool::Cancellable*)>>
       new_connection_functions_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  std::string redirect_records_data_ = "some data";
 };
 
 TEST_F(TcpProxyTest, DefaultRoutes) {
@@ -1910,6 +1934,31 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   Buffer::OwnedImpl buffer("a");
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
+TEST_F(TcpProxyTest, UpstreamSocketOptionsReturnedEmpty) {
+  setup(1);
+  auto options = filter_->upstreamSocketOptions();
+  EXPECT_EQ(options->size(), 0);
+}
+
+TEST_F(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
+  setup(1, true);
+  EXPECT_TRUE(filter_->upstreamSocketOptions());
+  auto iterator = std::find_if(
+      filter_->upstreamSocketOptions()->begin(), filter_->upstreamSocketOptions()->end(),
+      [this](std::shared_ptr<const Network::Socket::Option> opt) {
+        NiceMock<Network::MockConnectionSocket> dummy_socket;
+        bool has_value = opt->getOptionDetails(dummy_socket,
+                                               envoy::config::core::v3::SocketOption::STATE_PREBIND)
+                             .has_value();
+        return has_value &&
+               opt->getOptionDetails(dummy_socket,
+                                     envoy::config::core::v3::SocketOption::STATE_PREBIND)
+                       .value()
+                       .name_ == ENVOY_SOCKET_REDIRECT_RECORDS;
+      });
+  EXPECT_TRUE(iterator != filter_->upstreamSocketOptions()->end());
 }
 
 // Tests that downstream connection can access upstream connections filter state.

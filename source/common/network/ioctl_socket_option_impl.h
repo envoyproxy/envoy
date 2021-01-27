@@ -33,7 +33,7 @@ public:
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
 
   // The common socket options don't require a hash key.
-  void hashKey(std::vector<uint8_t>&) const override {}
+  void hashKey(std::vector<uint8_t>&) const override;
 
   absl::optional<Details>
   getOptionDetails(const Socket& socket,

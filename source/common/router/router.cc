@@ -513,7 +513,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                     Network::RedirectRecordsFilterState::key())
                                 .value();
     const Network::Socket::OptionsSharedPtr wfp_socket_options =
-        Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(redirect_records);
+        Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records);
     Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
   }
 

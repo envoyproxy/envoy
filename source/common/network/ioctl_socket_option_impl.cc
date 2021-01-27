@@ -5,6 +5,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/scalar_to_byte_vector.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 
@@ -33,9 +34,20 @@ bool IoctlSocketOptionImpl::setOption(
   return true;
 }
 
-absl::optional<Socket::Option::Details> IoctlSocketOptionImpl::getOptionDetails(
-    const Socket&, envoy::config::core::v3::SocketOption::SocketState) const {
-  return absl::nullopt;
+ void IoctlSocketOptionImpl::hashKey(std::vector<uint8_t>& hash) const {
+    std::string in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
+    std::string out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(std::string(in_buffer_bstr + out_buffer_bstr)), hash);
+ }
+
+absl::optional<Socket::Option::Details>
+IoctlSocketOptionImpl::getOptionDetails(const Socket&,
+                                        envoy::config::core::v3::SocketOption::SocketState) const {
+
+  std::string in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
+  std::string out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
+
+  return Socket::Option::Details{optname_, std::string(in_buffer_bstr + out_buffer_bstr)};
 }
 
 bool IoctlSocketOptionImpl::isSupported() const { return optname_.hasValue(); }

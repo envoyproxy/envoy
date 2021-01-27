@@ -11,12 +11,13 @@ namespace Network {
  */
 class RedirectRecordsFilterState : public StreamInfo::FilterState::Object {
 public:
-  RedirectRecordsFilterState(Network::EnvoyRedirectRecords records) : records_(records) {}
-  const Network::EnvoyRedirectRecords& value() const { return records_; }
+  RedirectRecordsFilterState(std::shared_ptr<Network::EnvoyRedirectRecords> records)
+      : records_(records) {}
+  const std::shared_ptr<Network::EnvoyRedirectRecords> value() const { return records_; }
   static const std::string& key();
 
 private:
-  const Network::EnvoyRedirectRecords records_;
+  const std::shared_ptr<Network::EnvoyRedirectRecords> records_;
 };
 
 } // namespace Network

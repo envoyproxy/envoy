@@ -2945,6 +2945,22 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
                    .value());
 }
 
+TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return =
+      Network::SocketOptionFactory::buildIpTransparentOptions();
+
+  EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
+
+  Tcp::ConnectionPool::Instance* cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                                          ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_NE(nullptr, cp);
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context;

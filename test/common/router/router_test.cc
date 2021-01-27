@@ -15,6 +15,8 @@
 #include "common/config/well_known_names.h"
 #include "common/http/context_impl.h"
 #include "common/network/application_protocol.h"
+#include "common/network/ioctl_socket_option_impl.h"
+#include "common/network/redirect_records_filter_state.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/upstream_server_name.h"
 #include "common/network/upstream_subject_alt_names.h"
@@ -386,6 +388,7 @@ public:
       new Http::TestResponseHeaderMapImpl{{":status", "302"}, {"location", "http://www.foo.com"}}};
   NiceMock<Tracing::MockSpan> span_;
   NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_;
+  std::string redirect_records_data_ = "some data";
 };
 
 class RouterTest : public RouterTestBase {
@@ -6118,6 +6121,33 @@ TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
   auto options = router_.upstreamSocketOptions();
 
   EXPECT_EQ(to_return, options);
+}
+
+TEST_F(RouterTest, RedirectRecords) {
+  auto redirect_records = std::make_shared<Network::EnvoyRedirectRecords>();
+  memcpy(redirect_records->buf_ptr_, reinterpret_cast<void*>(redirect_records_data_.data()),
+         redirect_records_data_.size());
+  redirect_records->buf_size_ = redirect_records_data_.size();
+  router_.downstream_connection_.stream_info_.filterState()->setData(
+      Network::RedirectRecordsFilterState::key(),
+      std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
+
+  Network::Socket::OptionsSharedPtr expected_options =
+      Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records);
+  auto options = router_.upstreamSocketOptions();
+  EXPECT_EQ(1, options->size());
+
+  NiceMock<Network::MockConnectionSocket> dummy_socket;
+  auto state = envoy::config::core::v3::SocketOption::STATE_PREBIND;
+  auto expected_details = expected_options->at(0)->getOptionDetails(dummy_socket, state);
+  auto returned_details = options->at(0)->getOptionDetails(dummy_socket, state);
+  EXPECT_TRUE(expected_details == returned_details);
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, ApplicationProtocols) {

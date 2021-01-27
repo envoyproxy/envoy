@@ -479,15 +479,19 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
 
-#ifdef SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS
+#if defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
+  ASSERT(
+      socket->addressProvider().localAddressRestored() &&
+          config_->direction() != envoy::config::core::v3::UNSPECIFIED,
+      "Envoy on Windows needs the traffic direction to be set for original destination listeners.");
   if (config_->direction() == envoy::config::core::v3::OUTBOUND &&
       socket->addressProvider().localAddressRestored()) {
     ENVOY_LOG(debug, "[Windows] Querying for redirect record for outbound listener");
     unsigned long redirectRecordsSize = 0;
-    Network::EnvoyRedirectRecords redirect_records;
+    auto redirect_records = std::make_shared<Network::EnvoyRedirectRecords>();
     auto status = socket->genericIoctl(
-        SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0, (uint8_t*)redirect_records.buf_ptr_,
-        sizeof(redirect_records.buf_ptr_), redirect_records.buf_size_);
+        SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0, (uint8_t*)redirect_records->buf_ptr_,
+        sizeof(redirect_records->buf_ptr_), redirect_records->buf_size_);
     if (status.rc_ != 0) {
       ENVOY_LOG(debug,
                 "closing connection: cannot broker connection to original destination "
