@@ -1,3 +1,5 @@
+#include "envoy/http/header_map.h"
+
 #include "extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
@@ -19,12 +21,14 @@ namespace ExternalProcessing {
 namespace {
 
 using envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor;
+using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;
 
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
+using Http::LowerCaseString;
 
 using testing::Invoke;
 using testing::Unused;
@@ -37,14 +41,14 @@ using namespace std::chrono_literals;
 
 class OrderingTest : public testing::Test {
 protected:
-  void initialize(std::function<void(ExternalProcessor&)> cb) {
+  void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
     EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
 
     ExternalProcessor proto_config;
     proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
-    if (cb != nullptr) {
-      cb(proto_config);
+    if (cb) {
+      (*cb)(proto_config);
     }
     config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
@@ -60,7 +64,7 @@ protected:
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
-    EXPECT_CALL(*stream, close()).WillRepeatedly(Invoke(this, &OrderingTest::doSendClose));
+    EXPECT_CALL(*stream, close());
     return stream;
   }
 
@@ -71,12 +75,19 @@ protected:
     stream_delegate_.send(std::move(request), end_stream);
   }
 
-  void doSendClose() { stream_delegate_.close(); }
-
   // Send data through the filter as if we are the proxy
 
   void sendRequestHeadersGet(bool expect_callback) {
     HttpTestUtility::addDefaultHeaders(request_headers_, "GET");
+    EXPECT_EQ(expect_callback ? FilterHeadersStatus::StopAllIterationAndWatermark
+                              : FilterHeadersStatus::Continue,
+              filter_->decodeHeaders(request_headers_, true));
+  }
+
+  void sendRequestHeadersPost(bool expect_callback) {
+    HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+    request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+    request_headers_.addCopy(LowerCaseString("content-length"), "10");
     EXPECT_EQ(expect_callback ? FilterHeadersStatus::StopAllIterationAndWatermark
                               : FilterHeadersStatus::Continue,
               filter_->decodeHeaders(request_headers_, true));
@@ -89,16 +100,20 @@ protected:
               filter_->encodeHeaders(response_headers_, false));
   }
 
-  void sendRequestBody() {
+  void sendRequestBody(bool expect_callback, bool end_stream) {
     Buffer::OwnedImpl data;
     data.add("Dummy data");
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+    EXPECT_EQ(expect_callback ? FilterDataStatus::StopIterationAndWatermark
+                              : FilterDataStatus::Continue,
+              filter_->decodeData(data, end_stream));
   }
 
-  void sendResponseBody() {
+  void sendResponseBody(bool expect_callback, bool end_stream) {
     Buffer::OwnedImpl data;
     data.add("Dummy data");
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data, true));
+    EXPECT_EQ(expect_callback ? FilterDataStatus::StopIterationAndWatermark
+                              : FilterDataStatus::Continue,
+              filter_->encodeData(data, end_stream));
   }
 
   void sendRequestTrailers() {
@@ -120,6 +135,24 @@ protected:
   void sendResponseHeadersReply() {
     auto reply = std::make_unique<ProcessingResponse>();
     reply->mutable_response_headers();
+    stream_callbacks_->onReceiveMessage(std::move(reply));
+  }
+
+  void sendRequestBodyReply() {
+    auto reply = std::make_unique<ProcessingResponse>();
+    reply->mutable_request_body();
+    stream_callbacks_->onReceiveMessage(std::move(reply));
+  }
+
+  void sendResponseBodyReply() {
+    auto reply = std::make_unique<ProcessingResponse>();
+    reply->mutable_response_body();
+    stream_callbacks_->onReceiveMessage(std::move(reply));
+  }
+
+  void sendResponseTrailersReply() {
+    auto reply = std::make_unique<ProcessingResponse>();
+    reply->mutable_response_trailers();
     stream_callbacks_->onReceiveMessage(std::move(reply));
   }
 
@@ -152,7 +185,7 @@ protected:
 
 // A normal call with the default configuration
 TEST_F(OrderingTest, DefaultOrderingGet) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -164,27 +197,102 @@ TEST_F(OrderingTest, DefaultOrderingGet) {
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
   sendResponseHeadersReply();
-  sendResponseBody();
+  sendResponseBody(false, true);
   sendResponseTrailers();
+}
 
-  EXPECT_CALL(stream_delegate_, close());
+// A normal call with all supported callbacks turned on
+TEST_F(OrderingTest, DefaultOrderingAllCallbacks) {
+  initialize([](ExternalProcessor& cfg) {
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_body_mode(ProcessingMode::STREAMED);
+    pm->set_response_body_mode(ProcessingMode::STREAMED);
+  });
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersPost(true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestHeadersReply();
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestBody(true, false);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestBodyReply();
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestBody(true, true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestBodyReply();
+  sendRequestTrailers();
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendResponseHeaders(true);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  sendResponseHeadersReply();
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendResponseBody(true, true);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  sendResponseBodyReply();
+  sendResponseTrailers();
+}
+
+// A normal call with all supported callbacks turned on,
+// but with request and response streams interleaved,
+// as if the upstream ignores the request body and replies
+// right away.
+TEST_F(OrderingTest, DefaultOrderingAllCallbacksInterleaved) {
+  initialize([](ExternalProcessor& cfg) {
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_body_mode(ProcessingMode::STREAMED);
+    pm->set_response_body_mode(ProcessingMode::STREAMED);
+  });
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersPost(true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestHeadersReply();
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendResponseHeaders(true);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  sendResponseHeadersReply();
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestBody(true, false);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestBodyReply();
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendResponseBody(true, false);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  sendResponseBodyReply();
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestBody(true, true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestBodyReply();
+
+  sendRequestTrailers();
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendResponseBody(true, true);
+  EXPECT_CALL(encoder_callbacks_, continueEncoding());
+  sendResponseBodyReply();
+  sendResponseTrailers();
 }
 
 // An immediate response on the request path
 TEST_F(OrderingTest, ImmediateResponseOnRequest) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(stream_delegate_, close());
   sendImmediateResponse500();
   // The rest of the filter isn't necessarily called after this.
 }
 
 // An immediate response on the response path
 TEST_F(OrderingTest, ImmediateResponseOnResponse) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -195,9 +303,8 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(stream_delegate_, close());
   sendImmediateResponse500();
-  sendResponseBody();
+  sendResponseBody(false, true);
   sendResponseTrailers();
 }
 
@@ -209,25 +316,68 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(stream_delegate_, close());
-  sendResponseHeadersReply();
+  sendResponseHeadersReply(); // Wrong message here
   sendRequestTrailers();
 
   // Expect us to go on from here normally but send no more stream messages
   sendResponseHeaders(false);
-  sendResponseBody();
+  sendResponseBody(false, true);
+  sendResponseTrailers();
+}
+
+// Receive a response trailers reply in response to the request
+// headers message -- should close stream and stop sending, but otherwise
+// continue without error.
+TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
+  initialize(absl::nullopt);
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersGet(true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendResponseTrailersReply(); // Wrong message here
+  sendRequestTrailers();
+
+  // Expect us to go on from here normally but send no more stream messages
+  sendResponseHeaders(false);
+  sendResponseBody(false, true);
+  sendResponseTrailers();
+}
+
+// Receive a response body reply in response to the request
+// body message -- should close stream and stop sending, but otherwise
+// continue without error.
+TEST_F(OrderingTest, IncorrectRequestBodyReply) {
+  initialize([](ExternalProcessor& cfg) {
+    auto* pm = cfg.mutable_processing_mode();
+    pm->set_request_body_mode(ProcessingMode::STREAMED);
+    pm->set_response_body_mode(ProcessingMode::STREAMED);
+  });
+
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestHeadersPost(true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendRequestHeadersReply();
+  EXPECT_CALL(stream_delegate_, send(_, false));
+  sendRequestBody(true, true);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  sendResponseBodyReply(); // Wrong message here
+  sendRequestTrailers();
+
+  // Expect us to go on from here normally but send no more stream messages
+  sendResponseHeaders(false);
+  sendResponseBody(false, true);
   sendResponseTrailers();
 }
 
 // Receive a request headers reply in response to the response
 // headers message -- should continue without error.
 TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -238,17 +388,16 @@ TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
-  EXPECT_CALL(stream_delegate_, close());
   sendRequestHeadersReply();
   // Still should ignore the message and go on but send no more stream messages
-  sendResponseBody();
+  sendResponseBody(false, true);
   sendResponseTrailers();
 }
 
 // Receive an extra message -- we should ignore it
 // and not send anything else to the server
 TEST_F(OrderingTest, ExtraReply) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -256,25 +405,23 @@ TEST_F(OrderingTest, ExtraReply) {
   sendRequestHeadersReply();
 
   // Extra call
-  EXPECT_CALL(stream_delegate_, close());
   sendRequestHeadersReply();
 
   // After this we are ignoring the processor
   sendRequestTrailers();
   sendResponseHeaders(false);
-  sendResponseBody();
+  sendResponseBody(false, true);
   sendResponseTrailers();
 }
 
 // Receive an extra message after the immediate response -- it should
 // be ignored.
 TEST_F(OrderingTest, ExtraAfterImmediateResponse) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(stream_delegate_, close());
   sendImmediateResponse500();
   // Extra messages sent after immediate response shouldn't affect anything
   sendRequestHeadersReply();
@@ -284,7 +431,7 @@ TEST_F(OrderingTest, ExtraAfterImmediateResponse) {
 
 // gRPC error in response to message calls results in an error
 TEST_F(OrderingTest, GrpcErrorInline) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -306,13 +453,13 @@ TEST_F(OrderingTest, GrpcErrorInlineIgnored) {
   // After that we ignore the processor
   sendRequestTrailers();
   sendResponseHeaders(false);
-  sendResponseBody();
+  sendResponseBody(false, true);
   sendResponseTrailers();
 }
 
 // gRPC error in between calls should still be delivered
 TEST_F(OrderingTest, GrpcErrorOutOfLine) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -326,7 +473,7 @@ TEST_F(OrderingTest, GrpcErrorOutOfLine) {
 
 // gRPC close after a proper message means rest of stream is ignored
 TEST_F(OrderingTest, GrpcCloseAfter) {
-  initialize(nullptr);
+  initialize(absl::nullopt);
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -337,7 +484,7 @@ TEST_F(OrderingTest, GrpcCloseAfter) {
   // After that we ignore the processor
   sendRequestTrailers();
   sendResponseHeaders(false);
-  sendResponseBody();
+  sendResponseBody(false, true);
   sendResponseTrailers();
 }
 
