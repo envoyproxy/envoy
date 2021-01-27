@@ -207,7 +207,8 @@ def FormatExtension(extension):
                                          extension=extension,
                                          status=status,
                                          security_posture=security_posture,
-                                         category=extension_metadata['category'])
+                                         # this shouldnt need get once all have cats...
+                                         category=extension_metadata.get('category', []))
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
