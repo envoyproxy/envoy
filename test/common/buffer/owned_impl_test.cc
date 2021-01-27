@@ -1197,7 +1197,9 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   buf.addBufferFragment(frag);
   buf.prepend("bbbbb");
   buf.add("");
+  expectSlices({{5, 0, 4096}, {0, 0, 0}}, buf);
   { auto reservation = buf.reserveSingleSlice(1280); }
+  expectSlices({{5, 0, 4096}}, buf);
   os_fd_t pipe_fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
 #ifdef WIN32
