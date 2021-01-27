@@ -450,7 +450,7 @@ http_parser_settings ConnectionImpl::settings_{
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->bufferBody(at, length);
-      return 0;
+      return enumToSignedInt(HttpParserCode::Success);
     },
     [](http_parser* parser) -> int {
       auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
