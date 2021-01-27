@@ -94,7 +94,7 @@ TYPED_TEST(HttpUpstreamTest, ReadDisable) {
 }
 
 TYPED_TEST(HttpUpstreamTest, AddBytesSentCallbackForCoverage) {
-  this->upstream_->addBytesSentCallback([&](uint64_t) {});
+  this->upstream_->addBytesSentCallback([&](uint64_t) { return true; });
 }
 
 TYPED_TEST(HttpUpstreamTest, DownstreamDisconnect) {
@@ -115,6 +115,41 @@ TYPED_TEST(HttpUpstreamTest, UpstreamWatermarks) {
 
   EXPECT_CALL(this->callbacks_, onBelowWriteBufferLowWatermark());
   this->upstream_->onBelowWriteBufferLowWatermark();
+}
+
+class MockHttpConnPoolCallbacks : public HttpConnPool::Callbacks {
+public:
+  MOCK_METHOD(void, onSuccess, (Http::RequestEncoder & request_encoder));
+  MOCK_METHOD(void, onFailure, ());
+};
+
+TYPED_TEST(HttpUpstreamTest, DownstreamDisconnectBeforeConnectResponse) {
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
+  EXPECT_TRUE(this->upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose) == nullptr);
+}
+
+TYPED_TEST(HttpUpstreamTest, OnSuccessCalledOnValidResponse) {
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure()).Times(0);
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TYPED_TEST(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "404"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
 }
 
 } // namespace

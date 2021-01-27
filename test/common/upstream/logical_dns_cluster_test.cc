@@ -193,7 +193,7 @@ protected:
     tls_.shutdownThread();
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};

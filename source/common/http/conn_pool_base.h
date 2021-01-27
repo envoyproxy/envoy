@@ -61,8 +61,8 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks) override;
-  bool maybePrefetch(float ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePrefetch(ratio);
+  bool maybePreconnect(float ratio) override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(ratio);
   }
   bool hasActiveConnections() const override;
 
@@ -101,6 +101,13 @@ public:
     initialize(data, parent);
   }
 
+  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
+               uint64_t concurrent_stream_limit, Upstream::Host::CreateConnectionData& data)
+      : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
+                                            concurrent_stream_limit) {
+    initialize(data, parent);
+  }
+
   void initialize(Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase& parent) {
     real_host_description_ = data.host_description_;
     codec_client_ = parent.createCodecClient(data);
@@ -113,6 +120,7 @@ public:
          &parent_.host()->cluster().stats().bind_errors_, nullptr});
   }
 
+  absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {

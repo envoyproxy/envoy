@@ -24,6 +24,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
+using testing::HasSubstr;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -90,6 +92,34 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
+}
+
+// Test TLS upstream.
+TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamTls) {
+  // Make sure old style nodelay is covered in at least one integration test.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
+  upstream_tls_ = true;
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  config_helper_.configureUpstreamTls();
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+
+  EXPECT_EQ("world", tcp_client->data());
+  // Any time an associated connection is destroyed, it increments both counters.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_with_active_rq", 1);
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -129,6 +159,86 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   tcp_client->waitForDisconnect();
 }
 
+TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
+  autonomous_upstream_ = true;
+  initialize();
+  const int num_connections = 50;
+  std::vector<IntegrationTcpClientPtr> clients(num_connections);
+
+  for (int i = 0; i < num_connections; ++i) {
+    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
+  }
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
+  for (int i = 0; i < num_connections; ++i) {
+    IntegrationTcpClientPtr& tcp_client = clients[i];
+    // The autonomous upstream is an HTTP upstream, so send raw HTTP.
+    // This particular request will result in the upstream sending a response,
+    // and flush-closing due to the 'close_after_response' header.
+    ASSERT_TRUE(tcp_client->write(
+        "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
+        false));
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
+  }
+}
+
+TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::list<IntegrationTcpClientPtr> clients;
+
+  // The autonomous upstream parses HTTP, and HTTP headers and sends responses
+  // when full requests are received. basic_request will result in
+  // bidirectional data. request_with_close will result in bidirectional data,
+  // but also the upstream closing the connection.
+  const char* basic_request = "GET / HTTP/1.1\r\nHost: foo\r\ncontent-length: 0\r\n\r\n";
+  const char* request_with_close =
+      "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n";
+  TestRandomGenerator rand;
+
+  // Seed some initial clients
+  for (int i = 0; i < 5; ++i) {
+    clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+  }
+
+  // Now randomly write / add more connections / close.
+  for (int i = 0; i < 50; ++i) {
+    int action = rand.random() % 3;
+
+    if (action == 0) {
+      // Add a new connection.
+      clients.push_back(makeTcpConnection(lookupPort("tcp_proxy")));
+    }
+    if (clients.empty()) {
+      break;
+    }
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    if (action == 1) {
+      // Write to the first connection.
+      ASSERT_TRUE(tcp_client->write(basic_request, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->clearData(tcp_client->data().size());
+    } else if (action == 2) {
+      // Close the first connection.
+      ASSERT_TRUE(tcp_client->write(request_with_close, false));
+      tcp_client->waitForData("\r\n\r\n", false);
+      tcp_client->waitForHalfClose();
+      tcp_client->close();
+      clients.pop_front();
+    }
+  }
+
+  while (!clients.empty()) {
+    IntegrationTcpClientPtr& tcp_client = clients.front();
+    ASSERT_TRUE(tcp_client->write(request_with_close, false));
+    tcp_client->waitForData("\r\n\r\n", false);
+    tcp_client->waitForHalfClose();
+    tcp_client->close();
+    clients.pop_front();
+  }
+}
+
 TEST_P(TcpProxyIntegrationTest, NoUpstream) {
   // Set the first upstream to have an invalid port, so connection will fail,
   // but it won't fail synchronously (as it would if there were simply no
@@ -141,7 +251,7 @@ TEST_P(TcpProxyIntegrationTest, NoUpstream) {
     lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
   });
   config_helper_.skipPortUsageValidation();
-  enable_half_close_ = false;
+  enableHalfClose(false);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -296,7 +406,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log->set_name("accesslog");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
-    access_log_config.mutable_log_format()->set_text_format(
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% "
         "sent=%BYTES_SENT% received=%BYTES_RECEIVED%\n");
@@ -384,7 +494,7 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   autonomous_upstream_ = true;
 
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -408,7 +518,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   config_helper_.setBufferLimits(1024, 1024);
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -441,7 +551,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithNoData) {
   autonomous_upstream_ = true;
 
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -466,7 +576,7 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithNoData) {
 
 TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithLargeOutstandingData) {
   config_helper_.setBufferLimits(1024, 1024);
-  enable_half_close_ = false;
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -1067,7 +1177,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // buffer. This allows us to track the bytes actually written to the socket.
 
   EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
-      .Times(1)
+      .Times(AtLeast(1))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
         client_write_buffer_ =

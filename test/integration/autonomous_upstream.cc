@@ -21,6 +21,7 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::RESPONSE_DATA_BLOCKS[] = "response_data_blocks";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
+const char AutonomousStream::CLOSE_AFTER_RESPONSE[] = "close_after_response";
 const char AutonomousStream::NO_TRAILERS[] = "no_trailers";
 const char AutonomousStream::NO_END_STREAM[] = "no_end_stream";
 
@@ -84,6 +85,11 @@ void AutonomousStream::sendResponse() {
       encodeTrailers(upstream_.responseTrailers());
     }
   }
+  if (!headers.get_(CLOSE_AFTER_RESPONSE).empty()) {
+    parent_.connection().dispatcher().post(
+        [this]() -> void { parent_.connection().close(Network::ConnectionCloseType::FlushWrite); });
+    return;
+  }
 }
 
 AutonomousHttpConnection::AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
@@ -113,8 +119,7 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
   shared_connections_.emplace_back(new SharedConnectionWrapper(connection));
   AutonomousHttpConnectionPtr http_connection(
       new AutonomousHttpConnection(*this, *shared_connections_.back(), http_type_, *this));
-  testing::AssertionResult result = http_connection->initialize();
-  RELEASE_ASSERT(result, result.message());
+  http_connection->initialize();
   http_connections_.push_back(std::move(http_connection));
   return true;
 }

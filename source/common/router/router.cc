@@ -405,7 +405,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                       route_entry_->clusterName());
     };
   }
-  Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
+  Upstream::ThreadLocalCluster* cluster =
+      config_.cm_.getThreadLocalCluster(route_entry_->clusterName());
   if (!cluster) {
     config_.stats_.no_cluster_.inc();
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
@@ -490,7 +491,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       *callbacks_->streamInfo().filterState());
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
 
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
@@ -594,19 +595,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+std::unique_ptr<GenericConnPool>
+Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
-    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().value());
-  } else {
+    ENVOY_BUG(factory != nullptr,
+              fmt::format("invalid factory type '{}', failing over to default upstream",
+                          cluster_->upstreamConfig().value().DebugString()));
+  }
+  if (!factory) {
     factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.http.generic");
   }
   const bool should_tcp_proxy =
       route_entry_->connectConfig().has_value() &&
       downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
-  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_,
+  return factory->createGenericConnPool(thread_local_cluster, should_tcp_proxy, *route_entry_,
                                         callbacks_->streamInfo().protocol(), this);
 }
 
@@ -1211,7 +1217,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_,
+        code_stats.chargeBasicResponseStat(cluster_->statsScope(),
+                                           config_.stats_.stat_names_.retry_,
                                            static_cast<Http::Code>(response_code));
 
         if (!end_stream || !upstream_request.encodeComplete()) {
@@ -1531,7 +1538,14 @@ void Filter::doRetry() {
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  // Clusters can technically get removed by CDS during a retry. Make sure it still exists.
+  const auto cluster = config_.cm_.getThreadLocalCluster(route_entry_->clusterName());
+  std::unique_ptr<GenericConnPool> generic_conn_pool;
+  if (cluster != nullptr) {
+    cluster_ = cluster->info();
+    generic_conn_pool = createConnPool(*cluster);
+  }
+
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();

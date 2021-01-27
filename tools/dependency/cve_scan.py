@@ -37,6 +37,16 @@ IGNORES_CVES = set([
     # Node.js issue rooted in a c-ares bug. Does not appear to affect
     # http-parser or our use of c-ares, c-ares has been bumped regardless.
     'CVE-2020-8277',
+    # gRPC issue that only affects Javascript bindings.
+    'CVE-2020-7768',
+    # Node.js issue unrelated to http-parser, see
+    # https://github.com/mhart/StringStream/issues/7.
+    'CVE-2018-21270',
+    # These should not affect Curl 7.74.0, but we see false positives due to the
+    # relative release date and CPE wildcard.
+    'CVE-2020-8169',
+    'CVE-2020-8177',
+    'CVE-2020-8284',
 ])
 
 # Subset of CVE fields that are useful below.

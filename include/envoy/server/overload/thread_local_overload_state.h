@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-#include "envoy/event/scaled_timer_minimum.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local_object.h"
 
@@ -28,7 +28,7 @@ public:
 
   explicit constexpr OverloadActionState(UnitFloat value) : action_value_(value) {}
 
-  float value() const { return action_value_.value(); }
+  UnitFloat value() const { return action_value_; }
   bool isSaturated() const { return action_value_.value() == UnitFloat::max().value(); }
 
 private:
@@ -40,14 +40,6 @@ private:
  */
 using OverloadActionCb = std::function<void(OverloadActionState)>;
 
-enum class OverloadTimerType {
-  // Timers created with this type will never be scaled. This should only be used for testing.
-  UnscaledRealTimerForTest,
-  // The amount of time an HTTP connection to a downstream client can remain idle (no streams). This
-  // corresponds to the HTTP_DOWNSTREAM_CONNECTION_IDLE TimerType in overload.proto.
-  HttpDownstreamIdleConnectionTimeout,
-};
-
 /**
  * Thread-local copy of the state of each configured overload action.
  */
@@ -55,14 +47,6 @@ class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
-
-  // Get a scaled timer whose minimum corresponds to the configured value for the given timer type.
-  virtual Event::TimerPtr createScaledTimer(OverloadTimerType timer_type,
-                                            Event::TimerCb callback) PURE;
-
-  // Get a scaled timer whose minimum is determined by the given scaling rule.
-  virtual Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
-                                            Event::TimerCb callback) PURE;
 };
 
 } // namespace Server

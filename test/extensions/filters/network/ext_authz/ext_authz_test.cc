@@ -66,8 +66,9 @@ public:
   }
 
   void expectOKWithOnData() {
-    EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+    filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        addr_);
+    filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
     EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
         .WillOnce(
             WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -129,6 +130,7 @@ public:
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
+transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -137,6 +139,7 @@ failure_mode_allow: true
 stat_prefix: name
   )EOF";
   const std::string metadata_yaml_string_ = R"EOF(
+transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -154,6 +157,7 @@ filter_enabled_metadata:
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   std::string yaml_string = R"EOF(
+transport_api_version: V3
 grpc_service: {}
 stat_prefix: name
   )EOF";
@@ -176,8 +180,8 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -217,8 +221,8 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -251,8 +255,8 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   // Explicitly set the failure_mode_allow to false.
   config_->setFailModeAllow(false);
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -263,7 +267,7 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
 
@@ -282,8 +286,8 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -317,8 +321,8 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
@@ -347,8 +351,8 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
@@ -379,8 +383,8 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
@@ -407,8 +411,8 @@ TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
   initialize(default_yaml_string_);
   InSequence s;
 
-  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(

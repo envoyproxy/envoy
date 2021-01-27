@@ -33,32 +33,16 @@ ActiveClient::StreamWrapper::~StreamWrapper() {
   // Upstream connection might be closed right after response is complete. Setting delay=true
   // here to attach pending requests in next dispatcher loop to handle that case.
   // https://github.com/envoyproxy/envoy/issues/2715
-  parent_.parent().onStreamClosed(parent_, true);
+  parent_.parent_.onStreamClosed(parent_, true);
 }
 
 void ActiveClient::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
 void ActiveClient::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
-    close_connection_ =
-        HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
-    if (close_connection_) {
-      parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
-    }
-  } else {
-    // If Connection: close OR
-    //    Http/1.0 and not Connection: keep-alive OR
-    //    Proxy-Connection: close
-    if ((absl::EqualsIgnoreCase(headers->getConnectionValue(),
-                                Headers::get().ConnectionValues.Close)) ||
-        (parent_.codec_client_->protocol() == Protocol::Http10 &&
-         !absl::EqualsIgnoreCase(headers->getConnectionValue(),
-                                 Headers::get().ConnectionValues.KeepAlive)) ||
-        (absl::EqualsIgnoreCase(headers->getProxyConnectionValue(),
-                                Headers::get().ConnectionValues.Close))) {
-      parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
-      close_connection_ = true;
-    }
+  close_connection_ =
+      HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
+  if (close_connection_) {
+    parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
   }
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
@@ -76,7 +60,7 @@ void ActiveClient::StreamWrapper::onDecodeComplete() {
     parent_.codec_client_->close();
   } else {
     auto* pool = &parent_.parent();
-    pool->dispatcher().post([pool]() -> void { pool->onUpstreamReady(); });
+    pool->scheduleOnUpstreamReady();
     parent_.stream_wrapper_.reset();
 
     pool->checkForDrained();
@@ -92,6 +76,14 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
           parent, parent.host()->cluster().maxRequestsPerConnection(),
           1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
+  parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
+}
+
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data)
+    : Envoy::Http::ActiveClient(
+          parent, parent.host()->cluster().maxRequestsPerConnection(),
+          1, // HTTP1 always has a concurrent-request-limit of 1 per connection.
+          data) {
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
 }
 

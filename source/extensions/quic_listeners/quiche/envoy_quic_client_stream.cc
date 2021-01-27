@@ -19,9 +19,11 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/utility.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -129,23 +131,29 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
   ASSERT(headers_decompressed() && !header_list.empty());
 
-  ENVOY_STREAM_LOG(debug, "Receive headers: {}.", *this, header_list.DebugString());
+  ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
   if (fin) {
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list);
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
-  if (status >= 100 && status < 200) {
-    // These are Informational 1xx headers, not the actual response headers.
-    ENVOY_STREAM_LOG(debug, "Received informational response code: {}", *this, status);
-    set_headers_decompressed(false);
-    if (status == 100 && !decoded_100_continue_) {
-      // This is 100 Continue, only decode it once to support Expect:100-Continue header.
-      decoded_100_continue_ = true;
-      response_decoder_->decode100ContinueHeaders(std::move(headers));
+  if (Http::CodeUtility::is1xx(status)) {
+    if (status == enumToInt(Http::Code::SwitchingProtocols)) {
+      // HTTP3 doesn't support the HTTP Upgrade mechanism or 101 (Switching Protocols) status code.
+      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+      return;
     }
-  } else {
+
+    // These are Informational 1xx headers, not the actual response headers.
+    set_headers_decompressed(false);
+  }
+
+  if (status == enumToInt(Http::Code::Continue) && !decoded_100_continue_) {
+    // This is 100 Continue, only decode it once to support Expect:100-Continue header.
+    decoded_100_continue_ = true;
+    response_decoder_->decode100ContinueHeaders(std::move(headers));
+  } else if (status != enumToInt(Http::Code::Continue)) {
     response_decoder_->decodeHeaders(std::move(headers),
                                      /*end_stream=*/fin);
   }
@@ -216,7 +224,7 @@ void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
   if (read_side_closed()) {
     return;
   }
-  ENVOY_STREAM_LOG(debug, "Receive trailers: {}.", *this, header_list.DebugString());
+  ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, header_list.DebugString());
   quic::QuicSpdyStream::OnTrailingHeadersComplete(fin, frame_len, header_list);
   ASSERT(trailers_decompressed());
   if (session()->connection()->connected() && !rst_sent()) {
@@ -252,6 +260,9 @@ void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
     runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
   }
   quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
+  if (!end_stream_decoded_) {
+    runResetCallbacks(quicErrorCodeToEnvoyResetReason(error));
+  }
 }
 
 void EnvoyQuicClientStream::OnClose() {

@@ -40,8 +40,7 @@ public:
   void initialize(const std::string& yaml) {
     config_ = createConfig(yaml);
     client_ = std::make_unique<RawHttpClientImpl>(cm_, config_);
-    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
-        .WillByDefault(ReturnRef(async_client_));
+    ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(async_client_));
   }
 
   ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING, uint32_t timeout = 250,
@@ -96,6 +95,7 @@ public:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
 
+    cm_.initializeThreadLocalClusters({"ext_authz"});
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
@@ -510,8 +510,8 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   InSequence s;
 
-  EXPECT_CALL(cm_, get(Eq("ext_authz"))).WillOnce(Return(nullptr));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("ext_authz")).Times(0);
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,

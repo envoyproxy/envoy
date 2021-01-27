@@ -75,6 +75,7 @@ SERIALIZE_AS_STRING_ALLOWLIST = (
     "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
+    "./test/extensions/filters/common/expr/context_test.cc",
     "./test/extensions/filters/http/common/fuzz/uber_filter.h",
     "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
 )
@@ -110,6 +111,11 @@ GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
 
+# Header files that can throw exceptions. These should be limited; the only
+# valid situation identified so far is template functions used for config
+# processing.
+EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
+
 # We want all URL references to exist in repository_locations.bzl files and have
 # metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
 # we have some exceptions for either infrastructure files or places we fall
@@ -121,7 +127,6 @@ BUILD_URLS_ALLOWLIST = (
     "./generated_api_shadow/bazel/repository_locations.bzl",
     "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
-    "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
     "./api/bazel/envoy_http_archive.bzl",
 )
@@ -149,6 +154,7 @@ VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
 RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
 INVALID_REFLINK = re.compile(".* ref:.*")
+OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
 # Check for punctuation in a terminal ref clause, e.g.
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
@@ -170,8 +176,20 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufWkt::MapPair":             "Protobuf::MapPair",
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
+
 LIBCXX_REPLACEMENTS = {
     "absl::make_unique<": "std::make_unique<",
+}
+
+CODE_CONVENTION_REPLACEMENTS = {
+    # We can't just remove Times(1) everywhere, since .Times(1).WillRepeatedly
+    # is a legitimate pattern. See
+    # https://github.com/google/googletest/blob/master/googlemock/docs/for_dummies.md#cardinalities-how-many-times-will-it-be-called
+    ".Times(1);": ";",
+    # These may miss some cases, due to line breaks, but should reduce the
+    # Times(1) noise.
+    ".Times(1).WillOnce": ".WillOnce",
+    ".Times(1).WillRepeatedly": ".WillOnce",
 }
 
 UNOWNED_EXTENSIONS = {
@@ -413,11 +431,11 @@ class FormatChecker:
 
   def denylistedForExceptions(self, file_path):
     # Returns true when it is a non test header file or the file_path is in DENYLIST or
-    # it is under toos/testdata subdirectory.
+    # it is under tools/testdata subdirectory.
     if file_path.endswith(DOCS_SUFFIX):
       return False
 
-    return (file_path.endswith('.h') and not file_path.startswith("./test/")) or file_path in EXCEPTION_DENYLIST \
+    return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
         or self.isInSubdir(file_path, 'tools/testdata')
 
   def allowlistedForBuildUrls(self, file_path):
@@ -505,8 +523,9 @@ class FormatChecker:
         match = VERSION_HISTORY_NEW_LINE_REGEX.match(line)
         if not match:
           reportError("Version history line malformed. "
-                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s" %
-                      line)
+                      "Does not match VERSION_HISTORY_NEW_LINE_REGEX in check_format.py\n %s\n"
+                      "Please use messages in the form 'category: feature explanation.', "
+                      "starting with a lower-cased letter and ending with a period." % line)
         else:
           first_word = match.groups()[0]
           next_word = match.groups()[1]
@@ -528,6 +547,7 @@ class FormatChecker:
         # If we hit the end of this release note block block, check the prior line.
         if not endsWithPeriod(prior_line):
           reportError("The following release note does not end with a '.'\n %s" % prior_line)
+        prior_line = ''
       elif prior_line:
         prior_line += line
 
@@ -567,6 +587,10 @@ class FormatChecker:
 
     # Use recommended cpp stdlib
     for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
+      line = line.replace(invalid_construct, valid_construct)
+
+    # Fix code conventions violations.
+    for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
       line = line.replace(invalid_construct, valid_construct)
 
     return line
@@ -634,6 +658,10 @@ class FormatChecker:
     for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
       if invalid_construct in line:
         reportError("term %s should be replaced with standard library term %s" %
+                    (invalid_construct, valid_construct))
+    for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
+      if invalid_construct in line:
+        reportError("term %s should be replaced with preferred term %s" %
                     (invalid_construct, valid_construct))
     # Do not include the virtual_includes headers.
     if re.search("#include.*/_virtual_includes/", line):
@@ -749,6 +777,9 @@ class FormatChecker:
       # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
       # with a lowercase letter.
       reportError("Test names should be CamelCase, starting with a capital letter")
+    if OLD_MOCK_METHOD_REGEX.search(line):
+      reportError("The MOCK_METHODn() macros should not be used, use MOCK_METHOD() instead")
+
     if not self.allowlistedForSerializeAsString(file_path) and "SerializeAsString" in line:
       # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
       # use MessageUtil::hash instead.
