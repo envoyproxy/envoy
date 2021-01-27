@@ -13,11 +13,12 @@ def main():
 
     categories = {}
     for k, v in data.items():
+        print(">> %s" % k)
+        print(v)
+        print()
         for cat in v['categories']:
             categories[cat] = categories.get(cat, [])
             categories[cat].append(k)
-
-    print(categories)
 
     with open(extension_cat_db, 'w') as f:
         json.dump(categories, f)
