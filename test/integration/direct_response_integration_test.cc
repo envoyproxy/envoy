@@ -57,7 +57,8 @@ TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseBodySize) {
 }
 
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeLarge) {
-  // Test with a large direct response body size.
+  // Test with a large direct response body size, and with constrained buffer limits.
+  config_helper_.setBufferLimits(1024, 1024);
   testDirectResponseBodySize(1000 * 4096);
 }
 
