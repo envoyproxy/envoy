@@ -61,6 +61,8 @@ This extension may be referenced by the qualified name *$extension*
 
   $security_posture
 
+  $category
+
 """)
 
 # A map from the extension security postures (as defined in the
@@ -204,7 +206,8 @@ def FormatExtension(extension):
     return EXTENSION_TEMPLATE.substitute(anchor=anchor,
                                          extension=extension,
                                          status=status,
-                                         security_posture=security_posture)
+                                         security_posture=security_posture,
+                                         category=extension_metadata['category'])
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
