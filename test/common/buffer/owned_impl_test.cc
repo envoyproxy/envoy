@@ -907,53 +907,6 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
   expectSlices({{8001, 4287, 12288}}, buffer);
 }
 
-TEST_F(OwnedImplTest, ReserveReuse) {
-  Buffer::OwnedImpl buffer;
-
-  // Test a zero-length reservation and commit.
-  {
-    auto reservation = buffer.reserveSingleSlice(0);
-    reservation.commit(0);
-  }
-
-  // Reserve some space and leave it uncommitted.
-  const void* first_slice;
-  {
-    auto reservation = buffer.reserveSingleSlice(8200);
-    first_slice = reservation.slice().mem_;
-  }
-
-  // Reserve more space and verify that it is not the same slice from the last reservation.
-  // That one was for a different size and was not committed.
-  const void* second_slice;
-  {
-    auto reservation = buffer.reserveSingleSlice(Slice::default_slice_size_);
-    EXPECT_NE(first_slice, reservation.slice().mem_);
-    second_slice = reservation.slice().mem_;
-  }
-
-  // Repeat the last reservation and verify that it yields the same slices. Both slices
-  // are for the default size, so the previous one should get re-used.
-  {
-    auto reservation = buffer.reserveSingleSlice(Slice::default_slice_size_);
-    EXPECT_EQ(second_slice, reservation.slice().mem_);
-
-    // Commit the most recent reservation and verify the representation.
-    reservation.commit(Slice::default_slice_size_);
-    expectSlices({{16384, 0, 16384}}, buffer);
-  }
-
-  // Do another reservation.
-  {
-    auto reservation = buffer.reserveSingleSlice(Slice::default_slice_size_);
-    expectSlices({{16384, 0, 16384}}, buffer);
-
-    // And commit.
-    reservation.commit(Slice::default_slice_size_);
-    expectSlices({{16384, 0, 16384}, {16384, 0, 16384}}, buffer);
-  }
-}
-
 // Test behavior when the size to commit() is larger than the reservation.
 TEST_F(OwnedImplTest, ReserveOverCommit) {
   Buffer::OwnedImpl buffer;
