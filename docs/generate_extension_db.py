@@ -3,6 +3,7 @@
 # Generate an extension database, a JSON file mapping from qualified well known
 # extension name to metadata derived from the envoy_cc_extension target.
 
+import ast
 import json
 import os
 import pathlib
@@ -48,9 +49,12 @@ def GetExtensionMetadata(target):
         % target)
   print(target)
   categories = categories or '[]'
+  # evaluate tuples/lists
+  # wrap strings in a list
   categories = (
-    json.loads(categories)
-    if '[' in categories
+    ast.literal_eval(categories)
+    if ('[' in categories
+        or '(' in categories)
     else [categories])
   print(categories)
   return {
