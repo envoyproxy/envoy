@@ -1963,10 +1963,14 @@ TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   OutputBufferStream ostream{buffer.data(), buffer.size()};
 
   // Dump the body
-  Buffer::OwnedImpl request("POST / HTTP/1.1\r\n"
-                            "Content-Length: 11\r\n"
-                            "\r\n"
-                            "Hello Envoy");
+  // Set content length to enable us to dumpState before
+  // buffers are drained. Only the first slice should be dumped.
+  Buffer::OwnedImpl request;
+  request.appendSliceForTest("POST / HTTP/1.1\r\n"
+                             "Content-Length: 5\r\n"
+                             "\r\n"
+                             "Hello");
+  request.appendSliceForTest("GarbageDataShouldNotBeDumped");
   EXPECT_CALL(decoder, decodeData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) {
         // dumpState here before buffers are drained. No memory should be allocated.
@@ -1980,11 +1984,11 @@ TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_TRUE(status.ok());
 
   // Check dump contents
-  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 11, header_parsing_state_: "
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
                                             "Done\n, active_request_.request_url_: null"));
   EXPECT_THAT(ostream.contents(),
-              HasSubstr("front_slice.length(): 50, front_slice: \n  POST / "
-                        "HTTP/1.1\\r\\nContent-Length: 11\\r\\n\\r\\nHello Envoy"));
+              HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: \"POST / "
+                        "HTTP/1.1\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
 }
 
 class Http1ClientConnectionImplTest : public Http1CodecTestBase {
@@ -3084,17 +3088,23 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
       }))
       .WillOnce(Invoke([]() {}));
 
-  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nHello Envoy");
+  // Dump the body
+  // Set content length to enable us to dumpState before
+  // buffers are drained. Only the first slice should be dumped.
+  Buffer::OwnedImpl response;
+  response.appendSliceForTest("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello");
+  response.appendSliceForTest("GarbageDataShouldNotBeDumped");
   auto status = codec_->dispatch(response);
-  EXPECT_EQ(0UL, response.length());
-  EXPECT_TRUE(status.ok());
+  // Client codec complains about extraneous data.
+  EXPECT_EQ(response.length(), 28UL);
+  EXPECT_FALSE(status.ok());
 
   // Check for body data.
-  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 11, header_parsing_state_: "
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
                                             "Done\n"));
   EXPECT_THAT(ostream.contents(),
-              testing::HasSubstr("front_slice.length(): 50, front_slice: \n  HTTP/1.1 200 "
-                                 "OK\\r\\nContent-Length: 11\\r\\n\\r\\nHello Envoy"));
+              testing::HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: "
+                                 "\"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
 }
 
 } // namespace Http

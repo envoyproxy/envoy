@@ -871,7 +871,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
      << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
-     << DUMP_MEMBER(buffered_body_.length(), buffered_body_.length());
+     << DUMP_MEMBER(buffered_body_.length());
 
   // Dump header parsing state, and any progress on other headers.
   os << DUMP_MEMBER(header_parsing_state_);
@@ -890,7 +890,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   if (current_dispatching_buffer_ == nullptr || dispatching_slice_already_drained_) {
     // Buffer is either null or already drained (in the body).
     // Use the macro for consistent formatting.
-    os << DUMP_NULLABLE_MEMBER(current_dispatching_buffer_, "null");
+    os << DUMP_NULLABLE_MEMBER(current_dispatching_buffer_, "drained");
     return;
   } else {
     auto front_slice = [](Buffer::Instance* instance) {
@@ -898,16 +898,13 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
       return absl::string_view(static_cast<const char*>(slice.mem_), slice.len_);
     }(current_dispatching_buffer_);
 
-    os << spaces << DUMP_MEMBER(front_slice.length(), front_slice.length()) << ", front_slice: \n";
-    {
-      const char* spaces = spacesForLevel(indent_level + 1);
-      // Dump buffer data escaping \r, \n, \t, ", ', and \.
-      // This is not the most performant implementation, but we're crashing and
-      // cannot allocate memory.
-      os << spaces;
-      StringUtil::escapeToOstream(os, front_slice);
-      os << '\n';
-    }
+    // Dump buffer data escaping \r, \n, \t, ", ', and \.
+    // This is not the most performant implementation, but we're crashing and
+    // cannot allocate memory.
+    os << spaces << "current_dispatching_buffer_ front_slice length: " << front_slice.length()
+       << " contents: \"";
+    StringUtil::escapeToOstream(os, front_slice);
+    os << "\"\n";
   }
 }
 
