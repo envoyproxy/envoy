@@ -34,6 +34,7 @@ public:
   static std::string getSqlState() { return "HY000"; }
   static std::string getErrorMessage() { return "auth failed"; }
   static std::string getAuthPluginName() { return "mysql_native_password"; }
+  static std::string getDb() { return "mysql.db"; }
   static int sizeOfLengthEncodeInteger(uint64_t val);
 
   std::string encodeServerGreeting(int protocol);

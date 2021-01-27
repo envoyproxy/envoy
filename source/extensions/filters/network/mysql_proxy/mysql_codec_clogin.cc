@@ -160,10 +160,20 @@ int ClientLogin::parseResponse320(Buffer::Instance& buffer) {
     ENVOY_LOG(info, "error when paring username of client login message");
     return MYSQL_FAILURE;
   }
-  // there are more
-  if (BufferHelper::readStringEof(buffer, auth_resp_)) {
-    ENVOY_LOG(info, "error when paring auth resp of client login message");
-    return MYSQL_FAILURE;
+  if (client_cap_ & CLIENT_CONNECT_WITH_DB) {
+    if (BufferHelper::readString(buffer, auth_resp_)) {
+      ENVOY_LOG(info, "error when paring auth resp of client login message");
+      return MYSQL_FAILURE;
+    }
+    if (BufferHelper::readString(buffer, db_)) {
+      ENVOY_LOG(info, "error when paring db of client login message");
+      return MYSQL_FAILURE;
+    }
+  } else {
+    if (BufferHelper::readStringEof(buffer, auth_resp_)) {
+      ENVOY_LOG(info, "error when paring auth resp of client login message");
+      return MYSQL_FAILURE;
+    }
   }
   return MYSQL_SUCCESS;
 }

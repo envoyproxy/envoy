@@ -77,8 +77,8 @@ bool ClientLoginResponse::OkMessage::operator==(const ClientLoginResponse::OkMes
 }
 
 ClientLoginResponse::ErrMessage::ErrMessage(ClientLoginResponse::ErrMessage&& other) noexcept
-    : marker_(other.marker_), error_code_(other.error_code_), sql_state_(other.sql_state_),
-      error_message_(other.error_message_) {}
+    : marker_(other.marker_), error_code_(other.error_code_),
+      sql_state_(std::move(other.sql_state_)), error_message_(std::move(other.error_message_)) {}
 
 ClientLoginResponse::ErrMessage&
 ClientLoginResponse::ErrMessage::operator=(ErrMessage&& other) noexcept {
