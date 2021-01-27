@@ -32,12 +32,10 @@ struct EnvoyRedirectRecords {
 };
 
 constexpr bool Win32SupportsOriginalDestination() {
-#ifdef WIN32
 #if defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
   return true;
 #else
   return false;
-#endif
 #endif
 }
 
