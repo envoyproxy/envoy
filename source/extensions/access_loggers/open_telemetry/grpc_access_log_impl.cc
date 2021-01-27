@@ -12,7 +12,7 @@
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
-const char GRPC_LOG_STATS_PREFIX[] = "access_logs.grpc_ot_access_log.";
+const char GRPC_LOG_STATS_PREFIX[] = "access_logs.open_telemetry_access_log.";
 
 namespace Envoy {
 namespace Extensions {
