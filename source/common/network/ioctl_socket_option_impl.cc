@@ -34,11 +34,12 @@ bool IoctlSocketOptionImpl::setOption(
   return true;
 }
 
- void IoctlSocketOptionImpl::hashKey(std::vector<uint8_t>& hash) const {
-    std::string in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
-    std::string out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
-    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(std::string(in_buffer_bstr + out_buffer_bstr)), hash);
- }
+void IoctlSocketOptionImpl::hashKey(std::vector<uint8_t>& hash) const {
+  std::string in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
+  std::string out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
+  pushScalarToByteVector(
+      StringUtil::CaseInsensitiveHash()(std::string(in_buffer_bstr + out_buffer_bstr)), hash);
+}
 
 absl::optional<Socket::Option::Details>
 IoctlSocketOptionImpl::getOptionDetails(const Socket&,
