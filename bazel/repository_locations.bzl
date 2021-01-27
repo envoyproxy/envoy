@@ -56,6 +56,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-01-26",
         use_category = ["test_only"],
         implied_untracked_deps = [
+            # This is a repository rule generated to define an OSS-Fuzz fuzzing
+            # engine target from the CFLAGS/CXXFLAGS environment.
             "rules_fuzzing_oss_fuzz",
         ],
     ),
