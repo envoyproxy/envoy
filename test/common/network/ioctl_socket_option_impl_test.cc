@@ -88,18 +88,17 @@ TEST_F(IoctlSocketOptionImplTest, SetOption) {
 }
 
 TEST_F(IoctlSocketOptionImplTest, HashKey) {
-    std::vector<uint8_t> hash;
-    IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
+  std::vector<uint8_t> hash;
+  IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                       ENVOY_MAKE_SOCKET_OPTION_NAME(IOCTL_LEVEL, 10),
                                       reinterpret_cast<void*>(redirect_records_->buf_ptr_),
                                       redirect_records_->buf_size_,
                                       nullptr,
                                       0};
-    socket_option.hashKey(hash);
-    std::vector<uint8_t> expected_hash;
-    pushScalarToByteVector(
-      StringUtil::CaseInsensitiveHash()(redirect_records_data_), expected_hash);
-    EXPECT_EQ(hash, expected_hash);
+  socket_option.hashKey(hash);
+  std::vector<uint8_t> expected_hash;
+  pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(redirect_records_data_), expected_hash);
+  EXPECT_EQ(hash, expected_hash);
 }
 
 TEST_F(IoctlSocketOptionImplTest, OptionDetails) {
