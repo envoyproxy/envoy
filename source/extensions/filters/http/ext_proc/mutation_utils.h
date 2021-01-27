@@ -14,6 +14,11 @@ public:
   static void buildHttpHeaders(const Http::HeaderMap& headers_in,
                                envoy::config::core::v3::HeaderMap& headers_out);
 
+  // Apply mutations that are common to header responses.
+  static void
+  applyCommonHeaderResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response,
+                            Http::HeaderMap& headers);
+
   // Modify header map based on a set of mutations from a protobuf
   static void
   applyHeaderMutations(const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation,

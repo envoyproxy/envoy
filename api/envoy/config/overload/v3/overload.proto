@@ -100,6 +100,12 @@ message ScaleTimersOverloadActionConfig {
     // :ref:`HttpConnectionManager.stream_idle_timeout
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`
     HTTP_DOWNSTREAM_STREAM_IDLE = 2;
+
+    // Adjusts the timer for how long downstream clients have to finish transport-level negotiations
+    // before the connection is closed.
+    // This affects the value of
+    // :ref:`FilterChain.transport_socket_connect_timeout <envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>`.
+    TRANSPORT_SOCKET_CONNECT = 3;
   }
 
   message ScaleTimer {
