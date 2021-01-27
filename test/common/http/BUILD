@@ -371,13 +371,22 @@ envoy_cc_test(
     ],
 )
 
+PATH_UTILITY_TEST_DEPS = [
+    "//source/common/http:header_map_lib",
+    "//source/common/http:path_utility_lib",
+]
+
 envoy_cc_test(
     name = "path_utility_test",
     srcs = ["path_utility_test.cc"],
-    deps = [
-        "//source/common/http:header_map_lib",
-        "//source/common/http:path_utility_lib",
-    ],
+    deps = PATH_UTILITY_TEST_DEPS,
+)
+
+envoy_cc_test(
+    name = "legacy_path_utility_test",
+    srcs = ["path_utility_test.cc"],
+    args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_forked_chromium_url"],
+    deps = PATH_UTILITY_TEST_DEPS,
 )
 
 envoy_cc_test(
