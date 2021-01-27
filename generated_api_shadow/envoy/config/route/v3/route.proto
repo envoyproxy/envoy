@@ -116,7 +116,7 @@ message RouteConfiguration {
   //   Envoy currently holds the content of :ref:`direct response body
   //   <envoy_api_field_config.route.v3.DirectResponseAction.body>` in memory. Be careful setting
   //   this to be larger than the default 4KB, since the allocated memory for direct response body
-  //   is not being subject to memory guards.
+  //   is not being subject to data plane buffering controls.
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
 }
