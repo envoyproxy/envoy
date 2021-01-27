@@ -791,7 +791,7 @@ Envoy::StatusOr<ConnectionImpl::HttpParserCode> ConnectionImpl::onHeadersComplet
 
   // Returning HttpParserCode::NoBodyData informs http_parser to not expect a body or further data
   // on this connection.
-  return handling_upgrade_ ? HttpParserCode::NoBodyData : statusor;
+  return handling_upgrade_ ? HttpParserCode::NoBodyData : statusor.value();
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
