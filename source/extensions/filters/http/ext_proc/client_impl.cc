@@ -38,7 +38,15 @@ void ExternalProcessorStreamImpl::send(
   stream_.sendMessage(std::move(request), end_stream);
 }
 
-void ExternalProcessorStreamImpl::close() { stream_->closeStream(); }
+bool ExternalProcessorStreamImpl::close() {
+  if (!stream_closed_) {
+    ENVOY_LOG(debug, "Closing gRPC stream");
+    stream_->closeStream();
+    stream_closed_ = true;
+    return true;
+  }
+  return false;
+}
 
 void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& response) {
   callbacks_.onReceiveMessage(std::move(response));
@@ -49,7 +57,9 @@ void ExternalProcessorStreamImpl::onReceiveInitialMetadata(Http::ResponseHeaderM
 void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) {}
 
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
-                                                const std::string&) {
+                                                const std::string& message) {
+  ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
+  stream_closed_ = true;
   if (status == Grpc::Status::Ok) {
     callbacks_.onGrpcClose();
   } else {

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <string>
 
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
@@ -78,10 +79,16 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
     // The filter is not waiting for anything, so any response on the
     // gRPC stream is spurious and will result in the filter closing
     // the stream.
-    IDLE,
+    Idle,
     // The filter is waiting for a "request_headers" or a "response_headers" message.
     // Any other response on the gRPC stream will be treated as spurious.
-    HEADERS,
+    Headers,
+    // The filter is waiting for a "request_body" or "response_body" message.
+    // The body to modify is the filter's buffered body.
+    BufferedBody,
+    // The filter is waiting for a "request_body" or "response_body" message.
+    // The body to modify is pointed to by this filter.
+    ChunkedBody,
   };
 
 public:
@@ -93,8 +100,11 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
   // ExternalProcessorCallbacks
 
@@ -107,7 +117,6 @@ public:
 
 private:
   void openStream();
-  void closeStream();
   void cleanupState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
@@ -115,8 +124,12 @@ private:
   handleRequestHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
   bool
   handleResponseHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
+  bool handleRequestBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& response);
+  bool handleResponseBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& response);
   void
   handleImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+
+  void sendBodyChunk(bool request_path, const Buffer::Instance& data, bool end_stream);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
@@ -125,23 +138,28 @@ private:
   // The state of the request-processing, or "decoding" side of the filter.
   // We maintain separate states for encoding and decoding since they may
   // be interleaved.
-  FilterState request_state_ = FilterState::IDLE;
+  FilterState request_state_ = FilterState::Idle;
 
   // The state of the response-processing side
-  FilterState response_state_ = FilterState::IDLE;
+  FilterState response_state_ = FilterState::Idle;
 
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
   ExternalProcessorStreamPtr stream_;
 
-  // Set to true when the stream has been closed and no more messages
-  // need to be sent to the processor. This happens when the processor
-  // has closed the stream, or when it has failed, or when the filter
-  // is destroyed.
+  // Set to true when no more messages need to be sent to the processor.
+  // This happens when the processor has closed the stream, or when it has
+  // failed.
   bool processing_complete_ = false;
 
-  Http::HeaderMap* request_headers_ = nullptr;
-  Http::HeaderMap* response_headers_ = nullptr;
+  // The headers that we'll be expected to modify.
+  Http::RequestHeaderMap* request_headers_ = nullptr;
+  Http::ResponseHeaderMap* response_headers_ = nullptr;
+
+  // If we're modifying only one chunk of the body, then
+  // save a pointer here.
+  Buffer::Instance* request_body_chunk_ = nullptr;
+  Buffer::Instance* response_body_chunk_ = nullptr;
 
   // The processing mode. May be locally overridden by any response,
   // So every instance of the filter has a copy.
