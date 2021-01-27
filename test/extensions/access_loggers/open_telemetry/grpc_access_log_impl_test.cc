@@ -5,7 +5,7 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 
-#include "extensions/access_loggers/grpc/grpc_ot_access_log_impl.h"
+#include "extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -26,7 +26,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace GrpcCommon {
+namespace OpenTelemetry {
 namespace {
 
 constexpr std::chrono::milliseconds FlushInterval(10);
@@ -35,15 +35,15 @@ const std::string ZONE_NAME = "zone_name";
 const std::string CLUSTER_NAME = "cluster_name";
 const std::string NODE_NAME = "node_name";
 
-// A helper test class to mock and intercept GrpcOpenTelemetryAccessLoggerImpl streams.
-class GrpcOpenTelemetryAccessLoggerImplTestHelper {
+// A helper test class to mock and intercept GrpcAccessLoggerImpl streams.
+class GrpcAccessLoggerImplTestHelper {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
   using AccessLogCallbacks = Grpc::AsyncStreamCallbacks<
       opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>;
 
-  GrpcOpenTelemetryAccessLoggerImplTestHelper(LocalInfo::MockLocalInfo& local_info,
-                                              Grpc::MockAsyncClient* async_client) {
+  GrpcAccessLoggerImplTestHelper(LocalInfo::MockLocalInfo& local_info,
+                                 Grpc::MockAsyncClient* async_client) {
     EXPECT_CALL(local_info, zoneName()).WillOnce(ReturnRef(ZONE_NAME));
     EXPECT_CALL(local_info, clusterName()).WillOnce(ReturnRef(CLUSTER_NAME));
     EXPECT_CALL(local_info, nodeName()).WillOnce(ReturnRef(NODE_NAME));
@@ -74,13 +74,13 @@ private:
   AccessLogCallbacks* callbacks_;
 };
 
-class GrpcOpenTelemetryAccessLoggerImplTest : public testing::Test {
+class GrpcAccessLoggerImplTest : public testing::Test {
 public:
-  GrpcOpenTelemetryAccessLoggerImplTest()
+  GrpcAccessLoggerImplTest()
       : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    logger_ = std::make_unique<GrpcOpenTelemetryAccessLoggerImpl>(
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(
         Grpc::RawAsyncClientPtr{async_client_}, "test_log_name", FlushInterval, BUFFER_SIZE_BYTES,
         dispatcher_, local_info_, stats_store_, envoy::config::core::v3::ApiVersion::V3);
   }
@@ -90,11 +90,11 @@ public:
   LocalInfo::MockLocalInfo local_info_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
-  std::unique_ptr<GrpcOpenTelemetryAccessLoggerImpl> logger_;
-  GrpcOpenTelemetryAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
+  std::unique_ptr<GrpcAccessLoggerImpl> logger_;
+  GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
 };
 
-TEST_F(GrpcOpenTelemetryAccessLoggerImplTest, LogHttp) {
+TEST_F(GrpcAccessLoggerImplTest, LogHttp) {
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
     resource:
@@ -120,7 +120,7 @@ TEST_F(GrpcOpenTelemetryAccessLoggerImplTest, LogHttp) {
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
 }
 
-TEST_F(GrpcOpenTelemetryAccessLoggerImplTest, LogTcp) {
+TEST_F(GrpcAccessLoggerImplTest, LogTcp) {
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
     resource:
@@ -146,9 +146,9 @@ TEST_F(GrpcOpenTelemetryAccessLoggerImplTest, LogTcp) {
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
 }
 
-class GrpcOpenTelemetryAccessLoggerCacheImplTest : public testing::Test {
+class GrpcAccessLoggerCacheImplTest : public testing::Test {
 public:
-  GrpcOpenTelemetryAccessLoggerCacheImplTest()
+  GrpcAccessLoggerCacheImplTest()
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, local_info_),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
@@ -167,19 +167,19 @@ public:
   LocalInfo::MockLocalInfo local_info_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  GrpcOpenTelemetryAccessLoggerCacheImpl logger_cache_;
-  GrpcOpenTelemetryAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
+  GrpcAccessLoggerCacheImpl logger_cache_;
+  GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
 };
 
 // Test that the logger is created according to the config (by inspecting the generated log).
-TEST_F(GrpcOpenTelemetryAccessLoggerCacheImplTest, LoggerCreation) {
+TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
   config.set_log_name("test-log");
   config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
   // Force a flush for every log entry.
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
-  GrpcOpenTelemetryAccessLoggerSharedPtr logger =
+  GrpcAccessLoggerSharedPtr logger =
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
@@ -207,7 +207,7 @@ TEST_F(GrpcOpenTelemetryAccessLoggerCacheImplTest, LoggerCreation) {
 }
 
 } // namespace
-} // namespace GrpcCommon
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy

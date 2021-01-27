@@ -20,14 +20,14 @@
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace GrpcCommon {
+namespace OpenTelemetry {
 
 // Note: OpenTelemetry protos are extra flexible and used also in the OT collector for batching and
 // so forth. As a result, some fields are repeated, but for our use case we assume the following
 // structure:
 // ExportLogsServiceRequest -> (single) ResourceLogs -> (single) InstrumentationLibraryLogs ->
 // (repeated) LogRecord.
-class GrpcOpenTelemetryAccessLoggerImpl
+class GrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<
           opentelemetry::proto::logs::v1::LogRecord,
           // OpenTelemetry logging uses LogRecord for both HTTP and TCP, so protobuf::Empty is used
@@ -36,11 +36,11 @@ class GrpcOpenTelemetryAccessLoggerImpl
           ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
-  GrpcOpenTelemetryAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
-                                    std::chrono::milliseconds buffer_flush_interval_msec,
-                                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                                    const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                                    envoy::config::core::v3::ApiVersion transport_api_version);
+  GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
+                       std::chrono::milliseconds buffer_flush_interval_msec,
+                       uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+                       envoy::config::core::v3::ApiVersion transport_api_version);
 
 private:
   void initMessageRoot(const std::string& log_name, const LocalInfo::LocalInfo& local_info);
@@ -55,18 +55,18 @@ private:
   opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;
 };
 
-class GrpcOpenTelemetryAccessLoggerCacheImpl
+class GrpcAccessLoggerCacheImpl
     : public Common::GrpcAccessLoggerCache<
-          GrpcOpenTelemetryAccessLoggerImpl,
+          GrpcAccessLoggerImpl,
           envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig> {
 public:
-  GrpcOpenTelemetryAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
-                                         Stats::Scope& scope, ThreadLocal::SlotAllocator& tls,
-                                         const LocalInfo::LocalInfo& local_info);
+  GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
+                            ThreadLocal::SlotAllocator& tls,
+                            const LocalInfo::LocalInfo& local_info);
 
 private:
   // Common::GrpcAccessLoggerCache
-  GrpcOpenTelemetryAccessLoggerImpl::SharedPtr
+  GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                Grpc::RawAsyncClientPtr&& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
@@ -78,13 +78,13 @@ private:
 /**
  * Aliases for class interfaces for mock definitions.
  */
-using GrpcOpenTelemetryAccessLogger = GrpcOpenTelemetryAccessLoggerImpl::Interface;
-using GrpcOpenTelemetryAccessLoggerSharedPtr = GrpcOpenTelemetryAccessLogger::SharedPtr;
+using GrpcAccessLogger = GrpcAccessLoggerImpl::Interface;
+using GrpcAccessLoggerSharedPtr = GrpcAccessLogger::SharedPtr;
 
-using GrpcOpenTelemetryAccessLoggerCache = GrpcOpenTelemetryAccessLoggerCacheImpl::Interface;
-using GrpcOpenTelemetryAccessLoggerCacheSharedPtr = GrpcOpenTelemetryAccessLoggerCache::SharedPtr;
+using GrpcAccessLoggerCache = GrpcAccessLoggerCacheImpl::Interface;
+using GrpcAccessLoggerCacheSharedPtr = GrpcAccessLoggerCache::SharedPtr;
 
-} // namespace GrpcCommon
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy
