@@ -225,6 +225,8 @@ def FormatExtensionType(extension_type):
   except KeyError as e:
     sys.stderr.write(
         '\n\nUnable to find extension type: %s\n\n' % extension_type)
+    for k in EXTENSION_CATEGORIES:
+      sys.stderr.write("category: %s" % k)
     exit(1)  # Raising the error buries the above message in tracebacks.
 
 
