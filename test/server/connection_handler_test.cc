@@ -264,11 +264,11 @@ public:
 
     Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
     Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-#if defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
-    if (test_listener->direction() == envoy::config::core::v3::TrafficDirection::OUTBOUND) {
-      EXPECT_CALL(*accepted_socket, genericIoctl(_, _, _, _, _, _));
+    if constexpr (Network::Win32SupportsOriginalDestination()) {
+      if (test_listener->direction() == envoy::config::core::v3::TrafficDirection::OUTBOUND) {
+        EXPECT_CALL(*accepted_socket, genericIoctl(_, _, _, _, _, _));
+      }
     }
-#endif
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
           // Insert the Mock filter.

@@ -113,6 +113,10 @@ public:
   Api::SysCallIntResult setSocketOption(int, int, const void*, socklen_t) override {
     return {0, 0};
   }
+  Api::SysCallIntResult genericIoctl(unsigned long, void*, unsigned long, void*, unsigned long,
+                                     unsigned long&) override {
+    return {0, 0};
+  }
   Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {
     return {0, 0};
   }

@@ -372,6 +372,32 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
   open_connections_ = origin.open_connections_;
+
+#ifdef WIN32
+  // On Windows we need to do some extra validation for the Original Destination filter.
+  // In particular we need to check if:
+  // 1. The platform supports the original destination feature
+  // 2. The `traffic_direction` property is set on the listener. This is required to redirect the
+  // traffic.
+  auto it =
+      std::find_if(config_.listener_filters().begin(), config_.listener_filters().end(),
+                   [](const envoy::config::listener::v3::ListenerFilter& listener) {
+                     return listener.name() ==
+                            Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst;
+                   });
+  if (it != config_.listener_filters().end()) {
+    if (Network::Win32SupportsOriginalDestination() &&
+        config_.traffic_direction() == envoy::config::core::v3::UNSPECIFIED) {
+      throw EnvoyException("[Windows] Setting original destination filter on a listener without "
+                           "specifiying the traffic_direction"
+                           "Configure the traffic_direction listener option");
+    } else {
+      ENVOY_LOG(warn,
+                "[Windows] Setting original destination filter on a version of Envoy that does not "
+                "support it. The listener will be able to proxy traffic");
+    }
+  }
+#endif
 }
 
 void ListenerImpl::buildAccessLog() {
