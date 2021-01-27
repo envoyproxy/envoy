@@ -47,12 +47,17 @@ def GetExtensionMetadata(target):
         'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
         % target)
   print(target)
+  categories = categories or '[]'
+  categories = (
+    json.loads(categories)
+    if '[' in categories
+    else [categories])
   print(categories)
   return {
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
       'status': 'stable' if IsMissing(status) else status,
-      'categories': json.loads(categories or '["missing"]'),
+      'categories': categories,
   }
 
 
