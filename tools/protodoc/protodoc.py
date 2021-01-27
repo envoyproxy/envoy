@@ -248,8 +248,9 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
     extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
     formatted_extension = FormatExtension(extension)
   formatted_extension_type = ''
-  if annotations.EXTENSION_TYPE_ANNOTATION in comment.annotations:
-    formatted_extension_type = FormatExtensionType(comment.annotations[annotations.EXTENSION_TYPE_ANNOTATION])
+  if annotations.EXTENSION_TYPE_ANNOTATION in source_code_info.file_level_annotations:
+    formatted_extension_type = FormatExtensionType(
+      source_code_info.file_level_annotations[annotations.EXTENSION_TYPE_ANNOTATION])
   if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
     return anchor + FormatHeader(
         style, source_code_info.file_level_annotations[
