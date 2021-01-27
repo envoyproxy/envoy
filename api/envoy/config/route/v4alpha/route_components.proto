@@ -734,8 +734,7 @@ message RouteAction {
         "envoy.config.route.v3.RouteAction.UpgradeConfig";
 
     // Configuration for sending data upstream as a raw data payload. This is used for
-    // CONNECT requests, when forwarding CONNECT payload as raw TCP. It also allows using POST
-    // payload as raw TCP if configured.
+    // CONNECT or POST requests, when forwarding request payload as raw TCP.
     message ConnectConfig {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.route.v3.RouteAction.UpgradeConfig.ConnectConfig";
