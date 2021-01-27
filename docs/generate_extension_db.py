@@ -49,6 +49,7 @@ def GetExtensionMetadata(target):
         % target)
   print(target)
   categories = categories or '[]'
+  print(categories)
   # evaluate tuples/lists
   # wrap strings in a list
   categories = (
@@ -56,6 +57,7 @@ def GetExtensionMetadata(target):
     if ('[' in categories
         or '(' in categories)
     else [categories])
+  print('mangled cats...')
   print(categories)
   return {
       'security_posture': security_posture,
