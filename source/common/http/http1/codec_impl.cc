@@ -1079,24 +1079,6 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   active_request_.reset();
 }
 
-void ServerConnectionImpl::sendProtocolErrorOld(absl::string_view details) {
-  if (active_request_.has_value()) {
-    active_request_.value().response_encoder_.setDetails(details);
-  }
-  // We do this here because we may get a protocol error before we have a logical stream. Higher
-  // layers can only operate on streams, so there is no coherent way to allow them to send an error
-  // "out of band." On one hand this is kind of a hack but on the other hand it normalizes HTTP/1.1
-  // to look more like HTTP/2 to higher layers.
-  if (!active_request_.has_value() ||
-      !active_request_.value().response_encoder_.startedResponse()) {
-    Buffer::OwnedImpl bad_request_response(
-        absl::StrCat("HTTP/1.1 ", error_code_, " ", CodeUtility::toString(error_code_),
-                     "\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"));
-
-    connection_.write(bad_request_response, false);
-  }
-}
-
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   // We do this here because we may get a protocol error before we have a logical stream.
   if (!active_request_.has_value()) {

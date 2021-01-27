@@ -533,8 +533,6 @@ private:
     }
   }
 
-  void sendProtocolErrorOld(absl::string_view details);
-
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
   Status doFloodProtectionChecks() const;
