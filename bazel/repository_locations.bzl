@@ -45,6 +45,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2019-10-10",
         use_category = ["build"],
     ),
+    rules_fuzzing = dict(
+        project_name = "Fuzzing Rules for Bazel",
+        project_desc = "Bazel rules for fuzz tests",
+        project_url = "https://github.com/bazelbuild/rules_fuzzing",
+        version = "04c6c334bba2142b3165a59ce29f57e057752fcd",
+        sha256 = "6af5cd0207f81d66a1c5ca762d8411c584a2a96d1a35da04410e1e65b414ee5f",
+        strip_prefix = "rules_fuzzing-{version}",
+        urls = ["https://github.com/bazelbuild/rules_fuzzing/archive/{version}.tar.gz"],
+        release_date = "2021-01-25",
+        use_category = ["test_only"],
+        implied_untracked_deps = [
+            "rules_fuzzing_oss_fuzz",
+        ],
+    ),
     envoy_build_tools = dict(
         project_name = "envoy-build-tools",
         project_desc = "Common build tools shared by the Envoy/UDPA ecosystem",
