@@ -389,7 +389,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
     if (Network::Win32SupportsOriginalDestination() &&
         config_.traffic_direction() == envoy::config::core::v3::UNSPECIFIED) {
       throw EnvoyException("[Windows] Setting original destination filter on a listener without "
-                           "specifiying the traffic_direction"
+                           "specifying the traffic_direction."
                            "Configure the traffic_direction listener option");
     } else {
       ENVOY_LOG(warn,
