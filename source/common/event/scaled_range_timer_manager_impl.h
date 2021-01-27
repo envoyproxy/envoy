@@ -68,6 +68,10 @@ private:
     //   2) on expiration
     //   3) when the scale factor changes
     const TimerPtr timer_;
+
+    // A flag indicating whether the queue is currently processing timers. Used to guard against
+    // queue deletion during timer processing.
+    bool processing_timers_{false};
   };
 
   /**

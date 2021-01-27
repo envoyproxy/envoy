@@ -225,7 +225,11 @@ void ScaledRangeTimerManagerImpl::removeTimer(ScalingTimerHandle handle) {
   handle.queue_.range_timers_.erase(handle.iterator_);
   // Don't keep around empty queues
   if (handle.queue_.range_timers_.empty()) {
-    queues_.erase(handle.queue_);
+    // Skip erasing the queue if we're in the middle of processing timers for the queue. The
+    // queue will be erased in `onQueueTimerFired` after the queue entries have been processed.
+    if (!handle.queue_.processing_timers_) {
+      queues_.erase(handle.queue_);
+    }
     return;
   }
 
@@ -255,12 +259,14 @@ void ScaledRangeTimerManagerImpl::onQueueTimerFired(Queue& queue) {
 
   // Pop and trigger timers until the one at the front isn't supposed to have expired yet (given the
   // current scale factor).
+  queue.processing_timers_ = true;
   while (!timers.empty() &&
          computeTriggerTime(timers.front(), queue.duration_, scale_factor_) <= now) {
     auto item = std::move(queue.range_timers_.front());
     queue.range_timers_.pop_front();
     item.timer_.trigger();
   }
+  queue.processing_timers_ = false;
 
   if (queue.range_timers_.empty()) {
     // Maintain the invariant that queues are never empty.
