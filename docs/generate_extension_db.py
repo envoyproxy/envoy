@@ -50,7 +50,7 @@ def GetExtensionMetadata(target):
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
       'status': 'stable' if IsMissing(status) else status,
-      'categories': 'nocategory' if IsMissing(categories) else categories,
+      'categories': json.loads(categories) if categories else 'missing',
   }
 
 
