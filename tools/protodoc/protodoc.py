@@ -221,7 +221,7 @@ def FormatExtensionType(extension_type):
     RST formatted extension description.
   """
   try:
-    "INFO ABOUT THE EXTENSION TYPE %s\n\n" % EXTENSION_CATEGORIES[extension_type]
+    return "INFO ABOUT THE EXTENSION TYPE %s\n\n" % EXTENSION_CATEGORIES[extension_type]
   except KeyError as e:
     sys.stderr.write(
         '\n\nUnable to find extension type: %s\n\n' % extension_type)
