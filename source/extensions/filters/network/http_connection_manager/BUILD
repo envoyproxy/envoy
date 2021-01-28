@@ -24,6 +24,7 @@ envoy_cc_extension(
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/http:ip_detection_extension_interface",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/registry",
         "//include/envoy/router:route_config_provider_manager_interface",

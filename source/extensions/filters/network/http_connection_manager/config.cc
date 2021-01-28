@@ -287,6 +287,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         Http::RequestIDExtensionFactory::defaultInstance(context_.api().randomGenerator());
   }
 
+  // Check if we are provided with an IP detection extension.
+  if (config.ip_detection_extension().has_typed_config()) {
+    auto& typed_config = config.ip_detection_extension().typed_config();
+    const std::string type{TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url())};
+    auto* ip_detection_extension_factory =
+        Registry::FactoryRegistry<Http::IPDetectionExtensionFactory>::getFactoryByType(type);
+    if (!ip_detection_extension_factory) {
+      throw EnvoyException("IP detection extension not found");
+    }
+    ip_detection_extension_ = ip_detection_extension_factory->createExtension(typed_config);
+  }
+
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {

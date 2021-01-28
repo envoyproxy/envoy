@@ -13,6 +13,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/http/filter_config_provider.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/ip_detection_extension.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
@@ -177,6 +178,9 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  Http::IPDetectionExtensionSharedPtr ipDetectionExtension() override {
+    return ip_detection_extension_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -255,6 +259,7 @@ private:
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;
+  Http::IPDetectionExtensionSharedPtr ip_detection_extension_{nullptr};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

@@ -95,7 +95,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
   Network::Address::InstanceConstSharedPtr final_remote_address;
-  bool single_xff_address;
+  bool single_xff_address = false;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
 
   if (config.useRemoteAddress()) {
@@ -127,12 +127,23 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
     }
   } else {
-    // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
+    // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF
+    // or through an extension. An extension might be needed when XFF doesn't work (e.g. an
+    // irregular network).
+    //
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
-    final_remote_address = ret.address_;
-    single_xff_address = ret.single_address_;
+    auto ip_detection_extension = config.ipDetectionExtension();
+    if (ip_detection_extension) {
+      final_remote_address = ip_detection_extension->detect(request_headers);
+    }
+
+    // If there's no extension or it failed to detect, give XFF a try.
+    if (!final_remote_address) {
+      auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
+      final_remote_address = ret.address_;
+      single_xff_address = ret.single_address_;
+    }
   }
 
   // If the x-forwarded-proto header is not set, set it here, since Envoy uses it for determining
@@ -170,30 +181,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.setReferenceEnvoyInternalRequest(
         Headers::get().EnvoyInternalRequestValues.True);
   } else {
-    if (edge_request) {
-      request_headers.removeEnvoyDecoratorOperation();
-      request_headers.removeEnvoyDownstreamServiceCluster();
-      request_headers.removeEnvoyDownstreamServiceNode();
-    }
-
-    request_headers.removeEnvoyRetriableStatusCodes();
-    request_headers.removeEnvoyRetriableHeaderNames();
-    request_headers.removeEnvoyRetryOn();
-    request_headers.removeEnvoyRetryGrpcOn();
-    request_headers.removeEnvoyMaxRetries();
-    request_headers.removeEnvoyUpstreamAltStatName();
-    request_headers.removeEnvoyUpstreamRequestTimeoutMs();
-    request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
-    request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
-    request_headers.removeEnvoyExpectedRequestTimeoutMs();
-    request_headers.removeEnvoyForceTrace();
-    request_headers.removeEnvoyIpTags();
-    request_headers.removeEnvoyOriginalUrl();
-    request_headers.removeEnvoyHedgeOnPerTryTimeout();
-
-    for (const LowerCaseString& header : route_config.internalOnlyHeaders()) {
-      request_headers.remove(header);
-    }
+    cleanInternalHeaders(request_headers, edge_request, route_config.internalOnlyHeaders());
   }
 
   if (config.userAgent()) {
@@ -234,6 +222,35 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return final_remote_address;
+}
+
+void ConnectionManagerUtility::cleanInternalHeaders(
+    RequestHeaderMap& request_headers, bool edge_request,
+    const std::list<Http::LowerCaseString>& internal_only_headers) {
+  if (edge_request) {
+    request_headers.removeEnvoyDecoratorOperation();
+    request_headers.removeEnvoyDownstreamServiceCluster();
+    request_headers.removeEnvoyDownstreamServiceNode();
+  }
+
+  request_headers.removeEnvoyRetriableStatusCodes();
+  request_headers.removeEnvoyRetriableHeaderNames();
+  request_headers.removeEnvoyRetryOn();
+  request_headers.removeEnvoyRetryGrpcOn();
+  request_headers.removeEnvoyMaxRetries();
+  request_headers.removeEnvoyUpstreamAltStatName();
+  request_headers.removeEnvoyUpstreamRequestTimeoutMs();
+  request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
+  request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
+  request_headers.removeEnvoyExpectedRequestTimeoutMs();
+  request_headers.removeEnvoyForceTrace();
+  request_headers.removeEnvoyIpTags();
+  request_headers.removeEnvoyOriginalUrl();
+  request_headers.removeEnvoyHedgeOnPerTryTimeout();
+
+  for (const LowerCaseString& header : internal_only_headers) {
+    request_headers.remove(header);
+  }
 }
 
 void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& request_headers,

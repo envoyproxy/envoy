@@ -140,3 +140,12 @@ envoy_cc_library(
         ":header_map_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "ip_detection_extension_interface",
+    hdrs = ["ip_detection_extension.h"],
+    deps = [
+        ":header_map_interface",
+        "//include/envoy/config:typed_config_interface",
+    ],
+)

@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 43]
+// [#next-free-field: 44]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -586,6 +586,11 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 
+  // The configuration of the IP detection extension.
+  //
+  // If not set, Envoy uses the default remote IP detection.
+  IPDetectionExtension ip_detection_extension = 43;
+
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
@@ -854,5 +859,10 @@ message RequestIDExtension {
       "envoy.config.filter.network.http_connection_manager.v2.RequestIDExtension";
 
   // Request ID extension specific configuration.
+  google.protobuf.Any typed_config = 1;
+}
+
+message IPDetectionExtension {
+  // IP detection extension specific configuration.
   google.protobuf.Any typed_config = 1;
 }
