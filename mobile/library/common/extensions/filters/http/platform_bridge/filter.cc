@@ -58,26 +58,11 @@ PlatformBridgeFilterConfig::PlatformBridgeFilterConfig(
       platform_filter_(static_cast<envoy_http_filter*>(
           Api::External::retrieveApi(proto_config.platform_filter_name()))) {}
 
-PlatformBridgeFilter::FilterBase
-PlatformBridgeFilter::FilterBase::createRequestBase(PlatformBridgeFilter& parent) {
-  return FilterBase{
-      parent, parent.platform_filter_.on_request_headers, parent.platform_filter_.on_request_data,
-      parent.platform_filter_.on_request_trailers, parent.platform_filter_.on_resume_request};
-}
-
-PlatformBridgeFilter::FilterBase
-PlatformBridgeFilter::FilterBase::createResponseBase(PlatformBridgeFilter& parent) {
-  return FilterBase{
-      parent, parent.platform_filter_.on_response_headers, parent.platform_filter_.on_response_data,
-      parent.platform_filter_.on_response_trailers, parent.platform_filter_.on_resume_response};
-}
-
 PlatformBridgeFilter::PlatformBridgeFilter(PlatformBridgeFilterConfigSharedPtr config,
                                            Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher), filter_name_(config->filter_name()),
-      platform_filter_(*config->platform_filter()),
-      request_filter_base_(FilterBase::createRequestBase(*this)),
-      response_filter_base_(FilterBase::createResponseBase(*this)) {
+      platform_filter_(*config->platform_filter()), request_filter_base_(RequestFilterBase{*this}),
+      response_filter_base_(ResponseFilterBase{*this}) {
   // The initialization above sets platform_filter_ to a copy of the struct stored on the config.
   // In the typical case, this will represent a filter implementation that needs to be intantiated.
   // static_context will contain the necessary platform-specific mechanism to produce a filter
@@ -186,8 +171,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance& data,
-                                                                bool end_stream,
-                                                                Buffer::Instance* internal_buffer) {
+                                                                bool end_stream) {
   stream_complete_ = end_stream;
 
   // Allow nullptr to act as no-op.
@@ -195,6 +179,7 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
     return Http::FilterDataStatus::Continue;
   }
 
+  auto internal_buffer = buffer();
   envoy_data in_data;
 
   // Decide whether to preemptively buffer data to present aggregate to platform.
@@ -276,9 +261,7 @@ Http::FilterDataStatus PlatformBridgeFilter::FilterBase::onData(Buffer::Instance
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Http::FilterTrailersStatus
-PlatformBridgeFilter::FilterBase::onTrailers(Http::HeaderMap& trailers,
-                                             Buffer::Instance* internal_buffer) {
+Http::FilterTrailersStatus PlatformBridgeFilter::FilterBase::onTrailers(Http::HeaderMap& trailers) {
   stream_complete_ = true;
 
   // Allow nullptr to act as no-op.
@@ -286,6 +269,7 @@ PlatformBridgeFilter::FilterBase::onTrailers(Http::HeaderMap& trailers,
     return Http::FilterTrailersStatus::Continue;
   }
 
+  auto internal_buffer = buffer();
   envoy_headers in_trailers = Http::Utility::toBridgeHeaders(trailers);
   ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_*_trailers", parent_.filter_name_);
   envoy_filter_trailers_status result =
@@ -340,6 +324,8 @@ Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeade
                                                               bool end_stream) {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeHeaders(end_stream:{})", filter_name_,
             end_stream);
+
+  // Delegate to base implementation for request and response path.
   return request_filter_base_.onHeaders(headers, end_stream);
 }
 
@@ -378,6 +364,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
+  // Delegate to base implementation for request and response path.
   return response_filter_base_.onHeaders(headers, end_stream);
 }
 
@@ -385,16 +372,8 @@ Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, 
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeData(length:{}, end_stream:{})", filter_name_,
             data.length(), end_stream);
 
-  // Delegate to shared implementation for request and response path.
-  Buffer::Instance* internal_buffer = nullptr;
-  if (request_filter_base_.iteration_state_ == IterationState::Stopped &&
-      decoder_callbacks_->decodingBuffer()) {
-    decoder_callbacks_->modifyDecodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
-      internal_buffer = &mutable_buffer;
-    });
-  }
-
-  return request_filter_base_.onData(data, end_stream, internal_buffer);
+  // Delegate to base implementation for request and response path.
+  return request_filter_base_.onData(data, end_stream);
 }
 
 Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -406,31 +385,15 @@ Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
-  // Delegate to shared implementation for request and response path.
-  Buffer::Instance* internal_buffer = nullptr;
-  if (response_filter_base_.iteration_state_ == IterationState::Stopped &&
-      encoder_callbacks_->encodingBuffer()) {
-    encoder_callbacks_->modifyEncodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
-      internal_buffer = &mutable_buffer;
-    });
-  }
-
-  return response_filter_base_.onData(data, end_stream, internal_buffer);
+  // Delegate to base implementation for request and response path.
+  return response_filter_base_.onData(data, end_stream);
 }
 
 Http::FilterTrailersStatus PlatformBridgeFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::decodeTrailers", filter_name_);
 
-  // Delegate to shared implementation for request and response path.
-  Buffer::Instance* internal_buffer = nullptr;
-  if (request_filter_base_.iteration_state_ == IterationState::Stopped &&
-      decoder_callbacks_->decodingBuffer()) {
-    decoder_callbacks_->modifyDecodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
-      internal_buffer = &mutable_buffer;
-    });
-  }
-
-  return request_filter_base_.onTrailers(trailers, internal_buffer);
+  // Delegate to base implementation for request and response path.
+  return request_filter_base_.onTrailers(trailers);
 }
 
 Http::FilterTrailersStatus
@@ -442,16 +405,8 @@ PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
     return Http::FilterTrailersStatus::Continue;
   }
 
-  // Delegate to shared implementation for request and response path.
-  Buffer::Instance* internal_buffer = nullptr;
-  if (response_filter_base_.iteration_state_ == IterationState::Stopped &&
-      encoder_callbacks_->encodingBuffer()) {
-    encoder_callbacks_->modifyEncodingBuffer([&internal_buffer](Buffer::Instance& mutable_buffer) {
-      internal_buffer = &mutable_buffer;
-    });
-  }
-
-  return response_filter_base_.onTrailers(trailers, internal_buffer);
+  // Delegate to base implementation for request and response path.
+  return response_filter_base_.onTrailers(trailers);
 }
 
 void PlatformBridgeFilter::resumeDecoding() {
@@ -467,15 +422,8 @@ void PlatformBridgeFilter::resumeDecoding() {
   // Relevant: https://github.com/lyft/envoy-mobile/issues/332
   dispatcher_.post([weak_self]() -> void {
     if (auto self = weak_self.lock()) {
-      Buffer::Instance* internal_buffer = nullptr;
-      if (self->decoder_callbacks_->decodingBuffer()) {
-        self->decoder_callbacks_->modifyDecodingBuffer(
-            [&internal_buffer](Buffer::Instance& mutable_buffer) {
-              internal_buffer = &mutable_buffer;
-            });
-      }
-      self->request_filter_base_.onResume(
-          internal_buffer, [&self]() { self->decoder_callbacks_->continueDecoding(); });
+      // Delegate to base implementation for request and response path.
+      self->request_filter_base_.onResume();
     }
   });
 }
@@ -486,27 +434,20 @@ void PlatformBridgeFilter::resumeEncoding() {
   auto weak_self = weak_from_this();
   dispatcher_.post([weak_self]() -> void {
     if (auto self = weak_self.lock()) {
-      Buffer::Instance* internal_buffer = nullptr;
-      if (self->encoder_callbacks_->encodingBuffer()) {
-        self->encoder_callbacks_->modifyEncodingBuffer(
-            [&internal_buffer](Buffer::Instance& mutable_buffer) {
-              internal_buffer = &mutable_buffer;
-            });
-      }
-      self->response_filter_base_.onResume(
-          internal_buffer, [&self]() { self->encoder_callbacks_->continueEncoding(); });
+      // Delegate to base implementation for request and response path.
+      self->response_filter_base_.onResume();
     }
   });
 }
 
-void PlatformBridgeFilter::FilterBase::onResume(Buffer::Instance* internal_buffer,
-                                                std::function<void()> resume_call) {
+void PlatformBridgeFilter::FilterBase::onResume() {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::onResume", parent_.filter_name_);
 
   if (iteration_state_ == IterationState::Ongoing) {
     return;
   }
 
+  auto internal_buffer = buffer();
   envoy_headers bridged_headers;
   envoy_data bridged_data;
   envoy_headers bridged_trailers;
@@ -551,9 +492,9 @@ void PlatformBridgeFilter::FilterBase::onResume(Buffer::Instance* internal_buffe
     internal_buffer->addBufferFragment(
         *Buffer::BridgeFragment::createBridgeFragment(*result.pending_data));
     free(result.pending_data);
-  } else {
-    RELEASE_ASSERT(!result.pending_data,
-                   "invalid filter state: data injection is unsupported at present");
+  } else if (result.pending_data) {
+    addData(*result.pending_data);
+    free(result.pending_data);
   }
 
   if (pending_trailers_) {
@@ -562,9 +503,70 @@ void PlatformBridgeFilter::FilterBase::onResume(Buffer::Instance* internal_buffe
     replaceHeaders(*pending_trailers_, *result.pending_trailers);
     pending_trailers_ = nullptr;
     free(result.pending_trailers);
+  } else if (result.pending_trailers) {
+    addTrailers(*result.pending_trailers);
   }
+
   iteration_state_ = IterationState::Ongoing;
-  resume_call();
+  resumeIteration();
+}
+
+void PlatformBridgeFilter::RequestFilterBase::addData(envoy_data data) {
+  Buffer::OwnedImpl inject_data;
+  inject_data.addBufferFragment(*Buffer::BridgeFragment::createBridgeFragment(data));
+  parent_.decoder_callbacks_->addDecodedData(inject_data, /* watermark */ false);
+}
+
+void PlatformBridgeFilter::ResponseFilterBase::addData(envoy_data data) {
+  Buffer::OwnedImpl inject_data;
+  inject_data.addBufferFragment(*Buffer::BridgeFragment::createBridgeFragment(data));
+  parent_.encoder_callbacks_->addEncodedData(inject_data, /* watermark */ false);
+}
+
+void PlatformBridgeFilter::RequestFilterBase::addTrailers(envoy_headers trailers) {
+  Http::HeaderMap& inject_trailers = parent_.decoder_callbacks_->addDecodedTrailers();
+  replaceHeaders(inject_trailers, trailers);
+}
+
+void PlatformBridgeFilter::ResponseFilterBase::addTrailers(envoy_headers trailers) {
+  Http::HeaderMap& inject_trailers = parent_.encoder_callbacks_->addEncodedTrailers();
+  replaceHeaders(inject_trailers, trailers);
+}
+
+void PlatformBridgeFilter::RequestFilterBase::resumeIteration() {
+  parent_.decoder_callbacks_->continueDecoding();
+}
+
+void PlatformBridgeFilter::ResponseFilterBase::resumeIteration() {
+  parent_.encoder_callbacks_->continueEncoding();
+}
+
+// Technically-speaking to align with Envoy's internal API this method should take
+// a closure to execute with the available buffer, but since we control all usage,
+// this shortcut works for now.
+Buffer::Instance* PlatformBridgeFilter::RequestFilterBase::buffer() {
+  Buffer::Instance* internal_buffer = nullptr;
+  if (parent_.decoder_callbacks_->decodingBuffer()) {
+    parent_.decoder_callbacks_->modifyDecodingBuffer(
+        [&internal_buffer](Buffer::Instance& mutable_buffer) {
+          internal_buffer = &mutable_buffer;
+        });
+  }
+  return internal_buffer;
+}
+
+// Technically-speaking to align with Envoy's internal API this method should take
+// a closure to execute with the available buffer, but since we control all usage,
+// this shortcut works for now.
+Buffer::Instance* PlatformBridgeFilter::ResponseFilterBase::buffer() {
+  Buffer::Instance* internal_buffer = nullptr;
+  if (parent_.encoder_callbacks_->encodingBuffer()) {
+    parent_.encoder_callbacks_->modifyEncodingBuffer(
+        [&internal_buffer](Buffer::Instance& mutable_buffer) {
+          internal_buffer = &mutable_buffer;
+        });
+  }
+  return internal_buffer;
 }
 
 } // namespace PlatformBridge

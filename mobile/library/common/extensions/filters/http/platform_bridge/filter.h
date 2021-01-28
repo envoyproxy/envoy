@@ -90,23 +90,24 @@ private:
         : iteration_state_(IterationState::Ongoing), parent_(parent), on_headers_(on_headers),
           on_data_(on_data), on_trailers_(on_trailers), on_resume_(on_resume) {}
 
-    static FilterBase createRequestBase(PlatformBridgeFilter& parent);
+    virtual ~FilterBase() = default;
 
-    static FilterBase createResponseBase(PlatformBridgeFilter& parent);
-
+    // Common handling for both request and response path.
     Http::FilterHeadersStatus onHeaders(Http::HeaderMap& headers, bool end_stream);
+    Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
+    Http::FilterTrailersStatus onTrailers(Http::HeaderMap& trailers);
 
-    Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream,
-                                  Buffer::Instance* internal_buffer);
-
-    Http::FilterTrailersStatus onTrailers(Http::HeaderMap& trailers,
-                                          Buffer::Instance* internal_buffer);
-
-    // Scheduled on the dispatcher when resume* is called from platform
+    // Scheduled on the dispatcher when resumeDecoding/Encoding is called from platform
     // filter callbacks. Provides a snapshot of pending HTTP stream state to the
     // platform filter, and consumes invocation results to modify pending HTTP
     // entities before resuming iteration.
-    void onResume(Buffer::Instance* internal_buffer, std::function<void()> resume_call);
+    void onResume();
+
+    // Directional (request/response) helper methods.
+    virtual void addData(envoy_data data) PURE;
+    virtual void addTrailers(envoy_headers trailers) PURE;
+    virtual void resumeIteration() PURE;
+    virtual Buffer::Instance* buffer() PURE;
 
     IterationState iteration_state_;
     PlatformBridgeFilter& parent_;
@@ -119,11 +120,39 @@ private:
     Http::HeaderMap* pending_trailers_{};
   };
 
+  struct RequestFilterBase : FilterBase {
+    RequestFilterBase(PlatformBridgeFilter& parent)
+        : FilterBase(parent, parent.platform_filter_.on_request_headers,
+                     parent.platform_filter_.on_request_data,
+                     parent.platform_filter_.on_request_trailers,
+                     parent.platform_filter_.on_resume_request) {}
+
+    // FilterBase
+    void addData(envoy_data data) override;
+    void addTrailers(envoy_headers trailers) override;
+    void resumeIteration() override;
+    Buffer::Instance* buffer() override;
+  };
+
+  struct ResponseFilterBase : FilterBase {
+    ResponseFilterBase(PlatformBridgeFilter& parent)
+        : FilterBase(parent, parent.platform_filter_.on_response_headers,
+                     parent.platform_filter_.on_response_data,
+                     parent.platform_filter_.on_response_trailers,
+                     parent.platform_filter_.on_resume_response) {}
+
+    // FilterBase
+    void addData(envoy_data data) override;
+    void addTrailers(envoy_headers trailers) override;
+    void resumeIteration() override;
+    Buffer::Instance* buffer() override;
+  };
+
   Event::Dispatcher& dispatcher_;
   const std::string filter_name_;
   envoy_http_filter platform_filter_;
-  FilterBase request_filter_base_;
-  FilterBase response_filter_base_;
+  RequestFilterBase request_filter_base_;
+  ResponseFilterBase response_filter_base_;
   envoy_http_filter_callbacks platform_request_callbacks_{};
   envoy_http_filter_callbacks platform_response_callbacks_{};
   bool error_response_{};
