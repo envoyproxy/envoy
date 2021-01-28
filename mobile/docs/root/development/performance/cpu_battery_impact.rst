@@ -86,7 +86,7 @@ Modified versions of the "hello world" example apps were used to run these exper
 
 Getting the build:
 
-1. Build the library using ``bazel build android_dist --config=android --fat_apk_cpu=armeabi-v7a``
+1. Build the library using ``bazelisk build android_dist --config=android --fat_apk_cpu=armeabi-v7a``
 2. Control: ``bazel mobile-install //examples/kotlin/control:hello_control_kt``
 3. Envoy: ``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=armeabi-v7a``
 

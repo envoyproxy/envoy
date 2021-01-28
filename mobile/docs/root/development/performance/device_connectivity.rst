@@ -72,7 +72,7 @@ Android configuration
 
 2. Build and run the example app:
 
-``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=armeabi-v7a``
+``bazelisk mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=armeabi-v7a``
 
 ~~~~~~~~~~~
 Open issues
