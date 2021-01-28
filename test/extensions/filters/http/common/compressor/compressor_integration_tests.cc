@@ -39,6 +39,8 @@ const std::string compressorFilterConfig = R"EOF(
 name: envoy.filters.http.compressor
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+  reque_direction_config:
+  response_direction_config:
   compressor_library:
     name: test
     typed_config:
@@ -215,6 +217,26 @@ TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
   auto upgrade_response_headers(upgradeResponseHeaders("foo"));
   validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
   codec_client_->close();
+
+  auto request_compressed_counter =
+      test_server_->counter("http.config_test.compressor.test.gzip.request.compressed");
+  ASSERT_NE(request_compressed_counter, nullptr);
+  ASSERT_EQ(1, request_compressed_counter->value());
+
+  auto request_uncompressed_counter =
+      test_server_->counter("http.config_test.compressor.test.gzip.request.not_compressed");
+  ASSERT_NE(request_uncompressed_counter, nullptr);
+  ASSERT_EQ(1, request_uncompressed_counter->value());
+
+  auto response_compressed_counter =
+      test_server_->counter("http.config_test.compressor.test.gzip.compressed");
+  ASSERT_NE(response_compressed_counter, nullptr);
+  ASSERT_EQ(0, response_compressed_counter->value());
+
+  auto response_uncompressed_counter =
+      test_server_->counter("http.config_test.compressor.test.gzip.not_compressed");
+  ASSERT_NE(response_uncompressed_counter, nullptr);
+  ASSERT_EQ(1, response_uncompressed_counter->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CompressorProxyingConnectIntegrationTest,

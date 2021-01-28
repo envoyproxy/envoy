@@ -160,7 +160,7 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   // temp variable to preserve old behavior w/ http upgrade. should be removed when
   // enable_compression_without_content_length_header runtime variable would be removed
   const bool is_not_upgrade =
-      (!Http::Utility::isUpgrade(headers) && !Http::Utility::isH2UpgradeRequest(headers)) ||
+      !Http::Utility::isUpgrade(headers) ||
       !Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_content_length_header");
 
@@ -522,7 +522,7 @@ bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
   }
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_content_length_header")) {
-    // returning true to account for HTTP/2 where content-length is optional
+    // return true to ignore the minimum length configuration if no content-length header presents
     return true;
   }
   return StringUtil::caseFindToken(headers.getTransferEncodingValue(), ",",
