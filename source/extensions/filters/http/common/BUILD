@@ -69,6 +69,5 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:token_bucket_impl_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
