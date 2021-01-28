@@ -17,7 +17,6 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
-
     setDeterministic();
 
     // Add the retry configuration to a new virtual host.
