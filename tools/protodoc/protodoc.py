@@ -63,7 +63,7 @@ This extension may be referenced by the qualified name *$extension*
 
   This extension extends the following extension type:
 
-  $category
+  $categories
 
 """)
 
@@ -216,14 +216,12 @@ def FormatExtension(extension):
     anchor = FormatAnchor('extension_' + extension)
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
-    print(extension)
-    print(extension_metadata)
     return EXTENSION_TEMPLATE.substitute(anchor=anchor,
                                          extension=extension,
                                          status=status,
                                          security_posture=security_posture,
                                          # this shouldnt need get once all have cats...
-                                         category=extension_metadata.get('category', []))
+                                         categories=extension_metadata.get('categories', []))
   except KeyError as e:
     sys.stderr.write(
         '\n\nDid you forget to add an entry to source/extensions/extensions_build_config.bzl?\n\n')
