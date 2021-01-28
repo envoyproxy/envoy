@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/grpc/ot_grpc_access_log_impl.h"
+#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include "external/opentelemetry_proto/opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
@@ -52,21 +52,18 @@ kvlist_value:
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace OtGrpc {
+namespace OpenTelemetry {
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     referer_handle(Http::CustomHeaders::get().Referer);
 
-OtGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
-    GrpcCommon::GrpcOpenTelemetryAccessLoggerSharedPtr logger)
+AccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-OtGrpcAccessLog::OtGrpcAccessLog(
-    AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls,
-    GrpcCommon::GrpcOpenTelemetryAccessLoggerCacheSharedPtr access_logger_cache,
-    Stats::Scope& scope)
+AccessLog::AccessLog(::Envoy::AccessLog::FilterPtr&& filter,
+                     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
+                     ThreadLocal::SlotAllocator& tls,
+                     GrpcAccessLoggerCacheSharedPtr access_logger_cache, Stats::Scope& scope)
     : Common::ImplBase(std::move(filter)), scope_(scope), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
 
@@ -88,10 +85,10 @@ OtGrpcAccessLog::OtGrpcAccessLog(
 //                         ProtobufMessage::ValidationVisitor& validation_visitor,
 //                         Protobuf::Message& dest);
 
-void OtGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
-                              const Http::ResponseHeaderMap& response_headers,
-                              const Http::ResponseTrailerMap& response_trailers,
-                              const StreamInfo::StreamInfo& stream_info) {
+void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
+                        const Http::ResponseHeaderMap& response_headers,
+                        const Http::ResponseTrailerMap& response_trailers,
+                        const StreamInfo::StreamInfo& stream_info) {
 
   opentelemetry::proto::logs::v1::LogRecord log_entry;
   const ProtobufWkt::Struct struct_entry = body_formatter_->format(
@@ -102,7 +99,7 @@ void OtGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }
 
-} // namespace OtGrpc
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy

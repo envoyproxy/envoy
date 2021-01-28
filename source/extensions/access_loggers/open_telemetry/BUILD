@@ -25,3 +25,23 @@ envoy_cc_library(
         "@opentelemetry_proto//:logs_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "access_log_lib",
+    srcs = ["access_log_impl.cc"],
+    hdrs = ["access_log_impl.h"],
+    deps = [
+        ":grpc_access_log_lib",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/extensions/access_loggers/common:access_log_base",
+        "//source/extensions/access_loggers/grpc:grpc_access_log_lib",
+        "//source/extensions/access_loggers/grpc:grpc_access_log_utils",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+        "@opentelemetry_proto//:logs_cc_proto"
+    ],
+)

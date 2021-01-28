@@ -10,9 +10,10 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
+#include "common/protobuf/protobuf.h"
 #include "common/router/string_accessor_impl.h"
 
-#include "extensions/access_loggers/grpc/ot_grpc_access_log_impl.h"
+#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -22,6 +23,8 @@
 #include "test/mocks/thread_local/mocks.h"
 
 using namespace std::chrono_literals;
+using ::Envoy::AccessLog::FilterPtr;
+using ::Envoy::AccessLog::MockFilter;
 using testing::_;
 using testing::An;
 using testing::InSequence;
@@ -33,23 +36,22 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
-namespace OtGrpc {
+namespace OpenTelemetry {
 namespace {
 
 using opentelemetry::proto::logs::v1::LogRecord;
 
-class MockGrpcOpenTelemetryAccessLogger : public GrpcCommon::GrpcOpenTelemetryAccessLogger {
+class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
   // GrpcAccessLogger
   MOCK_METHOD(void, log, (LogRecord && entry));
-  MOCK_METHOD(void, log, (opentelemetry::proto::logs::v1::ResourceLogs && entry));
+  MOCK_METHOD(void, log, (ProtobufWkt::Empty && entry));
 };
 
-class MockGrpcOpenTelemetryAccessLoggerCache
-    : public GrpcCommon::GrpcOpenTelemetryAccessLoggerCache {
+class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD(GrpcCommon::GrpcOpenTelemetryAccessLoggerSharedPtr, getOrCreateLogger,
+  MOCK_METHOD(GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
 };
@@ -68,8 +70,8 @@ public:
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
             });
-    access_log_ = std::make_unique<OtGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                    logger_cache_, scope_);
+    access_log_ =
+        std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, scope_);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {
@@ -86,14 +88,12 @@ public:
   }
 
   Stats::IsolatedStoreImpl scope_;
-  AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
+  MockFilter* filter_{new NiceMock<MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config_;
-  std::shared_ptr<MockGrpcOpenTelemetryAccessLogger> logger_{
-      new MockGrpcOpenTelemetryAccessLogger()};
-  std::shared_ptr<MockGrpcOpenTelemetryAccessLoggerCache> logger_cache_{
-      new MockGrpcOpenTelemetryAccessLoggerCache()};
-  OtGrpcAccessLogPtr access_log_;
+  std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
+  std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
+  AccessLogPtr access_log_;
 };
 
 // Test HTTP log marshaling.
@@ -588,7 +588,7 @@ TEST_F(OtGrpcAccessLogTest, Marshalling) {
 }
 
 } // namespace
-} // namespace OtGrpc
+} // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions
 } // namespace Envoy
