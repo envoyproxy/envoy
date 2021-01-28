@@ -239,8 +239,8 @@ def FormatExtensionType(extension_type):
   """
   try:
     anchor = FormatAnchor('extension_type_' + extension_type)
-    extensions = "\n- ".join(
-      ":ref:`%s <extension_%s>`" % (ext, ext)
+    extensions = "\n".join(
+      "    - :ref:`%s <extension_%s>`" % (ext, ext)
       for ext
       in EXTENSION_CATEGORIES[extension_type])
     return EXTENSION_TYPE_TEMPLATE.substitute(anchor=anchor,
