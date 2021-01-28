@@ -394,7 +394,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
     if (!Network::Win32SupportsOriginalDestination()) {
       ENVOY_LOG(warn,
                 "[Windows] Setting original destination filter on a version of Envoy that does not "
-                "support it. The listener will be able to proxy traffic");
+                "support it. The listener will not be able to proxy traffic");
     }
   }
 #endif
