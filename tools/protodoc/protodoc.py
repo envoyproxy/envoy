@@ -73,8 +73,6 @@ EXTENSION_TYPE_TEMPLATE = string.Template("""$anchor
 .. tip::
   This extension type has the following known extensions
 
-  $extensions
-
 """)
 
 
@@ -244,7 +242,7 @@ def FormatExtensionType(extension_type):
       for ext
       in EXTENSION_CATEGORIES[extension_type])
     return EXTENSION_TYPE_TEMPLATE.substitute(anchor=anchor,
-                                              extensions="%s\n" % extensions)
+                                              extensions="%s\n\n" % extensions)
   except KeyError as e:
     sys.stderr.write(
         '\n\nUnable to find extension type: %s\n\n' % extension_type)
