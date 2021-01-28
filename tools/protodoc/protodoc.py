@@ -61,6 +61,8 @@ This extension may be referenced by the qualified name *$extension*
 
   $security_posture
 
+  This extension extends the following extension type:
+
   $category
 
 """)
@@ -214,6 +216,8 @@ def FormatExtension(extension):
     anchor = FormatAnchor('extension_' + extension)
     status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
     security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
+    print(extension)
+    print(extension_metadata)
     return EXTENSION_TEMPLATE.substitute(anchor=anchor,
                                          extension=extension,
                                          status=status,
