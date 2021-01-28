@@ -122,8 +122,8 @@ class BuildGraph(object):
     """
     deps_query = ' union '.join(f'deps({l})' for l in targets)
     try:
-    deps = subprocess.check_output(['bazel', 'query', deps_query],
-                                   stderr=subprocess.PIPE).decode().splitlines()
+      deps = subprocess.check_output(['bazel', 'query', deps_query],
+                                    stderr=subprocess.PIPE).decode().splitlines()
     except subprocess.CalledProcessError as exc:
       print("Bazel query failed with error", exc.returncode, exc.output)
       raise exc                      
