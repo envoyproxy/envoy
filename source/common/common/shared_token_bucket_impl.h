@@ -28,31 +28,23 @@ public:
   SharedTokenBucketImpl(SharedTokenBucketImpl&&) = delete;
 
   // TokenBucket
-  uint64_t consume(uint64_t tokens, bool allow_partial)
-      /*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ override;
 
-  std::chrono::milliseconds nextTokenAvailable() /*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ override;
+  uint64_t consume(uint64_t tokens, bool allow_partial) override;
+
+  std::chrono::milliseconds nextTokenAvailable() override;
 
   /**
-   * Resets the bucket to contain tokens equal to @param num_tokens
-   * Since the token bucket is shared, only the first reset call will work. Subsequent calls to
-   * reset method will be ignored.
+   * Since the token bucket is shared, only the first reset call will work.
+   * Subsequent calls to reset method will be ignored.
    */
-  void reset(uint64_t num_tokens) /*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ override;
-
-  // Used only for testing.
-  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; };
-
-  // Returns a flag to indicate whether mutex was in lock state.
-  bool isMutexLocked() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(false, mutex_);
+  void reset(uint64_t num_tokens) override;
 
 private:
-  TokenBucketImpl& getImpl() { return impl_; }
-
   Thread::MutexBasicLockable mutex_;
   TokenBucketImpl impl_ ABSL_GUARDED_BY(mutex_);
   bool reset_once_ ABSL_GUARDED_BY(mutex_);
   mutable Thread::ThreadSynchronizer synchronizer_; // Used only for testing.
+  friend class SharedTokenBucketImplTest;
 };
 
 } // namespace Envoy

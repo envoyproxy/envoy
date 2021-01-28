@@ -10,6 +10,18 @@ namespace Envoy {
 
 class SharedTokenBucketImplTest : public testing::Test {
 protected:
+  bool isMutexLocked(SharedTokenBucketImpl& token) {
+    auto locked = token.mutex_.tryLock();
+    if (locked) {
+      token.mutex_.unlock();
+    }
+    return !locked;
+  }
+
+  Thread::ThreadSynchronizer& synchronizer(SharedTokenBucketImpl& token) {
+    return token.synchronizer_;
+  };
+
   Event::SimulatedTimeSystem time_system_;
 };
 
@@ -88,20 +100,20 @@ TEST_F(SharedTokenBucketImplTest, PartialConsumption) {
 // Test reset functionality for a shared token bucket.
 TEST_F(SharedTokenBucketImplTest, Reset) {
   SharedTokenBucketImpl token_bucket{16, time_system_, 16};
-  token_bucket.synchronizer().enable();
+  synchronizer(token_bucket).enable();
   // Start a thread and call consume. This will wait post checking reset_once flag.
-  token_bucket.synchronizer().waitOn(SharedTokenBucketImpl::ResetCheckSyncPoint);
+  synchronizer(token_bucket).waitOn(SharedTokenBucketImpl::ResetCheckSyncPoint);
   std::thread thread([&] { token_bucket.reset(1); });
 
   // Wait until the thread is actually waiting.
-  token_bucket.synchronizer().barrierOn(SharedTokenBucketImpl::ResetCheckSyncPoint);
+  synchronizer(token_bucket).barrierOn(SharedTokenBucketImpl::ResetCheckSyncPoint);
 
   // Mutex should be already locked.
-  EXPECT_TRUE(token_bucket.isMutexLocked());
-  token_bucket.synchronizer().signal(SharedTokenBucketImpl::ResetCheckSyncPoint);
+  EXPECT_TRUE(isMutexLocked(token_bucket));
+  synchronizer(token_bucket).signal(SharedTokenBucketImpl::ResetCheckSyncPoint);
 
   thread.join();
-  EXPECT_FALSE(token_bucket.isMutexLocked());
+  EXPECT_FALSE(isMutexLocked(token_bucket));
 
   EXPECT_EQ(1, token_bucket.consume(2, true));
   EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
@@ -115,38 +127,38 @@ TEST_F(SharedTokenBucketImplTest, Reset) {
 TEST_F(SharedTokenBucketImplTest, SynchronizedConsume) {
   SharedTokenBucketImpl token_bucket{10, time_system_, 1};
 
-  token_bucket.synchronizer().enable();
+  synchronizer(token_bucket).enable();
   // Start a thread and call consume. This will wait post lock.
-  token_bucket.synchronizer().waitOn(SharedTokenBucketImpl::GetImplSyncPoint);
+  synchronizer(token_bucket).waitOn(SharedTokenBucketImpl::GetImplSyncPoint);
   std::thread thread([&] { EXPECT_EQ(10, token_bucket.consume(20, true)); });
 
   // Wait until the thread is actually waiting.
-  token_bucket.synchronizer().barrierOn(SharedTokenBucketImpl::GetImplSyncPoint);
+  synchronizer(token_bucket).barrierOn(SharedTokenBucketImpl::GetImplSyncPoint);
 
   // Mutex should be already locked.
-  EXPECT_TRUE(token_bucket.isMutexLocked());
-  token_bucket.synchronizer().signal(SharedTokenBucketImpl::GetImplSyncPoint);
+  EXPECT_TRUE(isMutexLocked(token_bucket));
+  synchronizer(token_bucket).signal(SharedTokenBucketImpl::GetImplSyncPoint);
   thread.join();
-  EXPECT_FALSE(token_bucket.isMutexLocked());
+  EXPECT_FALSE(isMutexLocked(token_bucket));
 }
 
 TEST_F(SharedTokenBucketImplTest, SynchronizedNextTokenAvailable) {
   SharedTokenBucketImpl token_bucket{10, time_system_, 16};
 
-  token_bucket.synchronizer().enable();
+  synchronizer(token_bucket).enable();
   // Start a thread and call consume. This will wait post lock.
-  token_bucket.synchronizer().waitOn(SharedTokenBucketImpl::GetImplSyncPoint);
+  synchronizer(token_bucket).waitOn(SharedTokenBucketImpl::GetImplSyncPoint);
   std::thread thread(
       [&] { EXPECT_EQ(std::chrono::milliseconds(0), token_bucket.nextTokenAvailable()); });
 
   // Wait until the thread is actually waiting.
-  token_bucket.synchronizer().barrierOn(SharedTokenBucketImpl::GetImplSyncPoint);
+  synchronizer(token_bucket).barrierOn(SharedTokenBucketImpl::GetImplSyncPoint);
 
   // Mutex should be already locked.
-  EXPECT_TRUE(token_bucket.isMutexLocked());
-  token_bucket.synchronizer().signal(SharedTokenBucketImpl::GetImplSyncPoint);
+  EXPECT_TRUE(isMutexLocked(token_bucket));
+  synchronizer(token_bucket).signal(SharedTokenBucketImpl::GetImplSyncPoint);
   thread.join();
-  EXPECT_FALSE(token_bucket.isMutexLocked());
+  EXPECT_FALSE(isMutexLocked(token_bucket));
 }
 
 } // namespace Envoy

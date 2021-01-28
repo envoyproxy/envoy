@@ -13,21 +13,19 @@ SharedTokenBucketImpl::SharedTokenBucketImpl(uint64_t max_tokens, TimeSource& ti
                                              double fill_rate)
     : impl_(max_tokens, time_source, fill_rate), reset_once_(false) {}
 
-uint64_t SharedTokenBucketImpl::consume(uint64_t tokens, bool allow_partial)
-/*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ {
+uint64_t SharedTokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
   Thread::LockGuard lock(mutex_);
   synchronizer_.syncPoint(GetImplSyncPoint);
-  return getImpl().consume(tokens, allow_partial);
+  return impl_.consume(tokens, allow_partial);
 };
 
-std::chrono::milliseconds SharedTokenBucketImpl::nextTokenAvailable()
-/*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ {
+std::chrono::milliseconds SharedTokenBucketImpl::nextTokenAvailable() {
   Thread::LockGuard lock(mutex_);
   synchronizer_.syncPoint(GetImplSyncPoint);
-  return getImpl().nextTokenAvailable();
+  return impl_.nextTokenAvailable();
 };
 
-void SharedTokenBucketImpl::reset(uint64_t num_tokens) /*ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)*/ {
+void SharedTokenBucketImpl::reset(uint64_t num_tokens) {
   Thread::LockGuard lock(mutex_);
   // Don't reset if reset once before.
   if (reset_once_) {
@@ -35,15 +33,7 @@ void SharedTokenBucketImpl::reset(uint64_t num_tokens) /*ABSL_EXCLUSIVE_LOCKS_RE
   }
   reset_once_ = true;
   synchronizer_.syncPoint(ResetCheckSyncPoint);
-  getImpl().reset(num_tokens);
+  impl_.reset(num_tokens);
 };
-
-bool SharedTokenBucketImpl::isMutexLocked() {
-  auto locked = mutex_.tryLock();
-  if (locked) {
-    mutex_.unlock();
-  }
-  return !locked;
-}
 
 } // namespace Envoy
