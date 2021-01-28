@@ -1477,7 +1477,6 @@ TEST_F(Http2ConnPoolImplTest, PreconnectOffWithSettings) {
   CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 
   // Settings frame reducing capacity to one stream per connection results in -1 capacity.
-  NiceMock<MockReceivedSettings> settings;
   settings.max_concurrent_streams_ = 1;
   test_clients_[0].codec_client_->onSettings(settings);
   CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
