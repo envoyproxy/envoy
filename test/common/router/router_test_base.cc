@@ -5,6 +5,9 @@
 namespace Envoy {
 namespace Router {
 
+using ::testing::AnyNumber;
+using ::testing::ReturnRef;
+
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
                                Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),

@@ -20,9 +20,7 @@
 namespace Envoy {
 namespace Router {
 
-using testing::AnyNumber;
-using testing::NiceMock;
-using testing::ReturnRef;
+using ::testing::NiceMock;
 
 class RouterTestFilter : public Filter {
 public:
