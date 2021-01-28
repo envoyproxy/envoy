@@ -394,7 +394,7 @@ ACK and NACK semantics summary
   :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` from the
   :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`.
 - NACK signifies unsuccessful configuration and is indicated by the presence of the
-  :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` field.  The :ref:`version_info
+  :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` field. The :ref:`version_info
   <envoy_api_field_DiscoveryResponse.version_info>` indicates the most recent version that the
   client is using, although that may not be an older version in the case where the client has
   subscribed to a new resource from an existing version and that new resource is invalid (see
