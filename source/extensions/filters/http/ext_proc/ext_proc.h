@@ -64,7 +64,7 @@ private:
   const std::chrono::milliseconds grpc_timeout_;
 
   ExtProcFilterStats stats_;
-  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
+  const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
