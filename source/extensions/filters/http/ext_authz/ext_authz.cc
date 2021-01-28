@@ -161,6 +161,9 @@ Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderM
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+  ENVOY_STREAM_LOG(trace,
+                   "ext_authz filter has {} response header(s) to add to the encoded response:",
+                   *encoder_callbacks_, response_headers_to_add_.size());
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
