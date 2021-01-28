@@ -255,7 +255,7 @@ message AuthorizationResponse {
   // *Status*, *Content-Length*, *WWWAuthenticate* and *Location* are automatically added.
   type.matcher.v4alpha.ListStringMatcher allowed_client_headers = 2;
 
-  // When this :ref:`list <envoy_api_msg_type.matcher.v4alpha.ListStringMatcher>`. is set, authorization
+  // When this :ref:`list <envoy_api_msg_type.matcher.v4alpha.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be emitted as dynamic metadata, whose keys
   // correspond to the name of the matched header and whose values are the respective values. When this
   // list is *not* set, no additional dynamic metadata will be emitted. This metadata lives in a namespace
