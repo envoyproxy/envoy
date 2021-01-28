@@ -151,7 +151,6 @@ TEST_F(HttpFilterTest, SimplestPost) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -241,7 +240,6 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -338,7 +336,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -383,7 +380,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -449,7 +445,6 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -491,7 +486,6 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -533,7 +527,6 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -579,7 +572,6 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -636,7 +628,6 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -680,7 +671,6 @@ TEST_F(HttpFilterTest, PostAndClose) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -726,23 +716,23 @@ TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
   resp1->mutable_request_headers();
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
-  data_.add("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  Buffer::OwnedImpl first_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   Http::TestRequestHeaderMapImpl final_expected_response{
       {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
   EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
 
-  data_.add("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  Buffer::OwnedImpl second_chunk("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(second_chunk, false));
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
   EXPECT_TRUE(stream_close_sent_);
@@ -777,23 +767,23 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
   resp1->mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
   stream_callbacks_->onReceiveMessage(std::move(resp1));
 
-  data_.add("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  Buffer::OwnedImpl first_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   Http::TestRequestHeaderMapImpl final_expected_response{
       {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
   EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
 
-  data_.add("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  Buffer::OwnedImpl second_chunk("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(second_chunk, false));
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
   EXPECT_TRUE(stream_close_sent_);
@@ -823,14 +813,13 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnly) {
   HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
-  data_.add("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
+  Buffer::OwnedImpl first_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(first_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->encodeHeaders(response_headers_, false));
 
@@ -849,9 +838,10 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnly) {
       {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
   EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
 
-  data_.add("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  Buffer::OwnedImpl second_chunk("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(second_chunk, false));
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_chunk, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
   EXPECT_TRUE(stream_close_sent_);
@@ -892,7 +882,6 @@ TEST_F(HttpFilterTest, OutOfOrder) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
   data_.add("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
