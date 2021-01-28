@@ -480,18 +480,15 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
 
   if constexpr (Network::Win32SupportsOriginalDestination()) {
-    ASSERT(socket->addressProvider().localAddressRestored() &&
-               config_->direction() != envoy::config::core::v3::UNSPECIFIED,
-           "Envoy on Windows needs the traffic direction to be set for original destination "
-           "listeners.");
     if (config_->direction() == envoy::config::core::v3::OUTBOUND &&
         socket->addressProvider().localAddressRestored()) {
       ENVOY_LOG(debug, "[Windows] Querying for redirect record for outbound listener");
       unsigned long redirectRecordsSize = 0;
-      auto redirect_records = std::make_shared<Network::EnvoyRedirectRecords>();
-      auto status = socket->genericIoctl(
-          SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0, (uint8_t*)redirect_records->buf_ptr_,
-          sizeof(redirect_records->buf_ptr_), redirect_records->buf_size_);
+      auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();
+      auto status =
+          socket->genericIoctl(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS, NULL, 0,
+                               reinterpret_cast<uint8_t*>(redirect_records->buf_),
+                               sizeof(redirect_records->buf_), redirect_records->buf_size_);
       if (status.rc_ != 0) {
         ENVOY_LOG(debug,
                   "closing connection: cannot broker connection to original destination "
@@ -500,9 +497,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
         return;
       }
       stream_info->filterState()->setData(
-          Network::RedirectRecordsFilterState::key(),
-          std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
-          StreamInfo::FilterState::StateType::Mutable,
+          Network::Win32RedirectRecordsFilterState::key(),
+          std::make_unique<Network::Win32RedirectRecordsFilterState>(redirect_records),
+          StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
@@ -532,7 +529,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
-} // namespace Server
+}
 
 ConnectionHandlerImpl::ActiveConnections&
 ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(

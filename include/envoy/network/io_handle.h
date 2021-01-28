@@ -26,13 +26,15 @@ using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
 
 namespace Network {
 
-struct EnvoyRedirectRecords {
-  void* buf_ptr_[256];
+struct Win32RedirectRecords {
+  // The size of the buffer is selected based on:
+  // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/sio-query-wfp-connection-redirect-records
+  uint8_t buf_[1024];
   unsigned long buf_size_;
 };
 
 constexpr bool Win32SupportsOriginalDestination() {
-#if defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
+#if defined(WIN32) && defined(SIO_QUERY_WFP_CONNECTION_REDIRECT_RECORDS) && defined(SO_ORIGINAL_DST)
   return true;
 #else
   return false;

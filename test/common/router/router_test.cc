@@ -6105,32 +6105,43 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
 }
 
 TEST_F(RouterTest, UpstreamSocketOptionsReturnedEmpty) {
-  EXPECT_CALL(callbacks_, getUpstreamSocketOptions())
-      .WillOnce(Return(Network::Socket::OptionsSharedPtr()));
-
   auto options = router_.upstreamSocketOptions();
-
   EXPECT_EQ(options.get(), nullptr);
 }
 
-TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
-  Network::Socket::OptionsSharedPtr to_return =
+TEST_F(RouterTest, IpTransparentOptions) {
+  Network::Socket::OptionsSharedPtr expected_options =
       Network::SocketOptionFactory::buildIpTransparentOptions();
-  EXPECT_CALL(callbacks_, getUpstreamSocketOptions()).WillOnce(Return(to_return));
+  EXPECT_CALL(callbacks_, getUpstreamSocketOptions())
+      .Times(2)
+      .WillRepeatedly(Return(expected_options));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  router_.decodeHeaders(headers, false);
 
   auto options = router_.upstreamSocketOptions();
+  EXPECT_EQ(expected_options->size(), options->size());
 
-  EXPECT_EQ(to_return, options);
+  for (size_t i = 0; i < 2; i++) {
+    NiceMock<Network::MockConnectionSocket> dummy_socket;
+    auto state = envoy::config::core::v3::SocketOption::STATE_PREBIND;
+    auto expected_details = expected_options->at(i)->getOptionDetails(dummy_socket, state);
+    auto returned_details = options->at(i)->getOptionDetails(dummy_socket, state);
+    EXPECT_TRUE(expected_details == returned_details);
+  }
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, RedirectRecords) {
-  auto redirect_records = std::make_shared<Network::EnvoyRedirectRecords>();
-  memcpy(redirect_records->buf_ptr_, reinterpret_cast<void*>(redirect_records_data_.data()),
+  auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();
+  memcpy(redirect_records->buf_, reinterpret_cast<void*>(redirect_records_data_.data()),
          redirect_records_data_.size());
   redirect_records->buf_size_ = redirect_records_data_.size();
   router_.downstream_connection_.stream_info_.filterState()->setData(
-      Network::RedirectRecordsFilterState::key(),
-      std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
+      Network::Win32RedirectRecordsFilterState::key(),
+      std::make_unique<Network::Win32RedirectRecordsFilterState>(redirect_records),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);

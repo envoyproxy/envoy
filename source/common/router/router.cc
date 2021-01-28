@@ -495,25 +495,29 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       *callbacks_->streamInfo().filterState());
 
   if (callbacks_->getUpstreamSocketOptions()) {
+    upstream_options_ = std::make_shared<Network::Socket::Options>();
     Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
   }
 
   auto has_downstream_connection_with_redirect_records =
-      downstreamConnection() &&
-      downstreamConnection()
-          ->streamInfo()
-          .filterState()
-          .hasData<Network::RedirectRecordsFilterState>(Network::RedirectRecordsFilterState::key());
+      downstreamConnection() && downstreamConnection()
+                                    ->streamInfo()
+                                    .filterState()
+                                    .hasData<Network::Win32RedirectRecordsFilterState>(
+                                        Network::Win32RedirectRecordsFilterState::key());
 
   if (has_downstream_connection_with_redirect_records) {
     auto redirect_records = downstreamConnection()
                                 ->streamInfo()
                                 .filterState()
-                                .getDataReadOnly<Network::RedirectRecordsFilterState>(
-                                    Network::RedirectRecordsFilterState::key())
+                                .getDataReadOnly<Network::Win32RedirectRecordsFilterState>(
+                                    Network::Win32RedirectRecordsFilterState::key())
                                 .value();
     const Network::Socket::OptionsSharedPtr wfp_socket_options =
         Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records);
+    if (!upstream_options_) {
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
+    }
     Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
   }
 

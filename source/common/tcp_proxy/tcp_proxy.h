@@ -381,8 +381,7 @@ protected:
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
-  Network::Socket::OptionsSharedPtr upstream_options_ =
-      std::make_shared<Network::Socket::Options>();
+  Network::Socket::OptionsSharedPtr upstream_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };

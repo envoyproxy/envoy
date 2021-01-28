@@ -17,8 +17,8 @@ class IoctlSocketOptionImplTest : public SocketOptionTest {
 public:
   IoctlSocketOptionImplTest() : SocketOptionTest() {
     redirect_records_data_ = "some data";
-    redirect_records_ = std::make_shared<Network::EnvoyRedirectRecords>();
-    memcpy(redirect_records_->buf_ptr_, reinterpret_cast<void*>(redirect_records_data_.data()),
+    redirect_records_ = std::make_shared<Network::Win32RedirectRecords>();
+    memcpy(redirect_records_->buf_, reinterpret_cast<void*>(redirect_records_data_.data()),
            redirect_records_data_.size());
     redirect_records_->buf_size_ = redirect_records_data_.size();
   }
@@ -33,14 +33,14 @@ protected:
   }
 
   std::string redirect_records_data_;
-  std::shared_ptr<Network::EnvoyRedirectRecords> redirect_records_;
+  std::shared_ptr<Network::Win32RedirectRecords> redirect_records_;
 };
 
 TEST_F(IoctlSocketOptionImplTest, IgnoresOptionOnDifferentState) {
 
   IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                       ENVOY_MAKE_SOCKET_OPTION_NAME(IOCTL_LEVEL, 10),
-                                      reinterpret_cast<void*>(redirect_records_->buf_ptr_),
+                                      reinterpret_cast<void*>(redirect_records_->buf_),
                                       redirect_records_->buf_size_,
                                       nullptr,
                                       0};
@@ -51,7 +51,7 @@ TEST_F(IoctlSocketOptionImplTest, IgnoresOptionOnDifferentState) {
 TEST_F(IoctlSocketOptionImplTest, FailsOnUnsupported) {
   IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                       Network::SocketOptionName(),
-                                      reinterpret_cast<void*>(redirect_records_->buf_ptr_),
+                                      reinterpret_cast<void*>(redirect_records_->buf_),
                                       redirect_records_->buf_size_,
                                       nullptr,
                                       0};
@@ -66,7 +66,7 @@ TEST_F(IoctlSocketOptionImplTest, FailsOnSyscallFailure) {
       .WillRepeatedly(testing::Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
   IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                       ENVOY_MAKE_SOCKET_OPTION_NAME(IOCTL_LEVEL, 10),
-                                      reinterpret_cast<void*>(redirect_records_->buf_ptr_),
+                                      reinterpret_cast<void*>(redirect_records_->buf_),
                                       redirect_records_->buf_size_,
                                       nullptr,
                                       0};
@@ -77,7 +77,7 @@ TEST_F(IoctlSocketOptionImplTest, FailsOnSyscallFailure) {
 TEST_F(IoctlSocketOptionImplTest, SetOption) {
   IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                       ENVOY_MAKE_SOCKET_OPTION_NAME(IOCTL_LEVEL, 10),
-                                      reinterpret_cast<void*>(redirect_records_->buf_ptr_),
+                                      reinterpret_cast<void*>(redirect_records_->buf_),
                                       redirect_records_->buf_size_,
                                       nullptr,
                                       0};
@@ -90,7 +90,7 @@ TEST_F(IoctlSocketOptionImplTest, HashKey) {
   std::vector<uint8_t> hash;
   IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                       ENVOY_MAKE_SOCKET_OPTION_NAME(IOCTL_LEVEL, 10),
-                                      reinterpret_cast<void*>(redirect_records_->buf_ptr_),
+                                      reinterpret_cast<void*>(redirect_records_->buf_),
                                       redirect_records_->buf_size_,
                                       nullptr,
                                       0};
@@ -106,7 +106,7 @@ TEST_F(IoctlSocketOptionImplTest, OptionDetails) {
                                            redirect_records_data_};
   IoctlSocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                       ENVOY_MAKE_SOCKET_OPTION_NAME(IOCTL_LEVEL, 10),
-                                      reinterpret_cast<void*>(redirect_records_->buf_ptr_),
+                                      reinterpret_cast<void*>(redirect_records_->buf_),
                                       redirect_records_->buf_size_,
                                       nullptr,
                                       0};

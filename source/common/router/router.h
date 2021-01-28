@@ -538,8 +538,7 @@ private:
   uint32_t pending_retries_{0};
 
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
-  Network::Socket::OptionsSharedPtr upstream_options_ =
-      std::make_shared<Network::Socket::Options>();
+  Network::Socket::OptionsSharedPtr upstream_options_;
 };
 
 class ProdFilter : public Filter {

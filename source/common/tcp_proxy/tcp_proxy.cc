@@ -424,22 +424,36 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (downstreamConnection()) {
+    if (!read_callbacks_->connection()
+             .streamInfo()
+             .filterState()
+             ->hasData<Network::ProxyProtocolFilterState>(
+                 Network::ProxyProtocolFilterState::key())) {
+      read_callbacks_->connection().streamInfo().filterState()->setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(
+              Network::ProxyProtocolData{downstreamConnection()->addressProvider().remoteAddress(),
+                                         downstreamConnection()->addressProvider().localAddress()}),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    }
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
 
     if (downstreamConnection()
             ->streamInfo()
             .filterState()
-            .hasData<Network::RedirectRecordsFilterState>(
-                Network::RedirectRecordsFilterState::key())) {
+            .hasData<Network::Win32RedirectRecordsFilterState>(
+                Network::Win32RedirectRecordsFilterState::key())) {
       auto redirect_records = downstreamConnection()
                                   ->streamInfo()
                                   .filterState()
-                                  .getDataReadOnly<Network::RedirectRecordsFilterState>(
-                                      Network::RedirectRecordsFilterState::key())
+                                  .getDataReadOnly<Network::Win32RedirectRecordsFilterState>(
+                                      Network::Win32RedirectRecordsFilterState::key())
                                   .value();
       const Network::Socket::OptionsSharedPtr wfp_socket_options =
           Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records);
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
       Network::Socket::appendOptions(upstream_options_, wfp_socket_options);
     }
   }

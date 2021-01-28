@@ -958,14 +958,14 @@ public:
 
     {
       if (set_redirect_records) {
-        auto redirect_records = std::make_shared<Network::EnvoyRedirectRecords>();
-        memcpy(redirect_records->buf_ptr_, reinterpret_cast<void*>(redirect_records_data_.data()),
+        auto redirect_records = std::make_shared<Network::Win32RedirectRecords>();
+        memcpy(redirect_records->buf_, reinterpret_cast<void*>(redirect_records_data_.data()),
                redirect_records_data_.size());
         redirect_records->buf_size_ = redirect_records_data_.size();
 
         filter_callbacks_.connection_.streamInfo().filterState()->setData(
-            Network::RedirectRecordsFilterState::key(),
-            std::make_unique<Network::RedirectRecordsFilterState>(redirect_records),
+            Network::Win32RedirectRecordsFilterState::key(),
+            std::make_unique<Network::Win32RedirectRecordsFilterState>(redirect_records),
             StreamInfo::FilterState::StateType::Mutable,
             StreamInfo::FilterState::LifeSpan::Connection);
       }

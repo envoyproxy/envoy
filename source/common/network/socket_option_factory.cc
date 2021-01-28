@@ -54,11 +54,11 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
 }
 
 std::unique_ptr<Socket::Options>
-SocketOptionFactory::buildWFPRedirectRecordsOptions(EnvoyRedirectRecords& redirect_records) {
+SocketOptionFactory::buildWFPRedirectRecordsOptions(Win32RedirectRecords& redirect_records) {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<Network::IoctlSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_REDIRECT_RECORDS,
-      reinterpret_cast<void*>(redirect_records.buf_ptr_), redirect_records.buf_size_, nullptr, 0));
+      reinterpret_cast<void*>(redirect_records.buf_), redirect_records.buf_size_, nullptr, 0));
   return options;
 }
 

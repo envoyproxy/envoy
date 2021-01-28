@@ -5,8 +5,8 @@
 namespace Envoy {
 namespace Network {
 
-const std::string& RedirectRecordsFilterState::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.network.redirect_records");
+const std::string& Win32RedirectRecordsFilterState::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.network.win32_redirect_records");
 }
 
 } // namespace Network

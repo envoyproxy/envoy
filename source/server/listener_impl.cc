@@ -386,12 +386,12 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst;
                    });
   if (it != config_.listener_filters().end()) {
-    if (Network::Win32SupportsOriginalDestination() &&
-        config_.traffic_direction() == envoy::config::core::v3::UNSPECIFIED) {
+    if (config_.traffic_direction() == envoy::config::core::v3::UNSPECIFIED) {
       throw EnvoyException("[Windows] Setting original destination filter on a listener without "
                            "specifying the traffic_direction."
                            "Configure the traffic_direction listener option");
-    } else {
+    }
+    if (!Network::Win32SupportsOriginalDestination()) {
       ENVOY_LOG(warn,
                 "[Windows] Setting original destination filter on a version of Envoy that does not "
                 "support it. The listener will be able to proxy traffic");

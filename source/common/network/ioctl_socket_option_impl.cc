@@ -35,20 +35,22 @@ bool IoctlSocketOptionImpl::setOption(
 }
 
 void IoctlSocketOptionImpl::hashKey(std::vector<uint8_t>& hash) const {
-  std::string in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
-  std::string out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
+  absl::string_view in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
+  absl::string_view out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
   pushScalarToByteVector(
-      StringUtil::CaseInsensitiveHash()(std::string(in_buffer_bstr + out_buffer_bstr)), hash);
+      StringUtil::CaseInsensitiveHash()(std::string(in_buffer_bstr) + std::string(out_buffer_bstr)),
+      hash);
 }
 
 absl::optional<Socket::Option::Details>
 IoctlSocketOptionImpl::getOptionDetails(const Socket&,
                                         envoy::config::core::v3::SocketOption::SocketState) const {
 
-  std::string in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
-  std::string out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
+  absl::string_view in_buffer_bstr(reinterpret_cast<const char*>(inBuffer_), inBuffer_size_);
+  absl::string_view out_buffer_bstr(reinterpret_cast<const char*>(outBuffer_), outBuffer_size_);
 
-  return Socket::Option::Details{optname_, std::string(in_buffer_bstr + out_buffer_bstr)};
+  return Socket::Option::Details{optname_,
+                                 std::string(in_buffer_bstr) + std::string(out_buffer_bstr)};
 }
 
 bool IoctlSocketOptionImpl::isSupported() const { return optname_.hasValue(); }
