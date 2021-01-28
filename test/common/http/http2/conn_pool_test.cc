@@ -1471,9 +1471,18 @@ TEST_F(Http2ConnPoolImplTest, PreconnectOffWithSettings) {
   expectClientConnect(0);
   CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 
+  // Settings frame without max_concurrent_streams_ is a no-op.
+  NiceMock<MockReceivedSettings> settings;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+
   // Settings frame reducing capacity to one stream per connection results in -1 capacity.
   NiceMock<MockReceivedSettings> settings;
   settings.max_concurrent_streams_ = 1;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
+
+  // Getting the same settings again should not affect capacity.
   test_clients_[0].codec_client_->onSettings(settings);
   CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
 
@@ -1483,7 +1492,17 @@ TEST_F(Http2ConnPoolImplTest, PreconnectOffWithSettings) {
   // As the second request completes, capacity returns to 1.
   completeRequest(r2);
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 1 /*capacity*/);
-  pool_->drainConnections();
+
+  // Increased limits are (currently) ignored: capacity will remain 1.
+  settings.max_concurrent_streams_ = 3;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 1 /*capacity*/);
+
+  // Now set the limit to 0. This sould result in the connection being drained.
+  settings.max_concurrent_streams_ = 0;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+
   closeAllClients();
 }
 

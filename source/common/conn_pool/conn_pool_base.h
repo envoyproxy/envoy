@@ -73,6 +73,7 @@ public:
   // Returns the number of active streams on this connection.
   virtual uint32_t numActiveStreams() const PURE;
 
+  // HTTP/1 and TCP pools can not have negative delta. HTTP/2 can, so overrides this function.
   virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
@@ -204,7 +205,7 @@ public:
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
-  void decrClusterStreamCapacity(int32_t delta) { state_.decrConnectingStreamCapacity(delta); }
+  void decrClusterStreamCapacity(uint32_t delta) { state_.decrConnectingStreamCapacity(delta); }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())

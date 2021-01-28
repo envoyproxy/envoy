@@ -41,7 +41,7 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 
 class ReceivedSettingsImpl : public ReceivedSettings {
 public:
-  ReceivedSettingsImpl(const nghttp2_settings& settings);
+  explicit ReceivedSettingsImpl(const nghttp2_settings& settings);
 
   // ReceivedSettings
   const absl::optional<uint32_t>& maxConcurrentStreams() const override {

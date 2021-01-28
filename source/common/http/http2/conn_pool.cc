@@ -40,11 +40,20 @@ void ActiveClient::onSettings(ReceivedSettings& settings) {
       settings.maxConcurrentStreams().has_value() &&
       settings.maxConcurrentStreams().value() < concurrent_stream_limit_) {
     int64_t old_unused_capacity = currentUnusedCapacity();
+    // Given config limits old_unused_capacity should never exceed int32_t.
+    // TODO(alyssawilk) move remaining_streams_, concurrent_stream_limit_ and
+    // currentUnusedCapacity() to be explicit int32_t
+    ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
     concurrent_stream_limit_ = settings.maxConcurrentStreams().value();
     int64_t delta = old_unused_capacity - currentUnusedCapacity();
     parent_.decrClusterStreamCapacity(delta);
     ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
     negative_capacity_ += delta;
+  }
+  // As we don't increase stream limits when maxConcurrentStreams goes up, treat
+  // a stream limit of 0 as a GOAWAY.
+  if (concurrent_stream_limit_ == 0) {
+    parent_.transitionActiveClientState(*this, ActiveClient::State::DRAINING);
   }
 }
 

@@ -355,14 +355,14 @@ public:
 };
 
 /**
- * A class for sharing what HTTP/1 SETTINGS were received from the peer.
+ * A class for sharing what HTTP/2 SETTINGS were received from the peer.
  */
 class ReceivedSettings {
 public:
   virtual ~ReceivedSettings() = default;
 
   /**
-   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or 0 if it was not present.
+   * @return value of SETTINGS_MAX_CONCURRENT_STREAMS, or absl::nullopt if it was not present.
    */
   virtual const absl::optional<uint32_t>& maxConcurrentStreams() const PURE;
 };
@@ -381,6 +381,7 @@ public:
 
   /**
    * Fires when the peer settings frame is received from the peer.
+   * This may occur multiple times across the lifetime of the connection.
    * @param ReceivedSettings the settings received from the peer.
    */
   virtual void onSettings(ReceivedSettings& settings) { UNREFERENCED_PARAMETER(settings); }
