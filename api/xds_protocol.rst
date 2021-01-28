@@ -368,11 +368,20 @@ After a NACK, an API update may succeed at a new version **Y**:
 The preferred mechanism for a server to detect a NACK is to look for the presence of the
 :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` field in the request sent by
 the client. Some older servers may instead detect a NACK by looking at both the version and the
-nonce in the request: if the version in the request is lower than the one sent by the server with
+nonce in the request: if the version in the request is not equal to the one sent by the server with
 that nonce, then the client has rejected the most recent version. However, this approach does not
 work for APIs other than LDS and CDS for clients that may dynamically change the set of resources
 that they are subscribing to, unless the server has somehow arranged to increment the resource
-type instance version every time any one client subscribes to a new resource.
+type instance version every time any one client subscribes to a new resource. Specifically,
+consider the following example:
+- C: sends resource_names=[A]
+- S: sends resources=[A], version=1, nonce=1
+- C: sends resource_names=[A], version=1, nonce=1 (this is an ACK)
+- C: sends resource_names=[A, B], version=1, nonce=1 (client is adding subscription to B)
+- S: sends resources=[B], version=1, nonce=2 (server sends B but system version does not change
+  because server has not gotten a new config)
+- C: sends resource_names=[A, B], version=1, nonce=2, error_detail="B is invalid" (client intended
+  to NACK B, server needs to look at error_detail to detect NACK instead of using version and nonce)
 
 ACK and NACK semantics summary
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -388,7 +397,8 @@ ACK and NACK semantics summary
   :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` field.  The :ref:`version_info
   <envoy_api_field_DiscoveryResponse.version_info>` indicates the most recent version that the
   client is using, although that may not be an older version in the case where the client has
-  subscribed to a new resource from an existing version and that new resource is invalid.
+  subscribed to a new resource from an existing version and that new resource is invalid (see
+  example above).
 
 .. _xds_protocol_resource_update:
 
