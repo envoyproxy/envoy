@@ -27,7 +27,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    extra_visibility = ["//test/extensions:__subpackages__"],
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":compressor_filter_lib",

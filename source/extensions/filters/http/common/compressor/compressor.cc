@@ -159,12 +159,12 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   const auto& request_config = config_->requestDirectionConfig();
   // temp variable to preserve old behavior w/ http upgrade. should be removed when
   // enable_compression_without_content_length_header runtime variable would be removed
-  const bool is_upgrade_allowed =
+  const bool is_not_upgrade =
       (!Http::Utility::isUpgrade(headers) && !Http::Utility::isH2UpgradeRequest(headers)) ||
       !Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_content_length_header");
 
-  if (!end_stream && request_config.compressionEnabled() && is_upgrade_allowed &&
+  if (!end_stream && request_config.compressionEnabled() && is_not_upgrade &&
       request_config.isMinimumContentLength(headers) &&
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
@@ -230,12 +230,12 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       config.compressionEnabled() && config.isMinimumContentLength(headers);
   // temp variable to preserve old behavior w/ http upgrade. should be removed when
   // enable_compression_without_content_length_header runtime variable would be removed
-  const bool is_upgrade_allowed =
+  const bool is_not_upgrade =
       !Http::Utility::isUpgrade(headers) ||
       !Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_compression_without_content_length_header");
 
-  const bool isCompressible = isEnabledAndContentLengthBigEnough && is_upgrade_allowed &&
+  const bool isCompressible = isEnabledAndContentLengthBigEnough && is_not_upgrade &&
                               config.isContentTypeAllowed(headers) &&
                               !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
                               !headers.getInline(response_content_encoding_handle.handle());
