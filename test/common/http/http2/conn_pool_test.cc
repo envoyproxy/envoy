@@ -1497,7 +1497,7 @@ TEST_F(Http2ConnPoolImplTest, PreconnectOffWithSettings) {
   test_clients_[0].codec_client_->onSettings(settings);
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 1 /*capacity*/);
 
-  // Now set the limit to 0. This sould result in the connection being drained.
+  // Now set the limit to 0. This could result in the connection being drained.
   settings.max_concurrent_streams_ = 0;
   test_clients_[0].codec_client_->onSettings(settings);
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
