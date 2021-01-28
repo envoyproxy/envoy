@@ -244,7 +244,7 @@ def FormatExtensionType(extension_type):
       for ext
       in EXTENSION_CATEGORIES[extension_type])
     return EXTENSION_TYPE_TEMPLATE.substitute(anchor=anchor,
-                                              extensions=extensions)
+                                              extensions="%s\n" % extensions)
   except KeyError as e:
     sys.stderr.write(
         '\n\nUnable to find extension type: %s\n\n' % extension_type)
