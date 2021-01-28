@@ -188,6 +188,25 @@ TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage)
       nullptr, filter_chain_factory_builder_, filter_chain_manager_);
 }
 
+TEST_F(FilterChainManagerImplTest, DuplicateUnnamedFilterChainMatchError) {
+  const std::string valid_uuid_regex =
+      "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[[a-fA-F0-9]{4}-[a-fA-F0-9]{12}";
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+
+  for (int i = 0; i < 2; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+  EXPECT_THROW_WITH_REGEX(
+      filter_chain_manager_.addFilterChains(
+          std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0],
+                                                                       &filter_chain_messages[1]},
+          nullptr, filter_chain_factory_builder_, filter_chain_manager_),
+      EnvoyException,
+      fmt::format("filter chain '{}' has the same matching rules defined as '{}'", valid_uuid_regex,
+                  valid_uuid_regex));
+}
+
 TEST_F(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
   std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
 

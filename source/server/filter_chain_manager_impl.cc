@@ -156,20 +156,26 @@ void FilterChainManagerImpl::addFilterChains(
       filter_chains;
   uint32_t new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
+    std::string fc_name;
+    if (!filter_chain->name().empty()) {
+      fc_name = filter_chain->name();
+    } else {
+      fc_name = parent_context_.api().randomGenerator().uuid();
+    }
+
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
       throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
                                        "unimplemented fields",
-                                       address_->asString(), filter_chain->name()));
+                                       address_->asString(), fc_name));
     }
     const auto& matching_iter = filter_chains.find(filter_chain_match);
     if (matching_iter != filter_chains.end()) {
       throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
                                        "the same matching rules defined as '{}'",
-                                       address_->asString(), filter_chain->name(),
-                                       matching_iter->second));
+                                       address_->asString(), fc_name, matching_iter->second));
     }
-    filter_chains.insert({filter_chain_match, filter_chain->name()});
+    filter_chains.insert({filter_chain_match, fc_name});
 
     // Validate IP addresses.
     std::vector<std::string> destination_ips;
