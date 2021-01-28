@@ -52,9 +52,6 @@ Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
     case datadog::opentracing::LogLevel::error:
       ENVOY_LOG(error, "{}", message);
       break;
-    default:
-      ENVOY_LOG(warn, "{}", message);
-      break;
     }
   };
 
