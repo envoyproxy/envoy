@@ -65,6 +65,17 @@ This extension may be referenced by the qualified name *$extension*
 
 """)
 
+
+EXTENSION_TYPE_TEMPLATE = string.Template("""$anchor
+
+.. tip::
+  This extension type has the following known extensions
+
+  $extensions
+
+""")
+
+
 # A map from the extension security postures (as defined in the
 # envoy_cc_extension build macro) to human readable text for extension docs.
 EXTENSION_SECURITY_POSTURES = {
@@ -219,13 +230,15 @@ def FormatExtensionType(extension_type):
   """Format extension metadata as RST.
 
   Args:
-    extension: the name of the extension, e.g. com.acme.foo.
+    extension_type: the name of the extension_type, e.g. com.acme.
 
   Returns:
-    RST formatted extension description.
+    RST formatted extension type description.
   """
   try:
-    return "INFO ABOUT THE EXTENSION TYPE %s\n\n" % EXTENSION_CATEGORIES[extension_type]
+    anchor = FormatAnchor('extension_type_' + extension_type)
+    return EXTENSION_TYPE_TEMPLATE.substitute(anchor=anchor,
+                                              extensions=EXTENSION_CATEGORIES[extension_type])
   except KeyError as e:
     sys.stderr.write(
         '\n\nUnable to find extension type: %s\n\n' % extension_type)
