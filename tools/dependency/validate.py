@@ -125,7 +125,9 @@ class BuildGraph(object):
       deps = subprocess.check_output(['bazel', 'query', deps_query],
                                      stderr=subprocess.PIPE).decode().splitlines()
     except subprocess.CalledProcessError as exc:
-      print(f'Bazel query failed with error code {exc.returncode} and std error: {exc.stderr.decode()}')
+      print(
+          f'Bazel query failed with error code {exc.returncode} and std error: {exc.stderr.decode()}'
+      )
       raise exc
     ext_deps = set()
     implied_untracked_deps = set()
