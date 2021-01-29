@@ -25,6 +25,6 @@ message ConsistentHashing {
 
   // The value to use for the modulus in the calculation. This effectively  bounds the hash output,
   // specifying the range of possible values.
-  // This value must be above the configured theshold.
+  // This value must be above the configured threshold.
   uint32 modulo = 2 [(validate.rules).uint32 = {gt: 0}];
 }
