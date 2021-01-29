@@ -14,9 +14,9 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.matching.matchers.consistent_hashing",
+    extension_name = "envoy.matching.input_matchers.consistent_hashing",
     deps = [
-        "//source/extensions/matching/matchers/consistent_hashing:config",
+        "//source/extensions/matching/input_matchers/consistent_hashing:config",
         "//test/mocks/server:factory_context_mocks",
     ],
 )
@@ -24,8 +24,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
-    extension_name = "envoy.matching.matchers.consistent_hashing",
+    extension_name = "envoy.matching.input_matchers.consistent_hashing",
     deps = [
-        "//source/extensions/matching/matchers/consistent_hashing:consistent_hashing_lib",
+        "//source/extensions/matching/input_matchers/consistent_hashing:consistent_hashing_lib",
     ],
 )

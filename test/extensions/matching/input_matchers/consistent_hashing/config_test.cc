@@ -1,4 +1,4 @@
-#include "extensions/matching/matchers/consistent_hashing/config.h"
+#include "extensions/matching/input_matchers/consistent_hashing/config.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace Matchers {
+namespace InputMatchers {
 namespace ConsistentHashing {
 
 TEST(ConfigTest, TestConfig) {
@@ -16,7 +16,7 @@ TEST(ConfigTest, TestConfig) {
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.matchers.consistent_hashing.v3.ConsistentHashing
+        "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing
         modulo: 100
         threshold: 10
 )EOF";
@@ -37,7 +37,7 @@ TEST(ConfigTest, InvalidConfig) {
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.matchers.consistent_hashing.v3.ConsistentHashing
+        "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing
         modulo: 100
         threshold: 200
 )EOF";
@@ -52,7 +52,7 @@ TEST(ConfigTest, InvalidConfig) {
                             "threshold cannot be greater than modulo: 200 > 100");
 }
 } // namespace ConsistentHashing
-} // namespace Matchers
+} // namespace InputMatchers
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

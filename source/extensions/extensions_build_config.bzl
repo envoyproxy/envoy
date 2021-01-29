@@ -46,7 +46,8 @@ EXTENSIONS = {
     # Input Matchers
     #
 
-    "envoy.matching.matchers.consistent_hashing":       "//source/extensions/matching/matchers/consistent_hashing:config",
+    "envoy.matching.input_matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
+
     #
     # HTTP filters
     #

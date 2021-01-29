@@ -162,3 +162,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
+# hash input matcher
+/*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu

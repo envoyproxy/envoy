@@ -1,11 +1,11 @@
-#include "extensions/matching/matchers/consistent_hashing/matcher.h"
+#include "extensions/matching/input_matchers/consistent_hashing/matcher.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace Matchers {
+namespace InputMatchers {
 namespace ConsistentHashing {
 
 TEST(MatcherTest, EmptyValue) {
@@ -30,7 +30,7 @@ TEST(MatcherTest, BasicUsage) {
   ASSERT_FALSE(matcher.match("hello"));
 }
 } // namespace ConsistentHashing
-} // namespace Matchers
+} // namespace InputMatchers
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

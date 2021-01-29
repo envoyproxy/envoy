@@ -28,6 +28,6 @@ envoy_cc_extension(
         "//include/envoy/matcher:matcher_interface",
         "//include/envoy/registry",
         "//include/envoy/server:factory_context_interface",
-        "@envoy_api//envoy/extensions/matching/matchers/consistent_hashing/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg_cc_proto",
     ],
 )

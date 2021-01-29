@@ -7,8 +7,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace Matchers {
+namespace InputMatchers {
 namespace ConsistentHashing {
+
 class Matcher : public Envoy::Matcher::InputMatcher {
 public:
   Matcher(uint32_t threshold, uint32_t modulo) : threshold_(threshold), modulo_(modulo) {}
@@ -27,7 +28,7 @@ private:
   const uint32_t modulo_;
 };
 } // namespace ConsistentHashing
-} // namespace Matchers
+} // namespace InputMatchers
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy
