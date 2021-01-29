@@ -917,69 +917,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
       false);
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
-  overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");
-  HttpIntegrationTest::initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-};
-
-class OverrideConfigGrpcJsonTranscoderIntegrationTest : public GrpcJsonTranscoderIntegrationTest {
-public:
-  /**
-   * Global initializer for all integration tests.
-   */
-  void SetUp() override {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    // creates filter but doesn't apply it to bookstore services
-    const std::string filter =
-        R"EOF(
-            name: grpc_json_transcoder
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
-              "proto_descriptor": ""
-            )EOF";
-    config_helper_.addFilter(filter);
-  }
-};
-INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
-  // add bookstore per-route override
-  const std::string filter =
-      R"EOF({{
-              "services": ["bookstore.Bookstore"],
-              "proto_descriptor": "{}"
-          }})EOF";
-  overrideConfig(
-      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
-
-  HttpIntegrationTest::initialize();
-
-  // testing the path that's defined in bookstore.descriptor file (should work  the same way
-  // as it does when grpc filter is applied to base config)
-  testTranscoding<Empty, bookstore::ListShelvesResponse>(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
-      "", {""}, {R"(shelves { id: 20 theme: "Children" }
-          shelves { id: 1 theme: "Foo" } )"},
-      Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                      {"content-type", "application/json"},
-                                      {"content-length", "69"},
-                                      {"grpc-status", "0"}},
-      R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
-};
-
 TEST_P(GrpcJsonTranscoderIntegrationTest, DisableStrictRequestValidation) {
   HttpIntegrationTest::initialize();
 
@@ -1101,6 +1038,69 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQue
           {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "");
 }
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
+  overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+};
+
+class OverrideConfigGrpcJsonTranscoderIntegrationTest : public GrpcJsonTranscoderIntegrationTest {
+public:
+  /**
+   * Global initializer for all integration tests.
+   */
+  void SetUp() override {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    // creates filter but doesn't apply it to bookstore services
+    const std::string filter =
+        R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              "proto_descriptor": ""
+            )EOF";
+    config_helper_.addFilter(filter);
+  }
+};
+INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
+  // add bookstore per-route override
+  const std::string filter =
+      R"EOF({{
+              "services": ["bookstore.Bookstore"],
+              "proto_descriptor": "{}"
+          }})EOF";
+  overrideConfig(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+
+  HttpIntegrationTest::initialize();
+
+  // testing the path that's defined in bookstore.descriptor file (should work  the same way
+  // as it does when grpc filter is applied to base config)
+  testTranscoding<Empty, bookstore::ListShelvesResponse>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
+      "", {""}, {R"(shelves { id: 20 theme: "Children" }
+          shelves { id: 1 theme: "Foo" } )"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "69"},
+                                      {"grpc-status", "0"}},
+      R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
+};
 
 } // namespace
 } // namespace Envoy
