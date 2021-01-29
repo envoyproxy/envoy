@@ -93,5 +93,8 @@ docker run --rm \
        -e SLACK_TOKEN \
        -e BUILD_URI\
        -e REPO_URI \
+       -e SYSTEM_STAGEDISPLAYNAME \
+       -e SYSTEM_JOBDISPLAYNAME \
+       -e SYSTEM_PULLREQUEST_PULLREQUESTID \
        "${ENVOY_BUILD_IMAGE}" \
        "${START_COMMAND[@]}"
