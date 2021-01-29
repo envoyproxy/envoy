@@ -2,13 +2,15 @@
 
 #include "common/protobuf/utility.h"
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
 
-static void BM_ProtobufMessageHash(benchmark::State& state) {
+static void bmProtobufMessageHashSmall(benchmark::State& state) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(R"EOF(
 admin:
@@ -55,9 +57,37 @@ static_resources:
   )EOF",
                             bootstrap);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     benchmark::DoNotOptimize(MessageUtil::hash(bootstrap));
   }
 }
-BENCHMARK(BM_ProtobufMessageHash);
+BENCHMARK(bmProtobufMessageHashSmall);
+
+static void bmProtobufMessageHashLarge(benchmark::State& state) {
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name(std::string('a', 100));
+  cluster.set_type(envoy::config::cluster::v3::Cluster_DiscoveryType_EDS);
+  cluster.mutable_eds_cluster_config()->mutable_eds_config()->mutable_ads();
+  for (int j = 0; j < 5; ++j) {
+    cluster.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(
+        1000000 + j);
+  }
+  cluster.mutable_upstream_bind_config()->mutable_source_address()->set_resolver_name(
+      "some.really.long.resolver.name");
+
+  for (int j = 0; j < 10; ++j) {
+    auto& filter_metadata = (*cluster.mutable_metadata()->mutable_filter_metadata())[absl::StrCat("KEY_NAME_", j)];
+    for (int k = 0; k < 5; ++k) {
+      (*filter_metadata.mutable_fields())[absl::StrCat("key_number_", k)].set_string_value(
+          std::string('b', 30));
+    }
+  }
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    benchmark::DoNotOptimize(MessageUtil::hash(cluster));
+  }
+}
+BENCHMARK(bmProtobufMessageHashLarge);
 
 } // namespace Envoy
