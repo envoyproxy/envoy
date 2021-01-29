@@ -98,7 +98,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
         factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
-        *filter_config));
+        filter_config));
   };
 }
 

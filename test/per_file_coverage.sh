@@ -56,6 +56,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/opencensus:91.6"
 "source/extensions/tracers/xray:94.0"
 "source/extensions/transport_sockets:95.1"
+"source/extensions/transport_sockets/tls/cert_validator:95.1"
 "source/extensions/transport_sockets/tls/private_key:76.9"
 "source/extensions/transport_sockets/tls:94.4"
 "source/extensions/wasm_runtime:50.0"
@@ -65,7 +66,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:85.7"
 "source/server:94.5"
 "source/server/admin:95.1"
-"source/server/config_validation:76.6"
+"source/server/config_validation:75.6"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
