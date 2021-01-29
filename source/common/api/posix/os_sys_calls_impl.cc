@@ -282,7 +282,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 }
 
 SysCallIntResult OsSysCallsImpl::genericIoctl(os_fd_t, unsigned long, void*, unsigned long, void*,
-                                              unsigned long, unsigned long&) {
+                                              unsigned long, unsigned long*) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
