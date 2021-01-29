@@ -60,18 +60,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "BoringSSL",
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
-        version = "1ce6682c7f6cfe0426ed54a37c10775bea9d3502",
-        sha256 = "b878d84f90b9a95fa1e53f46f1b69a5116621e117a6d4dbf602d884311ee6aa7",
-        strip_prefix = "boringssl-{version}",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/stable release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-87.0.4280.66
+        # chromium-88.0.4324.96
+        version = "fbbf8781456c38a90f674d4771126ed39132855b",
+        sha256 = "76a571c1c3f6f6618d538384319ccc2b7ba9f7ae3f60087ba67894faba11a6b6",
+        strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2020-09-21",
+        release_date = "2020-11-04",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -665,14 +665,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "8.8.278.8",
+        version = "8.9.255.6",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "0c5c7b534a619d3f6077dd3583b7976a2cfe7f8ea71ca1e2d81a9de1d40131f9",
+        sha256 = "34c41e1f62a68f94cc0715fa3dc02e8bdcd35b5ca45a038975d9aa6a3e2688b5",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2020-12-04",
+        release_date = "2021-01-18",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_quiche = dict(
@@ -696,7 +696,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "ef0d23689e240e6c8de4c3a5296b209128c87373",
         sha256 = "d769283fed1319bca68bae8bdd47fbc3a7933999329eee850eff1f1ea61ce176",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_{version}.tar.gz"],
-        use_category = ["dataplane_ext"],
+        use_category = ["controlplane", "dataplane_core"],
         extensions = [],
         release_date = "2020-07-30",
         cpe = "N/A",
@@ -804,7 +804,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "2.4.1",
         sha256 = "2177cbd14118999e1d76fec628ca78ace7e6f841219dbc6035027c796bbe1a2a",
         strip_prefix = "kafka_2.12-{version}",
-        urls = ["https://mirrors.gigenet.com/apache/kafka/{version}/kafka_2.12-{version}.tgz"],
+        urls = ["https://archive.apache.org/dist/kafka/{version}/kafka_2.12-{version}.tgz"],
         release_date = "2020-03-12",
         use_category = ["test_only"],
     ),
