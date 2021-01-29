@@ -26,8 +26,8 @@ public:
   int getServerCharset() const { return server_charset_; }
   int getServerStatus() const { return server_status_; }
   uint32_t getServerCap() const { return server_cap_; }
-  uint16_t getBaseServerCap() const { return base_server_cap_; }
-  uint16_t getExtServerCap() const { return ext_server_cap_; }
+  uint16_t getBaseServerCap() const { return server_cap_ & 0xffff; }
+  uint16_t getExtServerCap() const { return server_cap_ >> 16; }
   const std::string& getAuthPluginName() const { return auth_plugin_name_; }
 
   void setProtocol(uint8_t protocol);
@@ -50,13 +50,7 @@ private:
   uint32_t thread_id_{0};
   std::string auth_plugin_data1_;
   std::string auth_plugin_data2_;
-  union {
-    uint32_t server_cap_{0};
-    struct {
-      uint16_t base_server_cap_;
-      uint16_t ext_server_cap_;
-    };
-  };
+  uint32_t server_cap_{0};
   uint8_t server_charset_{0};
   uint16_t server_status_{0};
   std::string auth_plugin_name_;

@@ -1,5 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
 
+#include <bits/stdint-uintn.h>
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -10,10 +12,15 @@ namespace MySQLProxy {
 
 void ClientLogin::setClientCap(uint32_t client_cap) { client_cap_ = client_cap; }
 
-void ClientLogin::setBaseClientCap(uint16_t base_cap) { base_cap_ = base_cap; }
+void ClientLogin::setBaseClientCap(uint16_t base_cap) {
+  client_cap_ &= 0xffffffff00000000;
+  client_cap_ = client_cap_ | base_cap;
+}
 
 void ClientLogin::setExtendedClientCap(uint16_t extended_client_cap) {
-  ext_cap_ = extended_client_cap;
+  uint32_t ext = extended_client_cap;
+  client_cap_ &= 0x00000000ffffffff;
+  client_cap_ = client_cap_ | (ext << 16);
 }
 
 void ClientLogin::setMaxPacket(uint32_t max_packet) { max_packet_ = max_packet; }
@@ -53,10 +60,12 @@ bool ClientLogin::isClientSecureConnection() const {
 int ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t) {
   /* 4.0 uses 2 byte, 4.1+ uses 4 bytes, but the proto-flag is in the lower 2
    * bytes */
-  if (BufferHelper::peekUint16(buffer, base_cap_) != MYSQL_SUCCESS) {
+  uint16_t base_cap = 0;
+  if (BufferHelper::peekUint16(buffer, base_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error when paring cap client login message");
     return MYSQL_FAILURE;
   }
+  setBaseClientCap(base_cap);
   if (client_cap_ & CLIENT_SSL) {
     return parseResponseSsl(buffer);
   }
@@ -148,10 +157,12 @@ int ClientLogin::parseResponse41(Buffer::Instance& buffer) {
 }
 
 int ClientLogin::parseResponse320(Buffer::Instance& buffer) {
-  if (BufferHelper::readUint16(buffer, base_cap_) != MYSQL_SUCCESS) {
+  uint16_t base_cap = 0;
+  if (BufferHelper::readUint16(buffer, base_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error when parsing cap of client login message");
     return MYSQL_FAILURE;
   }
+  setBaseClientCap(base_cap);
   if (BufferHelper::readUint24(buffer, max_packet_) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error when paring max packet of client login message");
     return MYSQL_FAILURE;
@@ -231,7 +242,7 @@ void ClientLogin::encodeResponse41(Buffer::Instance& out) {
 
 void ClientLogin::encodeResponse320(Buffer::Instance& out) {
   uint8_t enc_end_string = 0;
-  BufferHelper::addUint16(out, base_cap_);
+  BufferHelper::addUint16(out, getBaseClientCap());
   BufferHelper::addUint24(out, max_packet_);
   BufferHelper::addString(out, username_);
   BufferHelper::addUint8(out, enc_end_string);

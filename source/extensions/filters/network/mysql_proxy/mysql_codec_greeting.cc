@@ -1,5 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
 
+#include <bits/stdint-uintn.h>
+
 #include "envoy/buffer/buffer.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
@@ -32,10 +34,15 @@ void ServerGreeting::setAuthPluginData2(const std::string& data) { auth_plugin_d
 void ServerGreeting::setServerCap(uint32_t server_cap) { server_cap_ = server_cap; }
 
 void ServerGreeting::setBaseServerCap(uint16_t base_server_cap) {
-  base_server_cap_ = base_server_cap;
+  server_cap_ &= 0xffffffff00000000;
+  server_cap_ |= base_server_cap;
 }
 
-void ServerGreeting::setExtServerCap(uint16_t ext_server_cap) { ext_server_cap_ = ext_server_cap; }
+void ServerGreeting::setExtServerCap(uint16_t ext_server_cap) {
+  uint32_t ext = ext_server_cap;
+  server_cap_ &= 0x00000000ffffffff;
+  server_cap_ |= (ext << 16);
+}
 
 void ServerGreeting::setServerCharset(uint8_t server_charset) { server_charset_ = server_charset; }
 
@@ -45,6 +52,8 @@ void ServerGreeting::setAuthPluginName(const std::string& name) { auth_plugin_na
 
 int ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
   uint8_t auth_plugin_data_len = 0;
+  uint16_t ext_server_cap = 0;
+  uint16_t base_server_cap = 0;
   // parsing logic from
   // https://github.com/mysql/mysql-proxy/blob/ca6ad61af9088147a568a079c44d0d322f5bee59/src/network-mysqld-packet.c#L1171
   if (BufferHelper::readUint8(buffer, protocol_) != MYSQL_SUCCESS) {
@@ -72,10 +81,11 @@ int ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
     // End of HandshakeV9 greeting
     goto CHECK;
   }
-  if (BufferHelper::readUint16(buffer, base_server_cap_) != MYSQL_SUCCESS) {
+  if (BufferHelper::readUint16(buffer, base_server_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing server_cap in mysql Greeting msg");
     return MYSQL_FAILURE;
   }
+  setBaseServerCap(base_server_cap);
   if (BufferHelper::endOfBuffer(buffer)) {
     // HandshakeV10 can terminate after Server Capabilities
     goto CHECK;
@@ -88,10 +98,12 @@ int ServerGreeting::parseMessage(Buffer::Instance& buffer, uint32_t) {
     ENVOY_LOG(info, "error parsing server_status in mysql Greeting msg");
     return MYSQL_FAILURE;
   }
-  if (BufferHelper::readUint16(buffer, ext_server_cap_) != MYSQL_SUCCESS) {
+
+  if (BufferHelper::readUint16(buffer, ext_server_cap) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing ext_server_cap in mysql Greeting msg");
     return MYSQL_FAILURE;
   }
+  setExtServerCap(ext_server_cap);
   if (BufferHelper::readUint8(buffer, auth_plugin_data_len) != MYSQL_SUCCESS) {
     ENVOY_LOG(info, "error parsing auth_plugin_data_len in mysql Greeting msg");
     return MYSQL_FAILURE;
@@ -164,10 +176,10 @@ void ServerGreeting::encode(Buffer::Instance& out) {
   if (protocol_ == MYSQL_PROTOCOL_9) {
     return;
   }
-  BufferHelper::addUint16(out, base_server_cap_);
+  BufferHelper::addUint16(out, getBaseServerCap());
   BufferHelper::addUint8(out, server_charset_);
   BufferHelper::addUint16(out, server_status_);
-  BufferHelper::addUint16(out, ext_server_cap_);
+  BufferHelper::addUint16(out, getExtServerCap());
 
   if (server_cap_ & CLIENT_PLUGIN_AUTH) {
     BufferHelper::addUint8(out, auth_plugin_data2_.size() + auth_plugin_data1_.size());

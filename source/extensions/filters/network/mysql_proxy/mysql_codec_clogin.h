@@ -18,14 +18,14 @@ public:
   void encode(Buffer::Instance&) override;
 
   uint32_t getClientCap() const { return client_cap_; }
-  uint16_t getBaseClientCap() const { return base_cap_; }
-  uint16_t getExtendedClientCap() const { return ext_cap_; }
+  uint16_t getBaseClientCap() const { return client_cap_ & 0xffff; }
+  uint16_t getExtendedClientCap() const { return client_cap_ >> 16; }
   uint32_t getMaxPacket() const { return max_packet_; }
   uint8_t getCharset() const { return charset_; }
-  std::string getUsername() const { return username_; }
-  std::string getAuthResp() const { return auth_resp_; }
-  std::string getDb() const { return db_; }
-  std::string getAuthPluginName() const { return auth_plugin_name_; }
+  const std::string& getUsername() const { return username_; }
+  const std::string& getAuthResp() const { return auth_resp_; }
+  const std::string& getDb() const { return db_; }
+  const std::string& getAuthPluginName() const { return auth_plugin_name_; }
   bool isResponse41() const;
   bool isResponse320() const;
   bool isSSLRequest() const;
@@ -49,13 +49,8 @@ private:
   void encodeResponseSsl(Buffer::Instance& out);
   void encodeResponse41(Buffer::Instance& out);
   void encodeResponse320(Buffer::Instance& out);
-  union {
-    uint32_t client_cap_;
-    struct {
-      uint16_t base_cap_;
-      uint16_t ext_cap_;
-    };
-  };
+
+  uint32_t client_cap_;
   uint32_t max_packet_;
   uint8_t charset_;
   std::string username_;

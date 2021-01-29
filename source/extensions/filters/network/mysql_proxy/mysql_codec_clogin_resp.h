@@ -42,7 +42,7 @@ public:
     AuthMoreMessage& operator=(const AuthMoreMessage&) = default;
     AuthMoreMessage& operator=(AuthMoreMessage&&) noexcept;
     bool operator==(const AuthMoreMessage&) const;
-    std::string getAuthMoreData() const { return more_plugin_data_; }
+    const std::string& getAuthMoreData() const { return more_plugin_data_; }
     void setAuthMoreData(const std::string& data) { more_plugin_data_ = data; }
     friend ClientLoginResponse;
 
@@ -60,8 +60,8 @@ public:
     AuthSwitchMessage& operator=(AuthSwitchMessage&&) noexcept;
     bool operator==(const AuthSwitchMessage&) const;
     bool isOldAuthSwitch() const { return is_old_auth_switch_; }
-    std::string getAuthPluginData() const { return auth_plugin_data_; }
-    std::string getAuthPluginName() const { return auth_plugin_name_; }
+    const std::string& getAuthPluginData() const { return auth_plugin_data_; }
+    const std::string& getAuthPluginName() const { return auth_plugin_name_; }
     void setIsOldAuthSwitch(bool old) { is_old_auth_switch_ = old; }
     void setAuthPluginData(const std::string& data) { auth_plugin_data_ = data; }
     void setAuthPluginName(const std::string& name) { auth_plugin_name_ = name; }
@@ -91,7 +91,7 @@ public:
     uint64_t getLastInsertId() const { return last_insert_id_; }
     uint16_t getServerStatus() const { return status_; }
     uint16_t getWarnings() const { return warnings_; }
-    std::string getInfo() const { return info_; }
+    const std::string& getInfo() const { return info_; }
     friend ClientLoginResponse;
 
   private:
@@ -117,8 +117,8 @@ public:
     void setErrorMessage(const std::string& msg) { error_message_ = msg; }
     uint16_t getErrorCode() const { return error_code_; }
     uint8_t getSqlStateMarker() const { return marker_; }
-    std::string getSqlState() const { return sql_state_; }
-    std::string getErrorMessage() const { return error_message_; }
+    const std::string& getSqlState() const { return sql_state_; }
+    const std::string& getErrorMessage() const { return error_message_; }
     friend ClientLoginResponse;
 
   private:
