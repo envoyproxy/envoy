@@ -1,7 +1,5 @@
 #include "extensions/io_socket/user_space/file_event_impl.h"
 
-#include <cstdint>
-
 #include "common/common/assert.h"
 
 #include "extensions/io_socket/user_space/io_handle.h"
@@ -35,6 +33,8 @@ void FileEventImpl::setEnabled(uint32_t events) {
   // Only supported event types are set.
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
+  // Align with Event::FileEventImpl. Clear pending events on updates to the fd event mask to avoid
+  // delivering events that are no longer relevant.
   event_listener_.clearEphemeralEvents();
   event_listener_.setEnabledEvents(events);
   bool was_enabled = schedulable_->enabled();

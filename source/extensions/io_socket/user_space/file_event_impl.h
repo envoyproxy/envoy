@@ -2,11 +2,10 @@
 
 #include <cstdint>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 
 #include "common/common/assert.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/event/event_impl_base.h"
 
 #include "extensions/io_socket/user_space/io_handle.h"
 
