@@ -151,7 +151,7 @@ void decodeFragment(
 } // namespace
 
 xds::core::v3::ResourceName XdsResourceIdentifier::decodeUrn(absl::string_view resource_urn) {
-  if (!absl::StartsWith(resource_urn, "xdstp:")) {
+  if (!hasXdsTpScheme(resource_urn)) {
     throw XdsResourceIdentifier::DecodeException(
         fmt::format("{} does not have an xdstp: scheme", resource_urn));
   }
@@ -178,7 +178,7 @@ xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_vie
     decodeFragment(path.substr(fragment_start + 1), *decoded_resource_locator.mutable_directives());
     path = path.substr(0, fragment_start);
   }
-  if (absl::StartsWith(resource_url, "xdstp:")) {
+  if (hasXdsTpScheme(resource_url)) {
     decoded_resource_locator.set_scheme(xds::core::v3::ResourceLocator::XDSTP);
   } else if (absl::StartsWith(resource_url, "http:")) {
     decoded_resource_locator.set_scheme(xds::core::v3::ResourceLocator::HTTP);
@@ -201,6 +201,10 @@ xds::core::v3::ResourceLocator XdsResourceIdentifier::decodeUrl(absl::string_vie
   decodePath(path, decoded_resource_locator.mutable_resource_type(),
              *decoded_resource_locator.mutable_id());
   return decoded_resource_locator;
+}
+
+bool XdsResourceIdentifier::hasXdsTpScheme(absl::string_view resource_name) {
+  return absl::StartsWith(resource_name, "xdstp:");
 }
 
 } // namespace Config

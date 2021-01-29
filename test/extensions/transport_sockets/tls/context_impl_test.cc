@@ -101,145 +101,6 @@ protected:
   ContextManagerImpl manager_{time_system_};
 };
 
-TEST_F(SslContextImplTest, TestDnsNameMatching) {
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("lyft.com", "lyft.com"));
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("a.lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("foo.test.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", ""));
-}
-
-TEST_F(SslContextImplTest, TestDnsNameMatchingLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("lyft.com", "lyft.com"));
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("a.lyft.com", "*.lyft.com"));
-  // Legacy behavior
-  EXPECT_TRUE(ContextImpl::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("foo.test.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("", "*lyft.com"));
-  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", ""));
-}
-
-TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  std::vector<std::string> verify_subject_alt_name_list = {"server1.example.com",
-                                                           "server2.example.com"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
-}
-
-TEST_F(SslContextImplTest, TestMatchSubjectAltNameDNSMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex(".*.example.com");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_TRUE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
-TEST_F(SslContextImplTest, TestMatchSubjectAltNameWildcardDNSMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("api.example.com");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_TRUE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
-TEST_F(SslContextImplTest, TestMultiLevelMatch) {
-  // san_multiple_dns_cert matches *.example.com
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("foo.api.example.com");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_FALSE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
-TEST_F(SslContextImplTest, TestMultiLevelMatchLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("foo.api.example.com");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_TRUE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
-TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
-  std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
-                                                           "spiffe://lyft.com/test-team"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
-}
-
-TEST_F(SslContextImplTest, TestVerifySubjectAltMultiDomain) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  std::vector<std::string> verify_subject_alt_name_list = {"https://a.www.example.com"};
-  EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
-}
-
-TEST_F(SslContextImplTest, TestVerifySubjectAltMultiDomainLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir "
-      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  std::vector<std::string> verify_subject_alt_name_list = {"https://a.www.example.com"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
-}
-
-TEST_F(SslContextImplTest, TestMatchSubjectAltNameURIMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex("spiffe://lyft.com/.*-team");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_TRUE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
-TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
-  EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
-}
-
-TEST_F(SslContextImplTest, TestMatchSubjectAltNameNotMatched) {
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex(".*.foo.com");
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  EXPECT_FALSE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
-}
-
 TEST_F(SslContextImplTest, TestCipherSuites) {
   const std::string yaml = R"EOF(
   common_tls_context:
@@ -1977,11 +1838,16 @@ protected:
 TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // Incrementing a value for a cipher that is part of the configuration works, and
   // we'll be able to find the value in the stats store.
-  context_->incCounter("ssl.ciphers", "ECDHE-ECDSA-AES256-GCM-SHA384");
-  Stats::CounterOptConstRef cipher =
-      store_.findCounterByString("ssl.ciphers.ECDHE-ECDSA-AES256-GCM-SHA384");
-  ASSERT_TRUE(cipher.has_value());
-  EXPECT_EQ(1, cipher->get().value());
+  for (const auto& cipher :
+       {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"}) {
+    // Test supported built-in TLS v1.3 cipher suites
+    // https://tools.ietf.org/html/rfc8446#appendix-B.4.
+    context_->incCounter("ssl.ciphers", cipher);
+    Stats::CounterOptConstRef stat =
+        store_.findCounterByString(absl::StrCat("ssl.ciphers.", cipher));
+    ASSERT_TRUE(stat.has_value());
+    EXPECT_EQ(1, stat->get().value());
+  }
 
   // Incrementing a stat for a random unknown cipher does not work. A
   // rate-limited error log message will also be generated but that is hard to
@@ -1995,9 +1861,9 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   // fallback registration does not occur. So we test for the fallback only in
   // release builds.
 #ifdef NDEBUG
-  cipher = store_.findCounterByString("ssl.ciphers.fallback");
-  ASSERT_TRUE(cipher.has_value());
-  EXPECT_EQ(1, cipher->get().value());
+  Stats::CounterOptConstRef stat = store_.findCounterByString("ssl.ciphers.fallback");
+  ASSERT_TRUE(stat.has_value());
+  EXPECT_EQ(1, stat->get().value());
 #endif
 }
 

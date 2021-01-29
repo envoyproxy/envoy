@@ -310,6 +310,9 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
 }
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndResponseWithBody) {
+  // Use the old nodelay in a random test for coverage. nodelay is a no-op for QUIC.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.always_nodelay", "false");
+
   initialize();
   sendRequestAndVerifyResponse(default_request_headers_, /*request_size=*/0,
                                default_response_headers_, /*response_size=*/1024,
@@ -535,6 +538,40 @@ TEST_P(QuicHttpIntegrationTest, RequestResponseWithTrailers) {
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   testTrailers(/*request_size=*/10, /*response_size=*/10, /*request_trailers_present=*/true,
                /*response_trailers_present=*/true);
+}
+
+// Multiple 1xx before the request completes.
+TEST_P(QuicHttpIntegrationTest, EnvoyProxyingEarlyMultiple1xx) {
+  testEnvoyProxying1xx(/*continue_before_upstream_complete=*/true, /*with_encoder_filter=*/false,
+                       /*with_multiple_1xx_headers=*/true);
+}
+
+// HTTP3 doesn't support 101 SwitchProtocol response code, the client should
+// reset the request.
+TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/dynamo/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"expect", "100-continue"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the request headers to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"}}, false);
+  response->waitForReset();
+  codec_client_->close();
+  EXPECT_FALSE(response->complete());
 }
 
 } // namespace Quic

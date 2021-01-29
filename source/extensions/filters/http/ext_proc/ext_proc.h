@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/http/filter.h"
+#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -82,11 +83,9 @@ public:
 
   void onDestroy() override;
 
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    decoder_callbacks_ = &callbacks;
-  }
-
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
 
   // ExternalProcessorCallbacks
@@ -100,22 +99,33 @@ public:
 
 private:
   void closeStream();
+  void cleanupState();
+  void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+
+  bool
+  handleRequestHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
+  bool
+  handleResponseHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
+  void
+  handleImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
-
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
 
   // The state of the request-processing, or "decoding" side of the filter.
   // We maintain separate states for encoding and decoding since they may
   // be interleaved.
   FilterState request_state_ = FilterState::IDLE;
 
+  // The state of the response-processing side
+  FilterState response_state_ = FilterState::IDLE;
+
   ExternalProcessorStreamPtr stream_;
   bool stream_closed_ = false;
 
   Http::HeaderMap* request_headers_ = nullptr;
+  Http::HeaderMap* response_headers_ = nullptr;
 };
 
 } // namespace ExternalProcessing

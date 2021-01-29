@@ -121,7 +121,8 @@ public:
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
                                           HealthyAndDegradedLoad& priority_load,
                                           HealthyAvailability& per_priority_health,
-                                          DegradedAvailability& per_priority_degraded);
+                                          DegradedAvailability& per_priority_degraded,
+                                          uint32_t& total_healthy_hosts);
   void recalculatePerPriorityPanic();
 
 protected:
@@ -154,6 +155,8 @@ protected:
   DegradedAvailability per_priority_degraded_;
   // Levels which are in panic
   std::vector<bool> per_priority_panic_;
+  // The total count of healthy hosts across all priority levels.
+  uint32_t total_healthy_hosts_;
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
