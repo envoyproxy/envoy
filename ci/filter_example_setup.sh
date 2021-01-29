@@ -26,5 +26,6 @@ mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 cp -f "$(bazel info workspace)"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "$(bazel info workspace)"/*.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export FILTER_WORKSPACE_SET=1
