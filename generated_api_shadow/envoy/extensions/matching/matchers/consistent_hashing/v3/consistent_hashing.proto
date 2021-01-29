@@ -22,7 +22,7 @@ message ConsistentHashing {
   // The threshold the resulting hash must be over in order for this matcher to evaluate to true.
   uint32 threshold = 1 [(validate.rules).uint32 = {gt: 0}];
 
-  // The value the hash should be moduloed with. This effecitvely bounds the hash output, specifying the range
-  // of possible values.
+  // The value to use for the modulus in the calcuation. This effectively  bounds the hash output,
+  // specifying the range of possible values.
   uint32 modulo = 2 [(validate.rules).uint32 = {gt: 0}];
 }
