@@ -123,10 +123,10 @@ class BuildGraph(object):
     deps_query = ' union '.join(f'deps({l})' for l in targets)
     try:
       deps = subprocess.check_output(['bazel', 'query', deps_query],
-                                    stderr=subprocess.PIPE).decode().splitlines()
+                                     stderr=subprocess.PIPE).decode().splitlines()
     except subprocess.CalledProcessError as exc:
-      print("Bazel query failed with error", exc.returncode, exc.output)
-      raise exc                      
+      print(f'Bazel query failed with error code {exc.returncode} and std error: {exc.stderr.decode()}')
+      raise exc
     ext_deps = set()
     implied_untracked_deps = set()
     for d in deps:
