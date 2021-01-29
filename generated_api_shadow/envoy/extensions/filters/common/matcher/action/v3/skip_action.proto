@@ -14,6 +14,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common Match Actions]
 
-// Indicates that the associated filter should be skipped.
+// Configuration for the SkipFilter match action. When matching results in this action, the
+// associated filter will be ignored going for all data callbacks (including the one that
+// triggered the match result). As a result, if this matching is done on the first data
+// callback (e.g. request headers), this will completely skip the filter.
 message SkipFilter {
 }

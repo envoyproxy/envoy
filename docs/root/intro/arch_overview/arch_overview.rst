@@ -7,6 +7,7 @@ Architecture overview
   intro/intro
   listeners/listeners_toc
   http/http
+  matching/matching
   upstream/upstream
   observability/observability
   security/security
