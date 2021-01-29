@@ -20,6 +20,11 @@ called the *downstream remote address*, for many reasons. Some examples include:
 Envoy supports multiple methods for providing the downstream remote address to the upstream host.
 These techniques vary in complexity and applicability.
 
+Envoy also supports an
+:ref:`extension mechanism<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection>`
+for detecting the original IP address. This might be useful if none of the techniques below is
+applicable to your setup.
+
 HTTP Headers
 ------------
 
