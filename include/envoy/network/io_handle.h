@@ -256,10 +256,10 @@ public:
   /**
    * @see MSDN WSAIoctl. Controls the mode of a socket.
    */
-  virtual Api::SysCallIntResult genericIoctl(unsigned long controlCode, void* InBuffer,
-                                             unsigned long InBufferLen, void* OutBuffer,
-                                             unsigned long OutBufferLen,
-                                             unsigned long& bytesReturned) PURE;
+  virtual Api::SysCallIntResult genericIoctl(unsigned long control_code, void* in_buffer,
+                                             unsigned long in_buffer_len, void* out_buffer,
+                                             unsigned long out_buffer_len,
+                                             unsigned long* bytes_returned) PURE;
   /**
    * Toggle blocking behavior
    * @param blocking flag to set/unset blocking state

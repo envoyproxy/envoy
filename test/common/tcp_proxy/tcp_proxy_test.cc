@@ -15,10 +15,10 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/application_protocol.h"
-#include "common/network/ioctl_socket_option_impl.h"
 #include "common/network/redirect_records_filter_state.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/win32_redirect_records_option_impl.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
@@ -1939,7 +1939,7 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
 TEST_F(TcpProxyTest, UpstreamSocketOptionsReturnedEmpty) {
   setup(1);
   auto options = filter_->upstreamSocketOptions();
-  EXPECT_EQ(options->size(), 0);
+  EXPECT_EQ(options, nullptr);
 }
 
 TEST_F(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {

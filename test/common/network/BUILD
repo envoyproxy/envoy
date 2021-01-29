@@ -447,12 +447,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "ioctl_socket_option_impl_test",
-    srcs = ["ioctl_socket_option_impl_test.cc"],
+    name = "win32_redirect_records_option_test",
+    srcs = ["win32_redirect_records_option_test.cc"],
     deps = [
         ":socket_option_test",
         "//source/common/network:address_lib",
-        "//source/common/network:ioctl_socket_option_lib",
+        "//source/common/network:win32_redirect_records_option_lib",
     ],
 )
 

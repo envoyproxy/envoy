@@ -11,22 +11,24 @@
 namespace Envoy {
 namespace Network {
 
-#define IOCTL_LEVEL 1
+// `IOCTL` controls unlike socket options do not have level paremeter. So we arbitrarily define one
+// in Envoy.
+#define ENVOY_IOCTL_LEVEL 1
 
 #ifdef SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS
 #define ENVOY_SOCKET_REDIRECT_RECORDS                                                              \
-  ENVOY_MAKE_SOCKET_OPTION_NAME(IOCTL_LEVEL, SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS)
+  ENVOY_MAKE_SOCKET_OPTION_NAME(ENVOY_IOCTL_LEVEL, SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS)
 #else
 #define ENVOY_SOCKET_REDIRECT_RECORDS Network::SocketOptionName()
 #endif
 
-class IoctlSocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
+class Win32RedirectRecordsOptionImpl : public Socket::Option,
+                                       Logger::Loggable<Logger::Id::connection> {
 public:
-  IoctlSocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
-                        Network::SocketOptionName optname, void* inBuffer,
-                        unsigned long inBufferSize, void* outBuffer, unsigned long outBufferSize)
-      : in_state_(in_state), optname_(optname), inBuffer_(inBuffer), inBuffer_size_(inBufferSize),
-        outBuffer_(outBuffer), outBuffer_size_(outBufferSize) {}
+  Win32RedirectRecordsOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
+                                 Network::SocketOptionName optname,
+                                 const Win32RedirectRecords& redirect_records)
+      : in_state_(in_state), optname_(optname), redirect_records_(redirect_records) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
@@ -44,11 +46,7 @@ public:
 private:
   const envoy::config::core::v3::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
-
-  void* inBuffer_;
-  unsigned long inBuffer_size_;
-  void* outBuffer_;
-  unsigned long outBuffer_size_;
+  Win32RedirectRecords redirect_records_;
 };
 
 } // namespace Network

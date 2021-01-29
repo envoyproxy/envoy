@@ -249,7 +249,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
   MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
   MOCK_METHOD(Api::SysCallIntResult, genericIoctl,
-              (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long&));
+              (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   IoHandlePtr io_handle_;
@@ -309,7 +309,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
   MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
   MOCK_METHOD(Api::SysCallIntResult, genericIoctl,
-              (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long&));
+              (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
