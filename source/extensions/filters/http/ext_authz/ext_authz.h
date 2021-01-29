@@ -229,8 +229,7 @@ private:
  * ext_authz service before allowing further filter iteration.
  */
 class Filter : public Logger::Loggable<Logger::Id::filter>,
-               public Http::StreamDecoderFilter,
-               public Http::StreamEncoderFilter,
+               public Http::StreamFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)

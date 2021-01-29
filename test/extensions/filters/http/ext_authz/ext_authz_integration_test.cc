@@ -664,10 +664,11 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   waitForSuccessfulUpstreamResponse("200");
 
   // Verify the response is HTTP 200 with the header from `response_headers_to_add` above.
+  const std::string expected_body(response_size_, 'a');
   verifyResponse(std::move(response_), "200",
                  Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                  {"downstream2", "downstream-should-see-me"}},
-                 "");
+                 expected_body);
   cleanup();
 }
 
