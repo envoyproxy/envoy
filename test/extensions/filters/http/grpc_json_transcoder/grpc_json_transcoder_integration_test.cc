@@ -1,7 +1,11 @@
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
@@ -165,8 +169,28 @@ protected:
     ASSERT_TRUE(fake_upstream_connection_->close());
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
-};
 
+  // override configuration on per-route basis
+  void overrideConfig(const std::string& json_config) {
+
+    envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder per_route_config;
+    TestUtility::loadFromJson(json_config, per_route_config);
+    ConfigHelper::HttpModifierFunction modifier =
+        [per_route_config](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                cfg) {
+          auto* config = cfg.mutable_route_config()
+                             ->mutable_virtual_hosts()
+                             ->Mutable(0)
+                             ->mutable_typed_per_filter_config();
+
+          (*config)[Extensions::HttpFilters::HttpFilterNames::get().GrpcJsonTranscoder].PackFrom(
+              per_route_config);
+        };
+
+    config_helper_.addConfigModifier(modifier);
+  }
+};
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -892,6 +916,69 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
       Http::TestResponseHeaderMapImpl{{":status", "400"}}, R"(Encountered non UTF-8 code points)",
       false);
 }
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, RouteDisabled) {
+  overrideConfig(R"EOF({"services": [], "proto_descriptor_bin": ""})EOF");
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+};
+
+class OverrideConfigGrpcJsonTranscoderIntegrationTest : public GrpcJsonTranscoderIntegrationTest {
+public:
+  /**
+   * Global initializer for all integration tests.
+   */
+  void SetUp() override {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    // creates filter but doesn't apply it to bookstore services
+    const std::string filter =
+        R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              "proto_descriptor": ""
+            )EOF";
+    config_helper_.addFilter(filter);
+  }
+};
+INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
+  // add bookstore per-route override
+  const std::string filter =
+      R"EOF({{
+              "services": ["bookstore.Bookstore"],
+              "proto_descriptor": "{}"
+          }})EOF";
+  overrideConfig(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+
+  HttpIntegrationTest::initialize();
+
+  // testing the path that's defined in bookstore.descriptor file (should work  the same way
+  // as it does when grpc filter is applied to base config)
+  testTranscoding<Empty, bookstore::ListShelvesResponse>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
+      "", {""}, {R"(shelves { id: 20 theme: "Children" }
+          shelves { id: 1 theme: "Foo" } )"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "69"},
+                                      {"grpc-status", "0"}},
+      R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
+};
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, DisableStrictRequestValidation) {
   HttpIntegrationTest::initialize();
