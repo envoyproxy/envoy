@@ -30,14 +30,16 @@ def _envoy_cc_test_infrastructure_library(
         include_prefix = None,
         copts = [],
         alwayslink = 1,
-        exclude_pch_dep = False,
+        disable_pch = False,
         **kargs):
     # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
     deps += tcmalloc_external_deps(repository)
-    pch_deps = []
+    extra_deps = []
     pch_copts = []
-    if not exclude_pch_dep:
-        pch_deps = [repository + "//test:test_pch"]
+    if disable_pch:
+        extra_deps = [envoy_external_dep_path("googletest")]
+    else:
+        extra_deps = [repository + "//test:test_pch"]
         pch_copts = envoy_pch_copts(repository, "//test:test_pch")
 
     cc_library(
@@ -47,7 +49,7 @@ def _envoy_cc_test_infrastructure_library(
         data = data,
         copts = envoy_copts(repository, test = True) + copts + pch_copts,
         testonly = 1,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + pch_deps,
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + extra_deps,
         tags = tags,
         include_prefix = include_prefix,
         alwayslink = alwayslink,
@@ -199,7 +201,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
-    exclude_pch_dep = kargs.pop("exclude_pch_dep", True)
+    disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,
         srcs,
@@ -213,7 +215,7 @@ def envoy_cc_test_library(
         copts,
         visibility = ["//visibility:public"],
         alwayslink = alwayslink,
-        exclude_pch_dep = exclude_pch_dep,
+        disable_pch = disable_pch,
         **kargs
     )
 
@@ -292,7 +294,7 @@ def envoy_py_test(
 
 # Envoy C++ mock targets should be specified with this function.
 def envoy_cc_mock(name, **kargs):
-    envoy_cc_test_library(name = name, exclude_pch_dep = True, **kargs)
+    envoy_cc_test_library(name = name, disable_pch = True, **kargs)
 
 # Envoy shell tests that need to be included in coverage run should be specified with this function.
 def envoy_sh_test(
