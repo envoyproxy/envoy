@@ -51,7 +51,8 @@ protected:
                        const Status& grpc_status, Http::HeaderMap&& expected_response_headers,
                        const std::string& expected_response_body, bool full_response = true,
                        bool always_send_trailers = false,
-                       const std::string expected_upstream_request_body = "") {
+                       const std::string expected_upstream_request_body = "",
+                       bool expect_connection_to_upstream = true) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     IntegrationStreamDecoderPtr response;
@@ -65,9 +66,13 @@ protected:
       response = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
-    if (!expected_grpc_request_messages.empty() || !expected_upstream_request_body.empty()) {
+    if (expect_connection_to_upstream) {
       ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_,
+                                                    fake_upstream_connection_));
+    }
+
+    if (!expected_grpc_request_messages.empty() || !expected_upstream_request_body.empty()) {
       ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
@@ -124,12 +129,10 @@ protected:
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());
-      ASSERT_TRUE(fake_upstream_connection_->close());
-      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     }
 
     response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
+    ASSERT_TRUE(response->complete());
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
         !absl::StartsWith(response->headers()
@@ -160,6 +163,8 @@ protected:
     }
 
     codec_client_->close();
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 };
 
@@ -970,7 +975,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
                                      {"content-type", "application/json"}},
       R"({ "theme" : "Children")", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "400"}},
-      "Bad request: Could not resolve /unknown/path to a method.", true, false, "");
+      "Bad request: Could not resolve /unknown/path to a method.", true, false, "", false);
 
   // Transcoding does not occur when unknown query param is included.
   // The request is rejected.
@@ -982,7 +987,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidation) {
       R"({ "theme" : "Children")", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "400"}},
       "Bad request: Could not find field \"unknown\" in the type \"bookstore.GetShelfRequest\".",
-      true, false, "");
+      true, false, "", false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, EnableStrictRequestValidationIgnoreQueryParam) {
