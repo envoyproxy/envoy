@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Network {
 
-// `IOCTL` controls unlike socket options do not have level paremeter. So we arbitrarily define one
+// `IOCTL` controls unlike socket options do not have level parameter. So we arbitrarily define one
 // in Envoy.
 #define ENVOY_IOCTL_LEVEL 1
 

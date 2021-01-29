@@ -377,8 +377,8 @@ envoy_cc_library(
     deps = [
         ":addr_family_aware_socket_option_lib",
         ":address_lib",
-        ":win32_redirect_records_option_lib",
         ":socket_option_lib",
+        ":win32_redirect_records_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
