@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
+        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
