@@ -470,6 +470,9 @@ void StringUtil::escapeToOstream(std::ostream& os, absl::string_view view) {
     case '\t':
       os << "\\t";
       break;
+    case '\v':
+      os << "\\v";
+      break;
     case '"':
       os << "\\\"";
       break;

@@ -317,6 +317,13 @@ TEST(StringUtil, escapeToOstream) {
     StringUtil::escapeToOstream(ostream, R"(\\)");
     EXPECT_EQ(ostream.contents(), R"(\\\\)");
   }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "vertical\vtab");
+    EXPECT_EQ(ostream.contents(), "vertical\\vtab");
+  }
 }
 
 TEST(StringUtil, toUpper) {

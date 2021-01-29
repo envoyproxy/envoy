@@ -1,9 +1,12 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 
+#include "common/buffer/buffer_impl.h"
+#include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -30,11 +33,15 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::EndsWith;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
+using testing::StartsWith;
+using std::string_literals::operator""s;
 
 namespace Envoy {
 namespace Http {
@@ -963,6 +970,134 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
 
   EXPECT_EQ(min_observed.count(), min_expected.count());
   EXPECT_EQ(max_observed.count(), max_expected.count());
+}
+
+TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
+  initialize();
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  Stats::TestUtil::MemoryTest memory_test;
+  server_->dumpState(ostream, 0);
+
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  // Check the entire dump to ensure correct formating.
+  // This test might be a little brittle because of this, and hence in the other
+  // dump tests we focus on the particular substring of interest.
+  EXPECT_THAT(ostream.contents(), StartsWith("Http2::ConnectionImpl 0x"));
+  EXPECT_THAT(
+      ostream.contents(),
+      HasSubstr(
+          "max_headers_kb_: 60, max_headers_count_: 100, "
+          "per_stream_buffer_limit_: 268435456, allow_metadata_: 0, "
+          "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
+          "0, skip_encoding_empty_trailers_: 1, dispatching_: 0, raised_goaway_: 0, "
+          "pending_deferred_reset_: 0\n"
+          "&protocol_constraints_: \n"
+          "  ProtocolConstraints 0x"));
+  EXPECT_THAT(
+      ostream.contents(),
+      EndsWith("outbound_frames_: 0, max_outbound_frames_: 10000, "
+               "outbound_control_frames_: 0, max_outbound_control_frames_: 1000, "
+               "consecutive_inbound_frames_with_empty_payload_: 0, "
+               "max_consecutive_inbound_frames_with_empty_payload_: 1, inbound_streams_: 0, "
+               "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
+               "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
+               "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"
+               "Number of active streams: 0 Active Streams:\n"
+               "current_slice_: null\n"));
+}
+
+TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+
+  // Dump server
+  {
+    std::array<char, 2048> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    // Check no memory allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    server_->dumpState(ostream, 0);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+    // Check contents for active stream, trailers to encode and header map.
+    EXPECT_THAT(
+        ostream.contents(),
+        HasSubstr(
+            "Number of active streams: 1 Active Streams:\nstream: \nConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(),
+                HasSubstr("pending_trailers_to_encode_:   null\n"
+                          "  absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n"
+                          "    ':scheme', 'http'\n"
+                          "    ':method', 'GET'\n"
+                          "    ':authority', 'host'\n"
+                          "    ':path', '/'\n"
+                          "current_slice_: null"));
+  }
+
+  // Dump client
+  {
+    std::array<char, 2048> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    // Check no memory allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    client_->dumpState(ostream, 0);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+    // Check contents for active stream, trailers to encode and header map.
+    EXPECT_THAT(ostream.contents(), HasSubstr("Number of active streams: 1 Active Streams:\n"
+                                              "stream: \n"
+                                              "ConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(),
+                HasSubstr("pending_trailers_to_encode_:   null\n"
+                          "  absl::get<ResponseHeaderMapPtr>(headers_or_trailers_): \n"
+                          "    ':status', '200'\n"
+                          "current_slice_: null"));
+  }
+}
+
+TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
+  initialize();
+  std::array<char, 2048> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  // Send headers
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  // Send data payload, dump buffer as decoding data
+  EXPECT_CALL(request_decoder_, decodeData(_, false)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    // dumpState here while we had a current slice of data. No Memory should be
+    // allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    server_->dumpState(ostream, 0);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+  }));
+  Buffer::OwnedImpl hello("hello envoy");
+  request_encoder_->encodeData(hello, false);
+
+  // Check contents for the current slice information
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("current slice length: 20 contents: \"\0\0\\v\0\0\0\0\0\x1hello envoy"s));
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
