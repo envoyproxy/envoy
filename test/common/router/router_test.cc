@@ -6433,7 +6433,5 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
         << fmt::format("'{}' should have failed strict validation", target);
   }
 }
-
->>>>>>> 9bd3a0d4f (Add a test case to router_test.)
 } // namespace Router
 } // namespace Envoy
