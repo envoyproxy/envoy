@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.matchers.consistent_hashing.v3;
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.matchers.consistent_hashing.v3";
+option java_outer_classname = "ConsistentHashingProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Consistent Hashing Matcher]
+// [#extension: envoy.matching.input_matchers.consistent_hashing]
+
+// The consistent hashing matchers computes a consistent hash from the input and matches if the resulting hash
+// is within the configured threshold.
+// More specifically, this matcher evaluates to true if hash(input) % modulo > threshold.
+message ConsistentHashing {
+  // The threshold the resulting hash must be over in order for this matcher to evaluate to true.
+  uint32 threshold = 1 [(validate.rules).uint32 = {gt: 0}];
+
+  // The value the hash should be moduloed with. This effecitvely bounds the hash output, specifying the range
+  // of possible values.
+  uint32 modulo = 2 [(validate.rules).uint32 = {gt: 0}];
+}

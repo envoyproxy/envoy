@@ -13,6 +13,13 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class FactoryContext;
+}
+} // namespace Server
+
 namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
@@ -143,7 +150,9 @@ using InputMatcherPtr = std::unique_ptr<InputMatcher>;
  */
 class InputMatcherFactory : public Config::TypedFactory {
 public:
-  virtual InputMatcherPtr createInputMatcher(const Protobuf::Message& config) PURE;
+  virtual InputMatcherPtr
+  createInputMatcher(const Protobuf::Message& config,
+                     Server::Configuration::FactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matcher"; }
 };
