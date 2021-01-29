@@ -11,10 +11,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
-                                           bool terminate_ssl, Stats::Scope& scope)
-    : enable_sql_parsing_(enable_sql_parsing),
-      terminate_ssl_(terminate_ssl), scope_{scope}, stats_{generateStats(stat_prefix, scope)} {}
+PostgresFilterConfig::PostgresFilterConfig(const PostgresFilterConfigOptions& config_options,
+                                           Stats::Scope& scope)
+    : enable_sql_parsing_(config_options.enable_sql_parsing_),
+      terminate_ssl_(config_options.terminate_ssl_), scope_{scope},
+      stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -209,7 +210,12 @@ bool PostgresFilter::onSSLRequest() {
       } else {
         // Unsubscribe the callback.
         config_->stats_.sessions_terminated_ssl_.inc();
-        // Switch to tls has been completed.
+        ENVOY_CONN_LOG(trace, "postgres_proxy: enabled SSL termination.",
+                       read_callbacks_->connection());
+        // Switch to TLS has been completed.
+        // Signal to the decoder to stop processing the current message (SSLRequest).
+        // Because Envoy terminates SSL, the message was consumed and should not be
+        // passed to other filters in the chain.
         return false;
       }
     }

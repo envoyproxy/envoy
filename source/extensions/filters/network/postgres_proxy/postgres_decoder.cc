@@ -215,7 +215,6 @@ Decoder::Result DecoderImpl::parseHeader(Buffer::Instance& data) {
         // to the server. If it returns false it means, that filter will try
         // to terminate SSL session and SSLRequest should not be passed to the
         // server.
-        ENVOY_LOG(trace, "postgres_proxy: enabling secure transport.");
         encrypted_ = callbacks_->onSSLRequest();
       }
 

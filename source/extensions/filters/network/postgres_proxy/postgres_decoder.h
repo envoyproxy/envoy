@@ -52,7 +52,15 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  enum Result { ReadyForNext, NeedMoreData, Stopped };
+  // The following values are returned by the decoder, when filter
+  // passes bytes of data via onData method:
+  enum Result {
+    ReadyForNext, // Decoder processed previous message and is ready for the next message.
+    NeedMoreData, // Decoder needs more data to reconstruct the message.
+    Stopped // Received and processed message disrupts the current flow. Decoder stopped accepting
+            // data. This happens when decoder wants filter to perform some action, for example to
+            // call starttls transport socket to enable TLS.
+  };
   virtual Result onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
 
