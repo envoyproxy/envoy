@@ -68,8 +68,7 @@ protected:
 
     if (expect_connection_to_upstream) {
       ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_,
-                                                    fake_upstream_connection_));
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     }
 
     if (!expected_grpc_request_messages.empty() || !expected_upstream_request_body.empty()) {
