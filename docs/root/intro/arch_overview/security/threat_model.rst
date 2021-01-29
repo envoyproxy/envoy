@@ -60,7 +60,7 @@ these concepts from an architectural perspective. Envoy's core components are co
 against both untrusted downstream and upstream peers. As such our highest priority in risk assessment is the
 threat posed by untrusted downstream client or untrusted upstream server traffic on the data plane. This
 reflects the use of Envoy in an edge serving capacity and also the use of Envoy as a networking component in a
-mesh deployment with unstrusted services.
+service mesh deployment with unstrusted services.
 
 The control plane management server is generally trusted. We do not consider wire-level exploits
 against the xDS transport protocol to be a concern as a result. However, the configuration delivered
