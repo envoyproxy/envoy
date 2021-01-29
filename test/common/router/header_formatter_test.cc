@@ -526,6 +526,24 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertVEndNoTls)
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT_V_END", EMPTY_STRING);
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithStartTime) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  absl::Time abslStartTime =
+      TestUtility::parseTime("Dec 17 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");
+  SystemTime startTime = absl::ToChronoTime(abslStartTime);
+  EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(startTime));
+  testFormatting(stream_info, "START_TIME", "2020-12-17T01:50:34.000Z");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithStartTimeCustom) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  absl::Time abslStartTime =
+      TestUtility::parseTime("Dec 17 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");
+  SystemTime startTime = absl::ToChronoTime(abslStartTime);
+  EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(startTime));
+  testFormatting(stream_info, "START_TIME(%b %e %H:%M:%S %Y %Z)", "Dec 17 01:50:34 2020 UTC");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
