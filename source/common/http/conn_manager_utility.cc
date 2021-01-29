@@ -133,9 +133,10 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     //
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    auto ip_detection_extension = config.ipDetectionExtension();
-    if (ip_detection_extension) {
-      final_remote_address = ip_detection_extension->detect(request_headers);
+    auto original_ip_detection = config.originalIpDetection();
+    if (original_ip_detection) {
+      struct OriginalIPDetectionParams params = {request_headers};
+      final_remote_address = original_ip_detection->detect(params);
     }
 
     // If there's no extension or it failed to detect, give XFF a try.

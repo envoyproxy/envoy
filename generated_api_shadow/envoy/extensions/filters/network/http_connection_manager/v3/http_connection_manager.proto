@@ -586,10 +586,10 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
   google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 
-  // The configuration of the IP detection extension.
+  // The configuration of the original IP detection extension.
   //
-  // If not set, Envoy uses the default remote IP detection.
-  IPDetectionExtension ip_detection_extension = 43;
+  // If not set, Envoy uses the default remote IP detection mechanism.
+  OriginalIPDetectionExtension original_ip_detection = 43;
 
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
@@ -862,7 +862,7 @@ message RequestIDExtension {
   google.protobuf.Any typed_config = 1;
 }
 
-message IPDetectionExtension {
-  // IP detection extension specific configuration.
+message OriginalIPDetectionExtension {
+  // Original IP detection extension configuration.
   google.protobuf.Any typed_config = 1;
 }

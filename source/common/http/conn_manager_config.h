@@ -3,7 +3,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/http/ip_detection_extension.h"
+#include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
@@ -469,9 +469,9 @@ public:
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
   /**
-   * @return IPDetectionExtensionSharedPtr The IP detection extension if available.
+   * @return OriginalIPDetectionSharedPtr original IP detection extension if available.
    */
-  virtual IPDetectionExtensionSharedPtr ipDetectionExtension() PURE;
+  virtual OriginalIPDetectionSharedPtr originalIpDetection() PURE;
 };
 } // namespace Http
 } // namespace Envoy

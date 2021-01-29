@@ -155,7 +155,7 @@ envoy_cc_library(
         ":date_provider_lib",
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/http:ip_detection_extension_interface",
+        "//include/envoy/http:original_ip_detection_interface",
         "//include/envoy/http:request_id_extension_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/local_reply:local_reply_lib",
