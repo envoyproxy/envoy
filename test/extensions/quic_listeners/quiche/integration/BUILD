@@ -13,13 +13,16 @@ envoy_cc_test(
     size = "medium",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    # TODO(envoyproxy/windows-dev): Diagnose why opt build test under Windows GCP RBE
+    # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
+    #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
+    # TODO(envoyproxy/windows-dev): Diagnose timeout, why opt build test under Windows GCP RBE
     # takes 10x as long as on linux (>300s vs ~30s). Shards = 2 solves for windows, see:
     #   https://github.com/envoyproxy/envoy/pull/13713/files#r512160087
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
     tags = [
-        "flaky_on_windows",
+        "fails_on_clang_cl",
+        "fails_on_windows",
         "nofips",
     ],
     deps = [

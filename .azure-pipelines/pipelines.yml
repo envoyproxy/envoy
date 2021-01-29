@@ -391,7 +391,7 @@ stages:
               path: $(Build.StagingDirectory)/repository_cache
             continueOnError: true
           - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
-            displayName: "Run Windows CI"
+            displayName: "Run Windows msvc-cl CI"
             env:
               CI_TARGET: "windows"
               ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
@@ -413,6 +413,41 @@ stages:
             inputs:
               pathtoPublish: "$(Build.StagingDirectory)/envoy"
               artifactName: windows.release
+            condition: always()
+
+      - job: clang_cl
+        timeoutInMinutes: 120
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - task: Cache@2
+            inputs:
+              key: '"windows.release" | ./WORKSPACE | **/*.bzl'
+              path: $(Build.StagingDirectory)/repository_cache
+            continueOnError: true
+          - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
+            displayName: "Run Windows clang-cl CI"
+            env:
+              CI_TARGET: "windows"
+              ENVOY_DOCKER_BUILD_DIR: "$(Build.StagingDirectory)"
+              SLACK_TOKEN: $(SLACK_TOKEN)
+              REPO_URI: $(Build.Repository.Uri)
+              BUILD_URI: $(Build.BuildUri)
+              ENVOY_RBE: "true"
+              BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-clang-cl --jobs=$(RbeJobs) --flaky_test_attempts=2"
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
+              testRunTitle: "clang-cl"
+              searchFolder: $(Build.StagingDirectory)/tmp
+            condition: always()
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathtoPublish: "$(Build.StagingDirectory)/envoy"
+              artifactName: windows.clang-cl
             condition: always()
 
       - job: docker

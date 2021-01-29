@@ -69,8 +69,10 @@ def envoy_copts(repository, test = False):
                ],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
                # Allow 'nodiscard' function results values to be discarded for test code only
-               # TODO(envoyproxy/windows-dev): Replace with /Zc:preprocessor for cl.exe versions >= 16.5
-               repository + "//bazel:windows_x86_64": ["-wd4834", "-experimental:preprocessor", "-Wv:19.4"] if test else ["-experimental:preprocessor", "-Wv:19.4"],
+               # TODO(envoyproxy/windows-dev): Replace /Zc:preprocessor with /experimental:preprocessor
+               # for msvc versions between 15.8 through 16.4.x. see
+               # https://docs.microsoft.com/en-us/cpp/build/reference/zc-preprocessor
+               repository + "//bazel:windows_x86_64": ["-wd4834", "-Zc:preprocessor", "-Wv:19.4"] if test else ["-Zc:preprocessor", "-Wv:19.4"],
                repository + "//bazel:clang_cl_build": ["-Wno-unused-result"] if test else [],
                "//conditions:default": [],
            }) + select({
