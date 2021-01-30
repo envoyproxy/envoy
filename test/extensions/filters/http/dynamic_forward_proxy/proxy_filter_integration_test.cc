@@ -102,11 +102,6 @@ typed_config:
     }
   }
 
-  void disableDnsCacheCircuitBreakers() {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_dns_cache_circuit_breakers",
-                                      "false");
-  }
-
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
@@ -120,30 +115,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 // A basic test where we pause a request to lookup localhost, and then do another request which
 // should hit the TLS cache.
 TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
-  setup();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
-
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
-
-  // Now send another request. This should hit the DNS cache.
-  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
-  checkSimpleRequestSuccess(512, 512, response.get());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
-}
-
-TEST_P(ProxyFilterIntegrationTest, RequestWithBodyWithClusterCircuitBreaker) {
-  disableDnsCacheCircuitBreakers();
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -341,26 +312,6 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
   auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
   response->waitForEndStream();
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
-}
-
-TEST_P(ProxyFilterIntegrationTest, ClusterCircuitBreakersInvoked) {
-  disableDnsCacheCircuitBreakers();
-  setup(1024, 0);
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
-
-  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-  response->waitForEndStream();
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());

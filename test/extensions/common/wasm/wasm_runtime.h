@@ -20,6 +20,8 @@ inline auto runtime_values = testing::ValuesIn(runtimes());
 inline auto sandbox_runtime_values = testing::ValuesIn(sandboxRuntimes());
 inline auto runtime_and_language_values = testing::ValuesIn(runtimesAndLanguages());
 
+std::string wasmTestParamsToString(const ::testing::TestParamInfo<std::string>& p);
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions

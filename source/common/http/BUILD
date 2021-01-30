@@ -184,6 +184,8 @@ envoy_cc_library(
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -247,6 +249,7 @@ envoy_cc_library(
         "//source/common/http/http2:codec_lib",
         "//source/common/http/http3:quic_codec_factory_lib",
         "//source/common/http/http3:well_known_names",
+        "//source/common/http/match_wrapper:config",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_rds_lib",
@@ -431,12 +434,23 @@ envoy_cc_library(
     name = "path_utility_lib",
     srcs = ["path_utility.cc"],
     hdrs = ["path_utility.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//include/envoy/http:header_map_interface",
-        "//source/common/chromium_url",
-        "//source/common/common:logger_lib",
+    external_deps = [
+        "abseil_optional",
+        "googleurl",
     ],
+    deps = [
+        ":legacy_path_canonicalizer",
+        "//include/envoy/http:header_map_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/runtime:runtime_features_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "legacy_path_canonicalizer",
+    srcs = ["legacy_path_canonicalizer.cc"],
+    hdrs = ["legacy_path_canonicalizer.h"],
+    deps = ["//source/common/chromium_url"],
 )
 
 envoy_cc_library(
