@@ -1,9 +1,9 @@
 #!/bin/bash -E
 
 TESTFILTER="${1:-*}"
+TESTEXCLUDES="${2}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
-
 
 trap_errors () {
     local frame=0 command line sub file
@@ -29,7 +29,7 @@ trap exit 1 INT
 run_examples () {
     local examples example
     cd "${SRCDIR}/examples" || exit 1
-    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" | sort)
+    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" ! -iname "_*" ! -name "$TESTEXCLUDES" | sort)
     for example in $examples; do
         pushd "$example" > /dev/null || return 1
         ./verify.sh
