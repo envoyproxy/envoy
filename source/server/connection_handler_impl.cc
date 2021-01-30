@@ -479,7 +479,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
-
+#ifdef WIN32
   if constexpr (Network::Win32SupportsOriginalDestination()) {
     if (config_->direction() == envoy::config::core::v3::OUTBOUND &&
         socket->addressProvider().localAddressRestored()) {
@@ -503,7 +503,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
           StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
-
+#endif
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
