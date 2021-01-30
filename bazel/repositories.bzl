@@ -691,10 +691,6 @@ def _com_googlesource_googleurl():
         patches = ["@envoy//bazel/external:googleurl.patch"],
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "googleurl",
-        actual = "@com_googlesource_googleurl//url:url",
-    )
 
 def _org_llvm_releases_compiler_rt():
     external_http_archive(

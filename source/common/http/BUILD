@@ -436,13 +436,13 @@ envoy_cc_library(
     hdrs = ["path_utility.h"],
     external_deps = [
         "abseil_optional",
-        "googleurl",
     ],
     deps = [
         ":legacy_path_canonicalizer",
         "//include/envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_googlesource_googleurl//url:envoy_url",
     ],
 )
 
