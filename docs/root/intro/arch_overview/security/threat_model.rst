@@ -56,16 +56,11 @@ Data and control plane
 ----------------------
 
 We divide our threat model into data and control plane, reflecting the internal division in Envoy of
-these concepts from an architectural perspective. Our highest priority in risk assessment is the
-threat posed by untrusted downstream client traffic on the data plane. This reflects the use of
-Envoy in an edge serving capacity and also the use of Envoy as an inbound destination in a service
-mesh deployment.
-
-In addition, we have an evolving position towards any vulnerability that might be exploitable by
-untrusted upstreams. We recognize that these constitute a serious security consideration, given the
-use of Envoy as an egress proxy. We will activate the security release process for disclosures that
-appear to present a risk profile that is significantly greater than the current Envoy upstream
-hardening status quo.
+these concepts from an architectural perspective. Envoy's core components are considered to be hardened
+against both untrusted downstream and upstream peers. As such our highest priority in risk assessment is the
+threat posed by untrusted downstream client or untrusted upstream server traffic on the data plane. This
+reflects the use of Envoy in an edge serving capacity and also the use of Envoy as a networking component in a
+service mesh deployment with unstrusted services.
 
 The control plane management server is generally trusted. We do not consider wire-level exploits
 against the xDS transport protocol to be a concern as a result. However, the configuration delivered
