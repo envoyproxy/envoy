@@ -190,11 +190,15 @@ def getGitInfo(CI_TARGET):
 
   ret += "\n"
 
-  output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
-  ret += "Origin:\t\t{}".format(output.replace('.git', ''))
+  remotes = subprocess.check_output(['git', 'remote'], encoding='utf-8').splitlines()
 
-  output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
-  ret += "Upstream:\t{}".format(output.replace('.git', ''))
+  if ("origin" in remotes):
+    output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
+    ret += "Origin:\t\t{}".format(output.replace('.git', ''))
+
+  if ("upstream" in remotes):
+    output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
+    ret += "Upstream:\t{}".format(output.replace('.git', ''))
 
   output = subprocess.check_output(['git', 'describe', '--all'], encoding='utf-8')
   ret += "Latest ref:\t{}".format(output)
