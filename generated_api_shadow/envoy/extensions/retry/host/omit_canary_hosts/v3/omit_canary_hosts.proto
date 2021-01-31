@@ -1,10 +1,11 @@
 syntax = "proto3";
 
-package envoy.config.retry.omit_canary_hosts.v3;
+package envoy.extensions.retry.host.omit_canary_hosts.v3;
 
 import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
 
-option java_package = "io.envoyproxy.envoy.config.retry.omit_canary_hosts.v3";
+option java_package = "io.envoyproxy.envoy.extensions.retry.host.omit_canary_hosts.v3";
 option java_outer_classname = "OmitCanaryHostsProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -13,4 +14,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.retry_host_predicates.omit_canary_hosts]
 
 message OmitCanaryHostsPredicate {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.retry.omit_canary_hosts.v2.OmitCanaryHostsPredicate";
 }

@@ -21,9 +21,9 @@ envoy_cc_library(
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/health_checker/redis/v2:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_checkers/redis/v3:pkg_cc_proto",
     ],
 )
 
@@ -40,8 +40,8 @@ envoy_cc_extension(
         "//source/common/common:assert_lib",
         "//source/extensions/health_checkers:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/health_checker/redis/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_checkers/redis/v3:pkg_cc_proto",
     ],
 )
 
@@ -53,6 +53,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/health_checker/redis/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_checkers/redis/v3:pkg_cc_proto",
     ],
 )

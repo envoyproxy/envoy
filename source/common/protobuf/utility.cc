@@ -27,6 +27,19 @@ using namespace std::chrono_literals;
 namespace Envoy {
 namespace {
 
+// For historical reasons, these v2 protos are allowed in v3 and will not be removed during the v2
+// turndown.
+static const absl::flat_hash_set<absl::string_view>& v2ProtosAllowedInV3() {
+  CONSTRUCT_ON_FIRST_USE(
+      absl::flat_hash_set<absl::string_view>,
+      {"envoy.config.health_checker.redis.v2.Redis",
+       "envoy.config.filter.thrift.router.v2alpha1.Router",
+       "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig",
+       "envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig",
+       "envoy.config.retry.omit_canary_hosts.v2.OmitCanaryHostsPredicate",
+       "envoy.config.retry.previous_hosts.v2.PreviousHostsPredicate"});
+}
+
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind("/");
   if (index == std::string::npos || index == full_path.size()) {
@@ -671,7 +684,10 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
                                          any_message_with_fixup.DebugString()));
       }
       Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
-      MessageUtil::onVersionUpgradeDeprecation(any_full_name);
+      // We allow some v2 protos in v3 for historical reasons.
+      if (v2ProtosAllowedInV3().count(any_full_name) == 0) {
+        MessageUtil::onVersionUpgradeDeprecation(any_full_name);
+      }
       return;
     }
   }
