@@ -606,7 +606,7 @@ public:
         new Http::TestResponseHeaderMapImpl{{":status", code}});
 
     if (degraded) {
-      response_headers->setEnvoyDegraded(1);
+      response_headers->setEnvoyDegraded("");
     }
     if (service_cluster) {
       response_headers->addCopy(Http::Headers::get().EnvoyUpstreamHealthCheckedCluster,
