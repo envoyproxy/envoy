@@ -23,3 +23,15 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "factory_test",
+    srcs = [
+        "factory_test.cc",
+    ],
+    data = [],
+    deps = [
+        "//include/envoy/ssl:context_config_interface",
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+    ],
+)

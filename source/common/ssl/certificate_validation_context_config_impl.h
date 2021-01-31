@@ -44,6 +44,15 @@ public:
     return trust_chain_verification_;
   }
 
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  customValidatorConfig() const override {
+    return custom_validator_config_;
+  }
+
+  Api::Api& api() override{
+    return api_;
+  }
+
 private:
   const std::string ca_cert_;
   const std::string ca_cert_path_;
@@ -56,6 +65,8 @@ private:
   const bool allow_expired_certificate_;
   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
       TrustChainVerification trust_chain_verification_;
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
+  Api::Api& api_;
 };
 
 } // namespace Ssl

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.v3";
+option java_outer_classname = "TlsSpiffeValidatorConfigProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: SPIFFE Certificate Validator Configuration]
+
+// [#not-implemented-hide:]
+// Configuration specific to the SPIFFE certificate validator
+message SPIFFECertValidatorConfig {
+  map<string, config.core.v3.DataSource> trust_bundles = 1;
+}

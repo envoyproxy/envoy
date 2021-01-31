@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.transport_sockets.tls.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
 
 import "google/protobuf/any.proto";
@@ -214,7 +215,7 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 14]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CertificateValidationContext";
@@ -374,4 +375,8 @@ message CertificateValidationContext {
   // Certificate trust chain verification mode.
   TrustChainVerification trust_chain_verification = 10
       [(validate.rules).enum = {defined_only: true}];
+
+  // The configuration of an extension specific certificate validator.
+  // If specified, then the usage of all the values above depends on the chosen extension.
+  config.core.v4alpha.TypedExtensionConfig custom_validator_config = 13;
 }

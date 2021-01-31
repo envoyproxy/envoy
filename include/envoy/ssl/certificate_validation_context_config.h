@@ -8,6 +8,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -69,6 +71,17 @@ public:
   virtual envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
       TrustChainVerification
       trustChainVerification() const PURE;
+
+  /**
+   * @return  the configuration for the custom certificate validator if configured.
+   */
+  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  customValidatorConfig() const PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
+  virtual Api::Api& api() PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

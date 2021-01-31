@@ -32,7 +32,12 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       verify_certificate_spki_list_(config.verify_certificate_spki().begin(),
                                     config.verify_certificate_spki().end()),
       allow_expired_certificate_(config.allow_expired_certificate()),
-      trust_chain_verification_(config.trust_chain_verification()) {
+      trust_chain_verification_(config.trust_chain_verification()),
+      custom_validator_config_(
+          config.has_custom_validator_config()
+              ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                    config.custom_validator_config())
+              : absl::nullopt), api_(api) {
   if (ca_cert_.empty()) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
