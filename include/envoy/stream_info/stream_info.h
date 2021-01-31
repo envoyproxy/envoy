@@ -107,9 +107,6 @@ struct ResponseCodeDetailValues {
   // to attempt a retry.
   const std::string RequestPayloadExceededRetryBufferLimit =
       "request_payload_exceeded_retry_buffer_limit";
-  // Envoy is doing non-streaming proxying, and the response payload exceeded
-  // configured limits.
-  const std::string ResponsePayloadTooLArge = "response_payload_too_large";
   // The per-stream keepalive timeout was exceeded.
   const std::string StreamIdleTimeout = "stream_idle_timeout";
   // The per-stream max duration timeout was exceeded.
