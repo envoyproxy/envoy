@@ -106,6 +106,8 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool strict_http_request_validation_{false};
+
 private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
@@ -113,7 +115,6 @@ private:
   ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                            google::grpc::transcoding::RequestInfo* info) const;
 
-private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,

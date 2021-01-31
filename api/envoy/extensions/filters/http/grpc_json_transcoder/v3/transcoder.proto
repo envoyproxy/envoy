@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -192,4 +192,26 @@ message GrpcJsonTranscoder {
   // For a path with `/foo/first/bar/prefix/second/third/fourth`, `x=first`, `y=prefix/second`, `z=third/fourth`.
   // If this setting is not specified, the value defaults to :ref:`ALL_CHARACTERS_EXCEPT_RESERVED<envoy_api_enum_value_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec.ALL_CHARACTERS_EXCEPT_RESERVED>`.
   UrlUnescapeSpec url_unescape_spec = 10 [(validate.rules).enum = {defined_only: true}];
+
+  // Whether to reject requests that cannot be transcoded.
+  //
+  // By default, the transcoder will silently pass through HTTP requests that all malformed.
+  // This includes requests with unknown query parameters, unregister paths, etc.
+  //
+  // Set this flag to enable strict HTTP request validation, resulting in the transcoder rejecting
+  // these requests with ``HTTP 400 Bad Request``.
+  // gRPC requests will still silently pass through without transcoding.
+  //
+  // The benefit of this flag is a proper error message to the downstream.
+  // Without this flag, the gRPC upstream will reset the TCP connection when a
+  // malformed HTTP request is silently passed through without transcoding. The downstream will
+  // receive a ``HTTP 503 Service Unavailable`` due to the upstream connection reset.
+  // This incorrect error message may conflict with other Envoy components, such as retry policies.
+  //
+  // Do not use this flag if the upstream supports both HTTP and gRPC.
+  // Only use this flag if the upstream is gRPC and all its services have been
+  // specified in the descriptor file in the filter config.
+  //
+  // Defaults to false for backwards compatibility.
+  bool strict_http_request_validation = 11;
 }
