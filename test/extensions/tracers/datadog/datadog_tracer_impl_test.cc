@@ -402,6 +402,15 @@ TEST_F(DatadogDriverTest, CancelInflightRequestsOnDestruction) {
   driver_.reset();
 }
 
+TEST_F(DatadogDriverTest, Logging) {
+  setupValidDriver();
+
+  // Ensure calls to the logger function work without errors or crashes.
+  driver_->tracerOptions().log_func(datadog::opentracing::LogLevel::debug, "debug");
+  driver_->tracerOptions().log_func(datadog::opentracing::LogLevel::info, "info");
+  driver_->tracerOptions().log_func(datadog::opentracing::LogLevel::error, "error");
+}
+
 } // namespace
 } // namespace Datadog
 } // namespace Tracers
