@@ -1,5 +1,5 @@
-Compression
-===========
+压缩
+=========
 
 .. toctree::
   :glob:
