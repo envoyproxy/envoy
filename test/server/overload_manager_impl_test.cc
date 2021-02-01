@@ -4,6 +4,7 @@
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/overload_manager.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
@@ -494,7 +495,9 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
           - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
             min_timeout: 2s
           - timer: HTTP_DOWNSTREAM_STREAM_IDLE
-            min_scale: { value: 10 }
+            min_scale: { value: 10 } # percent
+          - timer: TRANSPORT_SOCKET_CONNECT
+            min_scale: { value: 40 } # percent
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:
@@ -507,6 +510,7 @@ constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimu
     {TimerType::HttpDownstreamIdleConnectionTimeout,
      Event::AbsoluteMinimum(std::chrono::seconds(2))},
     {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
+    {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
 };
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));

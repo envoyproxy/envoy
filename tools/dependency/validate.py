@@ -121,8 +121,14 @@ class BuildGraph(object):
       A set of dependency identifiers that are reachable from targets.
     """
     deps_query = ' union '.join(f'deps({l})' for l in targets)
-    deps = subprocess.check_output(['bazel', 'query', deps_query],
-                                   stderr=subprocess.PIPE).decode().splitlines()
+    try:
+      deps = subprocess.check_output(['bazel', 'query', deps_query],
+                                     stderr=subprocess.PIPE).decode().splitlines()
+    except subprocess.CalledProcessError as exc:
+      print(
+          f'Bazel query failed with error code {exc.returncode} and std error: {exc.stderr.decode()}'
+      )
+      raise exc
     ext_deps = set()
     implied_untracked_deps = set()
     for d in deps:
