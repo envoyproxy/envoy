@@ -39,9 +39,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-DefaultCertValidator::DefaultCertValidator(
-    const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    TimeSource& time_source)
+DefaultCertValidator::DefaultCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
+                                           SslStats& stats, TimeSource& time_source)
     : config_(config), stats_(stats), time_source_(time_source) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
@@ -142,23 +141,22 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     }
   }
 
-  const Envoy::Ssl::CertificateValidationContextConfig* cert_validation_config = config_;
-  if (cert_validation_config != nullptr) {
-    if (!cert_validation_config->verifySubjectAltNameList().empty()) {
-      verify_subject_alt_name_list_ = cert_validation_config->verifySubjectAltNameList();
+  if (config_ != nullptr) {
+    if (!config_->verifySubjectAltNameList().empty()) {
+      verify_subject_alt_name_list_ = config_->verifySubjectAltNameList();
       verify_mode = verify_mode_validation_context;
     }
 
-    if (!cert_validation_config->subjectAltNameMatchers().empty()) {
+    if (!config_->subjectAltNameMatchers().empty()) {
       for (const envoy::type::matcher::v3::StringMatcher& matcher :
-           cert_validation_config->subjectAltNameMatchers()) {
+           config_->subjectAltNameMatchers()) {
         subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
 
-    if (!cert_validation_config->verifyCertificateHashList().empty()) {
-      for (auto hash : cert_validation_config->verifyCertificateHashList()) {
+    if (!config_->verifyCertificateHashList().empty()) {
+      for (auto hash : config_->verifyCertificateHashList()) {
         // Remove colons from the 95 chars long colon-separated "fingerprint"
         // in order to get the hex-encoded string.
         if (hash.size() == 95) {
@@ -173,8 +171,8 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       verify_mode = verify_mode_validation_context;
     }
 
-    if (!cert_validation_config->verifyCertificateSpkiList().empty()) {
-      for (const auto& hash : cert_validation_config->verifyCertificateSpkiList()) {
+    if (!config_->verifyCertificateSpkiList().empty()) {
+      for (const auto& hash : config_->verifyCertificateSpkiList()) {
         const auto decoded = Base64::decode(hash);
         if (decoded.size() != SHA256_DIGEST_LENGTH) {
           throw EnvoyException(absl::StrCat("Invalid base64-encoded SHA-256 ", hash));
@@ -474,7 +472,7 @@ size_t DefaultCertValidator::daysUntilFirstCertExpires() const {
 
 class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+  CertValidatorPtr createCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
                                        SslStats& stats, TimeSource& time_source) override {
     return std::make_unique<DefaultCertValidator>(config, stats, time_source);
   }

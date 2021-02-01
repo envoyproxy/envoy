@@ -16,12 +16,14 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 
 #include "common/common/matchers.h"
+#include "common/common/regex.h"
 #include "common/config/utility.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/config/datasource.h"
 
 #include "extensions/transport_sockets/tls/stats.h"
+#include "extensions/transport_sockets/tls/utility.h"
 #include "extensions/transport_sockets/tls/cert_validator/factory.h"
 
 #include "openssl/ssl.h"
@@ -46,7 +48,6 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
 
   trust_bundle_stores_.reserve(message.trust_bundles().size());
   for (auto& it : message.trust_bundles()) {
-    // TODO(@mathetake): check "spiffe://" prefix?
     auto cert = Config::DataSource::read(it.second, true, config->api());
     bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
     RELEASE_ASSERT(bio != nullptr, "");
@@ -57,40 +58,107 @@ SPIFFEValidator::SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig*
     }
 
     auto store = X509StorePtr(X509_STORE_new());
+    bool has_crl = false;
     for (const X509_INFO* item : list.get()) {
       if (item->x509) {
         X509_STORE_add_cert(store.get(), item->x509);
       }
       if (item->crl) {
+        has_crl = true;
         X509_STORE_add_crl(store.get(), item->crl);
       }
     }
-    store.get();
+    if (has_crl) {
+      X509_STORE_set_flags(store.get(), X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+    }
     trust_bundle_stores_[it.first] = std::move(store);
   }
 }
 
-void SPIFFEValidator::addClientValidationContext(SSL_CTX*, bool require_client_cert) {}
+void SPIFFEValidator::addClientValidationContext(SSL_CTX*, bool) { /* TODO */
+}
 
-void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
-                                               uint8_t hash_buffer[EVP_MAX_MD_SIZE],
-                                               unsigned hash_length) {}
+void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX&, uint8_t[EVP_MAX_MD_SIZE],
+                                               unsigned) { /* TODO */
+}
 
-int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                           bool provides_certificates) {
+int SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) { return SSL_VERIFY_PEER; }
+
+int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo*,
+                                       X509& leaf_cert, const Network::TransportSocketOptions*) {
+  if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
+    return 0;
+  }
+
+  bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
+      X509_get_ext_d2i(&leaf_cert, NID_subject_alt_name, nullptr, nullptr)));
+
+  if (san_names == nullptr) {
+    return 0;
+  }
+
+  std::string trust_domain;
+  for (const GENERAL_NAME* general_name : san_names.get()) {
+    const std::string san = Utility::generalNameAsString(general_name);
+    trust_domain = SPIFFEValidator::extractTrustDomain(san);
+    // we can assume that valid SVIDs have only one san
+    break;
+  }
+
+  if (trust_domain.empty()) {
+    return 0;
+  }
+
+  auto target_store = trust_bundle_stores_.find(trust_domain);
+  if (target_store == trust_bundle_stores_.end()) {
+    // unregisterd trust domain
+    return 0;
+  }
+
+  store_ctx->ctx = target_store->second.get();
+  return X509_verify_cert(store_ctx);
+}
+
+int SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
+  // Check basic constrains and key usage
+  // https://github.com/spiffe/spiffe/blob/master/standards/X509-SVID.md#52-leaf-validation
+  auto ext = X509_get_extension_flags(leaf_cert);
+  if (ext & EXFLAG_CA) {
+    return 0;
+  }
+
+  auto us = X509_get_key_usage(leaf_cert);
+  return !(us & KU_CRL_SIGN) && !(us & KU_KEY_CERT_SIGN);
+}
+
+std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
+  static const std::regex reg = Envoy::Regex::Utility::parseStdRegex("spiffe:\\/\\/([^\\/]+)\\/");
+  std::smatch m;
+  if (!std::regex_search(san, m, reg) || m.size() < 2) {
+    return "";
+  }
+  return m[1];
+}
+
+size_t SPIFFEValidator::daysUntilFirstCertExpires() const {
+  /* TODO */
   return 0;
 }
 
-int SPIFFEValidator::doVerifyCertChain(
-    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
-    const Network::TransportSocketOptions* transport_socket_options) {
-  return 0;
+std::string SPIFFEValidator::getCaFileName() const {
+  /* TODO */
+  return "";
 }
+
+Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const {
+  /* TODO */
+  return nullptr;
+};
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                       SslStats& stats, TimeSource& time_source) override {
+  CertValidatorPtr createCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config,
+                                       SslStats&, TimeSource&) override {
     return std::make_unique<SPIFFEValidator>(config);
   }
 

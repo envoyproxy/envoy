@@ -47,6 +47,14 @@ public:
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
 
+  size_t daysUntilFirstCertExpires() const override;
+  std::string getCaFileName() const override;
+  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+
+  // utility functions
+  static std::string extractTrustDomain(const std::string& san);
+  static int certificatePrecheck(X509* leaf_cert);
+
 private:
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
 };

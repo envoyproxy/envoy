@@ -21,7 +21,7 @@ public:
   virtual ~CertValidatorFactory() = default;
 
   virtual CertValidatorPtr
-  createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+  createCertValidator( Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       TimeSource& time_source) PURE;
 
   virtual absl::string_view name() PURE;

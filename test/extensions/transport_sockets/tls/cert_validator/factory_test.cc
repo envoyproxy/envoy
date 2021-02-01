@@ -4,6 +4,8 @@
 
 #include "envoy/ssl/context_config.h"
 
+#include "test/mocks/api/mocks.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -65,7 +67,10 @@ public:
     return custom_validator_config_;
   }
 
+  Api::Api& api() override { return api_; }
+
 private:
+  Api::MockApi api_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
 };
 
@@ -76,7 +81,7 @@ TEST(FactoryTest, TestGetCertValidatorName) {
 
   envoy::config::core::v3::TypedExtensionConfig custom_config = {};
   custom_config.set_name("envoy.tls.cert_validator.spiffe");
-  config = std::make_unique<TestCertificateValidationContextConfig>(custom_config);
+  config.reset(new TestCertificateValidationContextConfig(custom_config));
   EXPECT_EQ(custom_config.name(), getCertValidatorName(config.get()));
 }
 
