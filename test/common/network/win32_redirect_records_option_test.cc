@@ -15,7 +15,7 @@ namespace {
 class Win32RedirectRecordsOptionImplTest : public SocketOptionTest {
 
 public:
-  Win32RedirectRecordsOptionImplTest() : SocketOptionTest() {
+  Win32RedirectRecordsOptionImplTest() {
     redirect_records_data_ = "some data";
     redirect_records_ = std::make_shared<Network::Win32RedirectRecords>();
     memcpy(redirect_records_->buf_, reinterpret_cast<void*>(redirect_records_data_.data()),

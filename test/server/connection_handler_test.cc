@@ -264,7 +264,7 @@ public:
 
     Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
     Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-    if constexpr (Network::Win32SupportsOriginalDestination()) {
+    if constexpr (Network::win32SupportsOriginalDestination()) {
       if (test_listener->direction() == envoy::config::core::v3::TrafficDirection::OUTBOUND) {
         EXPECT_CALL(*accepted_socket, genericIoctl(_, _, _, _, _, _));
       }

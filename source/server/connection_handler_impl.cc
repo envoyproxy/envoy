@@ -480,7 +480,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
 #ifdef WIN32
-  if constexpr (Network::Win32SupportsOriginalDestination()) {
+  if constexpr (Network::win32SupportsOriginalDestination()) {
     if (config_->direction() == envoy::config::core::v3::OUTBOUND &&
         socket->addressProvider().localAddressRestored()) {
       ENVOY_LOG(debug, "[Windows] Querying for redirect record for outbound listener");
