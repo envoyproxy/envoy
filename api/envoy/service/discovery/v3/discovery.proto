@@ -202,7 +202,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.DeltaDiscoveryResponse";
@@ -230,7 +230,7 @@ message DeltaDiscoveryResponse {
 
   // [#not-implemented-hide:]
   // The control plane instance that sent the response.
-  config.core.v3.ControlPlane control_plane = 6;
+  config.core.v3.ControlPlane control_plane = 7;
 }
 
 // [#next-free-field: 8]
