@@ -1985,7 +1985,8 @@ TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
 
   // Check dump contents
   EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
-                                            "Done\n, active_request_.request_url_: null"));
+                                            "Done, current_header_field_: , current_header_value_: "
+                                            "\n, active_request_.request_url_: null"));
   EXPECT_THAT(ostream.contents(),
               HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: \"POST / "
                         "HTTP/1.1\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
@@ -2490,8 +2491,8 @@ TEST_F(Http1ClientConnectionImplTest, PrematureUpgradeResponse) {
   initialize();
 
   // make sure upgradeAllowed doesn't cause crashes if run with no pending response.
-  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
-                             "upgrade\r\nUpgrade: websocket\r\n\r\n");
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(isPrematureResponseError(status));
 }
@@ -2512,8 +2513,8 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
 
   // Send upgrade headers
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
-  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
-                             "upgrade\r\nUpgrade: websocket\r\n\r\n");
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
   auto status = codec_->dispatch(response);
 
   // Send body payload
@@ -2713,8 +2714,7 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true))
       .WillOnce(Invoke([&](ResponseHeaderMapPtr&, bool) {
-        // Fake a call for going below the low watermark. Make sure no stream callbacks get
-        // called.
+        // Fake a call for going below the low watermark. Make sure no stream callbacks get called.
         EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
         static_cast<ClientConnection*>(codec_.get())
             ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
@@ -3101,7 +3101,7 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
 
   // Check for body data.
   EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
-                                            "Done\n"));
+                                            "Done"));
   EXPECT_THAT(ostream.contents(),
               testing::HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: "
                                  "\"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));

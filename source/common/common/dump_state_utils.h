@@ -9,19 +9,8 @@ namespace Envoy {
 // i.e. under the Envoy signal handler if encountering a crash due to OOM, where allocating more
 // memory would likely lead to the crash handler itself causing a subsequent OOM.
 
-#define _DUMP_MEMBER(member) ", " #member ": " << (member)
-#define _DUMP_MEMBER_VIA_VALUE(member, value) ", " #member ": " << (value)
-#define _DUMP_MEMBER_SELECTOR(_1, _2, DUMP_MACRO, ...) DUMP_MACRO
-
-// This is a workaround for fact that MSVC expands __VA_ARGS__ after passing them into a macro,
-// rather than before passing them into a macro. Without this,
-// _DUMP_MEMBER_SELECTOR does not work correctly when compiled with MSVC.
-#define EXPAND(X) X
-
-// If DUMP_MEMBER is called with one argument, then _DUMP_MEMBER is called.
-// If DUMP_MEMBER is called with two arguments, then _DUMP_MEMBER_VIA_VALUE is called.
-#define DUMP_MEMBER(...)                                                                           \
-  EXPAND(_DUMP_MEMBER_SELECTOR(__VA_ARGS__, _DUMP_MEMBER_VIA_VALUE, _DUMP_MEMBER)(__VA_ARGS__))
+#define DUMP_MEMBER(member) ", " #member ": " << (member)
+#define DUMP_MEMBER_AS(member, value) ", " #member ": " << (value)
 
 #define DUMP_OPTIONAL_MEMBER(member)                                                               \
   ", " #member ": " << ((member).has_value() ? absl::StrCat((member).value()) : "null")
