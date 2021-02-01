@@ -2,6 +2,8 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "common/common/logger.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -59,6 +61,14 @@ void Command::setData(const std::string& data) { data_.assign(data); }
 void Command::encode(Buffer::Instance& out) {
   BufferHelper::addUint8(out, static_cast<int>(cmd_));
   BufferHelper::addString(out, data_);
+}
+
+int CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {
+  if (BufferHelper::readStringBySize(buffer, len, data_) != MYSQL_SUCCESS) {
+    ENVOY_LOG(info, "read command response error");
+    return MYSQL_FAILURE;
+  }
+  return MYSQL_SUCCESS;
 }
 
 } // namespace MySQLProxy

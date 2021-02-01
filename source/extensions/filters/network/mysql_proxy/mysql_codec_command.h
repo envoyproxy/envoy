@@ -56,18 +56,19 @@ private:
   bool is_query_;
 };
 
+/* CommandResponse has many types. ref https://dev.mysql.com/doc/internals/en/text-protocol.html
+ * We just get all data
+ */
 class CommandResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int parseMessage(Buffer::Instance&, uint32_t) override { return MYSQL_SUCCESS; }
+  int parseMessage(Buffer::Instance&, uint32_t) override;
   void encode(Buffer::Instance&) override {}
-
-  void setServerStatus(uint16_t status);
-  void setWarnings(uint16_t warnings);
+  const std::string& getData() const { return data_; }
+  void setData(const std::string& data) { data_ = data; }
 
 private:
-  uint16_t server_status_;
-  uint16_t warnings_;
+  std::string data_;
 };
 
 } // namespace MySQLProxy

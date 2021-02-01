@@ -2,6 +2,8 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "common/common/logger.h"
+
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -14,7 +16,13 @@ void ClientSwitchResponse::setAuthPluginResp(const std::string& auth_plugin_resp
   auth_plugin_resp_.assign(auth_plugin_resp);
 }
 
-int ClientSwitchResponse::parseMessage(Buffer::Instance&, uint32_t) { return MYSQL_SUCCESS; }
+int ClientSwitchResponse::parseMessage(Buffer::Instance& buffer, uint32_t) {
+  if (BufferHelper::readString(buffer, auth_plugin_resp_) != MYSQL_SUCCESS) {
+    ENVOY_LOG(info, "error when parsing auth plugin data in client switch response");
+    return MYSQL_FAILURE;
+  }
+  return MYSQL_SUCCESS;
+}
 
 void ClientSwitchResponse::encode(Buffer::Instance& out) {
   BufferHelper::addString(out, auth_plugin_resp_);
