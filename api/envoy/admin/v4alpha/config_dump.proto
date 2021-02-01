@@ -63,9 +63,10 @@ message UpdateFailureState {
   string version_info = 4;
 
   // This resource is not included in the update or being explicitly removed by
-  // an update, either case means that this resource is no longer existed at the
-  // xDS server. For more information, please refer to the "Knowing When a
-  // Requested Resource Does Not Exist" of xDS protocol document.
+  // an update, either case means that this resource no longer existed in the
+  // xDS server. For more information, please refer to the :ref:`"Knowing When a
+  // Requested Resource Does Not Exist" <xds_protocol_resource_not_existed>`
+  // section.
   // [#not-implemented-hide:]
   bool does_not_exist_at_server = 5;
 }
