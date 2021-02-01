@@ -22,7 +22,7 @@ public:
   Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
       const Protobuf::Message&,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
-      Server::Configuration::ListenerFactoryContext& context) override {
+      [[maybe_unused]] Server::Configuration::ListenerFactoryContext& context) override {
 #ifdef WIN32
     // On Windows we need to do some extra validation for the Original Destination filter.
     // In particular we need to check if:
