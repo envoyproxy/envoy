@@ -1,5 +1,5 @@
-Common
-======
+通用
+========
 
 .. toctree::
   :glob:
