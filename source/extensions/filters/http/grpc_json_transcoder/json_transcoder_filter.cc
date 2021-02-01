@@ -17,6 +17,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
@@ -111,6 +112,12 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
     Api::Api& api) {
+
+  disabled_ = proto_config.services().empty();
+  if (disabled_) {
+    return;
+  }
+
   FileDescriptorSet descriptor_set;
 
   switch (proto_config.descriptor_set_case()) {
@@ -216,6 +223,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
+  strict_http_request_validation_ = proto_config.strict_http_request_validation();
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -306,12 +314,10 @@ bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_statu
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
-    google::grpc::transcoding::TranscoderInputStream& response_input, TranscoderPtr& transcoder,
-    MethodInfoSharedPtr& method_info) {
-  if (Grpc::Common::isGrpcRequestHeaders(headers)) {
-    return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
-                                "Request headers has application/grpc content-type");
-  }
+    google::grpc::transcoding::TranscoderInputStream& response_input,
+    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) const {
+
+  ASSERT(!disabled_);
   const std::string method(headers.getMethodValue());
   std::string path(headers.getPathValue());
   std::string args;
@@ -327,7 +333,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
   if (!method_info) {
-    return ProtobufUtil::Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method");
+    return ProtobufUtil::Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method.");
   }
 
   auto status = methodToRequestInfo(method_info, &request_info);
@@ -384,7 +390,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 
 ProtobufUtil::Status
 JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info,
-                                          google::grpc::transcoding::RequestInfo* info) {
+                                          google::grpc::transcoding::RequestInfo* info) const {
   const std::string& request_type_full_name = method_info->descriptor_->input_type()->full_name();
   auto request_type_url = Grpc::Common::typeUrl(request_type_full_name);
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
@@ -399,7 +405,7 @@ JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info
 
 ProtobufUtil::Status
 JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& message,
-                                                  std::string* json_out) {
+                                                  std::string* json_out) const {
   return ProtobufUtil::BinaryToJsonString(
       type_helper_->Resolver(), Grpc::Common::typeUrl(message.GetDescriptor()->full_name()),
       message.SerializeAsString(), json_out, print_options_);
@@ -407,15 +413,49 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
 
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
 
+void JsonTranscoderFilter::initPerRouteConfig() {
+  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
+    per_route_config_ = &config_;
+    return;
+  }
+
+  const std::string& name = HttpFilterNames::get().GrpcJsonTranscoder;
+  const auto* entry = decoder_callbacks_->route()->routeEntry();
+  const auto* route_local = entry->mostSpecificPerFilterConfigTyped<JsonTranscoderConfig>(name);
+
+  per_route_config_ = route_local ? route_local : &config_;
+}
+
 Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
-  const auto status =
-      config_.createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
-
-  if (!status.ok()) {
-    // If transcoder couldn't be created, it might be a normal gRPC request, so the filter will
-    // just pass-through the request to upstream.
+  initPerRouteConfig();
+  if (per_route_config_->disabled()) {
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (Grpc::Common::isGrpcRequestHeaders(headers)) {
+    ENVOY_LOG(debug, "Request headers has application/grpc content-type. Request is passed through "
+                     "without transcoding.");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  const auto status =
+      per_route_config_->createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
+  if (!status.ok()) {
+    ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.error_message());
+
+    if (config_.strict_http_request_validation_) {
+      ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
+      error_ = true;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::BadRequest, absl::StrCat("Bad request: ", status.error_message().ToString()),
+          nullptr, absl::nullopt,
+          absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
+      return Http::FilterHeadersStatus::StopIteration;
+    } else {
+      ENVOY_LOG(debug, "Request is passed through without transcoding.");
+      return Http::FilterHeadersStatus::Continue;
+    }
   }
 
   if (method_->request_type_is_http_body_) {
@@ -449,7 +489,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
 
-  if (!config_.matchIncomingRequestInfo()) {
+  if (!per_route_config_->matchIncomingRequestInfo()) {
     decoder_callbacks_->clearRouteCache();
   }
 
@@ -611,7 +651,7 @@ JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
-  if (error_ || !transcoder_) {
+  if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled()) {
     return;
   }
 
@@ -767,7 +807,8 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
 
 bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
                                                   Http::ResponseHeaderOrTrailerMap& trailers) {
-  if (!config_.convertGrpcStatus()) {
+  ASSERT(per_route_config_ && !per_route_config_->disabled());
+  if (!per_route_config_->convertGrpcStatus()) {
     return false;
   }
 
@@ -799,7 +840,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   }
 
   std::string json_status;
-  auto translate_status = config_.translateProtoMessageToJson(*status_details, &json_status);
+  auto translate_status =
+      per_route_config_->translateProtoMessageToJson(*status_details, &json_status);
   if (!translate_status.ok()) {
     ENVOY_LOG(debug, "Transcoding status error {}", translate_status.ToString());
     return false;

@@ -1129,7 +1129,10 @@ envoy_cc_test(
     # TODO(envoyproxy/windows-dev): The key rotation in SdsDynamicKeyRotationIntegrationTest via
     # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
     # correctly handle symlinks.
-    tags = ["fails_on_windows"],
+    tags = [
+        "fails_on_clang_cl",
+        "fails_on_windows",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:api_version_lib",
