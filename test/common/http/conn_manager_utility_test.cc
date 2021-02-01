@@ -1543,5 +1543,47 @@ TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
     EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
   }
 }
+
+class CustomHeaderBasedDetection : public Http::OriginalIPDetection {
+public:
+  CustomHeaderBasedDetection(const std::string& header_name) : header_name_(header_name) {}
+
+  Network::Address::InstanceConstSharedPtr
+  detect(struct Http::OriginalIPDetectionParams& params) override {
+    auto hdr = params.request_headers.get(LowerCaseString(header_name_));
+    if (hdr.empty()) {
+      return nullptr;
+    }
+    auto header_value = hdr[0]->value().getStringView();
+    return std::make_shared<Network::Address::Ipv4Instance>(std::string(header_value));
+  }
+
+private:
+  std::string header_name_;
+};
+
+// Test an extension to detect the original IP for the request.
+TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
+  const std::string header_name = "x-cdn-detected-ip";
+  auto detection_extension = std::make_shared<CustomHeaderBasedDetection>(header_name);
+
+  ON_CALL(config_, originalIpDetection()).WillByDefault(Return(detection_extension));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+
+  // Header is present.
+  {
+    TestRequestHeaderMapImpl headers{{header_name, "2.1.3.4"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "2.1.3.4:0");
+  }
+
+  // Header missing -- fallbacks to default behavior.
+  {
+    TestRequestHeaderMapImpl headers;
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "10.0.0.3:50000");
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
