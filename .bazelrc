@@ -308,7 +308,6 @@ build:oss-fuzz --copt=-fno-sanitize=vptr
 build:oss-fuzz --linkopt=-fno-sanitize=vptr
 build:oss-fuzz --define=tcmalloc=disabled
 build:oss-fuzz --define=signal_trace=disabled
-build:oss-fuzz --define=ENVOY_CONFIG_ASAN=1
 build:oss-fuzz --copt=-D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
 build:oss-fuzz --define=force_libcpp=enabled
 build:oss-fuzz --linkopt=-lc++
