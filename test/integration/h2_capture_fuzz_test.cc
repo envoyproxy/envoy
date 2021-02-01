@@ -13,7 +13,11 @@ void H2FuzzIntegrationTest::initialize() {
   });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+              hcm) -> void {
+        // Allow https "in the clear"
+        hcm.set_xff_num_trusted_hops(1);
+        hcm.mutable_http2_protocol_options()->set_allow_metadata(true);
+      });
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 

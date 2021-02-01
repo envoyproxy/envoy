@@ -107,7 +107,11 @@ public:
   Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(GetParam()) {
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
+               hcm) {
+          // Allow https "in the clear"
+          hcm.set_xff_num_trusted_hops(1);
+          hcm.mutable_delayed_close_timeout()->set_seconds(1);
+        });
   }
 
 protected:

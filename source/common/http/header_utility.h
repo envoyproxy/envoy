@@ -164,6 +164,18 @@ public:
   requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
+   * Determines if request headers pass HCM-specific validity checks.
+   * @param headers to validate
+   * @param xff_num_trusted_hops the configured number of prior trusted hops.
+   * @param connection_is_ssl true if the direct connection is ssl.
+   * @return details of the error and response code to send if an error is present, otherwise
+   * absl::nullopt
+   */
+  static absl::optional<std::pair<std::reference_wrapper<const absl::string_view>, Http::Code>>
+  requestHeadersValidAtHcm(const RequestHeaderMap& headers, uint32_t xff_num_trusted_hops,
+                           bool connection_is_ssl);
+
+  /**
    * Determines if the response should be framed by Connection: Close based on protocol
    * and headers.
    * @param protocol the protocol of the request

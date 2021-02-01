@@ -1010,6 +1010,35 @@ TEST_P(IntegrationTest, AbsolutePath) {
   EXPECT_FALSE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
 }
 
+TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
+  // Sent an HTTPS request over non-TLS. It should be rejected.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 403 Forbidden\r\n") == 0);
+}
+
+TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
+  // Sent an HTTPS request over non-TLS. It will be allowed for non-frontline Envoys
+  // and match the configured redirect.
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET https://www.redirect.com HTTP/1.1\r\nHost: host\r\n\r\n",
+                                &response, true);
+  EXPECT_FALSE(response.find("HTTP/1.1 302\r\n") == 0);
+}
+
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
 TEST_P(IntegrationTest, TestHostWithAddress) {
   useAccessLog("%REQ(Host)%\n");

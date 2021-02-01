@@ -18,6 +18,7 @@ namespace Http {
 struct SharedResponseCodeDetailsValues {
   const absl::string_view InvalidAuthority = "http.invalid_authority";
   const absl::string_view ConnectUnsupported = "http.connect_not_supported";
+  const absl::string_view HttpsNotEncrypted = "http.https_not_encrypted";
 };
 
 using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
@@ -256,6 +257,22 @@ HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
   }
+  return absl::nullopt;
+}
+
+absl::optional<std::pair<std::reference_wrapper<const absl::string_view>, Http::Code>>
+HeaderUtility::requestHeadersValidAtHcm(const RequestHeaderMap& headers,
+                                        uint32_t xff_num_trusted_hops, bool connection_is_ssl) {
+  if (xff_num_trusted_hops == 0 &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header") &&
+      !connection_is_ssl &&
+      (headers.getSchemeValue() == Headers::get().SchemeValues.Https ||
+       headers.getForwardedProtoValue() == Headers::get().SchemeValues.Https)) {
+    return std::make_pair(std::reference_wrapper<const absl::string_view>(
+                              SharedResponseCodeDetails::get().HttpsNotEncrypted),
+                          Code::Forbidden);
+  }
+
   return absl::nullopt;
 }
 

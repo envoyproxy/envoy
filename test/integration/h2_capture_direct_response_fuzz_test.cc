@@ -17,6 +17,8 @@ void H2FuzzIntegrationTest::initialize() {
       [&file_path, &prefix](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
+        // Allow https "in the clear"
+        hcm.set_xff_num_trusted_hops(1);
         auto* route_config = hcm.mutable_route_config();
         // adding direct response mode to the default route
         auto* default_route =

@@ -381,7 +381,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
                                                    {":path", "/"},
                                                    {"content-length", "2048"},
                                                    {":authority", "host"},
-                                                   {":scheme", "https"}};
+                                                   {":scheme", "http"}};
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     response_ = std::move(encoder_decoder.second);

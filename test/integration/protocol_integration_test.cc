@@ -1133,7 +1133,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 }
 
 // Verify that request with headers containing underscores is rejected when configured.
-TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
