@@ -98,7 +98,7 @@ public:
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       xds_cluster->set_name("xds_cluster");
-      xds_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*xds_cluster);
     });
   }
 
@@ -120,6 +120,7 @@ public:
           envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               hcm.mutable_rds()->mutable_config_source()->mutable_api_config_source();
           rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
           envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
@@ -145,7 +146,7 @@ public:
     registerTestServerPorts({"http"});
   }
 
-  void testRewriteResponse(const std::string& code) {
+  void expectResponseBodyRewrite(const std::string& code, bool empty_body, bool enable_wrap_body) {
     initializeFilter(code);
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -163,20 +164,38 @@ public:
     waitForNextUpstreamRequest();
 
     Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
-    upstream_request_->encodeHeaders(response_headers, false);
-    Buffer::OwnedImpl response_data1("good");
-    upstream_request_->encodeData(response_data1, false);
-    Buffer::OwnedImpl response_data2("bye");
-    upstream_request_->encodeData(response_data2, true);
+
+    if (empty_body) {
+      upstream_request_->encodeHeaders(response_headers, true);
+    } else {
+      upstream_request_->encodeHeaders(response_headers, false);
+      Buffer::OwnedImpl response_data1("good");
+      upstream_request_->encodeData(response_data1, false);
+      Buffer::OwnedImpl response_data2("bye");
+      upstream_request_->encodeData(response_data2, true);
+    }
 
     response->waitForEndStream();
 
-    EXPECT_EQ("2", response->headers()
-                       .get(Http::LowerCaseString("content-length"))[0]
-                       ->value()
-                       .getStringView());
-    EXPECT_EQ("ok", response->body());
+    if (enable_wrap_body) {
+      EXPECT_EQ("2", response->headers()
+                         .get(Http::LowerCaseString("content-length"))[0]
+                         ->value()
+                         .getStringView());
+      EXPECT_EQ("ok", response->body());
+    } else {
+      EXPECT_EQ("", response->body());
+    }
+
     cleanup();
+  }
+
+  void testRewriteResponse(const std::string& code) {
+    expectResponseBodyRewrite(code, false, true);
+  }
+
+  void testRewriteResponseWithoutUpstreamBody(const std::string& code, bool enable_wrap_body) {
+    expectResponseBodyRewrite(code, true, enable_wrap_body);
   }
 
   void cleanup() {
@@ -893,7 +912,9 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
 // Test whether Rds can correctly deliver LuaPerRoute configuration.
 TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 // When the route configuration is updated dynamically via RDS and the configuration contains an
-// inline Lua code, Envoy may call lua_open in multiple threads to create new lua_State objects.
+// inline Lua code, Envoy may call `luaL_newstate`
+// (https://www.lua.org/manual/5.1/manual.html#luaL_newstate) in multiple threads to create new
+// lua_State objects.
 // During lua_State creation, 'LuaJIT' uses some static local variables shared by multiple threads
 // to aid memory allocation. Although 'LuaJIT' itself guarantees that there is no thread safety
 // issue here, the use of these static local variables by multiple threads will cause a TSAN alarm.
@@ -969,6 +990,47 @@ typed_config:
 )EOF";
 
   testRewriteResponse(FILTER_AND_CODE);
+}
+
+// Rewrite response buffer, without original upstream response body
+// and always wrap body.
+TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBody) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body(true):setBytes("ok")
+      response_handle:logTrace(content_length)
+
+      response_handle:headers():replace("content-length", content_length)
+    end
+)EOF";
+
+  testRewriteResponseWithoutUpstreamBody(FILTER_AND_CODE, true);
+}
+
+// Rewrite response buffer, without original upstream response body
+// and don't always wrap body.
+TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBodyAndDisableWrapBody) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      if response_handle:body(false) then
+        local content_length = response_handle:body():setBytes("ok")
+        response_handle:logTrace(content_length)
+        response_handle:headers():replace("content-length", content_length)
+      end
+    end
+)EOF";
+
+  testRewriteResponseWithoutUpstreamBody(FILTER_AND_CODE, false);
 }
 
 // Rewrite chunked response body.

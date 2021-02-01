@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/router:context_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -85,6 +86,7 @@ envoy_cc_fuzz_test(
     corpus = "codec_impl_corpus",
     deps = [
         ":codec_impl_fuzz_proto_cc_proto",
+        "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
@@ -369,13 +371,22 @@ envoy_cc_test(
     ],
 )
 
+PATH_UTILITY_TEST_DEPS = [
+    "//source/common/http:header_map_lib",
+    "//source/common/http:path_utility_lib",
+]
+
 envoy_cc_test(
     name = "path_utility_test",
     srcs = ["path_utility_test.cc"],
-    deps = [
-        "//source/common/http:header_map_lib",
-        "//source/common/http:path_utility_lib",
-    ],
+    deps = PATH_UTILITY_TEST_DEPS,
+)
+
+envoy_cc_test(
+    name = "legacy_path_utility_test",
+    srcs = ["path_utility_test.cc"],
+    args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_forked_chromium_url"],
+    deps = PATH_UTILITY_TEST_DEPS,
 )
 
 envoy_cc_test(
@@ -401,12 +412,14 @@ envoy_cc_test(
     name = "mixed_conn_pool_test",
     srcs = ["mixed_conn_pool_test.cc"],
     deps = [
-        "//source/common/http:conn_pool_base_lib",
+        ":common_lib",
+        "//source/common/http:mixed_conn_pool",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",

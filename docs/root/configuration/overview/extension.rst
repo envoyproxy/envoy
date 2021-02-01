@@ -21,8 +21,10 @@ filter configuration snippet is permitted:
     rds:
       route_config_name: local_route
       config_source:
+        resource_api_version: V3
         api_config_source:
           api_type: GRPC
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: xds_cluster
@@ -49,9 +51,11 @@ follows:
       codec_type: AUTO
       rds:
         route_config_name: local_route
+        resource_api_version: V3
         config_source:
           api_config_source:
             api_type: GRPC
+            transport_api_version: V3
             grpc_services:
               envoy_grpc:
                 cluster_name: xds_cluster

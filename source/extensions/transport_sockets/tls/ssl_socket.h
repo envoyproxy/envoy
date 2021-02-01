@@ -62,6 +62,7 @@ public:
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  bool startSecureTransport() override { return false; }
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks
@@ -75,7 +76,7 @@ protected:
 
 private:
   struct ReadResult {
-    bool commit_slice_{};
+    uint64_t bytes_read_{0};
     absl::optional<int> error_;
   };
   ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
@@ -108,6 +109,7 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
+  bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

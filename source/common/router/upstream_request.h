@@ -132,7 +132,7 @@ private:
   Event::TimerPtr per_try_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
-  Buffer::WatermarkBufferPtr buffered_request_body_;
+  Buffer::InstancePtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   DownstreamWatermarkManager downstream_watermark_manager_{*this};
   Tracing::SpanPtr span_;

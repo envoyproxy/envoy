@@ -18,14 +18,16 @@ namespace {
 constexpr uint64_t CopyThreshold = 512;
 } // namespace
 
+thread_local absl::InlinedVector<Slice::StoragePtr, Slice::free_list_max_> Slice::free_list_;
+
 void OwnedImpl::addImpl(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplace_back(OwnedSlice::create(size));
+      slices_.emplace_back(size);
     }
-    uint64_t copy_size = slices_.back()->append(src, size);
+    uint64_t copy_size = slices_.back().append(src, size);
     src += copy_size;
     size -= copy_size;
     length_ += copy_size;
@@ -35,14 +37,14 @@ void OwnedImpl::addImpl(const void* data, uint64_t size) {
 
 void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
   ASSERT(!slices_.empty());
-  slices_.back()->addDrainTracker(std::move(drain_tracker));
+  slices_.back().addDrainTracker(std::move(drain_tracker));
 }
 
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   length_ += fragment.size();
-  slices_.emplace_back(std::make_unique<UnownedSlice>(fragment));
+  slices_.emplace_back(fragment);
 }
 
 void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
@@ -59,9 +61,9 @@ void OwnedImpl::prepend(absl::string_view data) {
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
     if (new_slice_needed) {
-      slices_.emplace_front(OwnedSlice::create(size));
+      slices_.emplace_front(size);
     }
-    uint64_t copy_size = slices_.front()->prepend(data.data(), size);
+    uint64_t copy_size = slices_.front().prepend(data.data(), size);
     size -= copy_size;
     length_ += copy_size;
     new_slice_needed = true;
@@ -72,54 +74,13 @@ void OwnedImpl::prepend(Instance& data) {
   ASSERT(&data != this);
   OwnedImpl& other = static_cast<OwnedImpl&>(data);
   while (!other.slices_.empty()) {
-    uint64_t slice_size = other.slices_.back()->dataSize();
+    uint64_t slice_size = other.slices_.back().dataSize();
     length_ += slice_size;
     slices_.emplace_front(std::move(other.slices_.back()));
     other.slices_.pop_back();
     other.length_ -= slice_size;
   }
   other.postProcess();
-}
-
-void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
-  if (num_iovecs == 0) {
-    return;
-  }
-  // Find the slices in the buffer that correspond to the iovecs:
-  // First, scan backward from the end of the buffer to find the last slice containing
-  // any content. Reservations are made from the end of the buffer, and out-of-order commits
-  // aren't supported, so any slices before this point cannot match the iovecs being committed.
-  ssize_t slice_index = static_cast<ssize_t>(slices_.size()) - 1;
-  while (slice_index >= 0 && slices_[slice_index]->dataSize() == 0) {
-    slice_index--;
-  }
-  if (slice_index < 0) {
-    // There was no slice containing any data, so rewind the iterator at the first slice.
-    slice_index = 0;
-    if (!slices_[0]) {
-      return;
-    }
-  }
-
-  // Next, scan forward and attempt to match the slices against iovecs.
-  uint64_t num_slices_committed = 0;
-  while (num_slices_committed < num_iovecs) {
-    if (slices_[slice_index]->commit(iovecs[num_slices_committed])) {
-      length_ += iovecs[num_slices_committed].len_;
-      num_slices_committed++;
-    }
-    slice_index++;
-    if (slice_index == static_cast<ssize_t>(slices_.size())) {
-      break;
-    }
-  }
-
-  // In case an extra slice was reserved, remove empty slices from the end of the buffer.
-  while (!slices_.empty() && slices_.back()->dataSize() == 0) {
-    slices_.pop_back();
-  }
-
-  ASSERT(num_slices_committed > 0);
 }
 
 void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
@@ -129,7 +90,7 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
     if (size == 0) {
       break;
     }
-    uint64_t data_size = slice->dataSize();
+    uint64_t data_size = slice.dataSize();
     if (data_size <= bytes_to_skip) {
       // The offset where the caller wants to start copying is after the end of this slice,
       // so just skip over this slice completely.
@@ -137,7 +98,7 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
       continue;
     }
     uint64_t copy_size = std::min(size, data_size - bytes_to_skip);
-    memcpy(dest, slice->data() + bytes_to_skip, copy_size);
+    memcpy(dest, slice.data() + bytes_to_skip, copy_size);
     size -= copy_size;
     dest += copy_size;
     // Now that we've started copying, there are no bytes left to skip over. If there
@@ -155,20 +116,20 @@ void OwnedImpl::drainImpl(uint64_t size) {
     if (slices_.empty()) {
       break;
     }
-    uint64_t slice_size = slices_.front()->dataSize();
+    uint64_t slice_size = slices_.front().dataSize();
     if (slice_size <= size) {
       slices_.pop_front();
       length_ -= slice_size;
       size -= slice_size;
     } else {
-      slices_.front()->drain(size);
+      slices_.front().drain(size);
       length_ -= size;
       size = 0;
     }
   }
   // Make sure to drain any zero byte fragments that might have been added as
   // sentinels for flushed data.
-  while (!slices_.empty() && slices_.front()->dataSize() == 0) {
+  while (!slices_.empty() && slices_.front().dataSize() == 0) {
     slices_.pop_front();
   }
 }
@@ -186,7 +147,7 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
       break;
     }
 
-    if (slice->dataSize() == 0) {
+    if (slice.dataSize() == 0) {
       continue;
     }
 
@@ -196,7 +157,8 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
     // there is currently no max size validation.
     // TODO(antoniovicente) Set realistic limits on the max size of BufferSlice and consider use of
     // size_t instead of uint64_t in the Slice interface.
-    raw_slices.emplace_back(RawSlice{slice->data(), static_cast<size_t>(slice->dataSize())});
+    raw_slices.emplace_back(
+        RawSlice{const_cast<uint8_t*>(slice.data()), static_cast<size_t>(slice.dataSize())});
   }
   return raw_slices;
 }
@@ -204,8 +166,9 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
 RawSlice OwnedImpl::frontSlice() const {
   // Ignore zero-size slices and return the first slice with data.
   for (const auto& slice : slices_) {
-    if (slice->dataSize() > 0) {
-      return RawSlice{slice->data(), slice->dataSize()};
+    if (slice.dataSize() > 0) {
+      return RawSlice{const_cast<uint8_t*>(slice.data()),
+                      static_cast<absl::Span<uint8_t>::size_type>(slice.dataSize())};
     }
   }
 
@@ -216,27 +179,26 @@ SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
   // Remove zero byte fragments from the front of the queue to ensure
   // that the extracted slice has data.
-  while (!slices_.empty() && slices_.front()->dataSize() == 0) {
+  while (!slices_.empty() && slices_.front().dataSize() == 0) {
     slices_.pop_front();
   }
   ASSERT(!slices_.empty());
-  ASSERT(slices_.front());
   auto slice = std::move(slices_.front());
-  auto size = slice->dataSize();
+  auto size = slice.dataSize();
   length_ -= size;
   slices_.pop_front();
-  if (!slice->isMutable()) {
+  if (!slice.isMutable()) {
     // Create a mutable copy of the immutable slice data.
-    auto mutable_slice = OwnedSlice::create(size);
-    auto copy_size = mutable_slice->append(slice->data(), size);
+    Slice mutable_slice{size};
+    auto copy_size = mutable_slice.append(slice.data(), size);
     ASSERT(copy_size == size);
     // Drain trackers for the immutable slice will be called as part of the slice destructor.
-    return mutable_slice;
+    return std::make_unique<SliceDataImpl>(std::move(mutable_slice));
   } else {
     // Make sure drain trackers are called before ownership of the slice is transferred from
     // the buffer to the caller.
-    slice->callAndClearDrainTrackers();
-    return slice;
+    slice.callAndClearDrainTrackers();
+    return std::make_unique<SliceDataImpl>(std::move(slice));
   }
 }
 
@@ -246,7 +208,7 @@ uint64_t OwnedImpl::length() const {
   // of the lengths of the slices.
   uint64_t length = 0;
   for (const auto& slice : slices_) {
-    length += slice->dataSize();
+    length += slice.dataSize();
   }
   ASSERT(length == length_);
 #endif
@@ -259,13 +221,13 @@ void* OwnedImpl::linearize(uint32_t size) {
   if (slices_.empty()) {
     return nullptr;
   }
-  if (slices_[0]->dataSize() < size) {
-    auto new_slice = OwnedSlice::create(size);
-    Slice::Reservation reservation = new_slice->reserve(size);
+  if (slices_[0].dataSize() < size) {
+    Slice new_slice{size};
+    Slice::Reservation reservation = new_slice.reserve(size);
     ASSERT(reservation.mem_ != nullptr);
     ASSERT(reservation.len_ == size);
     copyOut(0, size, reservation.mem_);
-    new_slice->commit(reservation);
+    new_slice.commit(reservation);
 
     // Replace the first 'size' bytes in the buffer with the new slice. Since new_slice re-adds the
     // drained bytes, avoid use of the overridable 'drain' method to avoid incorrectly checking if
@@ -274,23 +236,23 @@ void* OwnedImpl::linearize(uint32_t size) {
     slices_.emplace_front(std::move(new_slice));
     length_ += size;
   }
-  return slices_.front()->data();
+  return slices_.front().data();
 }
 
-void OwnedImpl::coalesceOrAddSlice(SlicePtr&& other_slice) {
-  const uint64_t slice_size = other_slice->dataSize();
+void OwnedImpl::coalesceOrAddSlice(Slice&& other_slice) {
+  const uint64_t slice_size = other_slice.dataSize();
   // The `other_slice` content can be coalesced into the existing slice IFF:
-  // 1. The `other_slice` can be coalesced. Objects of type UnownedSlice can not be coalesced. See
-  //    comment in the UnownedSlice class definition;
+  // 1. The `other_slice` can be coalesced. Immutable slices can not be safely coalesced because
+  // their destructors can be arbitrary global side effects.
   // 2. There are existing slices;
   // 3. The `other_slice` content length is under the CopyThreshold;
   // 4. There is enough unused space in the existing slice to accommodate the `other_slice` content.
-  if (other_slice->canCoalesce() && !slices_.empty() && slice_size < CopyThreshold &&
-      slices_.back()->reservableSize() >= slice_size) {
+  if (other_slice.canCoalesce() && !slices_.empty() && slice_size < CopyThreshold &&
+      slices_.back().reservableSize() >= slice_size) {
     // Copy content of the `other_slice`. The `move` methods which call this method effectively
     // drain the source buffer.
-    addImpl(other_slice->data(), slice_size);
-    other_slice->transferDrainTrackersTo(*slices_.back());
+    addImpl(other_slice.data(), slice_size);
+    other_slice.transferDrainTrackersTo(slices_.back());
   } else {
     // Take ownership of the slice.
     slices_.emplace_back(std::move(other_slice));
@@ -305,7 +267,7 @@ void OwnedImpl::move(Instance& rhs) {
   // want to maintain an abstraction.
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
   while (!other.slices_.empty()) {
-    const uint64_t slice_size = other.slices_.front()->dataSize();
+    const uint64_t slice_size = other.slices_.front().dataSize();
     coalesceOrAddSlice(std::move(other.slices_.front()));
     other.length_ -= slice_size;
     other.slices_.pop_front();
@@ -318,15 +280,15 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   // See move() above for why we do the static cast.
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
   while (length != 0 && !other.slices_.empty()) {
-    const uint64_t slice_size = other.slices_.front()->dataSize();
+    const uint64_t slice_size = other.slices_.front().dataSize();
     const uint64_t copy_size = std::min(slice_size, length);
     if (copy_size == 0) {
       other.slices_.pop_front();
     } else if (copy_size < slice_size) {
       // TODO(brian-pane) add reference-counting to allow slices to share their storage
       // and eliminate the copy for this partial-slice case?
-      add(other.slices_.front()->data(), copy_size);
-      other.slices_.front()->drain(copy_size);
+      add(other.slices_.front().data(), copy_size);
+      other.slices_.front().drain(copy_size);
       other.length_ -= copy_size;
     } else {
       coalesceOrAddSlice(std::move(other.slices_.front()));
@@ -338,55 +300,119 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   other.postProcess();
 }
 
-uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
-  if (num_iovecs == 0 || length == 0) {
-    return 0;
+Reservation OwnedImpl::reserveForRead() {
+  return reserveWithMaxLength(default_read_reservation_size_);
+}
+
+Reservation OwnedImpl::reserveWithMaxLength(uint64_t max_length) {
+  Reservation reservation = Reservation::bufferImplUseOnlyConstruct(*this);
+  if (max_length == 0) {
+    return reservation;
   }
+
+  // Remove any empty slices at the end.
+  while (!slices_.empty() && slices_.back().dataSize() == 0) {
+    slices_.pop_back();
+  }
+
+  uint64_t bytes_remaining = max_length;
+  uint64_t reserved = 0;
+  auto& reservation_slices = reservation.bufferImplUseOnlySlices();
+  auto slices_owner = std::make_unique<OwnedImplReservationSlicesOwnerMultiple>();
+
   // Check whether there are any empty slices with reservable space at the end of the buffer.
-  size_t first_reservable_slice = slices_.size();
-  while (first_reservable_slice > 0) {
-    if (slices_[first_reservable_slice - 1]->reservableSize() == 0) {
-      break;
-    }
-    first_reservable_slice--;
-    if (slices_[first_reservable_slice]->dataSize() != 0) {
-      // There is some content in this slice, so anything in front of it is non-reservable.
-      break;
-    }
+  uint64_t reservable_size = slices_.empty() ? 0 : slices_.back().reservableSize();
+  if (reservable_size >= max_length || reservable_size >= (Slice::default_slice_size_ / 8)) {
+    auto& last_slice = slices_.back();
+    const uint64_t reservation_size = std::min(last_slice.reservableSize(), bytes_remaining);
+    auto slice = last_slice.reserve(reservation_size);
+    reservation_slices.push_back(slice);
+    slices_owner->owned_slices_.emplace_back(Slice());
+    bytes_remaining -= slice.len_;
+    reserved += slice.len_;
   }
 
-  // Having found the sequence of reservable slices at the back of the buffer, reserve
-  // as much space as possible from each one.
-  uint64_t num_slices_used = 0;
+  while (bytes_remaining != 0 && reservation_slices.size() < reservation.MAX_SLICES_) {
+    const uint64_t size = Slice::default_slice_size_;
+
+    // If the next slice would go over the desired size, and the amount already reserved is already
+    // at least one full slice in size, stop allocating slices. This prevents returning a
+    // reservation larger than requested, which could go above the watermark limits for a watermark
+    // buffer, unless the size would be very small (less than 1 full slice).
+    if (size > bytes_remaining && reserved >= size) {
+      break;
+    }
+
+    Slice slice(size, slices_owner->free_list_);
+    const auto raw_slice = slice.reserve(size);
+    reservation_slices.push_back(raw_slice);
+    slices_owner->owned_slices_.emplace_back(std::move(slice));
+    bytes_remaining -= std::min<uint64_t>(raw_slice.len_, bytes_remaining);
+    reserved += raw_slice.len_;
+  }
+
+  ASSERT(reservation_slices.size() == slices_owner->owned_slices_.size());
+  reservation.bufferImplUseOnlySlicesOwner() = std::move(slices_owner);
+  reservation.bufferImplUseOnlySetLength(reserved);
+
+  return reservation;
+}
+
+ReservationSingleSlice OwnedImpl::reserveSingleSlice(uint64_t length, bool separate_slice) {
+  ReservationSingleSlice reservation = ReservationSingleSlice::bufferImplUseOnlyConstruct(*this);
+  if (length == 0) {
+    return reservation;
+  }
+
+  // Remove any empty slices at the end.
+  while (!slices_.empty() && slices_.back().dataSize() == 0) {
+    slices_.pop_back();
+  }
+
+  auto& reservation_slice = reservation.bufferImplUseOnlySlice();
+  auto slice_owner = std::make_unique<OwnedImplReservationSlicesOwnerSingle>();
+
+  // Check whether there are any empty slices with reservable space at the end of the buffer.
+  uint64_t reservable_size =
+      (separate_slice || slices_.empty()) ? 0 : slices_.back().reservableSize();
+  if (reservable_size >= length) {
+    reservation_slice = slices_.back().reserve(length);
+  } else {
+    Slice slice(length);
+    reservation_slice = slice.reserve(length);
+    slice_owner->owned_slice_ = std::move(slice);
+  }
+
+  reservation.bufferImplUseOnlySliceOwner() = std::move(slice_owner);
+
+  return reservation;
+}
+
+void OwnedImpl::commit(uint64_t length, absl::Span<RawSlice> slices,
+                       ReservationSlicesOwnerPtr slices_owner_base) {
+  if (length == 0) {
+    return;
+  }
+
+  ASSERT(dynamic_cast<OwnedImplReservationSlicesOwner*>(slices_owner_base.get()) != nullptr);
+  std::unique_ptr<OwnedImplReservationSlicesOwner> slices_owner(
+      static_cast<OwnedImplReservationSlicesOwner*>(slices_owner_base.release()));
+
+  absl::Span<Slice> owned_slices = slices_owner->ownedSlices();
+  ASSERT(slices.size() == owned_slices.size());
+
   uint64_t bytes_remaining = length;
-  size_t slice_index = first_reservable_slice;
-  while (slice_index < slices_.size() && bytes_remaining != 0 && num_slices_used < num_iovecs) {
-    auto& slice = slices_[slice_index];
-    const uint64_t reservation_size = std::min(slice->reservableSize(), bytes_remaining);
-    if (num_slices_used + 1 == num_iovecs && reservation_size < bytes_remaining) {
-      // There is only one iovec left, and this next slice does not have enough space to
-      // complete the reservation. Stop iterating, with last one iovec still unpopulated,
-      // so the code following this loop can allocate a new slice to hold the rest of the
-      // reservation.
-      break;
+  for (uint32_t i = 0; i < slices.size() && bytes_remaining > 0; i++) {
+    Slice& owned_slice = owned_slices[i];
+    if (owned_slice.data() != nullptr) {
+      slices_.emplace_back(std::move(owned_slice));
     }
-    iovecs[num_slices_used] = slice->reserve(reservation_size);
-    bytes_remaining -= iovecs[num_slices_used].len_;
-    num_slices_used++;
-    slice_index++;
+    slices[i].len_ = std::min<uint64_t>(slices[i].len_, bytes_remaining);
+    bool success = slices_.back().commit(slices[i]);
+    ASSERT(success);
+    length_ += slices[i].len_;
+    bytes_remaining -= slices[i].len_;
   }
-
-  // If needed, allocate one more slice at the end to provide the remainder of the reservation.
-  if (bytes_remaining != 0) {
-    slices_.emplace_back(OwnedSlice::create(bytes_remaining));
-    iovecs[num_slices_used] = slices_.back()->reserve(bytes_remaining);
-    bytes_remaining -= iovecs[num_slices_used].len_;
-    num_slices_used++;
-  }
-
-  ASSERT(num_slices_used <= num_iovecs);
-  ASSERT(bytes_remaining == 0);
-  return num_slices_used;
 }
 
 ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t length) const {
@@ -409,13 +435,13 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
   for (size_t slice_index = 0; slice_index < slices_.size() && (left_to_search > 0);
        slice_index++) {
     const auto& slice = slices_[slice_index];
-    uint64_t slice_size = slice->dataSize();
+    uint64_t slice_size = slice.dataSize();
     if (slice_size <= start) {
       start -= slice_size;
       offset += slice_size;
       continue;
     }
-    const uint8_t* slice_start = slice->data();
+    const uint8_t* slice_start = slice.data();
     const uint8_t* haystack = slice_start;
     const uint8_t* haystack_end = haystack + slice_size;
     haystack += start;
@@ -450,8 +476,8 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t 
             break;
           }
           const auto& match_slice = slices_[match_index];
-          match_next = match_slice->data();
-          match_end = match_next + match_slice->dataSize();
+          match_next = match_slice.data();
+          match_end = match_next + match_slice.dataSize();
           continue;
         }
         left_to_search--;
@@ -487,8 +513,8 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
   const uint8_t* prefix = reinterpret_cast<const uint8_t*>(data.data());
   size_t size = data.length();
   for (const auto& slice : slices_) {
-    uint64_t slice_size = slice->dataSize();
-    const uint8_t* slice_start = slice->data();
+    uint64_t slice_size = slice.dataSize();
+    const uint8_t* slice_start = slice.data();
 
     if (slice_size >= size) {
       // The remaining size bytes of data are in this slice.
@@ -530,7 +556,8 @@ std::string OwnedImpl::toString() const {
 void OwnedImpl::postProcess() {}
 
 void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
-  slices_.emplace_back(OwnedSlice::create(data, size));
+  slices_.emplace_back(size);
+  slices_.back().append(data, size);
   length_ += size;
 }
 
@@ -538,10 +565,10 @@ void OwnedImpl::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
 }
 
-std::vector<OwnedSlice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const {
-  std::vector<OwnedSlice::SliceRepresentation> slices;
+std::vector<Slice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const {
+  std::vector<Slice::SliceRepresentation> slices;
   for (const auto& slice : slices_) {
-    slices.push_back(slice->describeSliceForTest());
+    slices.push_back(slice.describeSliceForTest());
   }
   return slices;
 }

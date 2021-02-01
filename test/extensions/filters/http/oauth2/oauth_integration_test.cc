@@ -16,7 +16,7 @@ class OauthIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   OauthIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   envoy::service::discovery::v3::DiscoveryResponse genericSecretResponse(absl::string_view name,
@@ -58,6 +58,10 @@ typed_config:
         name: token
       hmac_secret:
         name: hmac
+    auth_scopes:
+    - user
+    - openid
+    - email
 )EOF");
 
     // Add the OAuth cluster.
@@ -130,7 +134,7 @@ TEST_F(OauthIntegrationTest, AuthenticationFlow) {
           api_->timeSource().systemTime().time_since_epoch() + std::chrono::seconds(10))
           .count());
 
-  Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessage(oauth_response));
+  Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrDie(oauth_response));
   upstream_request_->encodeData(buffer, true);
 
   // We should get an immediate redirect back.

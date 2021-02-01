@@ -16,6 +16,8 @@
 #include "envoy/network/udp_packet_writer_handler.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/interval_value.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -94,8 +96,7 @@ public:
   /**
    * @return bool if a connection should be handed off to another Listener after the original
    *         destination address has been restored. 'true' when 'use_original_dst' flag in listener
-   *         configuration is set, false otherwise. Note that this flag is deprecated and will be
-   *         removed from the v2 API.
+   *         configuration is set, false otherwise.
    */
   virtual bool handOffRestoredDestinationConnections() const PURE;
 
@@ -333,7 +334,7 @@ public:
    * Set the fraction of incoming connections that will be closed immediately
    * after being opened.
    */
-  virtual void setRejectFraction(float reject_fraction) PURE;
+  virtual void setRejectFraction(UnitFloat reject_fraction) PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

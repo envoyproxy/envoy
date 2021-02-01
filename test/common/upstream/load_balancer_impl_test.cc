@@ -40,11 +40,14 @@ protected:
   // all the load balancers have equivalent functionality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
-  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+  LoadBalancerTestBase()
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
+  ClusterStatNames stat_names_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -593,7 +596,8 @@ TEST_P(FailoverTest, BasicDegradedHosts) {
   host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
-  EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->peekAnotherHost(nullptr));
+  // We don't preconnect degraded hosts.
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr));
 }
 
@@ -799,7 +803,8 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime()));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
-  peekThenPick({2, 0, 1, 2});
+  peekThenPick({2, 0, 1});
+  peekThenPick({2});
 
   // Now peek a few extra to push the index forward, alter the host set, and
   // make sure the index is restored to 0.
@@ -809,7 +814,8 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:83", simTime()));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {hostSet().healthy_hosts_.front()});
-  peekThenPick({1, 2, 3});
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  peekThenPick({2, 3});
 }
 
 // Validate that the RNG seed influences pick order.

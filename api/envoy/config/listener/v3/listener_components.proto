@@ -4,6 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
@@ -23,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// [#next-free-field: 6]
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.Filter";
 
@@ -34,10 +36,16 @@ message Filter {
   // :ref:`supported filter <config_network_filters>`.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
   oneof config_type {
+    // Filter specific configuration which depends on the filter being
+    // instantiated. See the supported filters for further documentation.
     google.protobuf.Any typed_config = 4;
+
+    // Configuration source specifier for an extension configuration discovery
+    // service. In case of a failure and without the default configuration, the
+    // listener closes the connections.
+    // [#not-implemented-hide:]
+    core.v3.ExtensionConfigSource config_discovery = 5;
   }
 }
 
@@ -218,7 +226,11 @@ message FilterChain {
   // load balancers including the AWS ELB support this option. If the option is
   // absent or set to false, Envoy will use the physical peer address of the
   // connection as the remote address.
-  google.protobuf.BoolValue use_proxy_proto = 4;
+  //
+  // This field is deprecated. Add a
+  // :ref:`PROXY protocol listener filter <config_listener_filters_proxy_protocol>`
+  // explicitly instead.
+  google.protobuf.BoolValue use_proxy_proto = 4 [deprecated = true];
 
   // [#not-implemented-hide:] filter chain metadata.
   core.v3.Metadata metadata = 5;

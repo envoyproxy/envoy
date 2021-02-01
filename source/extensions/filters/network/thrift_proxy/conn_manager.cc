@@ -176,6 +176,23 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
   return **rpcs_.begin();
 }
 
+bool ConnectionManager::passthroughEnabled() const {
+  if (!config_.payloadPassthrough()) {
+    return false;
+  }
+
+  // If the rpcs list is empty, a local response happened.
+  //
+  // TODO(rgs1): we actually could still enable passthrough for local
+  // responses as long as the transport is framed and the protocol is
+  // not Twitter.
+  if (rpcs_.empty()) {
+    return false;
+  }
+
+  return (*rpcs_.begin())->passthroughSupported();
+}
+
 bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   upstream_buffer_.move(data);
 
@@ -274,6 +291,10 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   return FilterStatus::Continue;
 }
 
+bool ConnectionManager::ResponseDecoder::passthroughEnabled() const {
+  return parent_.parent_.passthroughEnabled();
+}
+
 void ConnectionManager::ActiveRpcDecoderFilter::continueDecoding() {
   const FilterStatus status = parent_.applyDecoderFilters(this);
   if (status == FilterStatus::Continue) {
@@ -308,12 +329,26 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(ActiveRpcDecoderF
     for (; entry != decoder_filters_.end(); entry++) {
       const FilterStatus status = filter_action_((*entry)->handle_.get());
       if (local_response_sent_) {
-        // The filter called sendLocalReply: stop processing filters and return
-        // FilterStatus::Continue irrespective of the current result.
+        // The filter called sendLocalReply but _did not_ close the connection.
+        // We return FilterStatus::Continue irrespective of the current result,
+        // which is fine because subsequent calls to this method will skip
+        // filters anyway.
+        //
+        // Note: we need to return FilterStatus::Continue here, in order for decoding
+        // to proceed. This is important because as noted above, the connection remains
+        // open so we need to consume the remaining bytes.
         break;
       }
 
       if (status != FilterStatus::Continue) {
+        // If we got FilterStatus::StopIteration and a local reply happened but
+        // local_response_sent_ was not set, the connection was closed.
+        //
+        // In this case, either resetAllRpcs() gets called via onEvent(LocalClose) or
+        // dispatch() stops the processing.
+        //
+        // In other words, after a local reply closes the connection and StopIteration
+        // is returned we are done.
         return status;
       }
     }
@@ -396,6 +431,25 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
   if (destroy_rpc) {
     parent_.doDeferredRpcDestroy(*this);
   }
+}
+
+bool ConnectionManager::ActiveRpc::passthroughSupported() const {
+  for (auto& entry : decoder_filters_) {
+    if (!entry->handle_->passthroughSupported()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
+  filter_context_ = &data;
+  filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
+    Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);
+    return filter->passthroughData(*data);
+  };
+
+  return applyDecoderFilters(nullptr);
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {

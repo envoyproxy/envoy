@@ -14,11 +14,13 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/config/api_version.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "test/integration/server_stats.h"
 
@@ -113,12 +115,16 @@ public:
   static std::string defaultHealthCheckFilter();
   // A string for a squash filter which can be used with addFilter()
   static std::string defaultSquashFilter();
+  // A string for startTls transport socket config.
+  static std::string startTlsConfig();
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type,
-                                  envoy::config::core::v3::ApiVersion api_version);
+                                  envoy::config::core::v3::ApiVersion resource_api_version,
+                                  envoy::config::core::v3::ApiVersion transport_api_version =
+                                      envoy::config::core::v3::ApiVersion::AUTO);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
                                                                 const std::string& address);
@@ -193,6 +199,9 @@ public:
   // Add a listener filter prior to existing filters.
   void addListenerFilter(const std::string& filter_yaml);
 
+  // Add a new bootstrap extension.
+  void addBootstrapExtension(const std::string& config);
+
   // Sets the client codec to the specified type.
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                           HttpConnectionManager::CodecType type);
@@ -203,7 +212,8 @@ public:
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
-  bool setAccessLog(const std::string& filename, absl::string_view format = "");
+  bool setAccessLog(const std::string& filename, absl::string_view format = "",
+                    std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
 
   // Set the listener access log for the first listener to a given file.
   bool setListenerAccessLog(const std::string& filename, absl::string_view format = "");
@@ -218,6 +228,19 @@ public:
   // Allows callers to easily modify the HttpConnectionManager configuration.
   // Modifiers will be applied just before ports are modified in finalize
   void addConfigModifier(HttpModifierFunction function);
+
+  // Allows callers to easily modify the filter named 'name' from the first filter chain from the
+  // first listener. Modifiers will be applied just before ports are modified in finalize
+  template <class FilterType>
+  void addFilterConfigModifier(const std::string& name,
+                               std::function<void(Protobuf::Message& filter)> function) {
+    addConfigModifier([name, function, this](envoy::config::bootstrap::v3::Bootstrap&) -> void {
+      FilterType filter_config;
+      loadFilter<FilterType>(name, filter_config);
+      function(filter_config);
+      storeFilter<FilterType>(name, filter_config);
+    });
+  }
 
   // Apply any outstanding config modifiers, stick all the listeners in a discovery response message
   // and write it to the lds file.
@@ -234,6 +257,9 @@ public:
 
   // Allow a finalized configuration to be edited for generating xDS responses
   void applyConfigModifiers();
+
+  // Configure Envoy to do TLS to upstream.
+  void configureUpstreamTls(bool use_alpn = false);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -257,8 +283,10 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
 
-  // Set new codecs to use for upstream and downstream codecs.
-  void setNewCodecs();
+  using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
+  static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
+                                 HttpProtocolOptions& protocol_options);
+  static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
 
 private:
   static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
@@ -274,6 +302,26 @@ private:
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(const HttpConnectionManager& hcm);
+
+  // Load the first FilterType struct from the first listener into a parsed proto.
+  template <class FilterType> bool loadFilter(const std::string& name, FilterType& filter) {
+    RELEASE_ASSERT(!finalized_, "");
+    auto* filter_config = getFilterFromListener(name);
+    if (filter_config) {
+      auto* config = filter_config->mutable_typed_config();
+      filter = MessageUtil::anyConvert<FilterType>(*config);
+      return true;
+    }
+    return false;
+  }
+  // Take the contents of the provided FilterType proto and stuff them into the first FilterType
+  // struct of the first listener.
+  template <class FilterType> void storeFilter(const std::string& name, const FilterType& filter) {
+    RELEASE_ASSERT(!finalized_, "");
+    auto* filter_config_any = getFilterFromListener(name)->mutable_typed_config();
+
+    filter_config_any->PackFrom(filter);
+  }
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);

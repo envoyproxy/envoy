@@ -152,9 +152,21 @@ public:
    *        - "[1234:5678::9]:443"
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
    * @return pointer to the Instance.
+   * @throw EnvoyException in case of a malformed IP address.
    */
   static Address::InstanceConstSharedPtr parseInternetAddressAndPort(const std::string& ip_address,
                                                                      bool v6only = true);
+
+  /**
+   * Create a new Instance from an internet host address (IPv4 or IPv6) and port.
+   * @param ip_addr string to be parsed as an internet address and port. Examples:
+   *        - "1.2.3.4:80"
+   *        - "[1234:5678::9]:443"
+   * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @return pointer to the Instance, or a nullptr in case of a malformed IP address.
+   */
+  static Address::InstanceConstSharedPtr
+  parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only = true);
 
   /**
    * Get the local address of the first interface address that is of type
