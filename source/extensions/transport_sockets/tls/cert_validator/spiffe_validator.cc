@@ -91,6 +91,9 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtend
   }
 
   auto trust_bundle = getTrustBundleStore(&leaf_cert);
+  if (!trust_bundle) {
+    return 0;
+  }
   store_ctx->ctx = trust_bundle;
   return X509_verify_cert(store_ctx);
 }
