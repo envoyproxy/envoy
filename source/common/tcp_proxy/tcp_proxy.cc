@@ -445,6 +445,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
             .filterState()
             .hasData<Network::Win32RedirectRecordsFilterState>(
                 Network::Win32RedirectRecordsFilterState::key())) {
+      // See how to perform bind or connect redirection on MSDN
+      // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection
       auto redirect_records = downstreamConnection()
                                   ->streamInfo()
                                   .filterState()

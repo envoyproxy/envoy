@@ -18,6 +18,15 @@ has been redirected by an HNS policy applied to a container endpoint. For this f
 :ref:`traffic_direction <envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>` must be set
 on the listener. This means that a separate listener is needed to handle inbound and outbound traffic.
 
+Redirection is not available for use with all types of network traffic. The types of packets that are supported for redirection are shown in the following list:
+
+* TCP
+* UDP
+* Raw UDPv4 without the header include option
+* Raw ICMP
+
+For more info see `Using Bind or Connect Redirection <https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection>`_
+
 .. note::
 
     At the time of writing (February 2021) the OS support for original destination is only available through the

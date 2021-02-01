@@ -3741,7 +3741,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->direction());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoTrafficDirection) {
+#ifdef WIN32
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
@@ -3752,6 +3753,44 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+                            , EnvoyException,
+                            "[Windows] Setting original destination filter on a listener without "
+                            "specifying the traffic_direction."
+                            "Configure the traffic_direction listener option");
+#endif
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoFeatureSupport) {
+#if defined(WIN32) && !defined(SOL_IP)
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "envoy.filters.listener.original_dst"
+      typed_config: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+                            , EnvoyException,
+                            "[Windows] Envoy was compiled without support for `SO_ORIGINAL_DST`, "
+                            "the original destination filter can not be used");
+#endif
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
+#ifdef SOL_IP
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains: {}
+    traffic_direction: INBOUND
+    listener_filters:
+    - name: "envoy.filters.listener.original_dst"
+      typed_config: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
   EXPECT_CALL(server_.api_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
@@ -3762,10 +3801,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
 
-#ifdef SOL_IP
   // Return error when trying to retrieve the original dst on the invalid handle
   EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
-#endif
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
@@ -3785,6 +3822,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+#endif
 }
 
 class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
@@ -4022,10 +4060,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
   listener.set_reuse_port(false);
   server_.options_.concurrency_ = 2;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(listener, "", true), EnvoyException,
-      "Listening on UDP when concurrency is > 1 without the SO_REUSEPORT socket option results in "
-      "unstable packet proxying. Configure the reuse_port listener option or set concurrency = 1.");
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+                            "Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
+                            "socket option results in "
+                            "unstable packet proxying. Configure the reuse_port listener option "
+                            "or set concurrency = 1.");
   EXPECT_EQ(0, manager_->listeners().size());
 }
 

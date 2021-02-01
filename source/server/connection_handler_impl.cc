@@ -480,6 +480,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
 #ifdef WIN32
+  // See how to perform bind or connect redirection on MSDN
+  // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection
   if constexpr (Network::win32SupportsOriginalDestination()) {
     if (config_->direction() == envoy::config::core::v3::OUTBOUND &&
         socket->addressProvider().localAddressRestored()) {
