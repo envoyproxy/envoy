@@ -117,11 +117,14 @@ Note that when using HTTP/1 CONNECT you will end up having a TCP connection
 between L1 and L2 Envoy for each TCP client connection, it is preferable to use
 HTTP/2 when you have the choice.
 
-Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`
+Examples of such a set up can be found in the Envoy example config :repo:`directory <configs/>`.
+
 For HTTP/1.1 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http1_connect.yaml --base-id 1`
 and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http1_connect.yaml`.
+
 For HTTP/2 run `bazel-bin/source/exe/envoy-static --config-path configs/encapsulate_in_http2_connect.yaml --base-id 1`
 and `bazel-bin/source/exe/envoy-static --config-path configs/terminate_http2_connect.yaml`.
+
 In both cases you will be running a first Envoy listening for TCP traffic on port 10000 and encapsulating it in an HTTP
 CONNECT request, and a second one listening on 10001, stripping the CONNECT headers, and forwarding the 
 original TCP upstream, in this case to google.com.

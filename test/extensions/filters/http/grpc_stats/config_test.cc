@@ -243,29 +243,25 @@ TEST_F(GrpcStatsFilterConfigTest, StatsForAllMethodsDefaultSetting) {
       deprecatedFeatureEnabled(
           "envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default", _))
       .WillOnce(Invoke([](absl::string_view, bool default_value) { return default_value; }));
-  EXPECT_LOG_CONTAINS("warn",
-                      "Using deprecated default value for "
-                      "'envoy.extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_"
-                      "methods'",
-                      initialize());
+  initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                                  {":path", "/BadCompanions/GetBadCompanions"}};
 
   doRequestResponse(request_headers);
 
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
                      .counterFromString("grpc.BadCompanions.GetBadCompanions.success")
                      .value());
-  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
                      .counterFromString("grpc.BadCompanions.GetBadCompanions.total")
                      .value());
   EXPECT_EQ(
-      0UL,
+      1UL,
       decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.success").value());
-  EXPECT_EQ(0UL,
+  EXPECT_EQ(1UL,
             decoder_callbacks_.clusterInfo()->statsScope().counterFromString("grpc.total").value());
 }
 
