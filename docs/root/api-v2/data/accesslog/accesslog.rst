@@ -1,4 +1,4 @@
-Access logs
+访问日志
 ===========
 
 .. toctree::
