@@ -126,7 +126,7 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(
     switch (format) {
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
-      output_string = MessageUtil::getJsonStringFromMessage(*trace, true, true);
+      output_string = MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

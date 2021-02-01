@@ -61,7 +61,7 @@ void ListenersHandler::writeListenersAsJson(Buffer::Instance& response) {
     Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
                                                *listener_status.mutable_local_address());
   }
-  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessageOrError(listeners, true)); // pretty-print
 }
 
 void ListenersHandler::writeListenersAsText(Buffer::Instance& response) {

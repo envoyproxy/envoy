@@ -589,10 +589,14 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
                                                   const bool block_print,
                                                   const bool always_print_primitive_fields) {
-  std::string json = getJsonStringFromMessage(message, false, always_print_primitive_fields);
+
+  auto json_or_error = getJsonStringFromMessage(message, false, always_print_primitive_fields);
+  if (!json_or_error.ok()) {
+    throw EnvoyException(json_or_error.status().ToString());
+  }
   YAML::Node node;
   try {
-    node = YAML::Load(json);
+    node = YAML::Load(json_or_error.value());
   } catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
   } catch (YAML::BadConversion& e) {
@@ -612,9 +616,9 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
   return out.c_str();
 }
 
-std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,
-                                                  const bool pretty_print,
-                                                  const bool always_print_primitive_fields) {
+ProtobufUtil::StatusOr<std::string>
+MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message, const bool pretty_print,
+                                      const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
   // By default, proto field names are converted to camelCase when the message is converted to JSON.
   // Setting this option makes debugging easier because it keeps field names consistent in JSON
@@ -629,10 +633,21 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
     json_options.always_print_primitive_fields = true;
   }
   std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
-  // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok(), "");
+  if (auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
+      !status.ok()) {
+    return status;
+  }
   return json;
+}
+
+std::string MessageUtil::getJsonStringFromMessageOrError(const Protobuf::Message& message,
+                                                         bool pretty_print,
+                                                         bool always_print_primitive_fields) {
+  auto json_or_error =
+      getJsonStringFromMessage(message, pretty_print, always_print_primitive_fields);
+  return json_or_error.ok() ? std::move(json_or_error).value()
+                            : fmt::format("Failed to convert protobuf message to JSON string: {}",
+                                          json_or_error.status().ToString());
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
@@ -1004,5 +1019,4 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .time_since_epoch()
           .count()));
 }
-
 } // namespace Envoy

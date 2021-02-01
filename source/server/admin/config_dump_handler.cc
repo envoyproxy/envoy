@@ -139,7 +139,7 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   MessageUtil::redact(dump);
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessageOrError(dump, true)); // pretty-print
   return Http::Code::OK;
 }
 

@@ -80,7 +80,7 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
             out, absl::StrJoin(
                      toListOfSpans(zipkin_span, replacements), ",",
                      [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
-                       const std::string json = MessageUtil::getJsonStringFromMessage(
+                       const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
                            span, /* pretty_print */ false,
                            /* always_print_primitive_fields */ true);
 

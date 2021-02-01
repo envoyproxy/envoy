@@ -21,7 +21,8 @@ Tracing::HttpTracerSharedPtr DynamicOpenTracingTracerFactory::createHttpTracerTy
     const envoy::config::trace::v3::DynamicOtConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   const std::string& library = proto_config.library();
-  const std::string config = MessageUtil::getJsonStringFromMessage(proto_config.config());
+  const ProtobufWkt::Struct& config_struct = proto_config.config();
+  const std::string config = MessageUtil::getJsonStringFromMessageOrDie(config_struct);
   Tracing::DriverPtr dynamic_driver = std::make_unique<DynamicOpenTracingDriver>(
       context.serverFactoryContext().scope(), library, config);
   return std::make_shared<Tracing::HttpTracerImpl>(std::move(dynamic_driver),

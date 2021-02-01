@@ -187,8 +187,8 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
   FakeRawConnectionPtr fake_upstream_connection_1;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -229,8 +229,8 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -398,8 +398,8 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
     c0->close();
     c_default->close();
   });
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -427,8 +427,8 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -465,8 +465,8 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
 
   auto codec_client_default = createHttpCodec("alpndefault");
   Cleanup cleanup0([c_default = codec_client_default.get()]() { c_default->close(); });
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto default_filter_chain =
@@ -493,8 +493,8 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup([c0 = codec_client_0.get()]() { c0->close(); });
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -538,8 +538,8 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 
   // Create a new config with HTTP/1.0 proxying.
-  ConfigHelper new_config_helper(version_, *api_,
-                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {

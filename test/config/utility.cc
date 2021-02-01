@@ -1211,7 +1211,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
 
   const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
-      "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
+      "new_lds_file", MessageUtil::getJsonStringFromMessageOrDie(lds));
   TestEnvironment::renameFile(file, lds_filename);
 }
 

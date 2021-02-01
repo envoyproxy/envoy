@@ -178,8 +178,8 @@ void BaseIntegrationTest::createEnvoy() {
       ProtobufWkt::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
-    TestEnvironment::writeStringToFileForTest(lds_path, MessageUtil::getJsonStringFromMessage(lds),
-                                              true);
+    TestEnvironment::writeStringToFileForTest(
+        lds_path, MessageUtil::getJsonStringFromMessageOrDie(lds), true);
 
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.

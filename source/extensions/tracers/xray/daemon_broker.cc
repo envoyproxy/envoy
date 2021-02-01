@@ -22,8 +22,8 @@ std::string createHeader(const std::string& format, uint32_t version) {
   source::extensions::tracers::xray::daemon::Header header;
   header.set_format(format);
   header.set_version(version);
-  return MessageUtil::getJsonStringFromMessage(header, false /* pretty_print  */,
-                                               false /* always_print_primitive_fields */);
+  return MessageUtil::getJsonStringFromMessageOrDie(header, false /* pretty_print  */,
+                                                    false /* always_print_primitive_fields */);
 }
 
 } // namespace

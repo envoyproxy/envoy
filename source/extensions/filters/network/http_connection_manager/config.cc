@@ -516,7 +516,7 @@ void HttpConnectionManagerConfig::processFilter(
       callback, proto_config.name());
   ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
   ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(
+            MessageUtil::getJsonStringFromMessageOrError(
                 proto_config.has_typed_config()
                     ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                     : static_cast<const Protobuf::Message&>(

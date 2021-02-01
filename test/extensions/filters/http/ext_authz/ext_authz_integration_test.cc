@@ -65,7 +65,7 @@ public:
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
+      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
     });
   }
 
@@ -466,7 +466,7 @@ public:
       ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
+      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
     });
   }
 
@@ -691,7 +691,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     envoy::config::listener::v3::Filter ext_authz_filter;
     ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
-    config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
+    config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
   });
 
   const std::string local_reply_yaml = R"EOF(

@@ -310,7 +310,7 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
   }
 
   MessageUtil::validate(json_req, ProtobufMessage::getStrictValidationVisitor());
-  const std::string json_data = MessageUtil::getJsonStringFromMessage(
+  const std::string json_data = MessageUtil::getJsonStringFromMessageOrError(
       json_req, false /* pretty_print  */, true /* always_print_primitive_fields */);
   out.add(json_data);
 }

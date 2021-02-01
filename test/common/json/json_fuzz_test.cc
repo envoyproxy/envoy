@@ -21,7 +21,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     MessageUtil::loadFromJson(json_string, message);
     // We should be able to serialize, parse again and get the same result.
     ProtobufWkt::Struct message2;
-    MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessage(message), message2);
+    MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessageOrDie(message), message2);
     FUZZ_ASSERT(TestUtility::protoEqual(message, message2));
 
     // MessageUtil::getYamlStringFromMessage automatically convert types, so we have to do another

@@ -192,9 +192,9 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapJsonDeprecate
     )EOF");
 
   EXPECT_EQ("{\"node\":{\"build_version\":\"foo\"}}",
-            MessageUtil::getJsonStringFromMessage(bootstrap, false, false));
+            MessageUtil::getJsonStringFromMessageOrDie(bootstrap, false, false));
   const std::string filename = TestEnvironment::writeStringToFileForTest(
-      "proto.json", MessageUtil::getJsonStringFromMessage(bootstrap, false, false));
+      "proto.json", MessageUtil::getJsonStringFromMessageOrDie(bootstrap, false, false));
 
   // Loading as previous version should work (after upgrade)
   API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_v2_from_file;
@@ -216,7 +216,7 @@ TEST(DeprecatedConfigsTest, DEPRECATED_FEATURE_TEST(LoadV2BootstrapJsonDeprecate
     )EOF");
 
   EXPECT_EQ("{\"node\":{\"hidden_envoy_deprecated_build_version\":\"foo\"}}",
-            MessageUtil::getJsonStringFromMessage(bootstrap_v3, false, false));
+            MessageUtil::getJsonStringFromMessageOrDie(bootstrap_v3, false, false));
   const std::string filename_v3 = TestEnvironment::writeStringToFileForTest(
       "proto_v3.json", MessageUtil::getYamlStringFromMessage(bootstrap_v3, false, false));
 
