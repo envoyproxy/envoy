@@ -810,8 +810,21 @@ namespace Http {
  * All of the inline header functions that just pass through to the child header map.
  */
 #define DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                      \
-public:                                                                                            \
   const HeaderEntry* name() const override { return header_map_->name(); }                         \
+  size_t remove##name() override {                                                                 \
+    const size_t headers_removed = header_map_->remove##name();                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+    return headers_removed;                                                                        \
+  }                                                                                                \
+  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }  \
+  void set##name(absl::string_view value) override {                                               \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+  }
+
+#define DEFINE_TEST_INLINE_STRING_HEADER_FUNCS(name)                                               \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     header_map_->append##name(data, delimiter);                                                    \
     header_map_->verifyByteSizeInternalForTest();                                                  \
@@ -819,21 +832,15 @@ public:                                                                         
   void setReference##name(absl::string_view value) override {                                      \
     header_map_->setReference##name(value);                                                        \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  void set##name(absl::string_view value) override {                                               \
-    header_map_->set##name(value);                                                                 \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
+  }
+
+#define DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS(name)                                              \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void set##name(uint64_t value) override {                                                        \
     header_map_->set##name(value);                                                                 \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  size_t remove##name() override {                                                                 \
-    const size_t headers_removed = header_map_->remove##name();                                    \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-    return headers_removed;                                                                        \
-  }                                                                                                \
-  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }
+  }
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map
@@ -1002,8 +1009,10 @@ class TestRequestHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_REQ_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_REQ_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;
@@ -1013,9 +1022,12 @@ class TestResponseHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 class TestResponseTrailerMapImpl
@@ -1023,7 +1035,8 @@ class TestResponseTrailerMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's

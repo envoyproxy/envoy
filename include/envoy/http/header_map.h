@@ -261,18 +261,17 @@ private:
  * The following defines all default request headers that Envoy allows direct access to inside of
  * the header map. In practice, these are all headers used during normal Envoy request flow
  * processing. This allows O(1) access to these headers without even a hash lookup.
+ *
  */
-#define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
+#define INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                     \
   HEADER_FUNC(ClientTraceId)                                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
-  HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyExternalAddress)                                                                \
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
   HEADER_FUNC(EnvoyHedgeOnPerTryTimeout)                                                           \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyIpTags)                                                                         \
-  HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
@@ -280,9 +279,7 @@ private:
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
-  HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutAltResponse)                                              \
-  HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
@@ -296,29 +293,43 @@ private:
   HEADER_FUNC(TE)                                                                                  \
   HEADER_FUNC(UserAgent)
 
+#define INLINE_REQ_NUMERIC_HEADERS(HEADER_FUNC)                                                    \
+  HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
+  HEADER_FUNC(EnvoyMaxRetries)                                                                     \
+  HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
+  HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)
+
+#define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
+  INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                           \
+  INLINE_REQ_NUMERIC_HEADERS(HEADER_FUNC)
+
 /**
  * Default O(1) response headers.
  */
-#define INLINE_RESP_HEADERS(HEADER_FUNC)                                                           \
+#define INLINE_RESP_STRING_HEADERS(HEADER_FUNC)                                                    \
   HEADER_FUNC(Date)                                                                                \
   HEADER_FUNC(EnvoyDegraded)                                                                       \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
   HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyUpstreamCanary)                                                                 \
   HEADER_FUNC(EnvoyUpstreamHealthCheckedCluster)                                                   \
-  HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
   HEADER_FUNC(Location)                                                                            \
-  HEADER_FUNC(Server)                                                                              \
+  HEADER_FUNC(Server)
+
+#define INLINE_RESP_NUMERIC_HEADERS(HEADER_FUNC)                                                   \
+  HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
   HEADER_FUNC(Status)
+
+#define INLINE_RESP_HEADERS(HEADER_FUNC)                                                           \
+  INLINE_RESP_STRING_HEADERS(HEADER_FUNC)                                                          \
+  INLINE_RESP_NUMERIC_HEADERS(HEADER_FUNC)
 
 /**
  * Default O(1) request and response headers.
  */
-#define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
+#define INLINE_REQ_RESP_STRING_HEADERS(HEADER_FUNC)                                                \
   HEADER_FUNC(Connection)                                                                          \
-  HEADER_FUNC(ContentLength)                                                                       \
   HEADER_FUNC(ContentType)                                                                         \
-  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(ProxyConnection)                                                                     \
@@ -327,36 +338,58 @@ private:
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(Via)
 
+#define INLINE_REQ_RESP_NUMERIC_HEADERS(HEADER_FUNC)                                               \
+  HEADER_FUNC(ContentLength)                                                                       \
+  HEADER_FUNC(EnvoyAttemptCount)
+
+#define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
+  INLINE_REQ_RESP_STRING_HEADERS(HEADER_FUNC)                                                      \
+  INLINE_REQ_RESP_NUMERIC_HEADERS(HEADER_FUNC)
+
 /**
  * Default O(1) response headers and trailers.
  */
+#define INLINE_RESP_STRING_HEADERS_TRAILERS(HEADER_FUNC) HEADER_FUNC(GrpcMessage)
+
+#define INLINE_RESP_NUMERIC_HEADERS_TRAILERS(HEADER_FUNC) HEADER_FUNC(GrpcStatus)
+
 #define INLINE_RESP_HEADERS_TRAILERS(HEADER_FUNC)                                                  \
-  HEADER_FUNC(GrpcMessage)                                                                         \
-  HEADER_FUNC(GrpcStatus)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(HEADER_FUNC)                                                 \
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(HEADER_FUNC)
 
 /**
  * The following functions are defined for each inline header above.
 
  * E.g., for path we have:
  * Path() -> returns the header entry if it exists or nullptr.
- * appendPath(path, "/") -> appends the string path with delimiter "/" to the header value.
- * setReferencePath(PATH) -> sets header value to reference string PATH.
- * setPath(path_string) -> sets the header value to the string path_string by copying the data.
  * removePath() -> removes the header if it exists.
+ * setPath(path_string) -> sets the header value to the string path_string by copying the data.
  *
- * For inline headers that use integers, we have:
- * setContentLength(5) -> sets the header value to the integer 5.
- *
- * TODO(asraa): Remove the integer set for inline headers that do not take integer values.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
-  virtual void append##name(absl::string_view data, absl::string_view delimiter) PURE;             \
-  virtual void setReference##name(absl::string_view value) PURE;                                   \
-  virtual void set##name(absl::string_view value) PURE;                                            \
-  virtual void set##name(uint64_t value) PURE;                                                     \
   virtual size_t remove##name() PURE;                                                              \
-  virtual absl::string_view get##name##Value() const PURE;
+  virtual absl::string_view get##name##Value() const PURE;                                         \
+  virtual void set##name(absl::string_view value) PURE;
+
+/*
+ * For inline headers that have string values, there are also:
+ * appendPath(path, "/") -> appends the string path with delimiter "/" to the header value.
+ * setReferencePath(PATH) -> sets header value to reference string PATH.
+ *
+ */
+#define DEFINE_INLINE_STRING_HEADER(name)                                                          \
+  DEFINE_INLINE_HEADER(name)                                                                       \
+  virtual void append##name(absl::string_view data, absl::string_view delimiter) PURE;             \
+  virtual void setReference##name(absl::string_view value) PURE;
+
+/*
+ * For inline headers that use integers, there is:
+ * setContentLength(5) -> sets the header value to the integer 5.
+ */
+#define DEFINE_INLINE_NUMERIC_HEADER(name)                                                         \
+  DEFINE_INLINE_HEADER(name)                                                                       \
+  virtual void set##name(uint64_t) PURE;
 
 /**
  * Wraps a set of HTTP headers.
@@ -738,7 +771,8 @@ public:
 // Base class for both request and response headers.
 class RequestOrResponseHeaderMap : public HeaderMap {
 public:
-  INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
 };
 
 // Request headers.
@@ -746,7 +780,8 @@ class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders> {
 public:
-  INLINE_REQ_HEADERS(DEFINE_INLINE_HEADER)
+  INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
+  INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
 using RequestHeaderMapOptRef = OptRef<RequestHeaderMap>;
@@ -764,7 +799,8 @@ class ResponseHeaderOrTrailerMap {
 public:
   virtual ~ResponseHeaderOrTrailerMap() = default;
 
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_INLINE_HEADER)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_INLINE_STRING_HEADER)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_INLINE_NUMERIC_HEADER)
 };
 
 // Response headers.
@@ -773,7 +809,8 @@ class ResponseHeaderMap
       public ResponseHeaderOrTrailerMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseHeaders> {
 public:
-  INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER)
+  INLINE_RESP_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
+  INLINE_RESP_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
 using ResponseHeaderMapOptRef = OptRef<ResponseHeaderMap>;

@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/ssl/context.h"
+
 #include "common/common/utility.h"
 
 #include "absl/types/optional.h"
@@ -37,6 +39,9 @@ static constexpr absl::string_view SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE =
 static constexpr absl::string_view SSL_ERROR_HANDOFF_MESSAGE = "HANDOFF";
 static constexpr absl::string_view SSL_ERROR_HANDBACK_MESSAGE = "HANDBACK";
 static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
+
+Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path,
+                                                     TimeSource& time_source);
 
 /**
  * Retrieves the serial number of a certificate.

@@ -47,6 +47,12 @@ IGNORES_CVES = set([
     'CVE-2020-8169',
     'CVE-2020-8177',
     'CVE-2020-8284',
+    # Node.js issue unrelated to http-parse (Node TLS).
+    'CVE-2020-8265',
+    # Node.js request smuggling.
+    # https://github.com/envoyproxy/envoy/pull/14686 validates that this does
+    # not apply to Envoy.
+    'CVE-2020-8287',
 ])
 
 # Subset of CVE fields that are useful below.
