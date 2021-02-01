@@ -55,7 +55,7 @@ extensions/filters/common/original_src @snowp @klarose
 # tracers.xray extension
 /*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
 # tracers.skywalking extension
-/*/extensions/tracers/skywalking @wbpcode @dio @lizan
+/*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
 # postgres_proxy extension

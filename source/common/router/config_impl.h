@@ -220,7 +220,6 @@ private:
   struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
                         Stats::Scope& scope, const VirtualClusterStatNames& stat_names);
-
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 

@@ -25,31 +25,6 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "skywalking_client_config_test",
-    srcs = ["skywalking_client_config_test.cc"],
-    extension_name = "envoy.tracers.skywalking",
-    deps = [
-        "//source/extensions/tracers/skywalking:skywalking_client_config_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/server:tracer_factory_context_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "skywalking_types_test",
-    srcs = ["skywalking_types_test.cc"],
-    extension_name = "envoy.tracers.skywalking",
-    deps = [
-        ":skywalking_test_helper",
-        "//source/extensions/tracers/skywalking:skywalking_types_lib",
-        "//test/mocks:common_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "trace_segment_reporter_test",
     srcs = ["trace_segment_reporter_test.cc"],
     extension_name = "envoy.tracers.skywalking",
@@ -70,10 +45,12 @@ envoy_extension_cc_test(
     name = "skywalking_test_helper",
     srcs = ["skywalking_test_helper.h"],
     extension_name = "envoy.tracers.skywalking",
+    external_deps = [
+        "cpp2sky",
+    ],
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
-        "//source/extensions/tracers/skywalking:skywalking_types_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -1,81 +1,80 @@
 #include "extensions/tracers/skywalking/tracer.h"
 
-#include <chrono>
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-constexpr absl::string_view StatusCodeTag = "status_code";
-constexpr absl::string_view UrlTag = "url";
-
 namespace {
-
-uint64_t getTimestamp(SystemTime time) {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count();
-}
-
+static constexpr absl::string_view StatusCodeTag = "status_code";
+static constexpr absl::string_view UrlTag = "url";
 } // namespace
 
-Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, SystemTime start_time,
-                                   const std::string& operation,
-                                   SegmentContextSharedPtr segment_context, Span* parent) {
-  SpanStore* span_store = segment_context->createSpanStore(parent ? parent->spanStore() : nullptr);
-
-  span_store->setStartTime(getTimestamp(start_time));
-
-  span_store->setOperation(operation);
-
-  return std::make_unique<Span>(std::move(segment_context), span_store, *this);
-}
-
-void Span::setOperation(absl::string_view operation) {
-  span_store_->setOperation(std::string(operation));
+const Http::LowerCaseString& skywalkingPropagationHeaderKey() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "sw8");
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
   if (name == Tracing::Tags::get().HttpUrl) {
-    span_store_->addTag(UrlTag, value);
-    return;
+    span_entity_->addTag(UrlTag.data(), value.data());
+  } else if (name == Tracing::Tags::get().HttpStatusCode) {
+    span_entity_->addTag(StatusCodeTag.data(), value.data());
+  } else if (name == Tracing::Tags::get().Error) {
+    span_entity_->setErrorStatus();
+    span_entity_->addTag(name.data(), value.data());
+  } else {
+    span_entity_->addTag(name.data(), value.data());
   }
-
-  if (name == Tracing::Tags::get().HttpStatusCode) {
-    span_store_->addTag(StatusCodeTag, value);
-    return;
-  }
-
-  if (name == Tracing::Tags::get().Error) {
-    span_store_->setAsError(value == Tracing::Tags::get().True);
-  }
-
-  span_store_->addTag(name, value);
 }
 
-// Logs in the SkyWalking format are temporarily unsupported.
-void Span::log(SystemTime, const std::string&) {}
+void Span::setSampled(bool do_sample) {
+  // Sampling status is always true on SkyWalking. But with disabling skip_analysis,
+  // this span can't be analyzed.
+  if (!do_sample) {
+    span_entity_->setSkipAnalysis();
+  }
+}
+
+void Span::log(SystemTime, const std::string& event) { span_entity_->addLog(EMPTY_STRING, event); }
 
 void Span::finishSpan() {
-  span_store_->setEndTime(DateUtil::nowToMilliseconds(tracer_.time_source_));
-  tryToReportSpan();
+  span_entity_->endSpan();
+  parent_tracer_.sendSegment(segment_context_);
 }
 
 void Span::injectContext(Http::RequestHeaderMap& request_headers) {
-  span_store_->injectContext(request_headers);
+  request_headers.setReferenceKey(
+      skywalkingPropagationHeaderKey(),
+      segment_context_->createSW8HeaderValue(std::string(request_headers.getHostValue())));
 }
 
-Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,
-                                  SystemTime start_time) {
-  // The new child span will share the same context with the parent span.
-  return tracer_.startSpan(config, start_time, operation_name, segment_context_, this);
+Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name, SystemTime) {
+  auto child_span = segment_context_->createCurrentSegmentSpan(span_entity_);
+  child_span->startSpan(name);
+  return std::make_unique<Span>(child_span, segment_context_, parent_tracer_);
 }
 
-void Span::setSampled(bool sampled) { span_store_->setSampled(sampled ? 1 : 0); }
+Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}
 
-std::string Span::getBaggage(absl::string_view) { return EMPTY_STRING; }
+void Tracer::sendSegment(SegmentContextPtr segment_context) {
+  ASSERT(reporter_);
+  if (segment_context->readyToSend()) {
+    reporter_->report(std::move(segment_context));
+  }
+}
 
-void Span::setBaggage(absl::string_view, absl::string_view) {}
-
+Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, SystemTime, const std::string& operation,
+                                   SegmentContextPtr segment_context,
+                                   CurrentSegmentSpanPtr parent) {
+  Tracing::SpanPtr span;
+  auto span_entity = parent != nullptr ? segment_context->createCurrentSegmentSpan(parent)
+                                       : segment_context->createCurrentSegmentRootSpan();
+  span_entity->startSpan(operation);
+  span = std::make_unique<Span>(span_entity, segment_context, *this);
+  return span;
+}
 } // namespace SkyWalking
 } // namespace Tracers
 } // namespace Extensions
