@@ -699,10 +699,8 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     external_http_archive(
         name = "com_googlesource_googleurl",
-    )
-    native.bind(
-        name = "googleurl",
-        actual = "@com_googlesource_googleurl//url:url",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
 
 def _org_llvm_releases_compiler_rt():

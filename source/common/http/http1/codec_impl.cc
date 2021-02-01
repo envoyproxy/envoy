@@ -407,16 +407,17 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
 int ConnectionImpl::setAndCheckCallbackStatus(Status&& status) {
   ASSERT(codec_status_.ok());
   codec_status_ = std::move(status);
-  return codec_status_.ok() ? enumToInt(HttpParserCode::Success) : enumToInt(HttpParserCode::Error);
+  return codec_status_.ok() ? enumToSignedInt(HttpParserCode::Success)
+                            : enumToSignedInt(HttpParserCode::Error);
 }
 
-int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<int>&& statusor) {
+int ConnectionImpl::setAndCheckCallbackStatusOr(Envoy::StatusOr<HttpParserCode>&& statusor) {
   ASSERT(codec_status_.ok());
   if (statusor.ok()) {
-    return statusor.value();
+    return enumToSignedInt(statusor.value());
   } else {
     codec_status_ = std::move(statusor.status());
-    return enumToInt(HttpParserCode::Error);
+    return enumToSignedInt(HttpParserCode::Error);
   }
 }
 
@@ -449,7 +450,7 @@ http_parser_settings ConnectionImpl::settings_{
     },
     [](http_parser* parser, const char* at, size_t length) -> int {
       static_cast<ConnectionImpl*>(parser->data)->bufferBody(at, length);
-      return 0;
+      return enumToSignedInt(HttpParserCode::Success);
     },
     [](http_parser* parser) -> int {
       auto* conn_impl = static_cast<ConnectionImpl*>(parser->data);
@@ -693,7 +694,7 @@ Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   return checkMaxHeadersSize();
 }
 
-Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
+Envoy::StatusOr<ConnectionImpl::HttpParserCode> ConnectionImpl::onHeadersCompleteBase() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
@@ -788,8 +789,9 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
 
   header_parsing_state_ = HeaderParsingState::Done;
 
-  // Returning 2 informs http_parser to not expect a body or further data on this connection.
-  return handling_upgrade_ ? 2 : statusor.value();
+  // Returning HttpParserCode::NoBodyData informs http_parser to not expect a body or further data
+  // on this connection.
+  return handling_upgrade_ ? HttpParserCode::NoBodyData : statusor.value();
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
@@ -942,7 +944,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int 
   return okStatus();
 }
 
-Envoy::StatusOr<int> ServerConnectionImpl::onHeadersComplete() {
+Envoy::StatusOr<ConnectionImpl::HttpParserCode> ServerConnectionImpl::onHeadersComplete() {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
@@ -1003,7 +1005,7 @@ Envoy::StatusOr<int> ServerConnectionImpl::onHeadersComplete() {
     }
   }
 
-  return 0;
+  return HttpParserCode::Success;
 }
 
 Status ServerConnectionImpl::onMessageBegin() {
@@ -1075,24 +1077,6 @@ void ServerConnectionImpl::onMessageComplete() {
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   active_request_.value().response_encoder_.runResetCallbacks(reason);
   active_request_.reset();
-}
-
-void ServerConnectionImpl::sendProtocolErrorOld(absl::string_view details) {
-  if (active_request_.has_value()) {
-    active_request_.value().response_encoder_.setDetails(details);
-  }
-  // We do this here because we may get a protocol error before we have a logical stream. Higher
-  // layers can only operate on streams, so there is no coherent way to allow them to send an error
-  // "out of band." On one hand this is kind of a hack but on the other hand it normalizes HTTP/1.1
-  // to look more like HTTP/2 to higher layers.
-  if (!active_request_.has_value() ||
-      !active_request_.value().response_encoder_.startedResponse()) {
-    Buffer::OwnedImpl bad_request_response(
-        absl::StrCat("HTTP/1.1 ", error_code_, " ", CodeUtility::toString(error_code_),
-                     "\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"));
-
-    connection_.write(bad_request_response, false);
-  }
 }
 
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
@@ -1190,7 +1174,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   return pending_response_.value().encoder_;
 }
 
-Envoy::StatusOr<int> ClientConnectionImpl::onHeadersComplete() {
+Envoy::StatusOr<ConnectionImpl::HttpParserCode> ClientConnectionImpl::onHeadersComplete() {
   ENVOY_CONN_LOG(trace, "status_code {}", connection_, parser_.status_code);
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
@@ -1251,9 +1235,9 @@ Envoy::StatusOr<int> ClientConnectionImpl::onHeadersComplete() {
     }
   }
 
-  // Here we deal with cases where the response cannot have a body by returning 1, but http_parser
-  // does not deal with it for us.
-  return cannotHaveBody() ? 1 : 0;
+  // Here we deal with cases where the response cannot have a body by returning
+  // HttpParserCode::NoBody, but http_parser does not deal with it for us.
+  return cannotHaveBody() ? HttpParserCode::NoBody : HttpParserCode::Success;
 }
 
 bool ClientConnectionImpl::upgradeAllowed() const {
