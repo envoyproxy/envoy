@@ -14,6 +14,21 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* healthcheck: the :ref:`health check filter <config_http_filters_health_check>` now sends the
+  :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
+  for all responses when Envoy is in the health check failed state. Additionally, receiving the
+  :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>`
+  header (either in response to normal traffic or in response to an HTTP :ref:`active health check <arch_overview_health_checking>`) will
+  cause Envoy to immediately :ref:`exclude <arch_overview_load_balancing_excluded>` the host from
+  load balancing calculations. This has the useful property that such hosts, which are being
+  explicitly told to disable traffic, will not be counted for panic routing calculations. See the
+  excluded documentation for more information. This behavior can be temporarily reverted by setting
+  the `envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster` feature flag
+  to false. Note that the runtime flag covers *both* the health check filter responding with
+  `x-envoy-immediate-health-check-fail` in all cases (versus just non-HC requests) as well as
+  whether receiving `x-envoy-immediate-health-check-fail` will cause exclusion or not. Thus,
+  depending on the Envoy deployment, the feature flag may need to be flipped on both downstream
+  and upstream instances, depending on the reason.
 * http: allow to use path canonicalizer from `googleurl <https://quiche.googlesource.com/googleurl>`_
   instead of `//source/common/chromium_url`. The new path canonicalizer is enabled by default. To
   revert to the legacy path canonicalizer, enable the runtime flag
