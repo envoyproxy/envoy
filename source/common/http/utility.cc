@@ -162,13 +162,6 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
-  initializeAndValidateOptions(options, options_clone);
-  return options_clone;
-}
-
-void initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
-                                  envoy::config::core::v3::Http2ProtocolOptions& options_clone) {
-
   // This will throw an exception when a custom parameter and a named parameter collide.
   validateCustomSettingsParameters(options);
 
@@ -224,21 +217,13 @@ void initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOp
     options_clone.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(
         OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
   }
+
+  return options_clone;
 }
 
 } // namespace Utility
 } // namespace Http2
 
-namespace Http3 {
-namespace Utility {
-
-void initializeAndValidateOptions(envoy::config::core::v3::Http3ProtocolOptions& options) {
-  Http2::Utility::initializeAndValidateOptions(options.http2_protocol_options(),
-                                               *options.mutable_http2_protocol_options());
-}
-
-} // namespace Utility
-} // namespace Http3
 namespace Http {
 
 static const char kDefaultPath[] = "/";

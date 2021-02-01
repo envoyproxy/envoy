@@ -91,7 +91,6 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
               : absl::nullopt) {
   if (http3_options_.has_value()) {
     use_http3_ = true;
-    Http3::Utility::initializeAndValidateOptions(http3_options_.value());
   }
   if (options.has_explicit_http_config() &&
       options.explicit_http_config().has_http2_protocol_options()) {

@@ -22,7 +22,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -419,16 +418,6 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                     .override_stream_error_on_invalid_http_message()
                     .value());
   }
-}
-
-TEST(HttpUtility, ValidateForHttp2AppliesToHttp3) {
-  envoy::config::core::v3::Http2ProtocolOptions http2_options;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options;
-  Envoy::Http3::Utility::initializeAndValidateOptions(http3_options);
-  EXPECT_THAT(http3_options.http2_protocol_options(), Not(ProtoEq(http2_options)));
-
-  Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, http2_options);
-  EXPECT_THAT(http3_options.http2_protocol_options(), ProtoEq(http2_options));
 }
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {

@@ -115,24 +115,12 @@ struct OptionsLimits {
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options);
 
-void initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& from_options,
-                                  envoy::config::core::v3::Http2ProtocolOptions& to_options);
-
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
-
-namespace Http3 {
-namespace Utility {
-
-/* Does in-place initialization and validation of http3 options. */
-void initializeAndValidateOptions(envoy::config::core::v3::Http3ProtocolOptions& options);
-
-} // namespace Utility
-} // namespace Http3
 
 namespace Http {
 namespace Utility {
