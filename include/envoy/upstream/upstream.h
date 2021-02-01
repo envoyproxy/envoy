@@ -59,7 +59,13 @@ public:
   /* active HC. */                                                               \
   m(PENDING_DYNAMIC_REMOVAL, 0x20)                                               \
   /* The host is pending its initial active health check. */                     \
-  m(PENDING_ACTIVE_HC, 0x40)
+  m(PENDING_ACTIVE_HC, 0x40)                                                     \
+  /* The host should be excluded from panic, spillover, etc. calculations */     \
+  /* because it was explicitly taken out of rotation via protocol signal and */  \
+  /* is not meant to be routed to. */                                            \
+  m(EXCLUDED_VIA_IMMEDIATE_HC_FAIL, 0x80)                                        \
+  /* The host failed active HC due to timeout. */                                \
+  m(ACTIVE_HC_TIMEOUT, 0x100)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -67,15 +73,6 @@ public:
   enum class HealthFlag { HEALTH_FLAG_ENUM_VALUES(DECLARE_ENUM) };
 
 #undef DECLARE_ENUM
-
-  enum class ActiveHealthFailureType {
-    // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
-    UNKNOWN,
-    // The host is actively responding it's unhealthy
-    UNHEALTHY,
-    // The host is timing out
-    TIMEOUT,
-  };
 
   /**
    * @return host specific counters.
@@ -155,17 +152,6 @@ public:
    * @return the health of the host.
    */
   virtual Health health() const PURE;
-
-  /**
-   * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
-   */
-  virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
-
-  /**
-   * Set the most recent health failure type for a host. Types are specified in
-   * ActiveHealthFailureType.
-   */
-  virtual void setActiveHealthFailureType(ActiveHealthFailureType flag) PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however

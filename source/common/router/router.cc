@@ -12,6 +12,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
@@ -1197,7 +1198,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
-    upstream_request.upstreamHost()->healthChecker().setUnhealthy();
+    upstream_request.upstreamHost()->healthChecker().setUnhealthy(
+        Upstream::HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
   }
 
   bool could_not_retry = false;

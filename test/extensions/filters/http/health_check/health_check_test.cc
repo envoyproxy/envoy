@@ -12,6 +12,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -229,7 +230,38 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
-  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
+  Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+      .Times(1)
+      .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+        filter_->encodeHeaders(headers, end_stream);
+        EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
+        EXPECT_NE(nullptr, headers.EnvoyImmediateHealthCheckFail());
+      }));
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+}
+
+// Verifies that header is not sent on HC requests when
+// "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster" is disabled.
+TEST_F(HealthCheckFilterNoPassThroughTest,
+       HealthCheckFailedCallbackCalledImmediateFailureExcludeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster", "false"}});
+
+  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(true));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
@@ -253,7 +285,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Ok) {
-  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -265,7 +297,7 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
-  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+  EXPECT_CALL(context_, healthCheckFailed()).Times(2).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);

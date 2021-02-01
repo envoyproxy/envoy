@@ -227,7 +227,7 @@ x-envoy-upstream-rq-timeout-alt-response
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Setting this header will cause Envoy to set a 204 response code (instead of 504) in the event of a request timeout.
-The actual value of the header is ignored; only its presence is considered. See also 
+The actual value of the header is ignored; only its presence is considered. See also
 :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`.
 
 .. _config_http_filters_router_x-envoy-upstream-rq-timeout-ms:
@@ -294,11 +294,12 @@ x-envoy-immediate-health-check-fail
 
 If the upstream host returns this header (set to any value), Envoy will immediately assume the
 upstream host has failed :ref:`active health checking <arch_overview_health_checking>` (if the
-cluster has been :ref:`configured <config_cluster_manager_cluster_hc>` for active health checking).
-This can be used to fast fail an upstream host via standard data plane processing without waiting
-for the next health check interval. The host can become healthy again via standard active health
-checks. See the :ref:`health checking overview <arch_overview_health_checking>` for more
-information.
+cluster has been :ref:`configured <config_cluster_manager_cluster_hc>` for active health checking)
+and :ref:`exclude <arch_overview_load_balancing_excluded>` it from load balancing. This can be used
+to fast fail an upstream host via standard data plane processing without waiting for the next health
+check interval. The host can become healthy again via standard active health checks. See the
+:ref:`active health checking fast failure overview <arch_overview_health_checking_fast_failure>` for
+more information.
 
 .. _config_http_filters_router_x-envoy-ratelimited:
 
