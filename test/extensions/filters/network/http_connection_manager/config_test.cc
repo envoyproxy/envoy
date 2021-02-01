@@ -1742,6 +1742,63 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   ASSERT_NE(nullptr, request_id_extension);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection:
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Original IP detection extension not found");
+}
+
+class TestIPDetection : public Http::OriginalIPDetection {
+  Network::Address::InstanceConstSharedPtr
+  detect(struct Http::OriginalIPDetectionParams&) override {
+    return nullptr;
+  }
+};
+
+class TestIPDetectionFactory : public Http::OriginalIPDetectionFactory {
+  Http::OriginalIPDetectionSharedPtr createExtension(const Protobuf::Message&) const override {
+    return std::make_shared<TestIPDetection>();
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "TestFactory"; }
+  std::string category() const override { return "OriginalIpDetection"; }
+};
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
+  TestIPDetectionFactory factory;
+  Registry::InjectFactory<Http::OriginalIPDetectionFactory> ip_detection_register(factory);
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection:
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  auto original_ip_detection =
+      dynamic_cast<Http::OriginalIPDetection*>(config.originalIpDetection().get());
+  ASSERT_NE(nullptr, original_ip_detection);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
