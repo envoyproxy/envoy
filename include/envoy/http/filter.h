@@ -898,7 +898,9 @@ public:
   virtual ~HttpMatchingData() = default;
 
   virtual RequestHeaderMapOptConstRef requestHeaders() const PURE;
+  virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
+  virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
 };
 
 /**

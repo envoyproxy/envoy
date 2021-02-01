@@ -793,6 +793,7 @@ class RequestTrailerMap
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
 using RequestTrailerMapOptRef = OptRef<RequestTrailerMap>;
+using RequestTrailerMapOptConstRef = OptRef<const RequestTrailerMap>;
 
 // Base class for both response headers and trailers.
 class ResponseHeaderOrTrailerMap {

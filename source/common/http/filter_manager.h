@@ -20,6 +20,7 @@
 #include "common/grpc/common.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
+#include "common/http/matching/data_impl.h"
 #include "common/local_reply/local_reply.h"
 #include "common/matcher/matcher.h"
 #include "common/protobuf/utility.h"
@@ -29,131 +30,12 @@ namespace Http {
 
 class FilterManager;
 
-class HttpMatchingDataImpl : public HttpMatchingData {
-public:
-  static absl::string_view name() { return "http"; }
-
-  void onRequestHeaders(const Http::RequestHeaderMap& request_headers) {
-    request_headers_ = &request_headers;
-  }
-
-  void onResponseHeaders(const Http::ResponseHeaderMap& response_headers) {
-    response_headers_ = &response_headers;
-  }
-
-  Http::RequestHeaderMapOptConstRef requestHeaders() const override {
-    return makeOptRefFromPtr(request_headers_);
-  }
-
-  Http::ResponseHeaderMapOptConstRef responseHeaders() const override {
-    return makeOptRefFromPtr(response_headers_);
-  }
-
-private:
-  const Http::RequestHeaderMap* request_headers_{};
-  const Http::ResponseHeaderMap* response_headers_{};
-};
-
-using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
-
-template <class HeaderType>
-class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
-public:
-  explicit HttpHeadersDataInputBase(const std::string& name) : name_(name) {}
-
-  virtual absl::optional<std::reference_wrapper<const HeaderType>>
-  headerMap(const HttpMatchingData& data) const PURE;
-
-  Matcher::DataInputGetResult get(const HttpMatchingData& data) override {
-    const auto maybe_headers = headerMap(data);
-
-    if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
-    }
-
-    auto header = maybe_headers->get().get(name_);
-    if (header.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-    }
-
-    if (header_as_string_result_) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              header_as_string_result_->result()};
-    }
-
-    header_as_string_result_ = HeaderUtility::getAllOfHeaderAsString(header, ",");
-
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            header_as_string_result_->result()};
-  }
-
-private:
-  const LowerCaseString name_;
-  absl::optional<HeaderUtility::GetAllOfHeaderAsStringResult> header_as_string_result_;
-};
-
-class HttpRequestHeadersDataInput : public HttpHeadersDataInputBase<RequestHeaderMap> {
-public:
-  explicit HttpRequestHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
-
-  absl::optional<std::reference_wrapper<const RequestHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
-    return data.requestHeaders();
-  }
-};
-
-template <class DataInputType, class ProtoType>
-class HttpHeadersDataInputFactoryBase : public Matcher::DataInputFactory<HttpMatchingData> {
-public:
-  explicit HttpHeadersDataInputFactoryBase(const std::string& name) : name_(name) {}
-
-  std::string name() const override { return name_; }
-
-  Matcher::DataInputPtr<HttpMatchingData>
-  createDataInput(const Protobuf::Message& config,
-                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& typed_config =
-        MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
-
-    return std::make_unique<DataInputType>(typed_config.header_name());
-  };
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtoType>();
-  }
-
-private:
-  const std::string name_;
-};
-
-class HttpRequestHeadersDataInputFactory
-    : public HttpHeadersDataInputFactoryBase<
-          HttpRequestHeadersDataInput, envoy::type::matcher::v3::HttpRequestHeaderMatchInput> {
-public:
-  HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request-headers") {}
-};
-
-class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
-public:
-  explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
-
-  absl::optional<std::reference_wrapper<const ResponseHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
-    return data.responseHeaders();
-  }
-};
-
-class HttpResponseHeadersDataInputFactory
-    : public HttpHeadersDataInputFactoryBase<
-          HttpResponseHeadersDataInput, envoy::type::matcher::v3::HttpResponseHeaderMatchInput> {
-public:
-  HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response-headers") {}
-};
-
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
 struct ActiveStreamFilterBase;
 
+using MatchDataUpdateFunc = std::function<void(Matching::HttpMatchingDataImpl&)>;
 /**
  * Manages the shared match state between one or two filters.
  * The need for this class comes from the fact that a single instantiated filter can be wrapped by
@@ -164,11 +46,11 @@ struct ActiveStreamFilterBase;
 class FilterMatchState {
 public:
   FilterMatchState(Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
-                   HttpMatchingDataImplSharedPtr matching_data)
+                   Matching::HttpMatchingDataImplSharedPtr matching_data)
       : match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)),
         match_tree_evaluated_(false), skip_filter_(false) {}
 
-  void evaluateMatchTreeWithNewData(std::function<void(HttpMatchingDataImpl&)> update_func);
+  void evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func);
 
   StreamFilterBase* filter_{};
 
@@ -176,7 +58,7 @@ public:
 
 private:
   Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree_;
-  HttpMatchingDataImplSharedPtr matching_data_;
+  Matching::HttpMatchingDataImplSharedPtr matching_data_;
   bool match_tree_evaluated_ : 1;
   bool skip_filter_ : 1;
 };
@@ -280,6 +162,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     return saved_response_metadata_.get();
   }
   bool skipFilter() const { return filter_match_state_ && filter_match_state_->skipFilter(); }
+  void maybeEvaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
+    if (filter_match_state_) {
+      filter_match_state_->evaluateMatchTreeWithNewData(update_func);
+    }
+  }
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
@@ -766,7 +653,7 @@ public:
       addStreamDecoderFilterWorker(
           filter,
           std::make_shared<FilterMatchState>(std::move(match_tree),
-                                             std::make_shared<HttpMatchingDataImpl>()),
+                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
           false);
       return;
     }
@@ -782,7 +669,7 @@ public:
       addStreamEncoderFilterWorker(
           filter,
           std::make_shared<FilterMatchState>(std::move(match_tree),
-                                             std::make_shared<HttpMatchingDataImpl>()),
+                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
           false);
       return;
     }
@@ -801,7 +688,7 @@ public:
     // the result to both filters after the first match evaluation.
     if (match_tree) {
       auto matching_state = std::make_shared<FilterMatchState>(
-          std::move(match_tree), std::make_shared<HttpMatchingDataImpl>());
+          std::move(match_tree), std::make_shared<Matching::HttpMatchingDataImpl>());
       addStreamDecoderFilterWorker(filter, matching_state, true);
       addStreamEncoderFilterWorker(filter, std::move(matching_state), true);
       return;

@@ -181,6 +181,8 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:scope_tracker",
         "//source/common/grpc:common_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/http/matching:inputs_lib",
         "//source/common/local_reply:local_reply_lib",
         "//source/common/matcher:matcher_lib",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
