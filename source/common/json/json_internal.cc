@@ -198,15 +198,25 @@ public:
   bool binary(binary_t&) override { return false; }
   bool parse_error(std::size_t, const std::string& token,
                    const nlohmann::detail::exception& ex) override {
-    // Errors are formatted like "[json.exception.parse_error.101] parse error at line x, column y:
-    // error string."
+    // Errors are formatted like "[json.exception.parse_error.101] parse error: explanatory string."
+    // or "[json.exception.parse_error.101] parser error at (position): explanatory string.".
+    // https://json.nlohmann.me/home/exceptions/#parse-errors
     absl::string_view error = ex.what();
-    // Extract position information (line, column, token) in the error.
-    auto start = error.find("line");
-    auto npos = error.find(":");
-    error_position_ = absl::StrCat(error.substr(start, npos - start), ", token ", token);
-    // Extract portion after ":" to get error string.
-    error_ = error.substr(npos + 2);
+    // Colon will always exist in the parse error.
+    auto end = error.find(": ");
+    if (end == std::string::npos) {
+      ENVOY_BUG(false, "Error string not present. Check nlohmann/json "
+                       "documentation in case error string changed.");
+    } else {
+      // Extract portion after ": " to get error string.
+      error_ = error.substr(end + 2);
+      // Extract position information if present.
+      auto start = error.find("at ");
+      if (start != std::string::npos && (start + 3) < end) {
+        start += 3;
+        error_position_ = absl::StrCat(error.substr(start, end - start), ", token ", token);
+      }
+    }
     return false;
   }
 
@@ -370,9 +380,8 @@ bool Field::getBoolean(const std::string& name, bool default_value) const {
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getBoolean(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 double Field::getDouble(const std::string& name) const {
@@ -390,9 +399,8 @@ double Field::getDouble(const std::string& name, double default_value) const {
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getDouble(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 int64_t Field::getInteger(const std::string& name) const {
@@ -410,9 +418,8 @@ int64_t Field::getInteger(const std::string& name, int64_t default_value) const 
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getInteger(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) const {
@@ -464,9 +471,8 @@ std::string Field::getString(const std::string& name, const std::string& default
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getString(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 std::vector<std::string> Field::getStringArray(const std::string& name, bool allow_empty) const {

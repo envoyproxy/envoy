@@ -71,7 +71,7 @@ TEST_F(JsonLoaderTest, Basic) {
   }
 
   {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_rapidjson")) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
       EXPECT_THROW_WITH_MESSAGE(Factory::loadFromString("{\"hello\": \n\n\"world\""), Exception,
                                 "JSON supplied is not valid. Error(line 3, column 8, token "
                                 "\"world\"): syntax error while "
@@ -293,7 +293,7 @@ TEST_F(JsonLoaderTest, Schema) {
     )EOF";
 
   ObjectSharedPtr json = Factory::loadFromString(json_string);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_rapidjson")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
     EXPECT_THROW_WITH_MESSAGE(json->validateSchema(invalid_schema), Exception, "not implemented");
   } else {
     EXPECT_THROW_WITH_MESSAGE(
@@ -313,7 +313,7 @@ TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
     }
   ]
   )EOF";
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_rapidjson")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
     EXPECT_THROW_WITH_MESSAGE(
         Factory::loadFromString(json_string), Exception,
         "JSON supplied is not valid. Error(line 2, column 15, token \"listeners\" :): syntax error "

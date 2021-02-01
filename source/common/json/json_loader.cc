@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Json {
 
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_rapidjson")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
     return Nlohmann::Factory::loadFromString(json);
   }
   return RapidJson::Factory::loadFromString(json);

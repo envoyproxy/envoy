@@ -337,9 +337,8 @@ bool Field::getBoolean(const std::string& name, bool default_value) const {
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getBoolean(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 double Field::getDouble(const std::string& name) const {
@@ -357,9 +356,8 @@ double Field::getDouble(const std::string& name, double default_value) const {
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getDouble(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 int64_t Field::getInteger(const std::string& name) const {
@@ -377,9 +375,8 @@ int64_t Field::getInteger(const std::string& name, int64_t default_value) const 
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getInteger(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) const {
@@ -431,9 +428,8 @@ std::string Field::getString(const std::string& name, const std::string& default
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getString(name);
-  } else {
-    return default_value;
   }
+  return default_value;
 }
 
 std::vector<std::string> Field::getStringArray(const std::string& name, bool allow_empty) const {
