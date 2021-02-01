@@ -37,7 +37,8 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
           config.has_custom_validator_config()
               ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
                     config.custom_validator_config())
-              : absl::nullopt), api_(api) {
+              : absl::nullopt),
+      api_(api) {
   if (ca_cert_.empty()) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",

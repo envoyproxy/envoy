@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -33,6 +34,9 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
+        ":util",
+        #        "//source/common/protobuf:utility_lib",
+        "//test/test_common:utility_lib",
         "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/test_common:environment_lib",
@@ -45,10 +49,17 @@ envoy_cc_test(
     srcs = [
         "factory_test.cc",
     ],
-    data = [],
+    deps = [
+        ":util",
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "util",
+    hdrs = ["util.h"],
     deps = [
         "//include/envoy/ssl:context_config_interface",
-        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
-        "//test/mocks/api:api_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

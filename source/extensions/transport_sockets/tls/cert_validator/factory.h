@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ssl/context_config.h"
+
 #include "common/common/utility.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
@@ -21,7 +22,7 @@ public:
   virtual ~CertValidatorFactory() = default;
 
   virtual CertValidatorPtr
-  createCertValidator( Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+  createCertValidator(Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       TimeSource& time_source) PURE;
 
   virtual absl::string_view name() PURE;

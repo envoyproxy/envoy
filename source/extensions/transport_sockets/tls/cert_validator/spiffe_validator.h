@@ -32,6 +32,7 @@ using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
 class SPIFFEValidator : public CertValidator {
 public:
+  SPIFFEValidator() = default;
   SPIFFEValidator(Envoy::Ssl::CertificateValidationContextConfig* config);
   ~SPIFFEValidator() override = default;
 
@@ -52,8 +53,12 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
   // utility functions
+  X509_STORE* getTrustBundleStore(X509* leaf_cert);
   static std::string extractTrustDomain(const std::string& san);
   static int certificatePrecheck(X509* leaf_cert);
+  absl::flat_hash_map<std::string, X509StorePtr>& trustBundleStores() {
+    return trust_bundle_stores_;
+  };
 
 private:
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;

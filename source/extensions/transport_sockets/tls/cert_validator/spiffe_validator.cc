@@ -6,25 +6,25 @@
 #include <string>
 #include <vector>
 
-#include "envoy/registry/registry.h"
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/registry/registry.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
-#include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/common/regex.h"
-#include "common/config/utility.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/protobuf/message_validator_impl.h"
 #include "common/config/datasource.h"
+#include "common/config/utility.h"
+#include "common/protobuf/message_validator_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
+#include "extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
-#include "extensions/transport_sockets/tls/cert_validator/factory.h"
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -90,11 +90,16 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtend
     return 0;
   }
 
-  bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
-      X509_get_ext_d2i(&leaf_cert, NID_subject_alt_name, nullptr, nullptr)));
+  auto trust_bundle = getTrustBundleStore(&leaf_cert);
+  store_ctx->ctx = trust_bundle;
+  return X509_verify_cert(store_ctx);
+}
 
+X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
+  bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
+      X509_get_ext_d2i(leaf_cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
-    return 0;
+    return nullptr;
   }
 
   std::string trust_domain;
@@ -106,17 +111,15 @@ int SPIFFEValidator::doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtend
   }
 
   if (trust_domain.empty()) {
-    return 0;
+    return nullptr;
   }
 
   auto target_store = trust_bundle_stores_.find(trust_domain);
   if (target_store == trust_bundle_stores_.end()) {
-    // unregisterd trust domain
-    return 0;
+    return nullptr;
   }
 
-  store_ctx->ctx = target_store->second.get();
-  return X509_verify_cert(store_ctx);
+  return target_store->second.get();
 }
 
 int SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {

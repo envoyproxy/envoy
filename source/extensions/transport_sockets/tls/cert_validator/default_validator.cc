@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/registry/registry.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/registry/registry.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
