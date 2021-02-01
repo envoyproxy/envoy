@@ -44,6 +44,7 @@ message ConfigDump {
   repeated google.protobuf.Any configs = 1;
 }
 
+// [#next-free-field: 6]
 message UpdateFailureState {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.UpdateFailureState";
@@ -61,6 +62,13 @@ message UpdateFailureState {
   // This is the version of the rejected resource.
   // [#not-implemented-hide:]
   string version_info = 4;
+
+  // This resource is not included in the update or being explicitly removed by
+  // an update, either case means that this resource is no longer existed at the
+  // xDS server. For more information, please refer to the "Knowing When a
+  // Requested Resource Does Not Exist" of xDS protocol document.
+  // [#not-implemented-hide:]
+  bool does_not_exist_at_server = 5;
 }
 
 // This message describes the bootstrap configuration that Envoy was started with. This includes
