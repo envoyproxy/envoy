@@ -109,4 +109,9 @@ callbacks will be sent to the associated filter as normal. Once sufficient data 
 A consequence of this is that if the filter wishes to gate some behavior on a match result, it has to manage stopping the iteration on its own.
 
 When it comes to actions such as SkipFilter, this means that if the skip condition is based on anything but the request headers, the filter might
-get partially applied until the match result is ready. This might result in surprising beahvior.
+get partially applied until the match result is ready. This might result in surprising beahvior. An example of this would be to have a matching
+tree that attempts to skip the gRPC-Web filter based on response headers: since the gRPC-Web filter will transform incoming requests into gRPC proper,
+clients will generally assume that the gRPC -> gRPC-Web transformation will happen on the encoding side. By causing the filter to once the response
+headers are parsed, the result will be that the response is passed through without being converted back to gRPC-Web, likely causing client errors
+as it receives an unexpected response format. If instead the skip action was resolved on trailers, the same gRPC-Web filter would consume all the
+data but never write them back out (as this happens when it receives the trailers), resulting in an gRPC-Web response with an empty body.
