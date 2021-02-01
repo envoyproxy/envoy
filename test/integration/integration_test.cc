@@ -1025,7 +1025,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
 }
 
 TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
-  // Sent an HTTPS request over non-TLS. It will be allowed for non-frontline Envoys
+  // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
   // and match the configured redirect.
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);

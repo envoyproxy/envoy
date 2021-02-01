@@ -659,14 +659,14 @@ TEST(ValidTest, ValidAtHcm) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http_match_on_all_headers", "true"}});
 
-  // Http scheme passes validity chekcs.
+  // Http scheme passes validity checks.
   EXPECT_FALSE(HeaderUtility::requestHeadersValidAtHcm(*http_scheme, 0, false).has_value());
-  // Http scheme is fine behind a frontline
+  // Http scheme is fine behind a front-line
   EXPECT_FALSE(HeaderUtility::requestHeadersValidAtHcm(*https_scheme, 1, false).has_value());
   // Http scheme is fine for TLS connections.
   EXPECT_FALSE(HeaderUtility::requestHeadersValidAtHcm(*https_scheme, 0, true).has_value());
 
-  // Https scheme is not fine for frontline plaintext connections.
+  // Https scheme is not fine for front-line plaintext connections.
   auto https_over_http_valid = HeaderUtility::requestHeadersValidAtHcm(*https_scheme, 0, false);
   ASSERT_TRUE(https_over_http_valid.has_value());
   EXPECT_EQ(https_over_http_valid.value().first.get(), "http.https_not_encrypted");
