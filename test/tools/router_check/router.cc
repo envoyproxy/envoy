@@ -203,7 +203,7 @@ RouterCheckTool::RouterCheckTool(
 Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
   std::string contents = api.fileSystem().fileReadToEnd(file_path);
   if (absl::EndsWith(file_path, ".yaml")) {
-    contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
+    contents = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::loadFromYaml(contents));
   }
   return Json::Factory::loadFromString(contents);
 }
