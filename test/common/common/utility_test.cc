@@ -29,6 +29,26 @@ using testing::Not;
 
 namespace Envoy {
 
+TEST(IntUtil, roundUpToMultiple) {
+  // Round up to non-power-of-2
+  EXPECT_EQ(3, IntUtil::roundUpToMultiple(1, 3));
+  EXPECT_EQ(3, IntUtil::roundUpToMultiple(3, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(4, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(5, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(6, 3));
+  EXPECT_EQ(21, IntUtil::roundUpToMultiple(20, 3));
+  EXPECT_EQ(21, IntUtil::roundUpToMultiple(21, 3));
+
+  // Round up to power-of-2
+  EXPECT_EQ(0, IntUtil::roundUpToMultiple(0, 4));
+  EXPECT_EQ(4, IntUtil::roundUpToMultiple(3, 4));
+  EXPECT_EQ(4, IntUtil::roundUpToMultiple(4, 4));
+  EXPECT_EQ(8, IntUtil::roundUpToMultiple(5, 4));
+  EXPECT_EQ(8, IntUtil::roundUpToMultiple(8, 4));
+  EXPECT_EQ(24, IntUtil::roundUpToMultiple(21, 4));
+  EXPECT_EQ(24, IntUtil::roundUpToMultiple(24, 4));
+}
+
 TEST(StringUtil, strtoull) {
   uint64_t out;
   const char* rest;

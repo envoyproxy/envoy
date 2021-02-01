@@ -180,6 +180,24 @@ public:
 };
 
 /**
+ * Utility routines for working with integers.
+ */
+class IntUtil {
+public:
+  /**
+   * Round `val` up to the next multiple. Examples:
+   *   roundUpToMultiple(3, 8) -> 8
+   *   roundUpToMultiple(9, 8) -> 16
+   *   roundUpToMultiple(8, 8) -> 8
+   */
+  static uint64_t roundUpToMultiple(uint64_t val, uint32_t multiple) {
+    ASSERT(multiple > 0);
+    ASSERT((val + multiple) >= val, "Unsigned overflow");
+    return ((val + multiple - 1) / multiple) * multiple;
+  }
+};
+
+/**
  * Utility routines for working with strings.
  */
 class StringUtil {
@@ -629,8 +647,8 @@ template <class Value> struct TrieLookupTable {
   }
 
   /**
-   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix, key
-   * length))
+   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix,
+   * key length)).
    * @param key the key used to find.
    * @return the value matching the longest prefix based on the key.
    */
